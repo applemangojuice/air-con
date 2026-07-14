@@ -1,0 +1,47 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+
+  /* Brand palette: deep ink + airy sky. */
+  --color-ink-950: #071322;
+  --color-ink-900: #0a1c2e;
+  --color-ink-700: #24405a;
+  --color-ink-500: #47637d;
+  --color-ink-300: #93aabf;
+
+  --color-air-700: #045e8c;
+  --color-air-600: #0578b4;
+  --color-air-500: #0b96d8;
+  --color-air-400: #38b6ee;
+  --color-air-100: #d7effb;
+  --color-air-50: #eef8fe;
+
+  --color-mist: #f5f9fc;
+  --color-line: #dfe9f1;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply bg-white text-ink-900 antialiased;
+  font-feature-settings: "ss01", "cv02";
+}
+
+/* Soft-gradient panel used across hero + cards. */
+.air-gradient {
+  background:
+    radial-gradient(1200px 500px at 80% -10%, rgba(56, 182, 238, 0.18), transparent 60%),
+    radial-gradient(900px 420px at 10% 0%, rgba(11, 150, 216, 0.12), transparent 55%),
+    linear-gradient(180deg, #f5f9fc 0%, #ffffff 70%);
+}
+
+.ink-gradient {
+  background:
+    radial-gradient(900px 400px at 85% 0%, rgba(11, 150, 216, 0.25), transparent 55%),
+    linear-gradient(160deg, #0a1c2e 0%, #071322 100%);
+}
