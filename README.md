@@ -9,21 +9,36 @@ surfaces and a data model already shaped for it. See
 
 - **Marketing site** (`/`) — postcode capture into the quote funnel.
 - **Fixed-price quote funnel** (`/quote`) — six-step mobile-first self-survey:
-  address → property → rooms (with photos) → outdoor unit → electrics → contact,
-  ending in an instant fixed price with finance options, an Installation
-  Confidence Score, and a full price breakdown. Drafts auto-save to the device.
+  address (live postcode validation) → property → rooms (with photos) →
+  outdoor unit → electrics → contact, ending in an instant fixed price with
+  finance options, an Installation Confidence Score, and a full price
+  breakdown. Drafts auto-save to the device.
+- **Saved quotes** (`/q/[id]`) — every submitted quote gets a permanent
+  shareable link, with online booking requests (optional email via Resend).
+- **Ops review** (`/ops/quotes`) — incoming surveys with answers, computed
+  loads, photos and status workflow, behind basic auth (`OPS_PASSWORD`).
+- **iOS capture app** (`apps/mobile`) — Expo scaffold of the same survey flow
+  with native camera capture and offline drafts, sharing the domain engine.
+  See [docs/capture-process.md](./docs/capture-process.md) for the capture
+  process design and the AR/RoomPlan roadmap.
 - **Pricing engine** (`packages/domain`) — deterministic, versioned, tested.
 - **Persistence** — quotes + photos into Supabase when configured; graceful
   demo mode when not.
 - **Placeholders** — `/portal` (customer), `/ops` (internal modules), `/how-it-works`.
+- **Design** — the Organic design system (from the owner's Claude Design
+  project) across web and mobile.
 
 ## Run it
 
 ```bash
 pnpm install
-pnpm dev            # http://localhost:3000
+pnpm dev            # web: http://localhost:3000
 pnpm test           # domain engine tests
 pnpm build          # production build (also typechecks)
+
+# iOS capture app (needs Xcode or the Expo Go app)
+cd apps/mobile
+EXPO_PUBLIC_API_URL=http://<your-ip>:3000 pnpm start
 ```
 
 Runs in demo mode with no configuration. To persist quotes, copy

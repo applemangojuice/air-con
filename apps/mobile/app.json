@@ -1,0 +1,28 @@
+{
+  "expo": {
+    "name": "Breeze Survey",
+    "slug": "breeze-survey",
+    "version": "0.1.0",
+    "scheme": "breezesurvey",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "uk.co.mh1.breeze.survey",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Photos of your rooms, outdoor space and fuse board let us guarantee your fixed price.",
+        "NSPhotoLibraryUsageDescription": "Choose existing photos of your home for your survey."
+      }
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Photos of your rooms, outdoor space and fuse board let us guarantee your fixed price."
+        }
+      ]
+    ]
+  }
+}

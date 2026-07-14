@@ -77,6 +77,7 @@ const surveySchema = z.object({
 
 const bodySchema = z.object({
   survey: surveySchema,
+  source: z.enum(["web", "ios"]).optional().default("web"),
   contact: z.object({
     name: z.string().min(2).max(120),
     email: z.string().email().max(200),
@@ -91,7 +92,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid survey" }, { status: 400 });
   }
 
-  const { survey, contact } = parsed.data;
+  const { survey, contact, source } = parsed.data;
   // The server recomputes the quote — the stored price never comes from the client.
   const quote = generateQuote(survey as Survey);
 
@@ -117,6 +118,7 @@ export async function POST(request: Request) {
       room_count: survey.rooms.length,
       confidence_score: quote.confidence.score,
       confidence_band: quote.confidence.band,
+      source,
     })
     .select("id")
     .single();

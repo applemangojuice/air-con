@@ -18,19 +18,32 @@ from the eventual business, built forwards from the quoting funnel.
 ```
 air-con/
 ├── apps/
-│   └── web/                  # Customer-facing app (live)
-│       ├── app/              #   marketing, /quote wizard, /portal, /ops placeholders
-│       ├── components/       #   site chrome + quote wizard components
-│       └── lib/              #   draft persistence, photo registry, Supabase server client
+│   ├── web/                  # Customer-facing app (live)
+│   │   ├── app/              #   marketing, /quote wizard, /q/[id] saved quotes,
+│   │   │                     #   /ops/quotes review, /portal placeholder
+│   │   ├── components/       #   site chrome + quote wizard components
+│   │   └── lib/              #   draft persistence, photo registry, Supabase server client
+│   └── mobile/               # iOS capture app (Expo/React Native, shares the domain pkg)
+│       ├── app/              #   expo-router screens mirroring the web capture flow
+│       ├── components/       #   native UI kit (Organic tokens) + guided photo capture
+│       └── lib/              #   device drafts, submit-to-web-API client
 ├── packages/
 │   └── domain/               # THE CORE ASSET (pure TS, zero runtime deps)
 │       ├── types.ts          #   canonical Survey/Quote types, JSON-serialisable
 │       ├── heatload.ts       #   room load estimation + unit sizing
 │       ├── pricing.ts        #   deterministic fixed-price engine (versioned)
 │       └── confidence.ts     #   Installation Confidence Score
+├── docs/
+│   └── capture-process.md    # design of the survey capture process (web + iOS)
 └── supabase/
     └── migrations/           # SQL migrations (source of truth for the schema)
 ```
+
+Design system: the UI on both apps uses the **Organic** tokens from the
+owner's Claude Design project (cream/sand ground, terracotta + sage accents,
+Caprasimo/Figtree). Web: `apps/web/app/globals.css`; mobile:
+`apps/mobile/lib/theme.ts`. Change the look by re-syncing those two files
+from the design project.
 
 ### Planned growth (create these when the feature ships, not before)
 
