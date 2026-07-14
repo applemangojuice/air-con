@@ -41,16 +41,16 @@ export default function HomePage() {
       <SiteHeader />
       <main>
         {/* Hero */}
-        <section className="air-gradient">
+        <section className="warm-gradient">
           <div className="mx-auto max-w-6xl px-4 pb-20 pt-16 sm:px-6 sm:pt-24">
             <div className="max-w-2xl">
-              <p className="inline-flex items-center gap-2 rounded-full border border-air-100 bg-white px-3 py-1 text-xs font-semibold text-air-700">
-                <span className="h-1.5 w-1.5 rounded-full bg-air-500" />
+              <p className="inline-flex items-center gap-2 rounded-full border border-accent-100 bg-white px-3 py-1 text-xs font-semibold text-accent-700">
+                <span className="h-1.5 w-1.5 rounded-full bg-accent-500" />
                 Now taking bookings — limited launch areas
               </p>
-              <h1 className="mt-5 text-4xl font-bold tracking-tight text-ink-900 sm:text-6xl">
+              <h1 className="mt-5 text-4xl font-display text-ink-900 sm:text-6xl">
                 Air conditioning for your home.{" "}
-                <span className="text-air-600">Priced in minutes.</span>
+                <span className="text-accent-600">Priced in minutes.</span>
               </h1>
               <p className="mt-5 max-w-xl text-lg text-ink-500">
                 Survey your own home from your phone and get a guaranteed fixed
@@ -65,11 +65,11 @@ export default function HomePage() {
                   required
                   placeholder="Your postcode, e.g. SW1A 1AA"
                   autoComplete="postal-code"
-                  className="w-full rounded-xl border border-line bg-white px-4 py-3 text-base shadow-sm outline-none transition focus:border-air-500 focus:ring-2 focus:ring-air-100"
+                  className="w-full rounded-full border border-line bg-white px-5 py-3 text-base shadow-sm outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-100"
                 />
                 <button
                   type="submit"
-                  className="shrink-0 rounded-xl bg-ink-900 px-5 py-3 font-semibold text-white transition hover:bg-ink-700"
+                  className="shrink-0 rounded-full bg-ink-900 px-5 py-3 font-semibold text-white transition hover:bg-ink-700"
                 >
                   Start
                 </button>
@@ -83,13 +83,13 @@ export default function HomePage() {
 
         {/* Steps */}
         <section className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
-          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
+          <h2 className="text-3xl font-display sm:text-4xl">
             From “maybe” to installed, in three steps
           </h2>
           <div className="mt-10 grid gap-6 md:grid-cols-3">
             {steps.map((s) => (
-              <div key={s.n} className="rounded-2xl border border-line bg-mist p-6">
-                <span className="text-sm font-bold text-air-600">{s.n}</span>
+              <div key={s.n} className="rounded-2xl border border-line bg-surface p-6">
+                <span className="text-sm font-bold text-accent-600">{s.n}</span>
                 <h3 className="mt-2 text-lg font-semibold">{s.title}</h3>
                 <p className="mt-2 text-sm leading-relaxed text-ink-500">{s.body}</p>
               </div>
@@ -98,7 +98,7 @@ export default function HomePage() {
           <div className="mt-8">
             <Link
               href="/quote"
-              className="inline-block rounded-xl bg-air-600 px-6 py-3 font-semibold text-white shadow-sm transition hover:bg-air-700"
+              className="inline-block rounded-full bg-accent-600 px-6 py-3 font-semibold text-white shadow-sm transition hover:bg-accent-700"
             >
               Get my fixed price
             </Link>
@@ -106,7 +106,7 @@ export default function HomePage() {
         </section>
 
         {/* Promises */}
-        <section className="border-y border-line bg-mist">
+        <section className="border-y border-line bg-surface">
           <div className="mx-auto grid max-w-6xl gap-6 px-4 py-16 sm:grid-cols-2 sm:px-6 lg:grid-cols-4">
             {promises.map((p) => (
               <div key={p.title}>
@@ -119,7 +119,7 @@ export default function HomePage() {
 
         {/* Platform teaser */}
         <section className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
-          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
+          <h2 className="text-3xl font-display sm:text-4xl">
             One platform, from first quote to year fifteen
           </h2>
           <p className="mt-3 max-w-2xl text-ink-500">
@@ -132,11 +132,11 @@ export default function HomePage() {
               <Link
                 key={p.title}
                 href={p.href}
-                className="group rounded-2xl border border-line p-6 transition hover:border-air-400 hover:shadow-sm"
+                className="group rounded-2xl border border-line p-6 transition hover:border-accent-400 hover:shadow-sm"
               >
                 <div className="flex items-center justify-between">
-                  <h3 className="font-semibold group-hover:text-air-700">{p.title}</h3>
-                  <span className="rounded-full bg-mist px-2.5 py-0.5 text-xs font-medium text-ink-500">
+                  <h3 className="font-semibold group-hover:text-accent-700">{p.title}</h3>
+                  <span className="rounded-full bg-surface px-2.5 py-0.5 text-xs font-medium text-ink-500">
                     {p.status}
                   </span>
                 </div>
@@ -149,7 +149,7 @@ export default function HomePage() {
         {/* Final CTA */}
         <section className="ink-gradient">
           <div className="mx-auto max-w-6xl px-4 py-20 text-center sm:px-6">
-            <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
+            <h2 className="text-3xl font-display text-white sm:text-4xl">
               Ready to see your price?
             </h2>
             <p className="mx-auto mt-3 max-w-md text-white/60">
@@ -158,7 +158,7 @@ export default function HomePage() {
             </p>
             <Link
               href="/quote"
-              className="mt-8 inline-block rounded-xl bg-air-500 px-8 py-3.5 font-semibold text-white shadow-lg transition hover:bg-air-400"
+              className="mt-8 inline-block rounded-full bg-accent-500 px-8 py-3.5 font-semibold text-white shadow-lg transition hover:bg-accent-400"
             >
               Start my survey
             </Link>

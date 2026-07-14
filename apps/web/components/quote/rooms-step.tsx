@@ -65,13 +65,13 @@ export function RoomsStep({ draft, setSurvey, step, totalSteps, onNext, onBack }
                       : "no photos yet"}
                   </span>
                 </span>
-                <span className="text-sm font-medium text-air-600">
+                <span className="text-sm font-medium text-accent-600">
                   {editingId === room.id ? "Done" : "Edit"}
                 </span>
               </button>
 
               {editingId === room.id && (
-                <div className="space-y-5 border-t border-line bg-mist px-4 py-5">
+                <div className="space-y-5 border-t border-line bg-surface px-4 py-5">
                   <Field label="Room name">
                     <input
                       className={inputCls}
@@ -172,7 +172,7 @@ export function RoomsStep({ draft, setSurvey, step, totalSteps, onNext, onBack }
               key={type}
               type="button"
               onClick={() => addRoom(type)}
-              className="rounded-full border border-line bg-white px-4 py-2 text-sm font-medium text-ink-700 transition hover:border-air-400 hover:text-air-700"
+              className="rounded-full border border-line bg-white px-4 py-2 text-sm font-medium text-ink-700 transition hover:border-accent-400 hover:text-accent-700"
             >
               + {ROOM_TYPE_LABEL[type]}
             </button>

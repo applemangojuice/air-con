@@ -20,6 +20,14 @@ const photoSchema = z.object({
 const surveySchema = z.object({
   postcode: z.string().min(5).max(10),
   addressLine: z.string().min(3).max(200),
+  geo: z
+    .object({
+      district: z.string().max(100).optional(),
+      region: z.string().max(100).optional(),
+      latitude: z.number().optional(),
+      longitude: z.number().optional(),
+    })
+    .optional(),
   property: z.object({
     type: z.enum(["detached", "semi-detached", "terraced", "flat", "bungalow"]),
     era: z.enum(["pre-1930", "1930-1979", "1980-1999", "2000+"]),
@@ -118,5 +126,52 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Could not save quote" }, { status: 502 });
   }
 
-  return NextResponse.json({ ok: true, demo: false, id: data.id });
+  const emailed = await sendQuoteEmail(contact.name, contact.email, data.id, quote.totalGbp);
+  return NextResponse.json({ ok: true, demo: false, id: data.id, emailed });
+}
+
+/** Best-effort quote email via Resend. Returns false when not configured or failed. */
+async function sendQuoteEmail(
+  name: string,
+  email: string,
+  quoteId: string,
+  totalGbp: number,
+): Promise<boolean> {
+  const apiKey = process.env.RESEND_API_KEY;
+  const from = process.env.EMAIL_FROM;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+  if (!apiKey || !from || !appUrl) return false;
+
+  const link = `${appUrl.replace(/\/$/, "")}/q/${quoteId}`;
+  const total = new Intl.NumberFormat("en-GB", {
+    style: "currency",
+    currency: "GBP",
+    maximumFractionDigits: 0,
+  }).format(totalGbp);
+
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
+      body: JSON.stringify({
+        from,
+        to: [email],
+        subject: `Your fixed price: ${total} installed`,
+        html: `<p>Hi ${escapeHtml(name)},</p>
+<p>Your fixed installation price is <strong>${total}</strong> (VAT included).</p>
+<p>Your full quote — system design, price breakdown and finance options — is saved here:</p>
+<p><a href="${link}">${link}</a></p>
+<p>You can book your installation from that page whenever you're ready. The link doesn't expire.</p>`,
+      }),
+    });
+    if (!res.ok) console.error("quote email failed:", res.status, await res.text());
+    return res.ok;
+  } catch (err) {
+    console.error("quote email failed:", err);
+    return false;
+  }
+}
+
+function escapeHtml(value: string): string {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }

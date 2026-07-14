@@ -22,8 +22,10 @@ export async function submitQuote(draft: QuoteDraft): Promise<SubmissionState> {
       body: JSON.stringify({ survey, contact: draft.contact }),
     });
     if (!res.ok) return { status: "error" };
-    const data = (await res.json()) as { demo: boolean; id?: string };
-    return data.demo ? { status: "demo" } : { status: "saved", id: data.id ?? "" };
+    const data = (await res.json()) as { demo: boolean; id?: string; emailed?: boolean };
+    return data.demo
+      ? { status: "demo" }
+      : { status: "saved", id: data.id ?? "", emailed: data.emailed ?? false };
   } catch {
     return { status: "error" };
   }

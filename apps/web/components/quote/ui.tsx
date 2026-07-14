@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 
 export const inputCls =
-  "w-full rounded-xl border border-line bg-white px-4 py-3 text-base outline-none transition focus:border-air-500 focus:ring-2 focus:ring-air-100";
+  "w-full rounded-full border border-line bg-white px-5 py-3 text-base outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-100";
 
 export function Field({
   label,
@@ -50,13 +50,13 @@ export function OptionCards<T extends string | number | boolean>({
             type="button"
             aria-pressed={selected}
             onClick={() => onChange(o.value)}
-            className={`rounded-xl border px-3 py-3 text-left transition ${
+            className={`rounded-2xl border px-3 py-3 text-left transition ${
               selected
-                ? "border-air-600 bg-air-50 ring-2 ring-air-100"
+                ? "border-accent-600 bg-accent-50 ring-2 ring-accent-100"
                 : "border-line bg-white hover:border-ink-300"
             }`}
           >
-            <span className={`block text-sm font-semibold ${selected ? "text-air-700" : "text-ink-900"}`}>
+            <span className={`block text-sm font-semibold ${selected ? "text-accent-700" : "text-ink-900"}`}>
               {o.label}
             </span>
             {o.hint && <span className="mt-0.5 block text-xs text-ink-300">{o.hint}</span>}
@@ -102,13 +102,13 @@ export function StepShell({
         </div>
         <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-line">
           <div
-            className="h-full rounded-full bg-air-500 transition-all duration-500"
+            className="h-full rounded-full bg-accent-500 transition-all duration-500"
             style={{ width: `${((step + 1) / totalSteps) * 100}%` }}
           />
         </div>
       </div>
 
-      <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{title}</h1>
+      <h1 className="text-2xl font-display sm:text-3xl">{title}</h1>
       {subtitle && <p className="mt-2 text-ink-500">{subtitle}</p>}
 
       <div className="mt-8 space-y-6">{children}</div>
@@ -119,7 +119,7 @@ export function StepShell({
             <button
               type="button"
               onClick={onBack}
-              className="rounded-xl border border-line px-5 py-3 font-semibold text-ink-700 transition hover:bg-mist"
+              className="rounded-full border border-line px-5 py-3 font-semibold text-ink-700 transition hover:bg-surface"
             >
               Back
             </button>
@@ -129,7 +129,7 @@ export function StepShell({
               type="button"
               onClick={onNext}
               disabled={nextDisabled || busy}
-              className="flex-1 rounded-xl bg-air-600 px-5 py-3 font-semibold text-white shadow-sm transition hover:bg-air-700 disabled:cursor-not-allowed disabled:opacity-40"
+              className="flex-1 rounded-full bg-accent-600 px-5 py-3 font-semibold text-white shadow-sm transition hover:bg-accent-700 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {busy ? "One moment…" : nextLabel}
             </button>

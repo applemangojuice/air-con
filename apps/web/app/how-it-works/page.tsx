@@ -35,9 +35,9 @@ export default function HowItWorksPage() {
     <>
       <SiteHeader />
       <main>
-        <section className="air-gradient">
+        <section className="warm-gradient">
           <div className="mx-auto max-w-3xl px-4 py-16 sm:px-6">
-            <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">How it works</h1>
+            <h1 className="text-4xl font-display sm:text-5xl">How it works</h1>
             <p className="mt-4 text-lg text-ink-500">
               We rebuilt the whole journey — from &ldquo;how much would it
               cost?&rdquo; to a quietly humming system — around one idea: answer
@@ -52,14 +52,14 @@ export default function HowItWorksPage() {
               <p className="mt-2 leading-relaxed text-ink-500">{s.body}</p>
             </div>
           ))}
-          <div className="rounded-3xl border border-air-100 bg-air-50 p-8 text-center">
+          <div className="rounded-3xl border border-accent-100 bg-accent-50 p-8 text-center">
             <h2 className="text-2xl font-bold">See your price</h2>
             <p className="mx-auto mt-2 max-w-md text-ink-500">
               Ten minutes, your phone, and a guaranteed fixed price at the end.
             </p>
             <Link
               href="/quote"
-              className="mt-5 inline-block rounded-xl bg-air-600 px-6 py-3 font-semibold text-white transition hover:bg-air-700"
+              className="mt-5 inline-block rounded-full bg-accent-600 px-6 py-3 font-semibold text-white transition hover:bg-accent-700"
             >
               Start my survey
             </Link>

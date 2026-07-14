@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { Metadata } from "next";
 import { SiteFooter } from "@/components/site/footer";
 import { SiteHeader } from "@/components/site/header";
@@ -63,16 +64,19 @@ export default function OpsPage() {
     <>
       <SiteHeader />
       <main className="mx-auto max-w-5xl px-4 py-16 sm:px-6">
-        <span className="rounded-full bg-mist px-3 py-1 text-xs font-semibold text-ink-500">
+        <span className="rounded-full bg-surface px-3 py-1 text-xs font-semibold text-ink-500">
           Internal · placeholder
         </span>
-        <h1 className="mt-4 text-4xl font-bold tracking-tight">
+        <h1 className="mt-4 text-4xl font-display">
           The operating system for residential air conditioning
         </h1>
         <p className="mt-3 max-w-2xl text-ink-500">
-          Customer quoting is live. These are the modules that follow — each one
-          exists to reduce skilled labour, standardise installations, or learn
-          from every job.
+          Customer quoting is live — incoming self-surveys are in{" "}
+          <Link href="/ops/quotes" className="font-semibold text-accent-700 underline">
+            quote requests
+          </Link>
+          . These are the modules that follow — each one exists to reduce
+          skilled labour, standardise installations, or learn from every job.
         </p>
 
         <div className="mt-10 grid gap-4 sm:grid-cols-2">
@@ -80,7 +84,7 @@ export default function OpsPage() {
             <div key={m.id} id={m.id} className="rounded-2xl border border-line p-6 scroll-mt-24">
               <div className="flex items-center justify-between gap-3">
                 <h2 className="font-semibold">{m.title}</h2>
-                <span className="shrink-0 rounded-full bg-mist px-2.5 py-0.5 text-xs font-medium text-ink-500">
+                <span className="shrink-0 rounded-full bg-surface px-2.5 py-0.5 text-xs font-medium text-ink-500">
                   {m.phase}
                 </span>
               </div>
@@ -89,7 +93,7 @@ export default function OpsPage() {
           ))}
         </div>
 
-        <div className="mt-12 rounded-2xl border border-line bg-mist p-6 text-sm text-ink-500">
+        <div className="mt-12 rounded-2xl border border-line bg-surface p-6 text-sm text-ink-500">
           <p className="font-semibold text-ink-900">Where the data already flows</p>
           <p className="mt-2">
             Every self-survey quote stores its full survey, the engine version

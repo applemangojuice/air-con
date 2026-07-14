@@ -80,9 +80,18 @@ export interface SurveyRoom {
   photos: SurveyPhoto[];
 }
 
+/** Resolved from the postcode (postcodes.io). Metadata only — the engine ignores it. */
+export interface SurveyGeo {
+  district?: string;
+  region?: string;
+  latitude?: number;
+  longitude?: number;
+}
+
 export interface Survey {
   postcode: string;
   addressLine: string;
+  geo?: SurveyGeo;
   property: {
     type: PropertyType;
     era: PropertyEra;

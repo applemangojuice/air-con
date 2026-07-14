@@ -15,7 +15,7 @@ export default async function QuotePage({
   const { postcode } = await searchParams;
 
   return (
-    <div className="min-h-dvh bg-white">
+    <div className="min-h-dvh bg-cream">
       {/* Minimal header: keep the customer in the flow. */}
       <header className="border-b border-line">
         <div className="mx-auto flex h-14 max-w-xl items-center justify-between px-4 sm:px-0">

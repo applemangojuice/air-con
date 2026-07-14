@@ -1,26 +1,44 @@
 @import "tailwindcss";
 
+/*
+ * Tokens synced from the "Organic" Claude Design project (theme.json):
+ * cream/sand ground, terracotta accent, sage second accent,
+ * Caprasimo display over Figtree, 16px radii growing into pills.
+ */
 @theme {
   --font-sans:
-    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
-    "Helvetica Neue", Arial, sans-serif;
+    "Figtree", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    Arial, sans-serif;
+  --font-display: "Caprasimo", "Figtree", ui-serif, Georgia, serif;
 
-  /* Brand palette: deep ink + airy sky. */
-  --color-ink-950: #071322;
-  --color-ink-900: #0a1c2e;
-  --color-ink-700: #24405a;
-  --color-ink-500: #47637d;
-  --color-ink-300: #93aabf;
+  /* ground */
+  --color-cream: #f5ead8; /* bg */
+  --color-surface: #ebddc5; /* surface */
+  --color-line: #ddcdae;
 
-  --color-air-700: #045e8c;
-  --color-air-600: #0578b4;
-  --color-air-500: #0b96d8;
-  --color-air-400: #38b6ee;
-  --color-air-100: #d7effb;
-  --color-air-50: #eef8fe;
+  /* warm text ramp derived from #201e1d */
+  --color-ink-950: #161412;
+  --color-ink-900: #201e1d;
+  --color-ink-700: #4a4540;
+  --color-ink-500: #746c63;
+  --color-ink-300: #a89e90;
 
-  --color-mist: #f5f9fc;
-  --color-line: #dfe9f1;
+  /* terracotta accent ramp (#c67139) */
+  --color-accent-50: #faf1e6;
+  --color-accent-100: #f4dcc2;
+  --color-accent-400: #d68b56;
+  --color-accent-500: #c67139;
+  --color-accent-600: #aa5a29;
+  --color-accent-700: #884921;
+
+  /* sage second accent ramp (#7a8a5e) */
+  --color-sage-50: #f1f3ea;
+  --color-sage-100: #e3e8d3;
+  --color-sage-200: #ccd5b2;
+  --color-sage-500: #7a8a5e;
+  --color-sage-700: #57633f;
+  --color-sage-800: #454f31;
+  --color-sage-900: #343b24;
 }
 
 html {
@@ -28,20 +46,36 @@ html {
 }
 
 body {
-  @apply bg-white text-ink-900 antialiased;
-  font-feature-settings: "ss01", "cv02";
+  @apply bg-cream text-ink-900 antialiased;
 }
 
-/* Soft-gradient panel used across hero + cards. */
-.air-gradient {
+/* Caprasimo ships one weight — the display voice is the face, not boldness. */
+.font-display {
+  font-weight: 400;
+  letter-spacing: 0.005em;
+}
+
+/* Themed interaction states — never the browser defaults. */
+:focus-visible {
+  outline: 2px solid var(--color-accent-500);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: var(--color-accent-100);
+}
+
+/* Warm wash used on hero panels — terracotta and sage glows on the ground. */
+.warm-gradient {
   background:
-    radial-gradient(1200px 500px at 80% -10%, rgba(56, 182, 238, 0.18), transparent 60%),
-    radial-gradient(900px 420px at 10% 0%, rgba(11, 150, 216, 0.12), transparent 55%),
-    linear-gradient(180deg, #f5f9fc 0%, #ffffff 70%);
+    radial-gradient(1100px 480px at 85% -10%, rgba(198, 113, 57, 0.16), transparent 60%),
+    radial-gradient(900px 420px at 8% 0%, rgba(122, 138, 94, 0.15), transparent 55%),
+    linear-gradient(180deg, #f0e1c6 0%, #f5ead8 70%);
 }
 
+/* Deep warm panel (dark hero, footer) with a terracotta glow. */
 .ink-gradient {
   background:
-    radial-gradient(900px 400px at 85% 0%, rgba(11, 150, 216, 0.25), transparent 55%),
-    linear-gradient(160deg, #0a1c2e 0%, #071322 100%);
+    radial-gradient(900px 400px at 85% 0%, rgba(198, 113, 57, 0.3), transparent 55%),
+    linear-gradient(160deg, #2b2521 0%, #161412 100%);
 }

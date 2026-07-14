@@ -46,7 +46,7 @@ export function PhotoInput({
           return (
             <div
               key={p.id}
-              className="relative h-20 w-20 overflow-hidden rounded-xl border border-line bg-mist"
+              className="relative h-20 w-20 overflow-hidden rounded-2xl border border-line bg-surface"
             >
               {preview ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -70,7 +70,7 @@ export function PhotoInput({
         <button
           type="button"
           onClick={() => inputRef.current?.click()}
-          className="flex h-20 w-20 flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-line text-ink-300 transition hover:border-air-400 hover:text-air-600"
+          className="flex h-20 w-20 flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-line text-ink-300 transition hover:border-accent-400 hover:text-accent-600"
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
             <path

@@ -21,10 +21,10 @@ export default function PortalPage() {
     <>
       <SiteHeader />
       <main className="mx-auto max-w-4xl px-4 py-16 sm:px-6">
-        <span className="rounded-full bg-mist px-3 py-1 text-xs font-semibold text-ink-500">
+        <span className="rounded-full bg-surface px-3 py-1 text-xs font-semibold text-ink-500">
           Coming soon
         </span>
-        <h1 className="mt-4 text-4xl font-bold tracking-tight">Your account</h1>
+        <h1 className="mt-4 text-4xl font-display">Your account</h1>
         <p className="mt-3 max-w-xl text-ink-500">
           The portal opens once you&apos;ve booked an installation. Everything
           about your system — quotes, contracts, progress, documents and
@@ -40,14 +40,14 @@ export default function PortalPage() {
           ))}
         </div>
 
-        <div className="mt-10 rounded-2xl border border-air-100 bg-air-50 p-6">
+        <div className="mt-10 rounded-2xl border border-accent-100 bg-accent-50 p-6">
           <p className="font-semibold">Haven&apos;t got a quote yet?</p>
           <p className="mt-1 text-sm text-ink-500">
             That&apos;s the first step — it takes about 10 minutes.
           </p>
           <Link
             href="/quote"
-            className="mt-4 inline-block rounded-xl bg-air-600 px-5 py-2.5 font-semibold text-white transition hover:bg-air-700"
+            className="mt-4 inline-block rounded-full bg-accent-600 px-5 py-2.5 font-semibold text-white transition hover:bg-accent-700"
           >
             Get my fixed price
           </Link>

@@ -1,6 +1,7 @@
 "use client";
 
-import type { Survey } from "@aircon/domain";
+import { useEffect, useState } from "react";
+import type { Survey, SurveyGeo } from "@aircon/domain";
 import { isValidUkPostcode, normalisePostcode } from "@/lib/format";
 import type { Contact, QuoteDraft, Timeframe } from "@/lib/quote-draft";
 import { PhotoInput } from "./photo-input";
@@ -20,9 +21,69 @@ export interface StepProps {
 /* Step 1 — Address                                                    */
 /* ------------------------------------------------------------------ */
 
+type PostcodeCheck =
+  | { state: "idle" | "checking" | "offline" }
+  | { state: "found"; geo: SurveyGeo }
+  | { state: "not-found" };
+
+/** Live postcode lookup via postcodes.io (free, no key, ~50ms). */
+function usePostcodeCheck(postcode: string, onGeo: (geo: SurveyGeo | undefined) => void) {
+  const [check, setCheck] = useState<PostcodeCheck>({ state: "idle" });
+
+  useEffect(() => {
+    if (!isValidUkPostcode(postcode)) {
+      setCheck({ state: "idle" });
+      return;
+    }
+    let cancelled = false;
+    setCheck({ state: "checking" });
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `https://api.postcodes.io/postcodes/${encodeURIComponent(postcode.replace(/\s+/g, ""))}`,
+        );
+        if (cancelled) return;
+        if (res.status === 404) {
+          setCheck({ state: "not-found" });
+          onGeo(undefined);
+          return;
+        }
+        const data = (await res.json()) as {
+          result?: {
+            admin_district?: string;
+            region?: string;
+            latitude?: number;
+            longitude?: number;
+          };
+        };
+        if (cancelled) return;
+        const geo: SurveyGeo = {
+          district: data.result?.admin_district,
+          region: data.result?.region,
+          latitude: data.result?.latitude,
+          longitude: data.result?.longitude,
+        };
+        setCheck({ state: "found", geo });
+        onGeo(geo);
+      } catch {
+        // Lookup unreachable — fall back to format-only validation.
+        if (!cancelled) setCheck({ state: "offline" });
+      }
+    }, 400);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [postcode]);
+
+  return check;
+}
+
 export function AddressStep({ draft, setSurvey, step, totalSteps, onNext }: StepProps) {
   const { postcode, addressLine } = draft.survey;
-  const postcodeOk = isValidUkPostcode(postcode);
+  const check = usePostcodeCheck(postcode, (geo) => setSurvey({ geo }));
+  const postcodeOk = isValidUkPostcode(postcode) && check.state !== "not-found";
   const ready = postcodeOk && addressLine.trim().length >= 5;
 
   return (
@@ -54,10 +115,19 @@ export function AddressStep({ draft, setSurvey, step, totalSteps, onNext }: Step
         />
       </Field>
 
-      {postcodeOk && (
-        <div className="rounded-2xl border border-air-100 bg-air-50 p-4">
-          <p className="text-sm font-semibold text-air-700">
-            Good news — we cover {normalisePostcode(postcode)}.
+      {check.state === "not-found" && (
+        <p className="text-sm text-red-600">
+          We couldn&apos;t find that postcode — double-check it and try again.
+        </p>
+      )}
+      {postcodeOk && check.state !== "checking" && (
+        <div className="rounded-2xl border border-accent-100 bg-accent-50 p-4">
+          <p className="text-sm font-semibold text-accent-700">
+            Good news — we cover{" "}
+            {check.state === "found" && check.geo.district
+              ? check.geo.district
+              : normalisePostcode(postcode)}
+            .
           </p>
           <p className="mt-1 text-sm text-ink-500">
             Answer a few questions about your home and rooms, add photos, and
@@ -240,7 +310,7 @@ export function ContactStep({
       step={step}
       totalSteps={totalSteps}
       title="Where should we send your quote?"
-      subtitle="Your fixed price appears on the next screen — we'll also email you a copy so you can come back to it."
+      subtitle="Your fixed price appears on the next screen, with a permanent link so you can come back to it any time."
       onNext={onNext}
       onBack={onBack}
       nextLabel="Show my fixed price"
