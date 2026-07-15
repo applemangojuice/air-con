@@ -9,8 +9,8 @@ export default function ElectricsScreen() {
 
   return (
     <Screen
-      step={4}
-      totalSteps={6}
+      step={6}
+      totalSteps={8}
       title="A quick look at your electrics"
       subtitle="Air conditioning needs its own circuit from your fuse board — usually in the hallway, garage or under the stairs."
       onBack={() => router.back()}

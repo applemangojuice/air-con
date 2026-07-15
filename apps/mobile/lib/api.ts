@@ -60,6 +60,79 @@ async function uploadPhotos(photos: LocalPhoto[]): Promise<void> {
   }
 }
 
+/* ------------------------------------------------------------------ */
+/* Video walkthrough pipeline                                          */
+/* ------------------------------------------------------------------ */
+
+export interface VideoSurveyStatus {
+  id: string;
+  status: "uploaded" | "transcribed" | "extracted" | "quoted" | "needs_review";
+  draft_survey?: unknown;
+  quote?: unknown;
+  error?: string | null;
+}
+
+/** Create the video survey record and get a signed upload URL. */
+export async function createVideoSurvey(
+  archetypeId: string,
+  permutationId: string,
+  postcode: string,
+  fileName: string,
+): Promise<{ id: string; signedUrl: string } | null> {
+  try {
+    const res = await fetch(`${API_BASE}/api/video-surveys`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ archetypeId, permutationId, postcode, fileName }),
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as {
+      configured: boolean;
+      id?: string;
+      signedUrl?: string;
+    };
+    if (!data.configured || !data.id || !data.signedUrl) return null;
+    return { id: data.id, signedUrl: data.signedUrl };
+  } catch {
+    return null;
+  }
+}
+
+export async function uploadVideo(signedUrl: string, uri: string): Promise<boolean> {
+  try {
+    const file = await fetch(uri);
+    const blob = await file.blob();
+    const put = await fetch(signedUrl, {
+      method: "PUT",
+      headers: { "content-type": blob.type || "video/mp4" },
+      body: blob,
+    });
+    return put.ok;
+  } catch {
+    return false;
+  }
+}
+
+/** Kick off transcription → extraction → quote. Long-running; errors park at needs_review. */
+export async function processVideoSurvey(id: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE}/api/video-surveys/${id}/process`, { method: "POST" });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+export async function getVideoSurvey(id: string): Promise<VideoSurveyStatus | null> {
+  try {
+    const res = await fetch(`${API_BASE}/api/video-surveys/${id}`);
+    if (!res.ok) return null;
+    return (await res.json()) as VideoSurveyStatus;
+  } catch {
+    return null;
+  }
+}
+
 export async function requestBooking(
   quoteId: string,
   preferredStart: "asap" | "2-4-weeks" | "1-2-months" | "flexible",

@@ -19,12 +19,13 @@ export default function WelcomeScreen() {
       </View>
       <Text style={styles.title}>Your home, priced in minutes</Text>
       <Text style={styles.body}>
-        Walk through your home with your phone — a few questions and photos per
-        room — and get a guaranteed fixed price for air conditioning at the end.
+        Pick the house that matches yours, film a short narrated walkthrough,
+        and we&apos;ll draft your floor plan and a guaranteed fixed price for
+        air conditioning.
       </Text>
 
       <View style={{ marginTop: space(8), gap: space(3) }}>
-        <Pressable style={styles.primary} onPress={() => router.push("/survey/address")}>
+        <Pressable style={styles.primary} onPress={() => router.push("/survey/house")}>
           <Text style={styles.primaryText}>
             {inProgress ? "Continue my survey" : "Start my survey"}
           </Text>
@@ -34,7 +35,7 @@ export default function WelcomeScreen() {
             style={styles.secondary}
             onPress={() => {
               reset();
-              router.push("/survey/address");
+              router.push("/survey/house");
             }}
           >
             <Text style={styles.secondaryText}>Start over</Text>

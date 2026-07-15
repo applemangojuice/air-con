@@ -1,4 +1,5 @@
 import { estimateRoomLoadWatts, selectCapacityKw } from "./heatload.ts";
+import { getPermutation } from "./archetypes.ts";
 import { scoreConfidence } from "./confidence.ts";
 import type {
   CapacityKw,
@@ -180,6 +181,29 @@ export function generateQuote(survey: Survey): QuoteResult {
   }
   if (survey.outdoor.location === "unsure") {
     reviewFlags.push("Outdoor unit position undecided — we'll advise on the best spot.");
+  }
+
+  // Archetype install permutation: pattern-specific work + ops checks.
+  const permutation =
+    survey.archetypeId && survey.permutationId
+      ? getPermutation(survey.archetypeId, survey.permutationId)
+      : undefined;
+  if (permutation) {
+    if (permutation.adderGbp > 0) {
+      lines.push({
+        label: `Install pattern — ${permutation.label}`,
+        detail: permutation.pipeRoute,
+        amount: permutation.adderGbp,
+      });
+    }
+    if (survey.rooms.length > permutation.servesUpTo) {
+      reviewFlags.push(
+        `"${permutation.label}" serves up to ${permutation.servesUpTo} rooms — ${survey.rooms.length} requested, so we'll confirm the second outdoor unit position.`,
+      );
+    }
+    for (const check of permutation.checks) {
+      reviewFlags.push(`Pattern check: ${check}`);
+    }
   }
 
   if (survey.electrics.condition === "older-fuse-box") {

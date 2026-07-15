@@ -29,8 +29,8 @@ export default function RoomsScreen() {
 
   return (
     <Screen
-      step={2}
-      totalSteps={6}
+      step={4}
+      totalSteps={8}
       title="Which rooms should we cool?"
       subtitle="Add every room you'd like a unit in. You can drop rooms later — the price updates instantly."
       onBack={() => router.back()}

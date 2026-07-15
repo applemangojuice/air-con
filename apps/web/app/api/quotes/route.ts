@@ -20,6 +20,8 @@ const photoSchema = z.object({
 const surveySchema = z.object({
   postcode: z.string().min(5).max(10),
   addressLine: z.string().min(3).max(200),
+  archetypeId: z.string().max(60).optional(),
+  permutationId: z.string().max(60).optional(),
   geo: z
     .object({
       district: z.string().max(100).optional(),

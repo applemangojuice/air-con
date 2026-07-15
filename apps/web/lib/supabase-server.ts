@@ -13,3 +13,4 @@ export function getServiceClient(): SupabaseClient | null {
 }
 
 export const PHOTO_BUCKET = "survey-photos";
+export const VIDEO_BUCKET = "survey-videos";

@@ -3,15 +3,16 @@ import { Field, Input, OptionCards, Screen } from "@/components/ui";
 import { useDraft, type Timeframe } from "@/lib/store";
 
 export default function ContactScreen() {
-  const { draft, setContact } = useDraft();
+  const { draft, setContact, setSurvey } = useDraft();
   const c = draft.contact;
+  const property = draft.survey.property;
   const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c.email);
   const ready = c.name.trim().length >= 2 && emailOk;
 
   return (
     <Screen
-      step={5}
-      totalSteps={6}
+      step={7}
+      totalSteps={8}
       title="Where should we send your quote?"
       subtitle="Your fixed price appears on the next screen, with a permanent link so you can come back to it any time."
       onBack={() => router.back()}
@@ -37,6 +38,16 @@ export default function ContactScreen() {
           autoComplete="tel"
           keyboardType="phone-pad"
           onChangeText={(phone) => setContact({ phone })}
+        />
+      </Field>
+      <Field label="Do you own the property?">
+        <OptionCards
+          value={property.ownership}
+          onChange={(ownership) => setSurvey({ property: { ...property, ownership } })}
+          options={[
+            { value: "owner", label: "Yes, I own it" },
+            { value: "renting", label: "No, renting", hint: "Landlord consent needed" },
+          ]}
         />
       </Field>
       <Field label="When are you looking to install?">

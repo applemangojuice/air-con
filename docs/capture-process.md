@@ -72,6 +72,58 @@ honest broker between "instant price" and "no surprises":
 This lets us quote *everyone instantly* without eating the risk of blind
 fixed pricing, and it gives the customer agency: more evidence → firmer price.
 
+## The archetype + video walkthrough flow (iOS, primary)
+
+The iOS app now leads with a fundamentally different capture shape, built on
+two constraints that make the business scalable:
+
+**1. Installation is a menu, not a blank page.** Like fibre roll-outs that
+only serve certain postcodes, we only install a small set of proven
+permutations per house type. `packages/domain/archetypes.ts` holds the
+library: 15 UK house archetypes (Victorian terrace, 1930s semi, bungalow,
+townhouse, converted flat…), each with 1–3 pre-engineered **install
+permutations** — where the outdoor unit lives, how pipes route, how many
+rooms it serves, what it adds to the price, and what ops must check before
+confirming. The customer *selects* their house and their install pattern
+before any capture happens. Design becomes selection; every job feeds data
+back to a named pattern (the Phase-10 knowledge loop gets its schema for
+free).
+
+**2. One narrated video replaces the question wizard.** With the pattern
+already chosen, the customer films a 2–3 minute walkthrough narrating what
+they want ("this is the main bedroom, it's a decent double, I'd love cooling
+in here… this is where the outdoor unit could go…"). The pipeline then runs
+server-side:
+
+```
+video ──▶ Whisper transcription ──▶ Claude structured extraction ──▶ assembled
+        (audio → transcript)      (transcript → rooms, sizes,      Survey draft
+                                   wishes, uncertainties)          (archetype fills
+                                                                   the gaps)
+                                                        └──▶ pricing engine ──▶ quote
+```
+
+- Transcription: OpenAI Whisper (Claude doesn't accept audio). Optional —
+  no key means the video parks at `needs_review` with everything saved.
+- Extraction: Claude (`claude-opus-4-8`) with structured outputs — the
+  result always validates against the room schema; anything the narration
+  left unclear lands in `uncertainties`, which become ops review flags.
+- Assembly: the archetype supplies what narration can't (property type/era,
+  outdoor pattern); the extraction supplies rooms and wishes; the engine
+  prices it. The extracted rooms flow back into the app for the customer to
+  **confirm and edit** — AI drafts, the customer approves.
+
+Every stage degrades gracefully: no server, no keys, or a muddled narration
+all fall back to the manual room editor, with the video retained as evidence
+for ops. Pipeline state lives in `video_surveys`
+(uploaded → transcribed → extracted → quoted | needs_review).
+
+iOS flow: **pick your house → pick the install pattern (with price impact
+shown upfront) → address → film the walkthrough → review drafted rooms →
+outdoor/electrics confirmation (prefilled) → contact → fixed price.**
+The v2 step here is ARKit/RoomPlan replacing narration-guessed size bands
+with measured dimensions — the video flow is the on-ramp to that.
+
 ## Why a native iOS capture app at all
 
 The web funnel is the acquisition surface — zero-install, link-from-an-ad.

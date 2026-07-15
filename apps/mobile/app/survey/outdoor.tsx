@@ -9,8 +9,8 @@ export default function OutdoorScreen() {
 
   return (
     <Screen
-      step={3}
-      totalSteps={6}
+      step={5}
+      totalSteps={8}
       title="Where could the outdoor unit go?"
       subtitle="Every system needs one outdoor unit (about the size of a suitcase). It hums quietly — roughly as loud as a fridge."
       onBack={() => router.back()}

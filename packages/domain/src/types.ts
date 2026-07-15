@@ -92,6 +92,9 @@ export interface Survey {
   postcode: string;
   addressLine: string;
   geo?: SurveyGeo;
+  /** Archetype + install permutation the customer selected (see archetypes.ts). */
+  archetypeId?: string;
+  permutationId?: string;
   property: {
     type: PropertyType;
     era: PropertyEra;

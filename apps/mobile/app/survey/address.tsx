@@ -11,12 +11,12 @@ export default function AddressScreen() {
 
   return (
     <Screen
-      step={0}
-      totalSteps={6}
+      step={2}
+      totalSteps={8}
       title="Where's the installation?"
       subtitle="We price every home individually — your address lets us check access, property type and local install patterns."
       onBack={() => router.back()}
-      onNext={() => router.push("/survey/property")}
+      onNext={() => router.push("/survey/walkthrough")}
       nextDisabled={!ready}
     >
       <Field label="Postcode">
