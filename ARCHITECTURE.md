@@ -32,9 +32,11 @@ air-con/
 │       ├── types.ts          #   canonical Survey/Quote types, JSON-serialisable
 │       ├── heatload.ts       #   room load estimation + unit sizing
 │       ├── pricing.ts        #   deterministic fixed-price engine (versioned)
-│       └── confidence.ts     #   Installation Confidence Score
+│       ├── confidence.ts     #   Installation Confidence Score
+│       └── project.ts        #   the project workflow: stage machine, fees, SLA (pure reducer)
 ├── docs/
-│   └── capture-process.md    # design of the survey capture process (web + iOS)
+│   ├── capture-process.md    # design of the survey capture process (web + iOS)
+│   └── project-workflow.md   # quote → install timeline: stages, fees, SLA, electrics
 └── supabase/
     └── migrations/           # SQL migrations (source of truth for the schema)
 ```
@@ -109,10 +111,14 @@ photos never transit Vercel functions and no storage keys reach the browser.
 `quote_requests` is deliberately a single wide table today. The known evolution:
 
 1. **Portal/auth** → split `customers`, link quotes to `auth.users`.
-2. **Booking** → `jobs` table (a quote becomes a job; status machine:
-   `booked → scheduled → installed → commissioned → monitored`).
+2. ~~**Booking** → jobs table~~ **Shipped as `projects`** (migration 0005): a
+   quote becomes a project running the six-stage machine in
+   `@aircon/domain/project.ts` (`quote → floor-plan → final-quote →
+   site-visit → delivery → installation`). Full JSONB snapshot as truth,
+   every transition through the pure reducer, event log embedded. See
+   [docs/project-workflow.md](./docs/project-workflow.md).
 3. **Design review** → `designs` table, versioned, referencing the survey.
-4. **Knowledge loop** → `install_actuals` keyed by job, joined back to the
+4. **Knowledge loop** → `install_actuals` keyed by project, joined back to the
    engine version that priced it.
 
 The JSONB snapshots mean none of these migrations rewrite history.

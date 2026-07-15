@@ -4,7 +4,8 @@ import { useMemo } from "react";
 import { generateQuote } from "@aircon/domain";
 import { BRAND } from "@/lib/brand";
 import type { QuoteDraft } from "@/lib/quote-draft";
-import { BookingPanel } from "./booking-panel";
+import { StartProjectPanel } from "@/components/project/start-project";
+import { TimelineStrip } from "@/components/project/timeline";
 import { QuoteView } from "./quote-view";
 
 export type SubmissionState =
@@ -26,6 +27,9 @@ export function QuoteResult({
 
   return (
     <div className="mx-auto w-full max-w-xl px-4 pb-24 pt-8 sm:px-0">
+      <div className="mb-6">
+        <TimelineStrip current="quote" />
+      </div>
       <QuoteView quote={quote} roomCount={draft.survey.rooms.length} />
 
       {saved && (
@@ -45,11 +49,7 @@ export function QuoteResult({
         </p>
       )}
 
-      <BookingPanel
-        quoteId={saved?.id ?? null}
-        installDays={quote.installDays}
-        postcode={draft.survey.postcode}
-      />
+      <StartProjectPanel quoteId={saved?.id ?? null} />
 
       <button
         type="button"

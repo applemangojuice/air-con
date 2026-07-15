@@ -28,7 +28,12 @@ export default function PortalPage() {
         <p className="mt-3 max-w-xl text-ink-500">
           The portal opens once you&apos;ve booked an installation. Everything
           about your system — quotes, contracts, progress, documents and
-          monitoring — will live here.
+          monitoring — will live here. Your installation itself already runs on
+          a live timeline:{" "}
+          <Link href="/p/demo" className="font-semibold text-accent-700 underline">
+            see a playable example
+          </Link>
+          .
         </p>
 
         <div className="mt-10 grid gap-4 sm:grid-cols-2">

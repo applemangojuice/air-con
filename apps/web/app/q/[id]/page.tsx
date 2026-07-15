@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import type { QuoteResult, Survey } from "@aircon/domain";
-import { BookingPanel, type BookingRequest } from "@/components/quote/booking-panel";
+import { StartProjectPanel } from "@/components/project/start-project";
 import { QuoteView } from "@/components/quote/quote-view";
 import { Logo } from "@/components/site/logo";
 import { getServiceClient } from "@/lib/supabase-server";
@@ -27,14 +27,19 @@ export default async function SavedQuotePage({
 
   const { data } = await supabase
     .from("quote_requests")
-    .select("id, customer_name, postcode, created_at, survey, quote, booking")
+    .select("id, customer_name, postcode, created_at, survey, quote")
     .eq("id", id)
     .single();
   if (!data) notFound();
 
+  const { data: projectRow } = await supabase
+    .from("projects")
+    .select("id")
+    .eq("quote_id", id)
+    .maybeSingle();
+
   const survey = data.survey as Survey;
   const quote = data.quote as QuoteResult;
-  const booking = (data.booking as BookingRequest | null) ?? null;
   const created = new Date(data.created_at).toLocaleDateString("en-GB", {
     day: "numeric",
     month: "long",
@@ -58,12 +63,7 @@ export default async function SavedQuotePage({
           {data.customer_name} · {survey.addressLine}, {survey.postcode} · prepared {created}
         </p>
         <QuoteView quote={quote} roomCount={survey.rooms.length} />
-        <BookingPanel
-          quoteId={data.id}
-          installDays={quote.installDays}
-          postcode={survey.postcode}
-          initialBooking={booking}
-        />
+        <StartProjectPanel quoteId={data.id} existingProjectId={projectRow?.id ?? null} />
       </main>
     </div>
   );
