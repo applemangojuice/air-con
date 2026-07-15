@@ -6,8 +6,8 @@ import { BRAND } from "@/lib/brand";
 const steps = [
   {
     n: "01",
-    title: "Survey your home from your phone",
-    body: "Answer a few questions and photograph each room, your outdoor space and your fuse board. Takes about 10 minutes, no visit needed.",
+    title: "Tell us about your home",
+    body: "A few taps about your house. If we already know your address, most of it is filled in for you. Under two minutes to your price.",
   },
   {
     n: "02",
@@ -29,8 +29,8 @@ const promises = [
 ];
 
 const platform = [
+  { title: "Your project timeline", body: "Quote to install day on one timeline: dates, deliveries, your installer, all live.", href: "/p/demo", status: "Live" },
   { title: "Customer portal", body: "Quotes, contracts, installation progress and documents in one place.", href: "/portal", status: "In progress" },
-  { title: "Operations & CRM", body: "Leads, pipeline, design review and scheduling for the internal team.", href: "/ops", status: "Planned" },
   { title: "Installer app", body: "Job packs, step-by-step workflows and photo-verified quality assurance.", href: "/ops#installer", status: "Planned" },
   { title: "Smart monitoring", body: "Energy use, running costs and predictive maintenance for every system.", href: "/ops#monitoring", status: "Planned" },
 ];
@@ -49,13 +49,13 @@ export default function HomePage() {
                 Now taking bookings in our launch areas
               </p>
               <h1 className="mt-5 text-4xl font-display text-ink-900 sm:text-6xl">
-                Air conditioning for your home.{" "}
-                <span className="text-accent-600">Priced in minutes.</span>
+                Dang, it&apos;s hot.{" "}
+                <span className="text-accent-600">Let&apos;s fix that.</span>
               </h1>
               <p className="mt-5 max-w-xl text-lg text-ink-500">
-                Survey your own home from your phone and get a guaranteed fixed
-                price for a professional installation. No salesperson, no
-                waiting a week for a surveyor.
+                Proper air conditioning for your home, with a guaranteed fixed
+                price in under two minutes. No salesperson, no waiting a week
+                for a surveyor. Keeping London cool, street by street.
               </p>
 
               <form action="/quote" className="mt-8 flex max-w-md gap-2">
@@ -75,7 +75,7 @@ export default function HomePage() {
                 </button>
               </form>
               <p className="mt-3 text-sm text-ink-300">
-                Free, takes about 10 minutes, and your price is fixed. Not an estimate.
+                Free, under two minutes to your price, and it&apos;s fixed. Not an estimate.
               </p>
             </div>
           </div>
@@ -117,6 +117,19 @@ export default function HomePage() {
           </div>
         </section>
 
+        {/* The brand */}
+        <section className="mx-auto max-w-6xl px-4 pt-20 sm:px-6">
+          <div className="overflow-hidden rounded-3xl border border-line bg-white">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/brand/dang-its-hot.webp"
+              alt="Dang, It's Hot: cooling technologies for the UK. Keeping London cool."
+              className="w-full"
+              loading="lazy"
+            />
+          </div>
+        </section>
+
         {/* Platform teaser */}
         <section className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
           <h2 className="text-3xl font-display sm:text-4xl">
@@ -153,7 +166,7 @@ export default function HomePage() {
               Ready to see your price?
             </h2>
             <p className="mx-auto mt-3 max-w-md text-white/60">
-              Ten minutes on your phone. A guaranteed price at the end. No
+              Two minutes on your phone. A guaranteed price at the end. No
               obligation, no pushy calls.
             </p>
             <Link

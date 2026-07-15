@@ -67,5 +67,5 @@ project, then run the files in `supabase/migrations/` against it in order.
 
 ## Deploy
 
-Vercel (root directory: `apps/web`) + Supabase. Full steps in
-[ARCHITECTURE.md](./ARCHITECTURE.md#deploying).
+Vercel (root directory: `apps/web`, watching `main`) + Supabase. Checklist
+and smoke tests in [docs/going-live.md](./docs/going-live.md).

@@ -26,6 +26,7 @@ const GROUPS: { title: string; links: { label: string; href: string }[] }[] = [
       { label: "Property intel", href: "/ops/intel" },
       { label: "Projects", href: "/ops/projects" },
       { label: "Quote requests", href: "/ops/quotes" },
+      { label: "Templates", href: "/ops/templates" },
     ],
   },
 ];

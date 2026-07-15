@@ -14,10 +14,10 @@ const columns = [
   {
     title: "Platform",
     links: [
-      { label: "Operations", href: "/ops" },
-      { label: "Design studio", href: "/ops#design" },
-      { label: "Installer app", href: "/ops#installer" },
-      { label: "Monitoring", href: "/ops#monitoring" },
+      { label: "Admin console", href: "/ops" },
+      { label: "Property intelligence", href: "/ops/intel" },
+      { label: "Projects", href: "/ops/projects" },
+      { label: "Template library", href: "/ops/templates" },
     ],
   },
   {

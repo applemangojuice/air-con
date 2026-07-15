@@ -29,6 +29,31 @@ const OUTDOOR_LABEL: Partial<Record<OutdoorLocation, string>> = {
   "ground-side": "Side wall / passage",
 };
 
+const TYPE_LABEL: Record<string, string> = {
+  detached: "Detached",
+  "semi-detached": "Semi-detached",
+  terraced: "Terraced",
+  flat: "Flat",
+  bungalow: "Bungalow",
+};
+
+const ERA_LABEL: Record<string, string> = {
+  "pre-1930": "before 1930",
+  "1930-1950": "1930s–40s",
+  "1950-2000": "1950s–90s",
+  "2000+": "2000+",
+};
+
+/** Why the outdoor position is fixed when there's only one option. */
+const OUTDOOR_LOCKED_REASON: Record<string, string> = {
+  terraced:
+    "Terraced homes route to the rear only. Running pipework past the front isn't something we do at a fixed price, and front walls usually need planning permission anyway.",
+  flat:
+    "Flats route to the rear only. We don't install on roofs or balconies, and the rear wall is the one spot that works at a fixed price.",
+  default:
+    "For your house type this is the one position we can guarantee at a fixed price. If the site visit finds a better spot, we move it there for free.",
+};
+
 /**
  * The price-first review screen: rooms were generated from the house answers,
  * the indicative price sits at the top and updates with every toggle.
@@ -96,6 +121,31 @@ export function RoomsStep({
         <p className="mt-1 text-xs text-white/60">
           {rooms.length} room{rooms.length === 1 ? "" : "s"} · installed · VAT included
         </p>
+      </div>
+
+      {/* What we've already filled in, one compact line, changeable */}
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-2xl border border-line bg-white px-4 py-2.5 text-xs text-ink-700">
+        <span className="font-semibold text-ink-500">Priced for:</span>
+        <span className="font-medium">
+          {TYPE_LABEL[draft.survey.property.type] ?? draft.survey.property.type}
+          {" · "}
+          {ERA_LABEL[draft.survey.property.era] ?? draft.survey.property.era}
+          {" · "}
+          {draft.survey.property.bedrooms} bed{draft.survey.property.bedrooms === 1 ? "" : "s"}
+          {draft.survey.property.floorAreaM2 ? ` · ~${draft.survey.property.floorAreaM2} m²` : ""}
+        </span>
+        {draft.prefilledFromIntel && (
+          <span className="text-ink-300">(from public records)</span>
+        )}
+        {onBack && (
+          <button
+            type="button"
+            onClick={onBack}
+            className="ml-auto shrink-0 rounded-full border border-line px-2.5 py-1 font-semibold text-accent-700 transition hover:bg-accent-50"
+          >
+            Change
+          </button>
+        )}
       </div>
 
       {/* Generated rooms */}
@@ -215,9 +265,12 @@ export function RoomsStep({
             }))}
           />
         ) : (
-          <p className="rounded-2xl border border-line bg-white px-4 py-3 text-sm font-medium">
-            {OUTDOOR_LABEL[draft.survey.outdoor.location] ?? "Back wall / garden"}
-          </p>
+          <LockedOutdoor
+            label={OUTDOOR_LABEL[draft.survey.outdoor.location] ?? "Back wall / garden"}
+            reason={
+              OUTDOOR_LOCKED_REASON[draft.survey.property.type] ?? OUTDOOR_LOCKED_REASON.default!
+            }
+          />
         )}
       </Field>
 
@@ -243,4 +296,24 @@ export function RoomsStep({
 
 function sizeLabel(size: SurveyRoom["size"]): string {
   return { small: "Small", medium: "Medium", large: "Large", xl: "Very large" }[size];
+}
+
+/** Single possible outdoor position: show it fixed, explain why on tap. */
+function LockedOutdoor({ label, reason }: { label: string; reason: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="rounded-2xl border border-line bg-white px-4 py-3">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm font-medium">{label}</p>
+        <button
+          type="button"
+          onClick={() => setOpen(!open)}
+          className="shrink-0 text-xs font-semibold text-accent-700 hover:underline"
+        >
+          {open ? "Got it" : "Why can't I change this?"}
+        </button>
+      </div>
+      {open && <p className="mt-2 text-xs text-ink-500">{reason}</p>}
+    </div>
+  );
 }

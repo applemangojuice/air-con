@@ -48,7 +48,7 @@ export default function PortalPage() {
         <div className="mt-10 rounded-2xl border border-accent-100 bg-accent-50 p-6">
           <p className="font-semibold">Haven&apos;t got a quote yet?</p>
           <p className="mt-1 text-sm text-ink-500">
-            That&apos;s the first step, and it takes about 10 minutes.
+            That&apos;s the first step, and it takes about two minutes.
           </p>
           <Link
             href="/quote"
