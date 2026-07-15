@@ -3,11 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   INVESTOR_BASE,
+  buildInvestorMemo,
   buildMilestones,
   ltvModel,
   marketModel,
   roundModel,
   sensitivity,
+  validationChecklist,
   type InvestorAssumptions,
   type MilestoneProof,
   type Plan,
@@ -71,6 +73,19 @@ export function SeedCase({ plan, a }: { plan: Plan; a: PlanAssumptions }) {
   const round = useMemo(() => roundModel(effectiveRaise, inv), [effectiveRaise, inv]);
   const rows = useMemo(() => sensitivity(a), [a]);
   const milestones = useMemo(() => buildMilestones(plan, a, inv), [plan, a, inv]);
+  const checklist = useMemo(() => validationChecklist(a, inv), [a, inv]);
+  const memo = useMemo(() => buildInvestorMemo(plan, a, inv), [plan, a, inv]);
+  const [copied, setCopied] = useState(false);
+
+  async function copyMemo() {
+    try {
+      await navigator.clipboard.writeText(memo);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* clipboard blocked; the text is on screen to select */
+    }
+  }
   const maxAskDelta = Math.max(
     1,
     ...rows.flatMap((r) => [Math.abs(r.askDeltaLowGbp), Math.abs(r.askDeltaHighGbp)]),
@@ -107,7 +122,7 @@ export function SeedCase({ plan, a }: { plan: Plan; a: PlanAssumptions }) {
             strong
           />
         </div>
-        <div className="mt-3 flex flex-wrap items-end gap-3 text-sm">
+        <div className="mt-3 flex flex-wrap items-end gap-3 text-sm print:hidden">
           <Num label="Beachhead homes (SW16+17)" value={inv.beachheadHouseholds} onChange={(v) => set({ beachheadHouseholds: v })} />
           <Num label="South London homes" value={inv.samHouseholds} onChange={(v) => set({ samHouseholds: v })} />
           <Num label="UK suitable homes" value={inv.tamHouseholds} onChange={(v) => set({ tamHouseholds: v })} />
@@ -134,12 +149,17 @@ export function SeedCase({ plan, a }: { plan: Plan; a: PlanAssumptions }) {
             <Fact k="Blended LTV" v={gbp(ltv.blendedLtvGbp)} strong />
             <Fact k={`CAC after ${inv.referralPct}% referrals`} v={gbp(ltv.effectiveCacGbp)} />
           </div>
-          <div className="mt-4 grid grid-cols-2 gap-3">
+          <div className="mt-4 grid grid-cols-2 gap-3 print:hidden">
             <Num label="Service £/month" value={inv.servicePlanMonthlyGbp} onChange={(v) => set({ servicePlanMonthlyGbp: v })} />
             <Num label="Attach %" value={inv.servicePlanAttachPct} onChange={(v) => set({ servicePlanAttachPct: v })} />
             <Num label="Service years" value={inv.servicePlanYears} onChange={(v) => set({ servicePlanYears: v })} />
             <Num label="Referral %" value={inv.referralPct} onChange={(v) => set({ referralPct: v })} />
           </div>
+          <p className="mt-3 text-xs text-ink-300">
+            Context for the meeting: most home-services businesses live near 3:1. A one-off
+            purchase with strong contribution and a service attach is what makes this ratio
+            unusual, and it is the best slide in the deck.
+          </p>
         </section>
 
         {/* The round */}
@@ -163,7 +183,7 @@ export function SeedCase({ plan, a }: { plan: Plan; a: PlanAssumptions }) {
               <span><span className="mr-1.5 inline-block h-2.5 w-2.5 rounded-full bg-sage-500 align-middle" />Option pool {round.optionPoolPct}%</span>
             </div>
           </div>
-          <div className="mt-4 grid grid-cols-2 gap-3">
+          <div className="mt-4 grid grid-cols-2 gap-3 print:hidden">
             <Num
               label="Raise £ (blank = plan's ask)"
               value={raise ?? effectiveRaise}
@@ -179,6 +199,11 @@ export function SeedCase({ plan, a }: { plan: Plan; a: PlanAssumptions }) {
               Reset raise to plan
             </button>
           </div>
+          <p className="mt-3 text-xs text-ink-300">
+            Two ways to tell this story: keep the plan&apos;s modest ask as a friends-and-family
+            round, or crank the ambition dials above (marketing-led growth, earlier second crew,
+            higher founder cover) and let the model price an institutional seed.
+          </p>
         </section>
       </div>
 
@@ -187,7 +212,8 @@ export function SeedCase({ plan, a }: { plan: Plan; a: PlanAssumptions }) {
         <h3 className="font-bold">What actually moves the ask</h3>
         <p className="mt-1 text-xs text-ink-500">
           Each driver swung to its downside and upside; bars show the change in cash needed.
-          Sage shrinks the raise, terracotta grows it.
+          Sage shrinks the raise, terracotta grows it. This is the &quot;we know our risks&quot;
+          slide, and it tells you which number to go validate first.
         </p>
         <div className="mt-4 space-y-3">
           {rows.map((row) => {
@@ -223,6 +249,29 @@ export function SeedCase({ plan, a }: { plan: Plan; a: PlanAssumptions }) {
               </div>
             );
           })}
+        </div>
+      </section>
+
+      {/* Before you show anyone */}
+      <section className="rounded-2xl border border-amber-200 bg-amber-50/60 p-5">
+        <h3 className="font-bold text-amber-900">Validate these before you show anyone</h3>
+        <p className="mt-1 text-xs text-amber-800">
+          The case is only as strong as its weakest placeholder. Each of these firms up in under
+          two weeks.
+        </p>
+        <div className="mt-3 grid gap-3 lg:grid-cols-2">
+          {checklist.map((item) => (
+            <div key={item.assumption} className="rounded-xl bg-white/70 p-3.5 text-sm">
+              <p className="font-bold">
+                {item.assumption}{" "}
+                <span className="font-normal text-ink-500">(currently {item.current})</span>
+              </p>
+              <p className="mt-1 text-xs text-ink-700">{item.why}</p>
+              <p className="mt-1 text-xs text-ink-500">
+                <span className="font-semibold">How:</span> {item.how}
+              </p>
+            </div>
+          ))}
         </div>
       </section>
 
@@ -263,6 +312,38 @@ export function SeedCase({ plan, a }: { plan: Plan; a: PlanAssumptions }) {
             );
           })}
         </ol>
+      </section>
+
+      {/* The memo: the data-room artifact, always in sync with the model */}
+      <section className="rounded-2xl border border-line bg-white p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
+          <div>
+            <h3 className="font-bold">The investor memo</h3>
+            <p className="mt-1 text-xs text-ink-500">
+              Auto-written from the live model, so it can never disagree with the numbers above.
+              Copy it into an email or data room, or print this page as the one-pager.
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={copyMemo}
+              className="rounded-full bg-accent-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-accent-700"
+            >
+              {copied ? "Copied ✓" : "Copy memo"}
+            </button>
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="rounded-full border border-line px-4 py-2 text-sm font-semibold text-ink-700 transition hover:bg-surface"
+            >
+              Print / PDF
+            </button>
+          </div>
+        </div>
+        <pre className="mt-4 max-h-96 overflow-auto whitespace-pre-wrap rounded-xl bg-surface/60 p-4 font-sans text-sm leading-relaxed text-ink-700 print:max-h-none print:bg-white print:p-0">
+{memo}
+        </pre>
       </section>
     </div>
   );

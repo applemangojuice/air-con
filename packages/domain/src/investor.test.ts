@@ -3,11 +3,13 @@ import { test } from "node:test";
 import { PLAN_BASE, buildPlan } from "./finance.ts";
 import {
   INVESTOR_BASE,
+  buildInvestorMemo,
   buildMilestones,
   ltvModel,
   marketModel,
   roundModel,
   sensitivity,
+  validationChecklist,
 } from "./investor.ts";
 
 test("LTV blends install contribution with the service plan", () => {
@@ -76,6 +78,31 @@ test("faster growth pulls the milestone dates in", () => {
     fastRunRate !== null && (baseRunRate === null || fastRunRate < baseRunRate),
     `expected faster growth to pull £1m run-rate in (${baseRunRate} → ${fastRunRate})`,
   );
+});
+
+test("the validation checklist covers the load-bearing placeholders", () => {
+  const items = validationChecklist(PLAN_BASE, INVESTOR_BASE);
+  const names = items.map((i) => i.assumption.toLowerCase()).join(" ");
+  for (const key of ["kit cost", "response rate", "labour", "pre-money", "service plan"]) {
+    assert.ok(names.includes(key), `checklist missing ${key}`);
+  }
+  for (const item of items) {
+    assert.ok(item.current.length > 0 && item.why.length > 0 && item.how.length > 0);
+  }
+});
+
+test("the investor memo assembles from the live model and stays consistent", () => {
+  const plan = buildPlan(PLAN_BASE);
+  const memo = buildInvestorMemo(plan, PLAN_BASE, INVESTOR_BASE);
+  const ltv = ltvModel(PLAN_BASE, INVESTOR_BASE);
+  assert.ok(memo.includes("# Dang, It's Hot: seed memo"));
+  assert.ok(memo.includes(`£${plan.summary.fundingNeedGbp / 1000}k`), "memo carries the ask");
+  assert.ok(memo.includes(`${ltv.ltvToCac}:1`), "memo carries LTV:CAC");
+  assert.ok(memo.includes(`month ${plan.summary.cashTrough.month}`), "memo carries the trough");
+  assert.ok(memo.includes("## Milestones"));
+  assert.ok(memo.includes("Series A window opens"));
+  assert.ok(memo.includes("Gate:"));
+  assert.ok(!memo.includes("—"), "no em dashes in the memo");
 });
 
 test("a flat plan leaves late milestones undated instead of inventing them", () => {

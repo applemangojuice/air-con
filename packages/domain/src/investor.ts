@@ -350,3 +350,125 @@ export function buildMilestones(
     return x.month - y.month;
   });
 }
+
+/* ------------------------------------------------------------------ */
+/* Numbers to validate before showing anyone                           */
+/* ------------------------------------------------------------------ */
+
+export interface ValidationItem {
+  assumption: string;
+  current: string;
+  why: string;
+  how: string;
+}
+
+/** The placeholder numbers that carry the case, and how to firm each up. */
+export function validationChecklist(
+  a: PlanAssumptions,
+  inv: InvestorAssumptions,
+): ValidationItem[] {
+  return [
+    {
+      assumption: "Kit cost per install",
+      current: `£${a.kitCostGbp.toLocaleString("en-GB")}`,
+      why: "The biggest COGS line; every £100 here moves gross margin ~3 points.",
+      how: "Two written supplier quotes for the standard multi-split BOM (see Procurement), at one-off and at 10-unit volume.",
+    },
+    {
+      assumption: "Mail response rate",
+      current: `${a.responseRatePct}%`,
+      why: "The top driver of the ask in the sensitivity analysis; CAC scales inversely with it.",
+      how: "One 5,000-letter test into hot-band SW16/17 homes with per-address pages; measure completed quotes, not clicks.",
+    },
+    {
+      assumption: "Labour per install",
+      current: `£${a.labourCostGbp.toLocaleString("en-GB")}`,
+      why: "Sets the crew model and the second-crew economics.",
+      how: "Day-rate quotes from two F-Gas subcontractors against the template install spec.",
+    },
+    {
+      assumption: "Pre-money valuation",
+      current: `£${inv.preMoneyGbp.toLocaleString("en-GB")}`,
+      why: "Pure placeholder; it prices the dilution, not the business.",
+      how: "Comparable UK pre-seed/seed rounds for tech-enabled trades; let the round page negotiate from there.",
+    },
+    {
+      assumption: "Service plan attach",
+      current: `${inv.servicePlanAttachPct}% at £${inv.servicePlanMonthlyGbp}/month`,
+      why: "Carries the recurring-revenue story and most of the LTV upside.",
+      how: "Offer it to the first ten install customers at handover and count signatures.",
+    },
+  ];
+}
+
+/* ------------------------------------------------------------------ */
+/* The investor memo                                                   */
+/* ------------------------------------------------------------------ */
+
+const money = (v: number) => {
+  const abs = Math.abs(v);
+  const sign = v < 0 ? "-" : "";
+  if (abs >= 1_000_000_000) return `${sign}£${(abs / 1_000_000_000).toFixed(1)}bn`;
+  if (abs >= 1_000_000) return `${sign}£${(abs / 1_000_000).toFixed(1)}m`;
+  if (abs >= 10_000) return `${sign}£${Math.round(abs / 1000)}k`;
+  return `${sign}£${abs.toLocaleString("en-GB")}`;
+};
+
+/**
+ * The one-pager, assembled from the live model so it can never disagree
+ * with the page. Markdown, ready for a data room, an email, or a deck's
+ * appendix. Deliberately plain: numbers first, adjectives last.
+ */
+export function buildInvestorMemo(
+  plan: Plan,
+  a: PlanAssumptions,
+  inv: InvestorAssumptions,
+  brandName = "Dang, It's Hot",
+): string {
+  const ltv = ltvModel(a, inv);
+  const market = marketModel(a, inv, plan);
+  const raise = Math.max(plan.summary.fundingNeedGbp, 0);
+  const round = roundModel(raise, inv);
+  const milestones = buildMilestones(plan, a, inv);
+  const s = plan.summary;
+  const topRisk = sensitivity(a).reduce((worst, row) =>
+    Math.max(row.askDeltaLowGbp, row.askDeltaHighGbp) >
+    Math.max(worst.askDeltaLowGbp, worst.askDeltaHighGbp)
+      ? row
+      : worst,
+  );
+
+  const lines: string[] = [
+    `# ${brandName}: seed memo`,
+    "",
+    "## The ask",
+    raise > 0
+      ? `Raising ${money(raise)} at ${money(round.preMoneyGbp)} pre-money (${round.investorPct}% to investors, ${round.optionPoolPct}% pool, founder keeps ${round.founderPct}%). The raise covers ${money(a.setupCostsGbp)} of setup and the cash trough of ${money(Math.abs(s.cashTrough.amountGbp))} in month ${s.cashTrough.month}, with a 25% buffer.`
+      : "On current assumptions the plan self-funds; any raise is for acceleration, not survival.",
+    "",
+    "## The business",
+    `Fixed-price residential air conditioning, sold in under two minutes online and installed from pre-engineered templates. A proprietary property database (EPC + planning + our own audits) means we know the house before the customer finishes typing their postcode: quotes prefill, mailings carry per-address landing pages, and design is selection rather than survey.`,
+    "",
+    "## Market (bottom-up)",
+    `TAM ${money(market.tamGbp)} (${(inv.tamHouseholds / 1_000_000).toFixed(1)}m suitable UK homes × ${money(a.avgOrderValueGbp)}). SAM ${money(market.samGbp)} across South London. This plan captures ${market.somInstalls.toLocaleString("en-GB")} installs (${money(market.somGbp)}), just ${market.beachheadPenetrationPct}% of the SW16/SW17 beachhead: the numbers work without heroic share.`,
+    "",
+    "## Unit economics",
+    `${money(a.avgOrderValueGbp)} order value, ${plan.unit.grossMarginPct}% gross margin (${money(plan.unit.grossProfitGbp)} per install). CAC ${money(ltv.effectiveCacGbp)} via addressed mail after ${inv.referralPct}% referrals; the first install repays it ${ltv.cacCoverage}x on its own. Blended LTV ${money(ltv.blendedLtvGbp)} with the service plan gives LTV:CAC of ${ltv.ltvToCac}:1.`,
+    "",
+    "## The plan",
+    `${s.year1.installs} installs and ${money(s.year1.revenueGbp)} revenue in year one; ${s.year2.installs} and ${money(s.year2.revenueGbp)} in year two, run by ${s.maxCrews} crew${s.maxCrews === 1 ? "" : "s"}. ${s.breakevenMonth ? `Monthly breakeven in month ${s.breakevenMonth}.` : "Breakeven sits beyond this horizon on current assumptions."}`,
+    "",
+    "## Milestones (months from the model, not from hope)",
+    ...milestones.map(
+      (m) =>
+        `- ${m.month ? `Month ${m.month}` : "Beyond plan"}: ${m.title}. Gate: ${m.kpi}`,
+    ),
+    "",
+    "## Biggest sensitivity",
+    `${topRisk.driver} (${topRisk.low} to ${topRisk.high}) moves the cash requirement by ${money(topRisk.askDeltaLowGbp)} to ${money(topRisk.askDeltaHighGbp)}. It is first on the validation list.`,
+    "",
+    "## Why this wins",
+    `Every install feeds actuals back into templates, pricing and the property database. The data asset compounds; a competitor starting later starts from zero.`,
+  ];
+  return lines.join("\n");
+}
