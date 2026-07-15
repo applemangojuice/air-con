@@ -15,6 +15,7 @@ import { normalisePostcode } from "@/lib/format";
 import { AddressStep, DetailsStep, HouseStep, type StepProps } from "./steps";
 import { RoomsStep } from "./rooms-step";
 import { QuoteResult, type SubmissionState } from "./result";
+import { TimelineStrip } from "@/components/project/timeline";
 
 // address+email → house → rooms(+price) → details
 const FORM_STEPS = 4;
@@ -169,21 +170,35 @@ export function QuoteWizard({ initialPostcode }: { initialPostcode?: string }) {
     busy,
   };
 
-  switch (step) {
-    case 0:
-      return <AddressStep {...common} onNext={nextFromAddress} />;
-    case 1:
-      return <HouseStep {...common} onNext={nextFromHouse} />;
-    case 2:
-      return (
-        <RoomsStep
-          {...common}
-          onNext={nextFromRooms}
-          excluded={config.excluded}
-          outdoorOptions={config.outdoorOptions}
-        />
-      );
-    default:
-      return <DetailsStep {...common} onNext={finish} />;
-  }
+  const stepView = (() => {
+    switch (step) {
+      case 0:
+        return <AddressStep {...common} onNext={nextFromAddress} />;
+      case 1:
+        return <HouseStep {...common} onNext={nextFromHouse} />;
+      case 2:
+        return (
+          <RoomsStep
+            {...common}
+            onNext={nextFromRooms}
+            excluded={config.excluded}
+            outdoorOptions={config.outdoorOptions}
+          />
+        );
+      default:
+        return <DetailsStep {...common} onNext={finish} />;
+    }
+  })();
+
+  return (
+    <>
+      {/* Address in → the whole journey appears: quote, dot dot dot. */}
+      {step > 0 && (
+        <div className="mx-auto w-full max-w-xl px-4 pt-6 sm:px-0">
+          <TimelineStrip current="quote" />
+        </div>
+      )}
+      {stepView}
+    </>
+  );
 }
