@@ -11,7 +11,7 @@ export default function RoomEditorScreen() {
   const room = draft.survey.rooms.find((r) => r.id === id);
 
   if (!room) {
-    // Deleted or bad deep link — go back to the list.
+    // Deleted or bad deep link, go back to the list.
     router.replace("/survey/rooms");
     return null;
   }
@@ -24,7 +24,7 @@ export default function RoomEditorScreen() {
   return (
     <Screen
       title={room.name}
-      subtitle="A few details and one photo — include the wall you'd want the unit on."
+      subtitle="A few details and one photo. Get the wall you'd want the unit on in shot."
       onBack={() => router.back()}
       onNext={() => router.back()}
       nextLabel="Done"
@@ -98,7 +98,7 @@ export default function RoomEditorScreen() {
       <PhotoGrid
         kind="room"
         label="Photo of the room"
-        guidance="Stand in the doorway — whole target wall in frame, ceiling line visible."
+        guidance="Stand in the doorway. Whole target wall in frame, ceiling line visible."
         photos={room.photos}
         onChange={(photos) => updateRoom(room.id, { photos })}
       />

@@ -6,7 +6,7 @@ import { PROJECT_STAGES, SITE_VISIT, STAGE_INFO } from "@aircon/domain";
 import { gbp } from "@/lib/format";
 
 /**
- * "Start your installation plan" — turns a saved quote into a project and
+ * "Start your installation plan": turns a saved quote into a project and
  * lands the customer on their timeline. Idempotent server-side, so it also
  * acts as the "open my timeline" button on revisits.
  */
@@ -45,8 +45,8 @@ export function StartProjectPanel({
         {existingProjectId ? "Your installation is underway" : "Ready when you are"}
       </h2>
       <p className="mt-2 text-sm text-ink-700">
-        Everything from here happens on one timeline — you can see every step, every projected
-        date, and book the real dates yourself:
+        Everything from here lives on one timeline. Every step, every projected
+        date, and you book the real dates yourself:
       </p>
       <ol className="mt-3 flex flex-wrap gap-x-1.5 gap-y-1 text-sm font-medium text-ink-700">
         {PROJECT_STAGES.map((stage, i) => (
@@ -57,8 +57,8 @@ export function StartProjectPanel({
         ))}
       </ol>
       <p className="mt-3 text-xs text-ink-500">
-        Nothing is payable until you book your {gbp(SITE_VISIT.feeGbp)} site visit — the one-hour
-        session that greenlights installation (and the fee comes off your price).
+        Nothing to pay until you book your {gbp(SITE_VISIT.feeGbp)} site visit, the one-hour
+        session that greenlights your install. And that fee comes off your price anyway.
       </p>
       <button
         type="button"
@@ -73,11 +73,11 @@ export function StartProjectPanel({
             : "Start my installation plan"}
       </button>
       {state === "error" && (
-        <p className="mt-2 text-sm text-red-600">That didn&apos;t work — try again in a moment.</p>
+        <p className="mt-2 text-sm text-red-600">That didn&apos;t work. Give it another go in a sec.</p>
       )}
       {!quoteId && (
         <p className="mt-2 text-center text-xs text-ink-300">
-          Demo mode — you&apos;ll get a playable example timeline.
+          Demo mode: you&apos;ll get a playable example timeline.
         </p>
       )}
     </section>

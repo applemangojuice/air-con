@@ -67,7 +67,7 @@ export function OptionCards<T extends string | number | boolean>({
   );
 }
 
-/** Compact 1…N+ number picker — narrow buttons in a single row. */
+/** Compact 1…N+ number picker, narrow buttons in a single row. */
 export function NumberRow({
   value,
   onChange,

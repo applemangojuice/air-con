@@ -1,6 +1,6 @@
 /**
  * Organic design system tokens (synced from the "Organic" Claude Design
- * project theme.json) — the same values as apps/web/app/globals.css.
+ * project theme.json), the same values as apps/web/app/globals.css.
  */
 export const theme = {
   colors: {

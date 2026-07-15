@@ -12,7 +12,7 @@ export default function OutdoorScreen() {
       step={5}
       totalSteps={8}
       title="Where could the outdoor unit go?"
-      subtitle="Every system needs one outdoor unit (about the size of a suitcase). It hums quietly — roughly as loud as a fridge."
+      subtitle="Every system needs one outdoor unit (about the size of a suitcase). It hums quietly, roughly as loud as a fridge."
       onBack={() => router.back()}
       onNext={() => router.push("/survey/electrics")}
     >
@@ -33,7 +33,7 @@ export default function OutdoorScreen() {
       <PhotoGrid
         kind="outdoor-location"
         label="Photo of the spot"
-        guidance="Step 3–4 m back — show where the unit sits and the route we'd walk to reach it."
+        guidance="Step 3–4 m back. Show where the unit sits and the route we'd walk to reach it."
         photos={outdoor.photos}
         onChange={(photos) => setSurvey({ outdoor: { ...outdoor, photos } })}
       />

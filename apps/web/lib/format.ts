@@ -7,7 +7,7 @@ export function gbp(amount: number): string {
 }
 
 // Hand-rolled short dates: Node and browser ICU disagree on en-GB comma
-// placement, which breaks React hydration — so no toLocaleDateString here.
+// placement, which breaks React hydration, so no toLocaleDateString here.
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 

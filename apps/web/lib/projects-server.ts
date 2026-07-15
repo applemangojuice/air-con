@@ -49,7 +49,7 @@ export async function saveProject(supabase: SupabaseClient, project: Project): P
 }
 
 /**
- * Create the project for a saved quote — idempotent: one project per quote,
+ * Create the project for a saved quote. Idempotent: one project per quote,
  * repeat calls return the existing project's id.
  */
 export async function createProjectForQuote(
@@ -89,7 +89,7 @@ export async function createProjectForQuote(
     .single();
 
   if (error || !data) {
-    // Lost a race with a concurrent create — the unique quote_id makes this safe.
+    // Lost a race with a concurrent create; the unique quote_id makes this safe.
     const { data: raced } = await supabase
       .from("projects")
       .select("id")
@@ -173,7 +173,7 @@ const DEMO_SURVEY: Survey = {
 };
 
 /**
- * A fresh demo project for /p/demo — the whole journey is playable in the
+ * A fresh demo project for /p/demo. The whole journey is playable in the
  * browser (the client runs the same reducer; nothing persists).
  */
 export function buildDemoProject(): Project {

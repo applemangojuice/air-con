@@ -6,14 +6,14 @@ import { applyAndSave } from "@/lib/projects-server";
 
 /**
  * Ops-side transitions. These run behind the /ops basic-auth wall (see
- * middleware.ts) — server actions POST to the page's own URL, so the same
+ * middleware.ts). Server actions POST to the page's own URL, so the same
  * wall covers them. Customer actions go through /api/projects instead.
  */
 
 /**
  * Plain <form action> requires void-returning actions. Each form only renders
  * when its transition is legal for the current state, so a reducer rejection
- * here means a stale page — the revalidate refreshes it either way.
+ * here means a stale page, and the revalidate refreshes it either way.
  */
 async function run(projectId: string, action: ProjectAction): Promise<void> {
   const result = await applyAndSave(projectId, action);

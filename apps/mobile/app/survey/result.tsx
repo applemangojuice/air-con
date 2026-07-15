@@ -30,7 +30,7 @@ export default function ResultScreen() {
     if (submitted.current) return;
     submitted.current = true;
     submitSurvey(draft).then(setSubmission);
-    // Submit once with the survey as completed — edits mean a new run-through.
+    // Submit once with the survey as completed; edits mean a new run-through.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -120,11 +120,11 @@ export default function ResultScreen() {
 
       {/* Status + booking */}
       {submission?.status === "saved" && (
-        <Text style={styles.saved}>✓ Saved — we&apos;ve emailed your permanent quote link.</Text>
+        <Text style={styles.saved}>✓ Saved. We&apos;ve emailed your permanent quote link.</Text>
       )}
       {submission?.status === "error" && (
         <Text style={styles.error}>
-          Couldn&apos;t reach the server — your quote is still valid. Reconnect and reopen this
+          Couldn&apos;t reach the server, but your quote is still valid. Reconnect and reopen this
           screen to save it.
         </Text>
       )}

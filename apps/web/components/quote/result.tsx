@@ -34,17 +34,17 @@ export function QuoteResult({
 
       {saved && (
         <p className="mt-4 text-sm text-sage-700">
-          ✓ Saved{saved.emailed ? ` — a copy is on its way to ${draft.contact.email}` : ""}. Your
+          ✓ Saved{saved.emailed ? `, and a copy is on its way to ${draft.contact.email}` : ""}. Your
           quote lives at{" "}
           <a href={`/q/${saved.id}`} className="font-semibold underline">
             this permanent link
-          </a>{" "}
-          — bookmark it to come back any time.
+          </a>
+          . Bookmark it to come back any time.
         </p>
       )}
       {submission?.status === "error" && (
         <p className="mt-4 text-sm text-red-600">
-          We couldn&apos;t save your survey just now — your quote is still valid.
+          We couldn&apos;t save your survey just now, but your quote is still valid.
           Screenshot this page or email us at {BRAND.supportEmail}.
         </p>
       )}

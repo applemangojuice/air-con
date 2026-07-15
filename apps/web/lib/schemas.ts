@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-/** Shared wire-schema for surveys — used by the quote and draft endpoints. */
+/** Shared wire-schema for surveys, used by the quote and draft endpoints. */
 
 const photoSchema = z.object({
   id: z.string(),

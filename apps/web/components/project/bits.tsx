@@ -18,7 +18,7 @@ export function StagePanel({
     <section className="rounded-3xl border border-line bg-white p-5 sm:p-7">
       {state === "upcoming" && (
         <p className="mb-4 inline-flex items-center gap-2 rounded-full bg-surface px-3 py-1 text-xs font-semibold text-ink-500">
-          <span aria-hidden>🔭</span> Coming up — a preview of this step
+          <span aria-hidden>🔭</span> Coming up: a sneak peek of this step
         </p>
       )}
       {state === "complete" && (
@@ -33,7 +33,7 @@ export function StagePanel({
   );
 }
 
-/** "What happens here" bullets — the explanation future stages open with. */
+/** "What happens here" bullets, the explanation future stages open with. */
 export function Explainer({ stage }: { stage: ProjectStageId }) {
   return (
     <ul className="space-y-2 rounded-2xl bg-surface/60 p-4 text-sm text-ink-700">

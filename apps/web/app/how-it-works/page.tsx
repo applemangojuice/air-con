@@ -10,19 +10,19 @@ export const metadata: Metadata = {
 const sections = [
   {
     title: "1. You survey your own home",
-    body: "Our guided survey walks you through your home room by room: how big each room is, which way it faces, where your fuse board is, where the outdoor unit could live. You photograph each one from your phone — the camera opens automatically. It replaces the traditional salesperson visit entirely.",
+    body: "Our guided survey walks you through your home room by room: how big each room is, which way it faces, where your fuse board is, where the outdoor unit could live. You photograph each one from your phone, the camera opens automatically. It replaces the traditional salesperson visit entirely.",
   },
   {
     title: "2. We size the system properly",
-    body: "Behind the scenes, a heat-load model estimates the cooling each room needs from its size, glazing, orientation and use — then picks the smallest unit that comfortably covers it. Oversized units short-cycle and waste money; undersized ones never keep up. Sizing is the bit the industry most often gets wrong, so we automated it.",
+    body: "Behind the scenes, a heat-load model estimates the cooling each room needs from its size, glazing, orientation and use, then picks the smallest unit that comfortably covers it. Oversized units short-cycle and waste money; undersized ones never keep up. Sizing is the bit the industry most often gets wrong, so we automated it.",
   },
   {
     title: "3. Your price is fixed, with a confidence score",
-    body: "Every quote comes with an Installation Confidence Score. A complete survey with photos scores high — and a high score means the price is guaranteed as-is. Missing details lower the score, and we tell you exactly what to add to lock it in. No on-the-day surprises, because the surprises got answered before we arrived.",
+    body: "Every quote comes with an Installation Confidence Score. A complete survey with photos scores high, and a high score means the price is guaranteed as-is. Missing details lower the score, and we tell you exactly what to add to lock it in. No on-the-day surprises, because the surprises got answered before we arrived.",
   },
   {
     title: "4. Installation, documented end to end",
-    body: "Our engineers arrive with a job pack generated from your survey: unit positions, pipe routes, electrical work. Each installation step is photographed and quality-checked — pressure tests, vacuum readings, commissioning data — and your handover documents generate automatically.",
+    body: "Our engineers arrive with a job pack generated from your survey: unit positions, pipe routes, electrical work. Each installation step is photographed and quality-checked (pressure tests, vacuum readings, commissioning data) and your handover documents generate automatically.",
   },
   {
     title: "5. It keeps working for years",
@@ -39,8 +39,8 @@ export default function HowItWorksPage() {
           <div className="mx-auto max-w-3xl px-4 py-16 sm:px-6">
             <h1 className="text-4xl font-display sm:text-5xl">How it works</h1>
             <p className="mt-4 text-lg text-ink-500">
-              We rebuilt the whole journey — from &ldquo;how much would it
-              cost?&rdquo; to a quietly humming system — around one idea: answer
+              We rebuilt the whole journey, from &ldquo;how much would it
+              cost?&rdquo; to a quietly humming system, around one idea: answer
               every question before an engineer sets foot in your home.
             </p>
           </div>

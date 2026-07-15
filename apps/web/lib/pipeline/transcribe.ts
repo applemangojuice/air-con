@@ -2,7 +2,7 @@
  * Speech-to-text for walkthrough videos.
  *
  * Claude doesn't accept audio/video input, so transcription uses OpenAI's
- * Whisper API when OPENAI_API_KEY is set. Returns null when not configured —
+ * Whisper API when OPENAI_API_KEY is set. Returns null when not configured,
  * the video survey then parks at 'needs_review' with the video still
  * available to ops.
  */

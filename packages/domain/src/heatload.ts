@@ -3,7 +3,7 @@ import type { CapacityKw, SurveyRoom } from "./types.ts";
 /**
  * Quick-estimate heat load per room.
  *
- * This is deliberately a simple, transparent rule set — not a Manual J / CIBSE
+ * This is deliberately a simple, transparent rule set, not a Manual J / CIBSE
  * calculation. It exists to size units consistently from self-survey answers.
  * As installation outcomes accumulate, these factors get tuned from real data
  * (see ARCHITECTURE.md → knowledge loop).

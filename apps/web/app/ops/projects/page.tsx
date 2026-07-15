@@ -5,7 +5,7 @@ import { fmtDay, fmtDayTime } from "@/lib/format";
 import { getServiceClient } from "@/lib/supabase-server";
 
 export const metadata: Metadata = {
-  title: "Projects — ops",
+  title: "Projects · ops",
   robots: { index: false },
 };
 
@@ -26,7 +26,7 @@ export default async function OpsProjectsPage() {
     return (
       <Shell>
         <div className="rounded-2xl border border-line bg-surface p-6 text-sm text-ink-500">
-          <p className="font-semibold text-ink-900">Demo mode — no database connected</p>
+          <p className="font-semibold text-ink-900">Demo mode, no database connected</p>
           <p className="mt-2">
             Set <code>SUPABASE_URL</code> and <code>SUPABASE_SERVICE_ROLE_KEY</code> to see live
             projects here. The customer-side demo timeline is at <code>/p/demo</code>.
@@ -56,7 +56,7 @@ export default async function OpsProjectsPage() {
     <Shell count={projects.length}>
       {projects.length === 0 ? (
         <p className="text-sm text-ink-500">
-          No projects yet — they appear when a customer starts their installation plan from a
+          No projects yet. They appear when a customer starts their installation plan from a
           saved quote.
         </p>
       ) : (
@@ -105,13 +105,13 @@ export default async function OpsProjectsPage() {
                     </span>
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-ink-500">
-                    {p.site_visit_at ? fmtDayTime(p.site_visit_at) : "—"}
+                    {p.site_visit_at ? fmtDayTime(p.site_visit_at) : "-"}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-ink-500">
-                    {p.delivery_expected_on ? fmtDay(p.delivery_expected_on) : "—"}
+                    {p.delivery_expected_on ? fmtDay(p.delivery_expected_on) : "-"}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-ink-500">
-                    {p.install_on ? fmtDay(p.install_on) : "—"}
+                    {p.install_on ? fmtDay(p.install_on) : "-"}
                   </td>
                 </tr>
               ))}

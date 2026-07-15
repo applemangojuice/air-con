@@ -28,7 +28,7 @@ export default function DesignScreen() {
     const permutation = archetype!.permutations.find((p) => p.id === permutationId)!;
     setSurvey({
       permutationId,
-      // The pattern decides where the outdoor unit lives — prefill it.
+      // The pattern decides where the outdoor unit lives, so prefill it.
       outdoor: { ...draft.survey.outdoor, location: permutation.outdoorLocation },
       // Zero-AI floor plan: start from the archetype's stock layout. The
       // customer confirms/tweaks rooms instead of describing them.
@@ -48,7 +48,7 @@ export default function DesignScreen() {
       step={1}
       totalSteps={8}
       title={`How we install in a ${archetype.name.toLowerCase()}`}
-      subtitle={`There ${archetype.permutations.length === 1 ? "is one proven way" : `are ${archetype.permutations.length} proven ways`} we install in homes like yours. Pick the one that suits you best — we'll verify it on your video.`}
+      subtitle={`There ${archetype.permutations.length === 1 ? "is one proven way" : `are ${archetype.permutations.length} proven ways`} we install in homes like yours. Pick the one that suits you best and we'll double-check it on your video.`}
       onBack={() => router.back()}
     >
       <View style={{ gap: space(3) }}>

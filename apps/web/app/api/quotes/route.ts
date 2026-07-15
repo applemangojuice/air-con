@@ -27,7 +27,7 @@ export async function POST(request: Request) {
   if (survey.rooms.length === 0) {
     return NextResponse.json({ error: "No rooms selected" }, { status: 400 });
   }
-  // The server recomputes the quote — the stored price never comes from the client.
+  // The server recomputes the quote; the stored price never comes from the client.
   const quote = generateQuote(survey as Survey);
 
   const supabase = getServiceClient();
@@ -111,7 +111,7 @@ async function sendQuoteEmail(
         subject: `Your fixed price: ${total} installed`,
         html: `<p>Hi ${escapeHtml(name)},</p>
 <p>Your fixed installation price is <strong>${total}</strong> (VAT included).</p>
-<p>Your full quote — system design, price breakdown and finance options — is saved here:</p>
+<p>Your full quote (system design, price breakdown and finance options) is saved here:</p>
 <p><a href="${link}">${link}</a></p>
 <p>You can book your installation from that page whenever you're ready. The link doesn't expire.</p>`,
       }),

@@ -6,7 +6,7 @@ import { applyAndSave, loadProject } from "@/lib/projects-server";
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
- * Customer actions only — ops-* actions never come through the public API;
+ * Customer actions only. ops-* actions never come through the public API;
  * they run as server actions behind the /ops basic-auth wall.
  */
 const actionSchema = z.discriminatedUnion("type", [

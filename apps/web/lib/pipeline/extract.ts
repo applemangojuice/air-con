@@ -68,8 +68,8 @@ export async function extractFromTranscript(
     system: `You extract structured home-survey data from a customer's narrated video walkthrough of their house.
 
 Context about this home:
-- House archetype: ${archetype.name} (${archetype.eraLabel}) — ${archetype.description}
-- Chosen install pattern: ${permutation.label} — ${permutation.summary} It serves up to ${permutation.servesUpTo} rooms.
+- House archetype: ${archetype.name} (${archetype.eraLabel}): ${archetype.description}
+- Chosen install pattern: ${permutation.label}: ${permutation.summary} It serves up to ${permutation.servesUpTo} rooms.
 
 Rules:
 - Create one entry per distinct room the customer mentions, even rooms they don't want cooled (wantsCooling=false for those).

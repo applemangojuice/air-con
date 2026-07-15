@@ -7,12 +7,12 @@ const steps = [
   {
     n: "01",
     title: "Survey your home from your phone",
-    body: "Answer a few questions and photograph each room, your outdoor space and your fuse board. It takes about 10 minutes — no visit needed.",
+    body: "Answer a few questions and photograph each room, your outdoor space and your fuse board. Takes about 10 minutes, no visit needed.",
   },
   {
     n: "02",
     title: "Get a fixed price instantly",
-    body: "Our pricing engine sizes the right units for every room and returns a guaranteed installation price with finance options — not an estimate.",
+    body: "Our pricing engine sizes the right units for every room and returns a guaranteed installation price with finance options. Not an estimate, the actual price.",
   },
   {
     n: "03",
@@ -25,7 +25,7 @@ const promises = [
   { title: "Fixed price, guaranteed", body: "The price you see is the price you pay. No surveyor upsell, no on-the-day extras." },
   { title: "5-year warranty", body: "Parts and labour included on every installation as standard." },
   { title: "Certified engineers", body: "Every install by F-Gas certified engineers, photographed and quality-checked at each step." },
-  { title: "Cooling and heating", body: "Modern systems heat efficiently in winter too — one unit, year-round comfort." },
+  { title: "Cooling and heating", body: "Modern systems heat efficiently in winter too. One unit, comfy all year." },
 ];
 
 const platform = [
@@ -46,7 +46,7 @@ export default function HomePage() {
             <div className="max-w-2xl">
               <p className="inline-flex items-center gap-2 rounded-full border border-accent-100 bg-white px-3 py-1 text-xs font-semibold text-accent-700">
                 <span className="h-1.5 w-1.5 rounded-full bg-accent-500" />
-                Now taking bookings — limited launch areas
+                Now taking bookings in our launch areas
               </p>
               <h1 className="mt-5 text-4xl font-display text-ink-900 sm:text-6xl">
                 Air conditioning for your home.{" "}
@@ -54,7 +54,7 @@ export default function HomePage() {
               </h1>
               <p className="mt-5 max-w-xl text-lg text-ink-500">
                 Survey your own home from your phone and get a guaranteed fixed
-                price for a professional installation — no salesperson, no
+                price for a professional installation. No salesperson, no
                 waiting a week for a surveyor.
               </p>
 
@@ -75,7 +75,7 @@ export default function HomePage() {
                 </button>
               </form>
               <p className="mt-3 text-sm text-ink-300">
-                Free, takes ~10 minutes, and your price is fixed — not an estimate.
+                Free, takes about 10 minutes, and your price is fixed. Not an estimate.
               </p>
             </div>
           </div>
@@ -123,8 +123,8 @@ export default function HomePage() {
             One platform, from first quote to year fifteen
           </h2>
           <p className="mt-3 max-w-2xl text-ink-500">
-            {BRAND.name} manages the whole life of your system — quoting, design,
-            installation, monitoring and servicing — so every step is faster,
+            {BRAND.name} looks after the whole life of your system: quoting, design,
+            installation, monitoring and servicing. Every step is faster,
             more predictable and better documented.
           </p>
           <div className="mt-10 grid gap-6 sm:grid-cols-2">

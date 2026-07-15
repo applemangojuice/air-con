@@ -28,7 +28,7 @@ type Stage =
   | { name: "uploading" }
   | { name: "processing" }
   | { name: "done"; roomCount: number }
-  | { name: "saved" } // uploaded for engineer eyes only — no AI processing
+  | { name: "saved" } // uploaded for engineer eyes only, no AI processing
   | { name: "fallback"; reason: string };
 
 /**
@@ -69,7 +69,7 @@ export default function WalkthroughScreen() {
     }
   }
 
-  /** Upload the video as evidence for the engineers — no AI processing at all. */
+  /** Upload the video as evidence for the engineers, no AI processing at all. */
   async function saveForReview(uri: string, fileName: string) {
     const { archetypeId, permutationId, postcode } = draft.survey;
     if (!archetypeId || !permutationId) return;
@@ -80,7 +80,7 @@ export default function WalkthroughScreen() {
     else
       setStage({
         name: "fallback",
-        reason: "The video didn't upload — carry on, your rooms are already drafted below.",
+        reason: "The video didn't upload. Carry on, your rooms are already drafted below.",
       });
   }
 
@@ -92,17 +92,17 @@ export default function WalkthroughScreen() {
     setStage({ name: "uploading" });
     const created = await createVideoSurvey(archetypeId, permutationId, postcode, fileName);
     if (!created) {
-      setStage({ name: "fallback", reason: "We couldn't reach the server, so add your rooms manually — your answers still get you a fixed price." });
+      setStage({ name: "fallback", reason: "We couldn't reach the server, so add your rooms manually. Your answers still get you a fixed price." });
       return;
     }
     const uploaded = await uploadVideo(created.signedUrl, uri);
     if (!uploaded) {
-      setStage({ name: "fallback", reason: "The video didn't upload. Add your rooms manually — you can also email us the video later." });
+      setStage({ name: "fallback", reason: "The video didn't upload. Add your rooms manually, and you can email us the video later." });
       return;
     }
 
     setStage({ name: "processing" });
-    processVideoSurvey(created.id); // fire and poll — the route may run for minutes
+    processVideoSurvey(created.id); // fire and poll, the route may run for minutes
 
     const deadline = Date.now() + 4 * 60 * 1000;
     while (Date.now() < deadline && !cancelled.current) {
@@ -124,7 +124,7 @@ export default function WalkthroughScreen() {
     if (!cancelled.current) {
       setStage({
         name: "fallback",
-        reason: "This is taking longer than expected — your video is saved. Add your rooms manually for an instant price.",
+        reason: "This is taking longer than expected, but your video is saved. Add your rooms manually for an instant price.",
       });
     }
   }
@@ -148,7 +148,7 @@ export default function WalkthroughScreen() {
       step={3}
       totalSteps={8}
       title="Film your walkthrough"
-      subtitle="Your rooms are already drafted from your house type. A short narrated video lets us verify your fixed price — and it's how our engineers prepare."
+      subtitle="Your rooms are already drafted from your house type. A short narrated video locks in your fixed price, and it's how our engineers prepare."
       onBack={busy ? undefined : () => router.back()}
       onNext={
         stage.name === "done" || stage.name === "fallback" || stage.name === "saved"
@@ -180,7 +180,7 @@ export default function WalkthroughScreen() {
           </View>
           <Pressable style={styles.primary} onPress={() => saveForReview(stage.uri, stage.fileName)}>
             <Text style={styles.primaryText}>Save for my install team</Text>
-            <Text style={styles.primaryHint}>Fastest — your rooms are already drafted</Text>
+            <Text style={styles.primaryHint}>Fastest option, your rooms are already drafted</Text>
           </Pressable>
           <Pressable style={styles.secondary} onPress={() => buildPlan(stage.uri, stage.fileName)}>
             <Text style={styles.secondaryText}>Or: build my plan from the video</Text>
@@ -198,7 +198,7 @@ export default function WalkthroughScreen() {
           </Text>
           <Text style={styles.busyBody}>
             {stage.name === "uploading"
-              ? "Keep the app open — this takes a moment on mobile data."
+              ? "Keep the app open, this takes a moment on mobile data."
               : "We're listening to your narration and drafting your rooms. Usually under two minutes."}
           </Text>
         </View>
@@ -209,7 +209,7 @@ export default function WalkthroughScreen() {
           <Text style={styles.doneTitle}>Floor plan drafted ✓</Text>
           <Text style={styles.doneBody}>
             We heard {stage.roomCount} room{stage.roomCount === 1 ? "" : "s"} in your walkthrough.
-            Check them on the next screen — you can rename, adjust or remove anything.
+            Check them on the next screen. You can rename, adjust or remove anything.
           </Text>
         </View>
       )}
@@ -219,7 +219,7 @@ export default function WalkthroughScreen() {
           <Text style={styles.doneTitle}>Video saved ✓</Text>
           <Text style={styles.doneBody}>
             Our engineers will watch it before confirming your fixed price.
-            Your rooms are already drafted — review them next.
+            Your rooms are already drafted. Review them next.
           </Text>
         </View>
       )}
@@ -232,7 +232,7 @@ export default function WalkthroughScreen() {
 
       {stage.name === "idle" && (
         <Pressable onPress={() => router.push("/survey/rooms")}>
-          <Text style={styles.skip}>Skip the video — review my drafted rooms</Text>
+          <Text style={styles.skip}>Skip the video and review my drafted rooms</Text>
         </Pressable>
       )}
     </Screen>

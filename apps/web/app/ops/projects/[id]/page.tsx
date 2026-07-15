@@ -14,7 +14,7 @@ import {
 } from "../actions";
 
 export const metadata: Metadata = {
-  title: "Project — ops",
+  title: "Project · ops",
   robots: { index: false },
 };
 
@@ -109,7 +109,7 @@ export default async function OpsProjectPage({
             v={
               project.delivery.expectedDate
                 ? `${fmtDay(project.delivery.expectedDate)} (${project.delivery.status})`
-                : "—"
+                : "-"
             }
           />
           <Row
@@ -121,7 +121,7 @@ export default async function OpsProjectPage({
             }
           />
           <Row k="Change fees accrued" v={fees.changeFeesGbp ? gbp(fees.changeFeesGbp) : "none"} />
-          <Row k="Electrics" v={`${project.electrics.status} — ${project.electrics.summary}`} />
+          <Row k="Electrics" v={`${project.electrics.status}: ${project.electrics.summary}`} />
         </Card>
 
         {/* Final quote */}
@@ -170,9 +170,9 @@ export default async function OpsProjectPage({
               <label className="block text-sm">
                 <span className="mb-1 block font-semibold">Electrics status</span>
                 <select name="electricsStatus" className={inputCls} defaultValue="validated">
-                  <option value="validated">validated — plan agreed</option>
-                  <option value="attention">attention — work to resolve</option>
-                  <option value="provisional">provisional — still open</option>
+                  <option value="validated">validated (plan agreed)</option>
+                  <option value="attention">attention (work to resolve)</option>
+                  <option value="provisional">provisional (still open)</option>
                 </select>
               </label>
               <label className="block text-sm">
@@ -204,7 +204,7 @@ export default async function OpsProjectPage({
               </label>
               <button className={buttonCls}>Mark dispatched</button>
               <p className="text-xs text-ink-300">
-                Courier-API integration lands here — dispatch + tracking events will sync
+                Courier-API integration lands here. Dispatch and tracking events will sync
                 automatically.
               </p>
             </form>
@@ -273,8 +273,8 @@ export default async function OpsProjectPage({
         {project.installation.status === "booked" && project.delivery.status === "delivered" && (
           <Card title="Installation day" highlight>
             <p className="text-sm text-ink-500">
-              Booked for {project.installation.date ? fmtDay(project.installation.date) : "—"} —
-              equipment is on site.
+              Booked for {project.installation.date ? fmtDay(project.installation.date) : "-"}.
+              Equipment is on site.
             </p>
             <form action={completeInstallation.bind(null, project.id)} className="mt-3">
               <button className={buttonCls}>Mark installation complete</button>

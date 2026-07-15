@@ -63,7 +63,7 @@ export function QuoteStagePanel({ project, demo }: PanelProps) {
           href={`/q/${project.quoteId}`}
           className="inline-block text-sm font-semibold text-accent-700 hover:underline"
         >
-          View the full quote — breakdown, finance, warranty →
+          See the full quote: breakdown, finance, warranty →
         </a>
       )}
     </StagePanel>
@@ -98,7 +98,7 @@ export function FloorPlanPanel({ project, busy, dispatch }: PanelProps) {
       {project.floorPlan.archetypeName && (
         <p className="text-sm text-ink-500">
           Based on the proven layout for a{" "}
-          <strong className="text-ink-900">{project.floorPlan.archetypeName}</strong> — we install
+          <strong className="text-ink-900">{project.floorPlan.archetypeName}</strong>. We fit
           this house type week in, week out.
         </p>
       )}
@@ -140,13 +140,13 @@ export function FloorPlanPanel({ project, busy, dispatch }: PanelProps) {
             Approve my floor plan
           </PrimaryButton>
           <p className="text-xs text-ink-300">
-            Not quite right? Nothing is final — the site visit walks every position with you, and
-            changing your mind there is free.
+            Not quite right? Nothing is final yet. The site visit walks every position with you,
+            and changing your mind there is free.
           </p>
         </>
       ) : state === "complete" ? (
         <p className="text-sm text-sage-700">
-          Approved {project.floorPlan.approvedAt ? fmtDay(project.floorPlan.approvedAt) : ""} — any
+          Approved {project.floorPlan.approvedAt ? fmtDay(project.floorPlan.approvedAt) : ""}. Any
           tweaks get picked up at your site visit.
         </p>
       ) : null}
@@ -167,17 +167,17 @@ export function FinalQuotePanel({ project, busy, dispatch }: PanelProps) {
       {state === "upcoming" && (
         <>
           <Explainer stage="final-quote" />
-          <LockedNote>Approve your floor plan first — this step unlocks right after.</LockedNote>
+          <LockedNote>Approve your floor plan first and this step unlocks right after.</LockedNote>
         </>
       )}
 
       {state === "current" && fq.status === "pending" && (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-          <p className="font-semibold">We&apos;re reviewing your survey now.</p>
+          <p className="font-semibold">We&apos;re checking your survey now.</p>
           <p className="mt-1">
-            Your final quote lands within <strong>1 working day</strong> of your floor-plan
-            approval — that&apos;s a commitment, not an aim: if we miss it, £50 comes off your
-            installation.
+            Your final quote lands within <strong>1 working day</strong> of you approving your
+            floor plan. That&apos;s a promise, not an aim. If we miss it, £50 comes off your
+            install.
           </p>
         </div>
       )}
@@ -187,7 +187,7 @@ export function FinalQuotePanel({ project, busy, dispatch }: PanelProps) {
           <InfoRow label="Final fixed price (inc. VAT)">{gbp(fq.totalGbp ?? 0)}</InfoRow>
           {fq.totalGbp !== project.quoteSummary.totalGbp && (
             <p className="mt-2 text-xs text-ink-500">
-              Your instant quote was {gbp(project.quoteSummary.totalGbp)} — the change comes from
+              Your instant quote was {gbp(project.quoteSummary.totalGbp)}. The change comes from
               our photo review{fq.note ? `: ${fq.note}` : "."}
             </p>
           )}
@@ -203,16 +203,16 @@ export function FinalQuotePanel({ project, busy, dispatch }: PanelProps) {
             Accept my final quote
           </PrimaryButton>
           <p className="text-xs text-ink-300">
-            Accepting costs nothing and doesn&apos;t commit you — it unlocks site-visit booking,
-            and the site visit is where you decide for real.
+            Accepting costs nothing and doesn&apos;t tie you in. It just unlocks site visit
+            booking, and the site visit is where you decide for real.
           </p>
         </>
       )}
 
       {state === "complete" && (
         <p className="text-sm text-sage-700">
-          Accepted {fq.acceptedAt ? fmtDay(fq.acceptedAt) : ""} — this price is now in writing and
-          only ever changes if you change the scope.
+          Accepted {fq.acceptedAt ? fmtDay(fq.acceptedAt) : ""}. This price is now in writing and
+          only ever changes if you change the plan.
         </p>
       )}
     </StagePanel>
@@ -254,7 +254,7 @@ export function SiteVisitPanel({ project, busy, dispatch }: PanelProps) {
 
   const purposeList = (
     <div className="rounded-2xl bg-surface/60 p-4">
-      <p className="text-sm font-semibold">One hour with our founder — what it&apos;s for</p>
+      <p className="text-sm font-semibold">One hour with our founder. Here&apos;s what it&apos;s for</p>
       <ul className="mt-2 space-y-1.5 text-sm text-ink-700">
         {SITE_VISIT.purposes.map((purpose) => (
           <li key={purpose} className="flex gap-2.5">
@@ -264,8 +264,8 @@ export function SiteVisitPanel({ project, busy, dispatch }: PanelProps) {
         ))}
       </ul>
       <p className="mt-3 text-xs text-ink-500">
-        {gbp(SITE_VISIT.feeGbp)}, credited in full against your installation price. It&apos;s the
-        one fixed gate before installation — nothing gets built without it.
+        {gbp(SITE_VISIT.feeGbp)}, and every penny comes off your install price. It&apos;s the one
+        fixed step before installation. Nothing gets built without it.
       </p>
     </div>
   );
@@ -292,8 +292,8 @@ export function SiteVisitPanel({ project, busy, dispatch }: PanelProps) {
               </span>
               <span className="mt-0.5 block text-xs text-ink-300">
                 {m === "video"
-                  ? "A guided video call — you're the camera"
-                  : "We come to you — where access needs eyes on"}
+                  ? "A guided video call where you're the camera"
+                  : "We come to you, for when access needs real eyes"}
               </span>
             </button>
           ))}
@@ -350,7 +350,7 @@ export function SiteVisitPanel({ project, busy, dispatch }: PanelProps) {
 
       {state === "upcoming" && (
         <LockedNote>
-          Unlocks once your final quote is accepted — but this is exactly what booking will look
+          Unlocks once your final quote is accepted, but this is exactly what booking will look
           like.
         </LockedNote>
       )}
@@ -374,7 +374,7 @@ export function SiteVisitPanel({ project, busy, dispatch }: PanelProps) {
       {sv.status === "booked" && (
         <div className="space-y-4">
           <div className="rounded-2xl border border-sage-200 bg-sage-50 p-4">
-            <InfoRow label="Booked for">{sv.scheduledFor ? fmtDayTime(sv.scheduledFor) : "—"}</InfoRow>
+            <InfoRow label="Booked for">{sv.scheduledFor ? fmtDayTime(sv.scheduledFor) : "-"}</InfoRow>
             <div className="mt-2 space-y-2">
               <InfoRow label="Format">{SITE_VISIT_MODE_LABEL[sv.mode]}</InfoRow>
               <InfoRow label="Fee">
@@ -393,8 +393,8 @@ export function SiteVisitPanel({ project, busy, dispatch }: PanelProps) {
                 Pay {gbp(sv.feeGbp)} &amp; confirm the slot
               </PrimaryButton>
               <p className="text-xs text-ink-300">
-                Credited in full against your installation. Card payment links go live shortly —
-                for now this confirms your slot and we invoice you.
+                Every penny comes off your install price. Card payments are coming soon, so for
+                now this confirms your slot and we send you an invoice.
               </p>
             </>
           )}
@@ -412,7 +412,7 @@ export function SiteVisitPanel({ project, busy, dispatch }: PanelProps) {
                   disabled={!slotIso}
                   busy={busy}
                 >
-                  Move it{moveFee > 0 ? ` — ${gbp(moveFee)} change fee` : " — free"}
+                  Move it{moveFee > 0 ? ` (${gbp(moveFee)} change fee)` : " (free)"}
                 </PrimaryButton>
                 <GhostButton onClick={() => setRescheduling(false)}>Cancel</GhostButton>
               </div>
@@ -447,7 +447,7 @@ export function SiteVisitPanel({ project, busy, dispatch }: PanelProps) {
   );
 }
 
-/** The power connection — assessed from the survey, settled at the site visit. */
+/** The power connection: assessed from the survey, settled at the site visit. */
 export function ElectricsCard({ project }: { project: Project }) {
   const e = project.electrics;
   const chip =
@@ -455,7 +455,7 @@ export function ElectricsCard({ project }: { project: Project }) {
       ? { cls: "bg-sage-50 text-sage-700", label: "Validated at site visit" }
       : e.status === "attention"
         ? { cls: "bg-amber-50 text-amber-700", label: "Needs a closer look" }
-        : { cls: "bg-surface text-ink-500", label: "Provisional — confirmed at site visit" };
+        : { cls: "bg-surface text-ink-500", label: "Provisional, confirmed at site visit" };
 
   return (
     <div className="rounded-2xl border border-line p-4">
@@ -489,8 +489,8 @@ export function DeliveryPanel({ project, busy, dispatch }: PanelProps) {
 
       {d.status === "pending" && (
         <LockedNote>
-          Your delivery date is set automatically when you book your installation — equipment
-          lands two days before, and you can slide it from here.
+          Your delivery date gets set automatically when you book your install. Your kit lands
+          two days before, and you can slide it from here.
         </LockedNote>
       )}
 
@@ -503,8 +503,8 @@ export function DeliveryPanel({ project, busy, dispatch }: PanelProps) {
           </div>
           {d.status === "scheduled" && (
             <p className="mt-3 text-xs text-ink-500">
-              Courier tracking appears here the moment your kit is dispatched — estimated windows
-              update automatically from the courier&apos;s feed.
+              Courier tracking shows up here the moment your kit ships, and the time windows
+              update straight from the courier&apos;s feed.
             </p>
           )}
         </div>
@@ -530,7 +530,7 @@ export function DeliveryPanel({ project, busy, dispatch }: PanelProps) {
 
       {d.status === "delivered" && (
         <p className="rounded-2xl border border-sage-200 bg-sage-50 p-4 text-sm text-sage-800">
-          ✓ Delivered — leave everything boxed where it landed. Your installer checks it all off
+          ✓ Delivered. Leave everything boxed where it landed, your installer checks it all off
           on the day.
         </p>
       )}
@@ -553,7 +553,7 @@ export function DeliveryPanel({ project, busy, dispatch }: PanelProps) {
               disabled={!newDate}
               busy={busy}
             >
-              Move delivery{moveFee > 0 ? ` — ${gbp(moveFee)} fee` : " — free"}
+              Move delivery{moveFee > 0 ? ` (${gbp(moveFee)} fee)` : " (free)"}
             </PrimaryButton>
           </div>
           <p className="text-xs text-ink-300">
@@ -608,8 +608,8 @@ export function InstallationPanel({ project, busy, dispatch }: PanelProps) {
         )}
       </div>
       <p className="text-xs text-ink-300">
-        At least {INSTALL_LEAD_DAYS} days out (the courier needs runway). Booking sets your
-        delivery for two days before — adjustable on the delivery step.
+        At least {INSTALL_LEAD_DAYS} days out, the courier needs a head start. Booking sets your
+        delivery for two days before, and you can tweak that on the delivery step.
       </p>
     </div>
   );
@@ -621,7 +621,7 @@ export function InstallationPanel({ project, busy, dispatch }: PanelProps) {
       {!unlocked && inst.status === "not-booked" && (
         <>
           <LockedNote>
-            Your installation date unlocks after the site visit — that hour is what makes this day
+            Your install date unlocks after the site visit. That one hour is what makes this day
             run like clockwork.
           </LockedNote>
           <div aria-disabled className="pointer-events-none opacity-50">
@@ -633,7 +633,7 @@ export function InstallationPanel({ project, busy, dispatch }: PanelProps) {
       {unlocked && inst.status === "not-booked" && (
         <>
           <p className="text-sm font-semibold">
-            You&apos;re approved — pick your installation day.
+            You&apos;re approved. Pick your install day.
           </p>
           {datePicker("Book installation day", "book-installation")}
         </>
@@ -655,7 +655,7 @@ export function InstallationPanel({ project, busy, dispatch }: PanelProps) {
 
           {rescheduling ? (
             datePicker(
-              moveFee > 0 ? `Move it — ${gbp(moveFee)} change fee` : "Move it — free",
+              moveFee > 0 ? `Move it (${gbp(moveFee)} change fee)` : "Move it (free)",
               "reschedule-installation",
             )
           ) : (
@@ -682,8 +682,8 @@ export function InstallationPanel({ project, busy, dispatch }: PanelProps) {
       ) : (
         inst.status === "booked" && (
           <p className="text-sm text-ink-500">
-            Your installer&apos;s profile appears here about a week before the day — photo, name
-            and track record, so you know exactly who&apos;s knocking.
+            Your installer&apos;s profile lands here about a week before the day. Photo, name,
+            track record, so you know exactly who&apos;s knocking.
           </p>
         )
       )}
@@ -728,8 +728,8 @@ export function InstallationPanel({ project, busy, dispatch }: PanelProps) {
         <div className="rounded-2xl border border-sage-200 bg-sage-50 p-5 text-sage-800">
           <p className="font-display text-lg">You&apos;re installed 🎉</p>
           <p className="mt-1.5 text-sm">
-            Warranty, commissioning data and care guides are on their way to your inbox — and
-            they&apos;ll live in your portal, along with monitoring, when it opens.
+            Warranty, commissioning data and care guides are on their way to your inbox, and
+            they&apos;ll live in your portal, along with monitoring, once it opens.
           </p>
         </div>
       )}

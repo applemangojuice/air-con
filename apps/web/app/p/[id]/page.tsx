@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
- * The project page — the customer's whole journey on one timeline.
+ * The project page: the customer's whole journey on one timeline.
  * `/p/demo` serves a fully playable in-browser project (nothing persists);
  * real projects live at `/p/<uuid>`.
  */

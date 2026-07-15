@@ -100,13 +100,13 @@ export function ProjectView({ initialProject, demo }: { initialProject: Project;
         | { project?: Project; error?: string }
         | null;
       if (!res.ok || !data?.project) {
-        setError(data?.error ?? "That didn't work — try again in a moment.");
+        setError(data?.error ?? "That didn't work. Give it another go in a sec.");
       } else {
         setProject(data.project);
         if (!KEEP_SELECTION.has(action.type)) setSelected(focusStage(data.project));
       }
     } catch {
-      setError("Network hiccup — try again in a moment.");
+      setError("Network wobble. Give it another go in a sec.");
     } finally {
       setBusy(false);
     }
@@ -136,7 +136,7 @@ export function ProjectView({ initialProject, demo }: { initialProject: Project;
 
       {demo && (
         <p className="rounded-2xl border border-accent-100 bg-accent-50 px-4 py-3 text-sm text-ink-700">
-          <strong>Demo project</strong> — click around freely; every step works and nothing is
+          <strong>Demo project.</strong> Click around freely, every step works and nothing is
           saved. The grey demo buttons play our side (site visit, courier, install crew).
         </p>
       )}
@@ -170,7 +170,7 @@ function SlaCard() {
     <section className="rounded-3xl border border-line bg-white p-5">
       <h2 className="font-bold">Our commitments to you</h2>
       <p className="mt-1 text-xs text-ink-500">
-        If we miss one, the remedy is automatic — you never have to ask.
+        If we miss one, you get the money off automatically. No chasing, no arguing.
       </p>
       <ul className="mt-3 space-y-2.5">
         {SLA_COMMITMENTS.map((c) => (
@@ -189,8 +189,8 @@ function FeesCard({ accrued }: { accrued: number }) {
     <section className="rounded-3xl border border-line bg-white p-5">
       <h2 className="font-bold">Changing a date</h2>
       <p className="mt-1 text-xs text-ink-500">
-        Move anything on the timeline whenever you need — fees only rise as the day gets close,
-        because couriers and crews are already committed.
+        Move anything on the timeline whenever you need. Fees only kick in as the day gets close,
+        because by then couriers and crews are already booked.
       </p>
       <div className="mt-3 space-y-3">
         {(Object.keys(RESCHEDULE_FEES) as (keyof typeof RESCHEDULE_FEES)[]).map((kind) => (
@@ -206,7 +206,7 @@ function FeesCard({ accrued }: { accrued: number }) {
       </div>
       {accrued > 0 && (
         <p className="mt-3 rounded-xl bg-surface px-3 py-2 text-xs text-ink-700">
-          Change fees so far: <strong>{gbp(accrued)}</strong> — added to your final balance.
+          Change fees so far: <strong>{gbp(accrued)}</strong>, added to your final balance.
         </p>
       )}
     </section>
@@ -264,7 +264,7 @@ function DemoControls({
       action: {
         type: "ops-complete-site-visit",
         summary:
-          "Walked every room on the call — unit positions confirmed, outdoor unit fits the rear wall with clearance to spare.",
+          "Walked every room on the call. Unit positions confirmed, and the outdoor unit fits the rear wall with room to spare.",
         approvedForInstall: true,
         electricsStatus: "validated",
         electricsSummary:
@@ -284,7 +284,7 @@ function DemoControls({
         installer: {
           name: "Danny Okafor",
           role: "Lead installation engineer",
-          bio: "F-Gas certified, 240+ installs of exactly your system layout. Tidy to a fault — brings his own dust sheets.",
+          bio: "F-Gas certified, 240+ installs of exactly your system layout. Tidy to a fault, brings his own dust sheets.",
           yearsExperience: 9,
         },
       },
@@ -311,7 +311,7 @@ function DemoControls({
   return (
     <section className="rounded-3xl border border-dashed border-ink-300 p-4">
       <p className="text-xs font-semibold uppercase tracking-wide text-ink-300">
-        Demo — play our side
+        Demo: play our side
       </p>
       <div className="mt-2 flex flex-wrap gap-2">
         {actions.map((a) => (

@@ -34,7 +34,7 @@ export function assembleSurvey(
 
   const survey: Survey = {
     postcode,
-    addressLine: "(video walkthrough — address on booking)",
+    addressLine: "(video walkthrough, address on booking)",
     archetypeId: archetype.id,
     permutationId: permutation.id,
     property: {

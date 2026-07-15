@@ -72,11 +72,11 @@ export function RoomsStep({
       step={step}
       totalSteps={totalSteps}
       title="Your home, your price"
-      subtitle="We've laid out your rooms from your answers. Remove any you don't want cooled — the price updates instantly."
+      subtitle="We've laid out your rooms from your answers. Untick any you don't want cooled and the price updates instantly."
       onNext={onNext}
       onBack={onBack}
       nextDisabled={rooms.length === 0}
-      nextLabel="Looks right — continue"
+      nextLabel="Looks right, continue"
     >
       {/* The price, immediately and always visible */}
       <div className="ink-gradient sticky top-2 z-10 rounded-3xl p-5 text-white shadow-lg">
@@ -85,7 +85,7 @@ export function RoomsStep({
         </p>
         <div className="mt-1 flex items-baseline justify-between gap-3">
           <p className="text-4xl font-display">
-            {quote ? gbp(quote.totalGbp) : "—"}
+            {quote ? gbp(quote.totalGbp) : "-"}
           </p>
           {monthly && (
             <p className="text-sm text-white/70">
@@ -178,7 +178,7 @@ export function RoomsStep({
                 </Field>
                 <PhotoInput
                   kind="room"
-                  label="Photo of the room (optional — firms up your price)"
+                  label="Photo of the room (optional, firms up your price)"
                   photos={room.photos}
                   onChange={(photos) => updateRoom(room.id, { photos })}
                 />
@@ -198,10 +198,10 @@ export function RoomsStep({
         </div>
       )}
 
-      {/* Outdoor unit — auto-chosen, ground level only */}
+      {/* Outdoor unit: auto-chosen, ground level only */}
       <Field
         label="Outdoor unit position"
-        hint="Chosen for your house type. Ground level only — we don't install on roofs or balconies."
+        hint="Chosen for your house type. Ground level only, we don't install on roofs or balconies."
       >
         {outdoorOptions.length > 1 ? (
           <OptionCards

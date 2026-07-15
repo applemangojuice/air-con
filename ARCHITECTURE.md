@@ -1,6 +1,6 @@
 # Architecture
 
-**The Operating System for Residential Air Conditioning** — designed backwards
+**The Operating System for Residential Air Conditioning.** Designed backwards
 from the eventual business, built forwards from the quoting funnel.
 
 ## Stack decision
@@ -54,7 +54,7 @@ apps/
 ├── ops/                      # internal: CRM, design studio, scheduling, procurement
 │                             #   (start as /ops routes in web; split out when auth +
 │                             #    deploy cadence diverge)
-├── installer/                # Expo/React Native — offline-first job packs
+├── installer/                # Expo/React Native, offline-first job packs
 └── portal/                   # customer portal (or a route group in web behind auth)
 packages/
 ├── db/                       # generated Supabase types + typed query helpers
@@ -71,7 +71,7 @@ folders.
 ### 1. The engine is a pure, versioned function
 
 `generateQuote(survey) → quote` lives in `@aircon/domain` with **zero
-dependencies** — no React, no Supabase, no I/O. Same survey in, same quote out.
+dependencies**, no React, no Supabase, no I/O. Same survey in, same quote out.
 Every persisted quote stores `{ engine_version, survey, quote }` as JSONB.
 
 This is what makes the "knowledge loop" (Phase 10) possible: when real install
@@ -79,11 +79,11 @@ data shows a loft install takes 1.4× the estimate, you change a constant, bump
 `ENGINE_VERSION`, and replay every historical survey to see exactly what the
 rule change does to your book. The pricing rules become a tuned model, not
 folklore. The same package will later hold heat-load refinement, template
-matching and labour estimation — all fed by actuals.
+matching and labour estimation, all fed by actuals.
 
 ### 2. Surveys are immutable snapshots, quotes are derived
 
-The survey a customer submits is never mutated — revisions are new rows. Ops
+The survey a customer submits is never mutated, revisions are new rows. Ops
 tooling, design review, and eventually AI design all *derive* from the survey.
 Denormalised columns (`total_gbp`, `confidence_score`, `postcode`) exist purely
 for ops queries; the JSONB snapshot is the truth.
@@ -100,7 +100,7 @@ photos never transit Vercel functions and no storage keys reach the browser.
 
 - No Supabase keys in the browser. All persistence goes through Next API routes
   using the service-role key.
-- `quote_requests` has RLS enabled with **no policies** — service role only.
+- `quote_requests` has RLS enabled with **no policies**, service role only.
 - Photo bucket is private; uploads via signed URLs, reads (ops) via signed URLs
   later.
 - When customer auth arrives (portal), switch to `@supabase/ssr` + RLS policies
@@ -126,7 +126,7 @@ The JSONB snapshots mean none of these migrations rewrite history.
 ## Conventions
 
 - Money: integer GBP (VAT-inclusive) in the domain layer; format at the edge.
-- All domain types JSON-serialisable — they cross the wire and into JSONB as-is.
+- All domain types JSON-serialisable, they cross the wire and into JSONB as-is.
 - Brand is centralised in `apps/web/lib/brand.ts` (placeholder name today).
 - Tests: `node --test` in packages (`pnpm test`); the engine has behavioural
   tests that double as documentation of pricing rules.

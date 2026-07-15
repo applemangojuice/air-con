@@ -27,8 +27,8 @@ export default function PortalPage() {
         <h1 className="mt-4 text-4xl font-display">Your account</h1>
         <p className="mt-3 max-w-xl text-ink-500">
           The portal opens once you&apos;ve booked an installation. Everything
-          about your system — quotes, contracts, progress, documents and
-          monitoring — will live here. Your installation itself already runs on
+          about your system (quotes, contracts, progress, documents and
+          monitoring) will live here. Your installation itself already runs on
           a live timeline:{" "}
           <Link href="/p/demo" className="font-semibold text-accent-700 underline">
             see a playable example
@@ -48,7 +48,7 @@ export default function PortalPage() {
         <div className="mt-10 rounded-2xl border border-accent-100 bg-accent-50 p-6">
           <p className="font-semibold">Haven&apos;t got a quote yet?</p>
           <p className="mt-1 text-sm text-ink-500">
-            That&apos;s the first step — it takes about 10 minutes.
+            That&apos;s the first step, and it takes about 10 minutes.
           </p>
           <Link
             href="/quote"

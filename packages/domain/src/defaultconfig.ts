@@ -10,7 +10,7 @@ import type {
 /**
  * Price-first capture: a handful of answers (house type, era, bedrooms,
  * bathrooms, kitchen/living layout, rough floor area) deterministically
- * generate a full default room configuration — so an indicative price can
+ * generate a full default room configuration, so an indicative price can
  * appear immediately, before any per-room clicking.
  *
  * The customer then edits the generated rooms rather than building the list.
@@ -112,7 +112,7 @@ export function buildDefaultConfig(input: DefaultConfigInput): DefaultConfig {
   }
 
   // Bedrooms / studies. In a terrace, only front- and rear-facing rooms have
-  // suitable external walls — extra middle rooms can't take a unit.
+  // suitable external walls; extra middle rooms can't take a unit.
   const excluded: ExcludedRoom[] = [];
   const maxExternalBedrooms = input.type === "terraced" ? 2 : input.bedrooms;
   for (let i = 1; i <= input.bedrooms; i++) {
@@ -121,7 +121,7 @@ export function buildDefaultConfig(input: DefaultConfigInput): DefaultConfig {
       excluded.push({
         name,
         reason:
-          "Middle rooms in a terrace usually have no suitable external wall — we only install on external walls.",
+          "Middle rooms in a terrace usually have no suitable external wall, and we only install on external walls.",
       });
       continue;
     }

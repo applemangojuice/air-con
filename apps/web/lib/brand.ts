@@ -1,5 +1,5 @@
 /**
- * Placeholder brand — change everything here when the real name lands.
+ * Placeholder brand. Change everything here when the real name lands.
  * Nothing else in the codebase hard-codes the brand.
  */
 export const BRAND = {

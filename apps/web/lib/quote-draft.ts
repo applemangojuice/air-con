@@ -13,7 +13,7 @@ export interface Contact {
 export interface QuoteDraft {
   survey: Survey;
   contact: Contact;
-  /** Kitchen/living arrangement — drives the generated default rooms. */
+  /** Kitchen/living arrangement, drives the generated default rooms. */
   layout: KitchenLivingLayout;
   /** Server row id once the address+email step has saved the draft. */
   draftId?: string;
@@ -76,7 +76,7 @@ export function loadDraft(): QuoteDraft | null {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const draft = JSON.parse(raw) as QuoteDraft;
-    // Photo files can't survive a reload — drop stale photo metadata that has
+    // Photo files can't survive a reload, so drop stale photo metadata that has
     // no uploaded copy, so confidence scoring stays honest.
     draft.survey.rooms.forEach((r) => (r.photos = r.photos.filter((p) => p.storagePath)));
     draft.survey.outdoor.photos = draft.survey.outdoor.photos.filter((p) => p.storagePath);
@@ -91,7 +91,7 @@ export function saveDraft(draft: QuoteDraft): void {
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
   } catch {
-    // storage full / private mode — the wizard still works in memory
+    // storage full / private mode; the wizard still works in memory
   }
 }
 

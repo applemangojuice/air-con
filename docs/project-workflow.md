@@ -14,7 +14,7 @@ JSON-serialisable, versionable.
 ## The timeline
 
 - **Every stage is clickable, including the future.** Greyed/dotted stages open
-  a *preview* — "what happens here" plus the real controls in a locked state —
+  a *preview*: "what happens here" plus the real controls in a locked state,
   so the customer can see the whole journey on day one.
 - **Every stage carries a date.** Actuals for what happened, **confirmed** for
   what's booked, *est.* projections for everything ahead
@@ -23,20 +23,20 @@ JSON-serialisable, versionable.
   installation day and the delivery day are all set (and moved) by the
   customer from the stage panels.
 - The compact strip version (`TimelineStrip`) appears in the quote funnel the
-  moment the postcode step is done — quote, dot dot dot.
+  moment the postcode step is done. Quote, dot dot dot.
 
 ## Stage rules (encoded in the reducer, not in UI)
 
 | Stage | Completes when | Gate |
 | --- | --- | --- |
-| Quote | at creation | — |
-| Floor plan | customer approves | ready instantly (stock archetype layouts — no designer wait) |
+| Quote | at creation | none |
+| Floor plan | customer approves | ready instantly (stock archetype layouts, no designer wait) |
 | Final quote | customer accepts | auto-issued at the same price when survey confidence is `high`; otherwise ops issues after photo review |
-| Site visit | ops records outcome | **hard prerequisite for installation** — booking requires an accepted final quote |
+| Site visit | ops records outcome | **hard prerequisite for installation**, booking requires an accepted final quote |
 | Delivery | courier delivers | auto-scheduled 2 days before installation when the install is booked |
 | Installation | ops marks complete | requires site-visit approval **and** delivered equipment |
 
-Every transition goes through `applyProjectAction(project, action, now)` — a
+Every transition goes through `applyProjectAction(project, action, now)`, a
 pure reducer. The API route runs it server-side as the authority; `/p/demo`
 runs the identical reducer in the browser, which is why the demo is fully
 playable with no database.
@@ -53,14 +53,14 @@ where access needs real eyes). It exists to:
 5. answer everything before the customer commits to a date.
 
 The fee is credited in full against the installation price. Payment is
-currently recorded on confirmation and invoiced (`pay-site-visit` action) —
-swap in a Stripe Payment Link / Checkout session at that action when payments
+currently recorded on confirmation and invoiced (`pay-site-visit` action).
+Swap in a Stripe Payment Link / Checkout session at that action when payments
 land.
 
 ## Date-change fees (escalating as the date approaches)
 
-Defined in `RESCHEDULE_FEES`, computed by `rescheduleFeeGbp(kind, daysNotice)`
-— always shown to the customer *before* they confirm a move.
+Defined in `RESCHEDULE_FEES` and computed by `rescheduleFeeGbp(kind, daysNotice)`.
+The fee is always shown to the customer *before* they confirm a move.
 
 | Notice | Site visit | Delivery | Installation |
 | --- | --- | --- | --- |
@@ -70,12 +70,12 @@ Defined in `RESCHEDULE_FEES`, computed by `rescheduleFeeGbp(kind, daysNotice)`
 | 1–2 days | £25 | £120 | £300 |
 | same-day | £50 | £120 | £300 |
 
-Fees accrue on the project (`projectFees`) and are added to the final balance
-— no card required at the moment of change.
+Fees accrue on the project (`projectFees`) and are added to the final balance.
+No card needed at the moment of change.
 
 ## Our SLA to the customer (`SLA_COMMITMENTS`)
 
-Remedies are automatic — the customer never has to argue for them:
+Remedies are automatic, the customer never has to argue for them:
 
 - Final quote within 1 working day of floor-plan approval, or **£50 off**.
 - Site visit starts within 15 minutes of the slot, or **the £150 is refunded
@@ -87,7 +87,7 @@ Remedies are automatic — the customer never has to argue for them:
 Enforcement today is manual (ops applies the remedy); the event log carries
 the timestamps needed to automate it later.
 
-## Electrics — de-black-boxing the power connection
+## Electrics: de-black-boxing the power connection
 
 The survey's fuse-board answer seeds an assessment
 (`provisional` / `attention`) with customer-facing copy, shown as the
@@ -104,7 +104,7 @@ auto-schedules delivery for `install − 2 days` (customer-adjustable within
 courier lead time, must land before installation). Ops marks dispatch with a
 courier + tracking ref; tracking events append to the project and render as a
 feed. The courier API integration point is `ops-mark-dispatched` /
-`ops-mark-delivered` — a webhook receiver can drive those same actions.
+`ops-mark-delivered`, a webhook receiver can drive those same actions.
 
 ## Ops module (`/ops/projects`)
 
@@ -120,7 +120,7 @@ domain reducer via server actions.
 `projects` table (migration `0005_projects.sql`): one row per quote
 (unique `quote_id`, idempotent create), full `Project` JSONB snapshot as
 truth, denormalised columns for list views recomputed on every save. History
-is the embedded `events` array — also rendered to the customer as the
+is the embedded `events` array, also rendered to the customer as the
 "Updates" feed.
 
 ## Deliberately not built yet

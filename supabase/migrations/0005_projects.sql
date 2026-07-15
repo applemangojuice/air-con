@@ -1,4 +1,4 @@
--- Phase 2: the project workflow — everything after the instant quote.
+-- Phase 2: the project workflow, everything after the instant quote.
 --
 -- A project is the customer's journey on one timeline:
 --   quote → floor plan → final quote → site visit → delivery → installation
@@ -8,7 +8,7 @@
 --    Every transition goes through the pure reducer server-side; the row is
 --    replaced wholesale. History lives in project->'events'.
 --  * Denormalised columns exist purely for ops queries and list views.
---  * One project per quote (unique quote_id) — POST /api/projects is
+--  * One project per quote (unique quote_id). POST /api/projects is
 --    idempotent.
 
 create table public.projects (

@@ -12,7 +12,7 @@ export default function ElectricsScreen() {
       step={6}
       totalSteps={8}
       title="A quick look at your electrics"
-      subtitle="Air conditioning needs its own circuit from your fuse board — usually in the hallway, garage or under the stairs."
+      subtitle="Air conditioning needs its own circuit from your fuse board, usually in the hallway, garage or under the stairs."
       onBack={() => router.back()}
       onNext={() => router.push("/survey/contact")}
     >

@@ -9,7 +9,7 @@ import {
 import { fmtDay } from "@/lib/format";
 
 /**
- * The horizontal project timeline. Every stage is clickable — including
+ * The horizontal project timeline. Every stage is clickable, including
  * greyed-out future ones, which open a preview of what that page will show.
  * Completed stages fill in; the current stage pulses; future stages carry
  * projected ("est.") dates like a project plan.
@@ -123,7 +123,7 @@ function Node({
 }
 
 /**
- * Compact, non-interactive strip for the quote funnel — the moment a
+ * Compact, non-interactive strip for the quote funnel: the moment a
  * postcode goes in, the customer sees the whole journey: quote, dot dot dot.
  */
 export function TimelineStrip({ current = "quote" }: { current?: ProjectStageId }) {

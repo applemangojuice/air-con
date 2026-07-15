@@ -19,7 +19,7 @@ export interface StepProps {
 }
 
 /* ------------------------------------------------------------------ */
-/* Step 1 — Address + email (saves the enquiry immediately)            */
+/* Step 1: Address + email (saves the enquiry immediately)             */
 /* ------------------------------------------------------------------ */
 
 type PostcodeCheck =
@@ -67,7 +67,7 @@ function usePostcodeCheck(postcode: string, onGeo: (geo: SurveyGeo | undefined) 
         setCheck({ state: "found", geo });
         onGeo(geo);
       } catch {
-        // Lookup unreachable — fall back to format-only validation.
+        // Lookup unreachable, fall back to format-only validation.
         if (!cancelled) setCheck({ state: "offline" });
       }
     }, 400);
@@ -125,7 +125,7 @@ export function AddressStep({ draft, setSurvey, setContact, step, totalSteps, on
       step={step}
       totalSteps={totalSteps}
       title="Let's price your home"
-      subtitle="Your address and email — that's all we need to start. Your quote saves as you go."
+      subtitle="Just your address and email to start. Your quote saves as you go."
       onNext={onNext}
       nextDisabled={!ready}
       busy={busy}
@@ -142,7 +142,7 @@ export function AddressStep({ draft, setSurvey, setContact, step, totalSteps, on
       </Field>
       {check.state === "not-found" && (
         <p className="text-sm text-red-600">
-          We couldn&apos;t find that postcode — double-check it and try again.
+          We couldn&apos;t find that postcode. Double-check it and try again.
         </p>
       )}
 
@@ -198,11 +198,11 @@ export function AddressStep({ draft, setSurvey, setContact, step, totalSteps, on
       {postcodeOk && check.state === "found" && check.geo.district && (
         <div className="rounded-2xl border border-accent-100 bg-accent-50 p-4">
           <p className="text-sm font-semibold text-accent-700">
-            Good news — we cover {check.geo.district}.
+            Good news, we cover {check.geo.district}.
           </p>
           <p className="mt-1 text-sm text-ink-500">
-            A few taps about your house and your indicative price appears —
-            no salesperson, no waiting.
+            A few taps about your house and your price pops up. No
+            salesperson, no waiting.
           </p>
         </div>
       )}
@@ -211,7 +211,7 @@ export function AddressStep({ draft, setSurvey, setContact, step, totalSteps, on
 }
 
 /* ------------------------------------------------------------------ */
-/* Step 2 — Your house (generates the default configuration)           */
+/* Step 2: Your house (generates the default configuration)            */
 /* ------------------------------------------------------------------ */
 
 export function HouseStep({
@@ -232,7 +232,7 @@ export function HouseStep({
       step={step}
       totalSteps={totalSteps}
       title="Tell us about your house"
-      subtitle="These few answers build your home's layout — your price appears on the next screen."
+      subtitle="These few answers build your home's layout. Your price is on the next screen."
       onNext={onNext}
       onBack={onBack}
       nextLabel="Show my price"
@@ -298,7 +298,7 @@ export function HouseStep({
 
       <Field
         label="Rough size of your home (optional)"
-        hint="In square metres — it's on your EPC or listing. We'll split it across your rooms."
+        hint="In square metres, it's on your EPC or listing. We'll split it across your rooms."
       >
         <div className="flex items-center gap-2">
           <input
@@ -321,7 +321,7 @@ export function HouseStep({
 }
 
 /* ------------------------------------------------------------------ */
-/* Step 4 — Final details (name only at the very end)                  */
+/* Step 4: Final details (name only at the very end)                   */
 /* ------------------------------------------------------------------ */
 
 export function DetailsStep({
@@ -343,7 +343,7 @@ export function DetailsStep({
       step={step}
       totalSteps={totalSteps}
       title="Nearly there"
-      subtitle="Your name locks the quote to you. We'll email your permanent quote link — we will never call you."
+      subtitle="Your name locks the quote to you. We'll email your permanent quote link. No phone calls, ever."
       onNext={onNext}
       onBack={onBack}
       nextLabel="Get my full quote"
@@ -381,7 +381,7 @@ export function DetailsStep({
         />
       </Field>
       <p className="text-xs text-ink-300">
-        We will never call you — everything arrives by email, and only about
+        We will never call you. Everything arrives by email, and only about
         this quote.
       </p>
     </StepShell>

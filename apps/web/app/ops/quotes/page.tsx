@@ -4,7 +4,7 @@ import { gbp } from "@/lib/format";
 import { getServiceClient } from "@/lib/supabase-server";
 
 export const metadata: Metadata = {
-  title: "Quote requests — ops",
+  title: "Quote requests · ops",
   robots: { index: false },
 };
 
@@ -24,7 +24,7 @@ export default async function OpsQuotesPage() {
     return (
       <Shell>
         <div className="rounded-2xl border border-line bg-surface p-6 text-sm text-ink-500">
-          <p className="font-semibold text-ink-900">Demo mode — no database connected</p>
+          <p className="font-semibold text-ink-900">Demo mode, no database connected</p>
           <p className="mt-2">
             Set <code>SUPABASE_URL</code> and <code>SUPABASE_SERVICE_ROLE_KEY</code> to see
             customer quote requests here. Set <code>OPS_PASSWORD</code> to protect this page.
@@ -53,7 +53,7 @@ export default async function OpsQuotesPage() {
   return (
     <Shell count={quotes.length}>
       {quotes.length === 0 ? (
-        <p className="text-sm text-ink-500">No quote requests yet — share the funnel link.</p>
+        <p className="text-sm text-ink-500">No quote requests yet. Share the funnel link.</p>
       ) : (
         <div className="overflow-x-auto rounded-2xl border border-line">
           <table className="w-full text-sm">

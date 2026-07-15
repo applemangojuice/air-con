@@ -26,7 +26,7 @@ export type RoomType =
   | "conservatory"
   | "other";
 
-/** Approximate floor area bands — customers guess bands far more reliably than metres. */
+/** Approximate floor area bands. Customers guess bands far more reliably than metres. */
 export type RoomSize = "small" | "medium" | "large" | "xl";
 
 export type FloorLevel = "ground" | "first" | "second-plus" | "loft";
@@ -46,7 +46,7 @@ export type OutdoorLocation =
 
 export type ElectricsCondition =
   | "modern-spare-ways" // modern consumer unit with spare ways
-  | "modern-full" // modern but full — needs a way freed / small board work
+  | "modern-full" // modern but full, needs a way freed / small board work
   | "older-fuse-box" // rewireable fuses / very old board
   | "unsure";
 
@@ -72,7 +72,7 @@ export interface SurveyRoom {
   name: string;
   type: RoomType;
   size: RoomSize;
-  /** Actual floor area when known (m²) — preferred over the size band. */
+  /** Actual floor area when known (m²), preferred over the size band. */
   areaM2?: number;
   floor: FloorLevel;
   glazing: GlazingLevel;
@@ -82,7 +82,7 @@ export interface SurveyRoom {
   photos: SurveyPhoto[];
 }
 
-/** Resolved from the postcode (postcodes.io). Metadata only — the engine ignores it. */
+/** Resolved from the postcode (postcodes.io). Metadata only, the engine ignores it. */
 export interface SurveyGeo {
   district?: string;
   region?: string;

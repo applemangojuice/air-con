@@ -13,7 +13,7 @@ export const BAND_COPY = {
   medium: {
     label: "Nearly locked",
     cls: "bg-amber-50 text-amber-700 border-amber-200",
-    body: "This price is fixed once we've reviewed your photos — usually within one working day.",
+    body: "This price is fixed once we've checked your photos, usually within one working day.",
   },
   low: {
     label: "Provisional",
@@ -144,7 +144,7 @@ export function QuoteView({ quote, roomCount }: { quote: Quote; roomCount: numbe
             ))}
           </div>
           <p className="mt-2 text-[11px] text-ink-300">
-            Illustrative figures — finance subject to status and lender approval.
+            Example figures. Finance subject to status and lender approval.
           </p>
         </section>
       )}

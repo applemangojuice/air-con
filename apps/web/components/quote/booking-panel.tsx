@@ -19,7 +19,7 @@ export const PREFERRED_START_LABEL: Record<PreferredStart, string> = {
 };
 
 /**
- * "Book my installation" — attaches a booking request to a saved quote.
+ * "Book my installation": attaches a booking request to a saved quote.
  * Falls back to email when the quote couldn't be saved (demo mode/offline).
  */
 export function BookingPanel({
@@ -77,7 +77,7 @@ export function BookingPanel({
         <li>We review your photos and confirm your fixed price.</li>
         <li>We agree an installation date and you pay a deposit to secure it.</li>
         <li>
-          Our engineers install, test and hand over — usually in{" "}
+          Our engineers install, test and hand over, usually in{" "}
           {installDays === 1 ? "a single day" : `${installDays} days`}.
         </li>
       </ol>
@@ -121,17 +121,17 @@ export function BookingPanel({
           </button>
           {state === "error" && (
             <p className="text-sm text-red-600">
-              That didn&apos;t send — try again, or email {BRAND.supportEmail}.
+              That didn&apos;t send. Try again, or email {BRAND.supportEmail}.
             </p>
           )}
           <p className="text-center text-xs text-ink-300">
-            No payment now — booking is free and doesn&apos;t commit you.
+            No payment now. Booking is free and doesn&apos;t tie you in.
           </p>
         </div>
       ) : (
         <div className="mt-5">
           <a
-            href={`mailto:${BRAND.supportEmail}?subject=Booking request — ${encodeURIComponent(postcode)}`}
+            href={`mailto:${BRAND.supportEmail}?subject=Booking request: ${encodeURIComponent(postcode)}`}
             className="block rounded-full bg-accent-600 px-5 py-3 text-center font-semibold text-white shadow-sm transition hover:bg-accent-700"
           >
             Book my installation

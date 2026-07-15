@@ -65,7 +65,7 @@ export function QuoteWizard({ initialPostcode }: { initialPostcode?: string }) {
     setDraft((d) => ({ ...d, layout }));
 
   // Exclusions and outdoor options derive deterministically from the house
-  // answers — recomputed live so the rooms screen always matches them.
+  // answers, recomputed live so the rooms screen always matches them.
   const config = useMemo(() => {
     const p = draft.survey.property;
     return buildDefaultConfig({

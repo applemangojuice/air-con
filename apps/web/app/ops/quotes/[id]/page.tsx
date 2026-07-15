@@ -8,7 +8,7 @@ import { PREFERRED_START_LABEL, type BookingRequest } from "@/components/quote/b
 import { PHOTO_BUCKET, getServiceClient } from "@/lib/supabase-server";
 
 export const metadata: Metadata = {
-  title: "Quote detail — ops",
+  title: "Quote detail · ops",
   robots: { index: false },
 };
 
@@ -117,7 +117,7 @@ export default async function OpsQuoteDetailPage({
 
       {/* Rooms */}
       <section className="mt-8">
-        <h2 className="text-lg font-bold">Survey — {survey.rooms.length} rooms</h2>
+        <h2 className="text-lg font-bold">Survey: {survey.rooms.length} rooms</h2>
         <p className="mt-1 text-sm text-ink-500">
           {propertyLine(survey)}
         </p>
@@ -146,7 +146,7 @@ export default async function OpsQuoteDetailPage({
                     <td className="px-4 py-2.5">{room.orientation}</td>
                     <td className="px-4 py-2.5">{room.hasExternalWall ? "yes" : "no"}</td>
                     <td className="whitespace-nowrap px-4 py-2.5">
-                      {design ? `${design.capacityKw.toFixed(1)} kW (${design.estimatedLoadWatts} W est.)` : "—"}
+                      {design ? `${design.capacityKw.toFixed(1)} kW (${design.estimatedLoadWatts} W est.)` : "-"}
                     </td>
                   </tr>
                 );
@@ -185,7 +185,7 @@ export default async function OpsQuoteDetailPage({
                   {url ? (
                     <a href={url} target="_blank" rel="noreferrer">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={url} alt={`${owner} — ${photo.kind}`} className="aspect-square w-full object-cover" />
+                      <img src={url} alt={`${owner}: ${photo.kind}`} className="aspect-square w-full object-cover" />
                     </a>
                   ) : (
                     <div className="flex aspect-square items-center justify-center text-xs text-ink-300">

@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 /**
  * HTTP Basic auth for internal ops pages. Set OPS_PASSWORD to enable.
- * (Interim measure — replaced by Supabase Auth roles when the portal lands.)
+ * (Interim measure, replaced by Supabase Auth roles when the portal lands.)
  */
 export function middleware(request: NextRequest) {
   const password = process.env.OPS_PASSWORD;

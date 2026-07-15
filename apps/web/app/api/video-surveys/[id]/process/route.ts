@@ -54,7 +54,7 @@ export async function POST(
     let transcript: string | null = row.transcript;
     if (!transcript) {
       if (!isTranscriptionConfigured()) {
-        return park("Transcription not configured (OPENAI_API_KEY) — video saved for manual review.");
+        return park("Transcription not configured (OPENAI_API_KEY). Video saved for manual review.");
       }
       const { data: video, error: dlError } = await supabase.storage
         .from(VIDEO_BUCKET)
@@ -70,7 +70,7 @@ export async function POST(
 
     // 2. Extract structured rooms/wishes with Claude
     if (!isExtractionConfigured()) {
-      return park("Extraction not configured (ANTHROPIC_API_KEY) — transcript saved for manual review.");
+      return park("Extraction not configured (ANTHROPIC_API_KEY). Transcript saved for manual review.");
     }
     const extraction = await extractFromTranscript(transcript, archetype, permutation);
     if (!extraction) return park("Extraction returned no result.");

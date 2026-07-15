@@ -4,7 +4,7 @@ import { isValidUkPostcode } from "@/lib/format";
 /**
  * Postcode → address list, so the first line autofills instead of being
  * typed. Uses getAddress.io when GETADDRESS_API_KEY is set (UK PAF data
- * requires a licensed provider — postcodes.io has no address lines).
+ * requires a licensed provider; postcodes.io has no address lines).
  * Unconfigured → { configured: false } and the UI falls back to manual entry.
  */
 export async function GET(request: Request) {

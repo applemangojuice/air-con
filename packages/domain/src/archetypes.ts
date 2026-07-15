@@ -9,7 +9,7 @@ import type {
 } from "./types.ts";
 
 /**
- * The archetype library — the constraint that makes fixed pricing possible.
+ * The archetype library: the constraint that makes fixed pricing possible.
  *
  * Like fibre roll-outs that only serve certain postcodes, we only install a
  * small set of proven permutations per house type. The customer picks the
@@ -30,7 +30,7 @@ export interface InstallPermutation {
   outdoorLocation: OutdoorLocation;
   /** Max indoor units this pattern serves before a second outdoor unit is needed. */
   servesUpTo: number;
-  /** How the pipework runs — shown to the customer as "how we install". */
+  /** How the pipework runs, shown to the customer as "how we install". */
   pipeRoute: string;
   /** Added to the engine's base price for this pattern's extra work. */
   adderGbp: number;
@@ -38,13 +38,13 @@ export interface InstallPermutation {
   checks: string[];
 }
 
-/** A room in the archetype's stock floor plan — the zero-AI capture path. */
+/** A room in the archetype's stock floor plan, the zero-AI capture path. */
 export interface RoomPreset {
   name: string;
   type: RoomType;
   size: RoomSize;
   floor: FloorLevel;
-  /** Rooms most customers cool — pre-ticked in the picker. */
+  /** Rooms most customers cool, pre-ticked in the picker. */
   popular?: boolean;
 }
 
@@ -60,7 +60,7 @@ export interface HouseArchetype {
   matches: { types: PropertyType[]; eras: PropertyEra[] };
   /**
    * The stock floor plan: because we only serve known house types, we know
-   * their typical rooms. Customers confirm and tweak instead of describing —
+   * their typical rooms. Customers confirm and tweak instead of describing,
    * no transcription or extraction needed.
    */
   typicalRooms: RoomPreset[];
@@ -109,7 +109,7 @@ export const ARCHETYPES: HouseArchetype[] = [
       p("rear-wall-bracket", "Rear wall bracket", "Outdoor unit bracket-mounted on the rear wall where the yard is too small.", "wall-bracket", 3,
         "Unit sits above head height on the outrigger return; short pipe runs to rear rooms.", 150,
         ["Solid brick fixing points", "Neighbour proximity / noise", "Working-at-height access"]),
-      p("front-room-single", "Single room (rear only)", "One system for a single room — we don't route to the front in terraces at fixed price.", "ground-rear", 1,
+      p("front-room-single", "Single room (rear only)", "One system for a single room. We don't route to the front in terraces at a fixed price.", "ground-rear", 1,
         "Straight drop through the rear wall to the yard unit.", 0,
         ["Room has a rear-facing or gable external wall"]),
     ],
@@ -154,7 +154,7 @@ export const ARCHETYPES: HouseArchetype[] = [
       r("Box room / office", "home-office", "small", "first"),
     ],
     permutations: [
-      p("side-passage-multi", "Side passage multi-split", "Outdoor unit beside the house serving up to 4 rooms — our most-installed pattern.", "ground-side", 4,
+      p("side-passage-multi", "Side passage multi-split", "Outdoor unit beside the house serving up to 4 rooms. Our most-fitted pattern.", "ground-side", 4,
         "Vertical riser on the side elevation; short ceiling-void spurs to front and rear bedrooms.", 0,
         ["Passage width", "Boiler flue clearance", "Riser fixing into cavity wall"]),
       p("rear-patio-multi", "Rear patio multi-split", "Outdoor unit on the patio; living spaces served directly, bedrooms via the rear wall.", "ground-rear", 4,
@@ -203,7 +203,7 @@ export const ARCHETYPES: HouseArchetype[] = [
     ],
     permutations: [
       p("rear-garden-multi", "Rear garden multi-split", "Outdoor unit at the rear; simple runs through rendered cavity walls.", "ground-rear", 4,
-        "Straightforward rear riser — these houses are our fastest installs.", 0,
+        "Straightforward rear riser. These houses are our fastest installs.", 0,
         ["Render condition at drill points"]),
       p("gable-side-multi", "Gable end multi-split", "Outdoor unit against the gable end serving both floors.", "ground-side", 4,
         "Gable riser with roomside spurs; keeps the garden elevation clean.", 0,
@@ -224,11 +224,11 @@ export const ARCHETYPES: HouseArchetype[] = [
       r("Bedroom 2", "bedroom", "small", "ground"),
     ],
     permutations: [
-      p("rear-multi", "Rear multi-split", "One outdoor unit at the rear serving up to 4 rooms — bungalows are ideal for this.", "ground-rear", 4,
+      p("rear-multi", "Rear multi-split", "One outdoor unit at the rear serving up to 4 rooms. Bungalows are made for this.", "ground-rear", 4,
         "Short horizontal runs at eaves level or through the loft to each room.", 0,
         ["Loft access for runs", "Eaves height"]),
       p("side-single-pair", "Side singles", "One or two single-splits on the flank wall for just the rooms you use.", "ground-side", 2,
-        "Direct through-wall installs — often done before lunch.", 0,
+        "Direct through-wall installs, often done before lunch.", 0,
         ["Flank wall space"]),
     ],
   },
@@ -249,7 +249,7 @@ export const ARCHETYPES: HouseArchetype[] = [
     ],
     permutations: [
       p("garage-side-multi", "Garage-side multi-split", "Outdoor unit beside the garage; runs enter through the garage for a clean look.", "ground-side", 4,
-        "Pipework crosses the garage ceiling then rises to bedrooms — almost nothing visible outside.", 0,
+        "Pipework crosses the garage ceiling then rises to the bedrooms. Almost nothing visible outside.", 0,
         ["Garage internal route", "Fire-separation ceiling penetrations"]),
       p("rear-patio-multi", "Rear patio multi-split", "Classic rear installation serving living spaces and bedrooms.", "ground-rear", 4,
         "Rear riser with trunked spurs.", 0,
@@ -275,7 +275,7 @@ export const ARCHETYPES: HouseArchetype[] = [
         "One riser serves all three floors; top-floor rooms need the longest runs (priced in).", 220,
         ["Riser fixing at height", "Scaffold or tower access for floor 3"]),
       p("garage-internal", "Garage-fed system", "Outdoor unit outside the garage; pipework distributed internally.", "ground-side", 3,
-        "Runs rise inside a boxed corner from the garage — nothing on the façade.", 180,
+        "Runs rise inside a boxed corner from the garage. Nothing on the front of the house.", 180,
         ["Internal boxing route agreed", "Garage wall penetrations"]),
     ],
   },
@@ -306,7 +306,7 @@ export const ARCHETYPES: HouseArchetype[] = [
     id: "new-build-house",
     name: "New build (2000+)",
     eraLabel: "2000–present",
-    description: "Modern developer home with high insulation — smaller units cool it easily.",
+    description: "Modern developer home with high insulation. Smaller units cool it easily.",
     recognisers: ["NHBC-era build", "Trickle vents", "Small but well-insulated rooms"],
     matches: { types: ["detached", "semi-detached", "terraced"], eras: ["2000+"] },
     typicalRooms: [
@@ -339,7 +339,7 @@ export const ARCHETYPES: HouseArchetype[] = [
     ],
     permutations: [
       p("balcony-single", "Balcony single-split", "Compact outdoor unit on your balcony serving the living space.", "balcony", 1,
-        "Short run from balcony through the external wall — minimal disruption.", 120,
+        "Short run from the balcony through the external wall. Minimal disruption.", 120,
         ["Freeholder/management consent", "Balcony load and drainage"]),
       p("balcony-twin", "Balcony twin", "Balcony unit serving living room + one bedroom.", "balcony", 2,
         "Trunked run along the balcony soffit to the second room.", 220,
@@ -350,7 +350,7 @@ export const ARCHETYPES: HouseArchetype[] = [
     id: "converted-flat",
     name: "Converted flat",
     eraLabel: "Victorian/Edwardian conversion",
-    description: "A flat carved out of a period house — solid walls, shared garden, freeholder consent needed.",
+    description: "A flat carved out of a period house. Solid walls, shared garden, freeholder consent needed.",
     recognisers: ["Period features", "Entrance hall shared with 1–3 flats", "Garden flat or upper maisonette"],
     matches: { types: ["flat"], eras: ["pre-1930"] },
     typicalRooms: [
@@ -395,7 +395,7 @@ export const ARCHETYPES: HouseArchetype[] = [
     name: "Flat without balcony / high rise",
     eraLabel: "any era",
     description:
-      "A flat with no balcony or above the 4th floor — usually not installable at a fixed price.",
+      "A flat with no balcony or above the 4th floor. Usually not one we can do at a fixed price.",
     recognisers: ["No private outside space", "Above 4th floor"],
     matches: { types: ["flat"], eras: ["1930-1950", "1950-2000", "2000+"] },
     typicalRooms: [
@@ -403,7 +403,7 @@ export const ARCHETYPES: HouseArchetype[] = [
       r("Main bedroom", "bedroom", "medium", "ground"),
     ],
     permutations: [
-      p("survey-required", "Bespoke survey required", "We can sometimes use plant decks or communal areas — needs a bespoke survey rather than an instant price.", "unsure", 2,
+      p("survey-required", "Bespoke survey required", "We can sometimes use plant decks or communal areas, but that needs a proper survey rather than an instant price.", "unsure", 2,
         "Depends entirely on building management and crane/lift access.", 0,
         ["Building management engagement", "Plant deck availability"]),
     ],
@@ -412,7 +412,7 @@ export const ARCHETYPES: HouseArchetype[] = [
     id: "barn-conversion",
     name: "Barn / unusual conversion",
     eraLabel: "converted",
-    description: "Converted barn, chapel, school or other one-off — high spaces, unusual construction.",
+    description: "Converted barn, chapel, school or other one-off. High spaces, unusual construction.",
     recognisers: ["Double-height spaces", "Exposed beams", "One-off construction"],
     matches: { types: ["detached"], eras: ["pre-1930", "1930-1950", "1950-2000", "2000+"] },
     typicalRooms: [
@@ -459,7 +459,7 @@ export function getPermutation(
 }
 
 /**
- * Materialise a stock-floor-plan room as a survey room (deterministic ids —
+ * Materialise a stock-floor-plan room as a survey room (deterministic ids,
  * the same preset always produces the same room). Glazing/orientation start
  * at safe defaults the customer can tweak.
  */

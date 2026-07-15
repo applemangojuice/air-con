@@ -1,11 +1,12 @@
 import type { Metadata, Viewport } from "next";
 import { BRAND } from "@/lib/brand";
+import { PrototypeNav } from "@/components/site/prototype-nav";
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: {
-    default: `${BRAND.name} — ${BRAND.tagline}`,
-    template: `%s — ${BRAND.name}`,
+    default: `${BRAND.name} · ${BRAND.tagline}`,
+    template: `%s · ${BRAND.name}`,
   },
   description:
     "Get a fixed price for home air conditioning in minutes. Complete a guided photo survey of your home and book your installation online.",
@@ -28,7 +29,10 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="min-h-dvh flex flex-col">{children}</body>
+      <body className="min-h-dvh flex flex-col">
+        {children}
+        <PrototypeNav />
+      </body>
     </html>
   );
 }

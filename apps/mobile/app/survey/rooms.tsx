@@ -24,7 +24,7 @@ export default function RoomsScreen() {
     ? getArchetype(draft.survey.archetypeId)
     : undefined;
 
-  // Stock-floor-plan rooms not yet added — one tap adds them fully configured.
+  // Stock-floor-plan rooms not yet added; one tap adds them fully configured.
   const remainingPresets = archetype
     ? archetype.typicalRooms
         .map((preset, i) => ({ preset, room: buildPresetRoom(archetype.id, preset, i) }))
@@ -45,7 +45,7 @@ export default function RoomsScreen() {
       subtitle={
         archetype
           ? `We've drafted the usual rooms for a ${archetype.name.toLowerCase()}. Remove any you don't need, tap one to adjust it, or add more.`
-          : "Add every room you'd like a unit in. You can drop rooms later — the price updates instantly."
+          : "Add every room you'd like a unit in. You can drop rooms later and the price updates instantly."
       }
       onBack={() => router.back()}
       onNext={() => router.push("/survey/outdoor")}

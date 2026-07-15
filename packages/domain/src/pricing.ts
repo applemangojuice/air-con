@@ -135,7 +135,7 @@ export function generateQuote(survey: Survey): QuoteResult {
     if (system.topology === "single") {
       const room = system.rooms[0]!;
       lines.push({
-        label: `${room.roomName} — ${room.capacityKw.toFixed(1)} kW single-split system`,
+        label: `${room.roomName}: ${room.capacityKw.toFixed(1)} kW single-split system`,
         detail: "Indoor + outdoor unit, pipework, install & commissioning",
         amount: SINGLE_SPLIT_PRICE[room.capacityKw],
       });
@@ -147,7 +147,7 @@ export function generateQuote(survey: Survey): QuoteResult {
       });
       for (const room of system.rooms) {
         lines.push({
-          label: `${room.roomName} — ${room.unitLabel}`,
+          label: `${room.roomName}: ${room.unitLabel}`,
           amount: MULTI_INDOOR_PRICE[room.capacityKw],
         });
       }
@@ -159,18 +159,18 @@ export function generateQuote(survey: Survey): QuoteResult {
     const floorAdder = FLOOR_ADDER[room.floor];
     if (floorAdder) {
       lines.push({
-        label: `${room.name} — ${floorAdder.label}`,
+        label: `${room.name}: ${floorAdder.label}`,
         amount: floorAdder.amount,
       });
     }
     if (!room.hasExternalWall) {
       lines.push({
-        label: `${room.name} — internal pipe routing`,
+        label: `${room.name}: internal pipe routing`,
         detail: "No external wall: concealed trunking to nearest route",
         amount: INTERNAL_ROUTING_ADDER,
       });
       reviewFlags.push(
-        `${room.name} has no external wall — pipe route needs design review.`,
+        `${room.name} has no external wall, so the pipe route needs a design check.`,
       );
     }
   }
@@ -180,7 +180,7 @@ export function generateQuote(survey: Survey): QuoteResult {
     lines.push({ label: outdoorAdder.label, amount: outdoorAdder.amount });
   }
   if (survey.outdoor.location === "unsure") {
-    reviewFlags.push("Outdoor unit position undecided — we'll advise on the best spot.");
+    reviewFlags.push("Outdoor unit position undecided. We'll advise on the best spot.");
   }
 
   // Archetype install permutation: pattern-specific work + ops checks.
@@ -191,14 +191,14 @@ export function generateQuote(survey: Survey): QuoteResult {
   if (permutation) {
     if (permutation.adderGbp > 0) {
       lines.push({
-        label: `Install pattern — ${permutation.label}`,
+        label: `Install pattern: ${permutation.label}`,
         detail: permutation.pipeRoute,
         amount: permutation.adderGbp,
       });
     }
     if (survey.rooms.length > permutation.servesUpTo) {
       reviewFlags.push(
-        `"${permutation.label}" serves up to ${permutation.servesUpTo} rooms — ${survey.rooms.length} requested, so we'll confirm the second outdoor unit position.`,
+        `"${permutation.label}" serves up to ${permutation.servesUpTo} rooms and you asked for ${survey.rooms.length}, so we'll confirm the second outdoor unit position.`,
       );
     }
     for (const check of permutation.checks) {
@@ -217,7 +217,7 @@ export function generateQuote(survey: Survey): QuoteResult {
       amount: FULL_BOARD_ADDER,
     });
   } else if (survey.electrics.condition === "unsure") {
-    reviewFlags.push("Electrics unconfirmed — fuse board photo lets us fix this line.");
+    reviewFlags.push("Electrics unconfirmed. A fuse board photo lets us lock this line in.");
   }
 
   const totalGbp = lines.reduce((sum, l) => sum + l.amount, 0);

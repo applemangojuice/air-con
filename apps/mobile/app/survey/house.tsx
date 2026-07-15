@@ -10,7 +10,7 @@ const { colors, radius, space } = theme;
 
 /**
  * Archetype-first capture: the customer identifies their house from the
- * library. Design becomes selection — only a few install permutations exist
+ * library. Design becomes selection: only a few install permutations exist
  * per archetype.
  */
 export default function HouseScreen() {
@@ -39,7 +39,7 @@ export default function HouseScreen() {
       step={0}
       totalSteps={8}
       title="Which is your house?"
-      subtitle="We've designed installations for every common British home. Pick the one that matches yours — it decides how we install."
+      subtitle="We've designed installations for every common British home. Pick the one that matches yours, it decides how we install."
       onBack={() => router.back()}
     >
       <View>

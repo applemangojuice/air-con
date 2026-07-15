@@ -7,14 +7,14 @@ import type {
 import { getArchetype, getPermutation } from "./archetypes.ts";
 
 /**
- * The project workflow — everything that happens after the instant quote.
+ * The project workflow: everything that happens after the instant quote.
  *
  * A project is the customer's whole journey on one horizontal timeline:
  *
  *   quote → floor plan → final quote → site visit → delivery → installation
  *
  * Design rules (mirroring the quote engine):
- *  * The Project is a plain JSON snapshot — it persists to JSONB as-is and
+ *  * The Project is a plain JSON snapshot. It persists to JSONB as-is and
  *    crosses the wire to web and mobile unchanged.
  *  * Every transition goes through `applyProjectAction`, a pure reducer.
  *    The API route runs it server-side (the authority); demo mode runs the
@@ -45,7 +45,7 @@ export interface StageInfo {
   title: string;
   /** One-liner under the title on the stage page. */
   strap: string;
-  /** "What happens here" — shown even when the stage is greyed out in the future. */
+  /** "What happens here", shown even when the stage is greyed out in the future. */
   explainer: string[];
 }
 
@@ -54,72 +54,72 @@ export const STAGE_INFO: Record<ProjectStageId, StageInfo> = {
     id: "quote",
     label: "Quote",
     title: "Your instant quote",
-    strap: "A fixed price from your own survey — no salesperson, no callbacks.",
+    strap: "A fixed price from your own survey. No pushy sales visit, no waiting by the phone.",
     explainer: [
-      "You told us about your home and rooms; our engine priced the installation on the spot.",
-      "The price is fixed once your photos are reviewed — it can go down, never up, unless the scope changes.",
-      "Everything after this step happens on this timeline.",
+      "You told us about your place, we priced the whole job on the spot.",
+      "Once your photos are checked the price is locked. It can go down, never up, unless you change the plan.",
+      "Everything from here happens on this timeline, and you can peek ahead any time.",
     ],
   },
   "floor-plan": {
     id: "floor-plan",
     label: "Floor plan",
-    title: "Your floor plan & system design",
-    strap: "Where every unit goes and how the pipework runs — approve it or ask for changes.",
+    title: "Your floor plan",
+    strap: "See exactly where everything goes, then give it the thumbs up.",
     explainer: [
-      "Because we only install proven layouts for your house type, your floor plan is ready immediately — no waiting for a designer.",
-      "It shows each indoor unit position, the outdoor unit location and the pipe route.",
-      "Approving the plan moves you to your final quote. You can still change your mind at the site visit.",
+      "We only fit proven layouts for your type of house, so your plan is ready straight away. No designer, no waiting.",
+      "It shows every indoor unit, where the outdoor unit sits, and how the pipes run.",
+      "Approve it and your final quote is next. You can still tweak things at the site visit.",
     ],
   },
   "final-quote": {
     id: "final-quote",
     label: "Final quote",
-    title: "Your final fixed quote",
-    strap: "The number that goes in writing — locked against your approved floor plan.",
+    title: "Your final quote",
+    strap: "Your price, in writing, locked to your approved plan.",
     explainer: [
-      "We review your photos and floor plan, then issue the final fixed price.",
-      "If your survey was complete, this is issued instantly at the same price as your instant quote.",
-      "Accepting the final quote unlocks site-visit booking. Nothing is payable yet.",
+      "We check your photos against your floor plan, then put the final price in writing.",
+      "If your survey was complete, this happens instantly at the same price as your instant quote.",
+      "Accepting unlocks site visit booking. Still nothing to pay.",
     ],
   },
   "site-visit": {
     id: "site-visit",
     label: "Site visit",
     title: "Your site visit",
-    strap: "One hour with our founder to validate everything before we build.",
+    strap: "One hour with our founder to check everything before we build.",
     explainer: [
-      "Every installation is preceded by exactly one site visit — it is the gate to installation day.",
-      "We walk your floor plan room by room, confirm the outdoor unit position, and pin down the electrical connection.",
-      "It runs as a video call by default, or in person where needed. The £150 fee comes off your installation price.",
+      "Every install gets exactly one site visit, and nothing gets built without it.",
+      "We walk your plan room by room, check the outdoor unit spot, and nail down where the power comes from.",
+      "Usually a video call, in person if your place needs real eyes. The £150 comes straight off your install price.",
     ],
   },
   delivery: {
     id: "delivery",
     label: "Delivery",
-    title: "Equipment delivery",
-    strap: "Everything ships to you by courier ahead of installation day — tracked here.",
+    title: "Your kit arrives",
+    strap: "Everything ships straight to your door before install day, tracked right here.",
     explainer: [
-      "Rather than vans carrying stock, your exact equipment is pre-shipped by courier a couple of days before installation.",
-      "You'll see the courier, tracking reference and a live event feed on this page.",
-      "The boxes are heavy but boxed and safe — leave them where they land; our installer handles the rest.",
+      "No van full of mystery stock. Your exact kit ships by courier a couple of days before your install.",
+      "You'll see the courier, the tracking number and live updates on this page.",
+      "The boxes are heavy but safe. Leave them where they land, your installer sorts the rest.",
     ],
   },
   installation: {
     id: "installation",
     label: "Installation",
-    title: "Installation day",
-    strap: "Meet your installer, see the plan for the day, and get your home ready.",
+    title: "Install day",
+    strap: "Meet your installer, see the plan for the day, get your place ready.",
     explainer: [
-      "You'll see who is coming, what the day looks like hour by hour, and exactly what to clear before we arrive.",
-      "Power is off for up to 30 minutes while we make the electrical connection agreed at your site visit.",
-      "We finish with a full handover: controls, app pairing, warranty and care.",
+      "You'll know exactly who's coming, what the day looks like, and what to clear before we arrive.",
+      "The power goes off for up to 30 minutes while we wire in the connection agreed at your site visit.",
+      "We finish with a proper handover: controls, app pairing, warranty, the lot.",
     ],
   },
 };
 
 /* ------------------------------------------------------------------ */
-/* Site visit / fees / SLA — the commercial constants                 */
+/* Site visit / fees / SLA: the commercial constants                  */
 /* ------------------------------------------------------------------ */
 
 export const SITE_VISIT = {
@@ -128,11 +128,11 @@ export const SITE_VISIT = {
   /** The fee is credited against the installation balance. */
   creditedAgainstInstall: true,
   purposes: [
-    "Validate the floor plan and unit positions in your actual rooms",
-    "Confirm the outdoor unit location, access and noise clearances",
-    "Agree the electrical connection: route, board work and isolation point",
-    "Review your survey videos and photos together, live",
-    "Answer everything before you commit to an installation date",
+    "Walk the floor plan and unit positions in your actual rooms",
+    "Check the outdoor unit spot, access and noise clearances",
+    "Nail down the electrics: cable route, board work, isolation point",
+    "Go through your survey videos and photos together, live",
+    "Ask us anything before you commit to an install date",
   ],
 } as const;
 
@@ -153,7 +153,7 @@ export interface FeeBand {
 }
 
 /**
- * Date-change fees escalate as the date approaches — the closer we are, the
+ * Date-change fees escalate as the date approaches: the closer we are, the
  * more is already committed (courier slots, crew days, freed stock).
  */
 export const RESCHEDULE_FEES: Record<ReschedulableKind, FeeBand[]> = {
@@ -185,34 +185,34 @@ export function rescheduleFeeGbp(kind: ReschedulableKind, daysNotice: number): n
 }
 
 /**
- * Our side of the deal. If we miss a commitment the remedy is automatic —
+ * Our side of the deal. If we miss a commitment the remedy is automatic,
  * the customer never has to argue for it.
  */
 export const SLA_COMMITMENTS = [
   {
     id: "final-quote-1-day",
-    promise: "Final quote within 1 working day of your floor-plan approval",
-    remedy: "£50 off your installation",
+    promise: "Final quote within 1 working day of you approving your floor plan",
+    remedy: "£50 off your install",
   },
   {
     id: "site-visit-on-time",
     promise: "Your site visit starts within 15 minutes of the booked slot",
-    remedy: "The £150 site-visit fee is refunded (and still credited)",
+    remedy: "Your £150 back, and it still counts off your price",
   },
   {
     id: "delivery-on-day",
-    promise: "Equipment arrives on the confirmed delivery date",
-    remedy: "£50 off, plus £25 for each further day",
+    promise: "Your kit arrives on the confirmed delivery date",
+    remedy: "£50 off, plus £25 for every extra day",
   },
   {
     id: "install-on-day",
     promise: "Installation starts on the confirmed date",
-    remedy: "5% off your installation price",
+    remedy: "5% off your install price",
   },
   {
     id: "install-duration",
-    promise: "Handover completed within the quoted number of install days",
-    remedy: "£100 off your installation price",
+    promise: "Handover done within the quoted number of install days",
+    remedy: "£100 off your install price",
   },
 ] as const;
 
@@ -232,7 +232,7 @@ export type ProjectActor = "customer" | "ops" | "system";
 export interface ProjectEvent {
   at: string; // ISO datetime
   type: string;
-  /** Customer-facing update line — this is the "great updates" feed. */
+  /** Customer-facing update line: this is the "great updates" feed. */
   label: string;
   actor: ProjectActor;
   feeGbp?: number;
@@ -273,7 +273,7 @@ export interface Project {
     roomCount: number;
     confidenceBand: ConfidenceBand;
     systems: string[];
-    /** Unit per room — the floor plan panel draws from this. */
+    /** Unit per room; the floor plan panel draws from this. */
     roomDesigns: { name: string; floor: string; unitLabel: string }[];
   };
   floorPlan: {
@@ -340,60 +340,60 @@ const ELECTRICS_ASSESSMENT: Record<
   "modern-spare-ways": {
     status: "provisional",
     summary:
-      "Your consumer unit has spare ways, so this looks like a straightforward dedicated circuit. We confirm the exact cable route at your site visit.",
+      "Your fuse board has spare ways, so this looks like a simple dedicated circuit. We'll confirm the exact cable route at your site visit.",
   },
   "modern-full": {
     status: "attention",
     summary:
-      "Your consumer unit is modern but full, so we plan to free a way or add a small enclosure. The work is already priced in — the site visit confirms exactly what's needed.",
+      "Your fuse board is modern but full, so we'll free up a way or add a small extra box. It's already priced in, and the site visit confirms exactly what's needed.",
   },
   "older-fuse-box": {
     status: "attention",
     summary:
-      "You have an older fuse board. Our electrician will assess it at the site visit; if board work is needed we'll agree it there before anything is booked.",
+      "You've got an older fuse board. Our electrician checks it at the site visit, and if it needs work we agree that with you there before anything is booked.",
   },
   unsure: {
     status: "provisional",
     summary:
-      "We couldn't assess your electrics from the survey — pinning down the power connection is a headline item for your site visit.",
+      "We couldn't tell much about your electrics from the survey, so sorting the power connection is top of the list for your site visit.",
   },
 };
 
 export const DEFAULT_PREP_ITEMS: Omit<PrepItem, "done">[] = [
   {
     id: "indoor-space",
-    label: "Clear space at each indoor unit position",
-    detail: "About a metre in front of each wall position on your floor plan, so we can work and sheet up.",
+    label: "Clear space where each indoor unit goes",
+    detail: "About a metre in front of each wall spot on your plan, so we can work and lay dust sheets.",
     confirmable: true,
   },
   {
     id: "outdoor-access",
     label: "Clear the route to the outdoor unit spot",
-    detail: "Move bins, planters and anything fragile along the access route and around the unit position.",
+    detail: "Move bins, planters and anything fragile along the way and around the spot itself.",
     confirmable: true,
   },
   {
     id: "parking",
     label: "Sort parking for one van",
-    detail: "As close to the property as possible — a permit or a coned space if you're in a controlled zone.",
+    detail: "As close as you can get us. A permit or a coned space if you're in a controlled zone.",
     confirmable: true,
   },
   {
     id: "pets-kids",
-    label: "Plan for pets and children",
-    detail: "Doors will be open and tools about — a closed room or a day out works best.",
+    label: "Plan for pets and kids",
+    detail: "Doors will be open and tools about, so a closed room or a day out works best.",
     confirmable: true,
   },
   {
     id: "power-off",
-    label: "Expect power off for up to 30 minutes",
-    detail: "We isolate the supply while making the electrical connection agreed at your site visit.",
+    label: "The power goes off for up to 30 minutes",
+    detail: "We switch off the supply while wiring in the connection agreed at your site visit.",
     confirmable: false,
   },
   {
     id: "adult-home",
     label: "Someone 18+ at home",
-    detail: "For access, decisions on the day, and the handover at the end.",
+    detail: "For letting us in, decisions on the day, and the handover at the end.",
     confirmable: true,
   },
 ];
@@ -434,13 +434,13 @@ export function createProject(input: CreateProjectInput): Project {
     {
       at: input.createdAt,
       type: "project-created",
-      label: "Project created — your installation timeline starts here.",
+      label: "Project created. Your installation timeline starts here.",
       actor: "system",
     },
     {
       at: input.createdAt,
       type: "floor-plan-ready",
-      label: "Your floor plan is ready to review — no waiting, it's built from your house type's proven layout.",
+      label: "Your floor plan is ready to look at. No waiting, it's built from the proven layout for your house type.",
       actor: "system",
     },
   ];
@@ -448,7 +448,7 @@ export function createProject(input: CreateProjectInput): Project {
     events.push({
       at: input.createdAt,
       type: "final-quote-issued",
-      label: "Your survey was complete, so your final quote is issued at the same fixed price.",
+      label: "Your survey was complete, so your final quote is already issued at the same fixed price.",
       actor: "system",
     });
   }
@@ -486,7 +486,7 @@ export function createProject(input: CreateProjectInput): Project {
           status: "issued",
           totalGbp: quote.totalGbp,
           issuedAt: input.createdAt,
-          note: "Issued automatically — your survey was complete enough to lock the price.",
+          note: "Issued automatically. Your survey was complete enough to lock the price straight in.",
         }
       : { status: "pending" },
     siteVisit: {
@@ -570,7 +570,7 @@ export function daysBetween(fromIso: string, toIso: string): number {
 
 /**
  * The dates on the timeline: actuals where a step happened, confirmed where
- * a date is booked, estimates everywhere else — so the future always shows
+ * a date is booked, estimates everywhere else, so the future always shows
  * projected dates, like a project plan.
  */
 export function projectTimeline(project: Project, todayIso: string): TimelineEntry[] {
@@ -635,7 +635,7 @@ export function projectTimeline(project: Project, todayIso: string): TimelineEnt
 }
 
 /* ------------------------------------------------------------------ */
-/* Actions — the single write path                                    */
+/* Actions: the single write path                                     */
 /* ------------------------------------------------------------------ */
 
 export type ProjectAction =
@@ -677,7 +677,7 @@ const fmtDate = (iso: string) => {
   return `${DAY_NAMES[d.getUTCDay()]} ${d.getUTCDate()} ${MONTH_NAMES[d.getUTCMonth()]}`;
 };
 
-// Slot datetimes are UK wall-clock encoded as UTC — format in UTC to round-trip.
+// Slot datetimes are UK wall-clock encoded as UTC; format in UTC to round-trip.
 const fmtDateTime = (iso: string) => {
   const d = new Date(iso);
   const hh = String(d.getUTCHours()).padStart(2, "0");
@@ -713,7 +713,7 @@ export function applyProjectAction(
           status: "issued",
           totalGbp: p.quoteSummary.totalGbp,
           issuedAt: now,
-          note: "Issued automatically — your survey was complete enough to lock the price.",
+          note: "Issued automatically. Your survey was complete enough to lock the price straight in.",
         };
         log(
           "final-quote-issued",
@@ -749,7 +749,7 @@ export function applyProjectAction(
       p.finalQuote.acceptedAt = now;
       log(
         "final-quote-accepted",
-        "You accepted your final quote — book your site visit to keep moving.",
+        "You accepted your final quote. Book your site visit to keep things moving.",
         "customer",
       );
       return { ok: true, project: p };
@@ -778,7 +778,7 @@ export function applyProjectAction(
       p.siteVisit.paymentStatus = "paid";
       log(
         "site-visit-paid",
-        `Site-visit fee paid (£${p.siteVisit.feeGbp}) — it comes off your installation balance.`,
+        `Site visit fee paid (£${p.siteVisit.feeGbp}). It comes straight off your install balance.`,
         "customer",
         p.siteVisit.feeGbp,
       );
@@ -813,8 +813,8 @@ export function applyProjectAction(
       log(
         "site-visit-completed",
         action.approvedForInstall
-          ? "Site visit complete — you're approved for installation. Book your installation date."
-          : "Site visit complete — a couple of things to resolve before installation (see notes).",
+          ? "Site visit done. You're approved for installation, go book your install date."
+          : "Site visit done. A couple of things to sort before installation (see notes).",
         "ops",
       );
       return { ok: true, project: p };
@@ -825,7 +825,7 @@ export function applyProjectAction(
       if (p.siteVisit.status !== "completed")
         return err("Your site visit has to happen before an installation date is confirmed.");
       if (!p.siteVisit.outcome?.approvedForInstall)
-        return err("Installation isn't approved yet — see your site-visit notes.");
+        return err("Installation isn't approved yet. Check your site visit notes.");
       if (p.installation.status === "completed") return err("Installation is already done.");
       const notice = daysBetween(now, action.date);
       if (notice < INSTALL_LEAD_DAYS)
@@ -837,7 +837,7 @@ export function applyProjectAction(
         fee = rescheduleFeeGbp("installation", daysBetween(now, p.installation.date!));
         p.installation.rescheduleFeesGbp += fee;
       } else if (p.installation.status === "booked") {
-        return err("Installation is already booked — reschedule it instead.");
+        return err("Installation is already booked. Use reschedule to move it.");
       }
 
       p.installation.status = "booked";
@@ -849,8 +849,8 @@ export function applyProjectAction(
       }
       log(
         action.type === "book-installation" ? "installation-booked" : "installation-rescheduled",
-        `Installation ${action.type === "book-installation" ? "booked" : "moved to"} ${fmtDate(p.installation.date)}` +
-          ` — equipment delivery expected ${fmtDate(p.delivery.expectedDate!)}` +
+        `Installation ${action.type === "book-installation" ? "booked for" : "moved to"} ${fmtDate(p.installation.date)}.` +
+          ` Your kit should land ${fmtDate(p.delivery.expectedDate!)}` +
           (fee ? ` (£${fee} change fee)` : "") +
           ".",
         "customer",
@@ -861,7 +861,7 @@ export function applyProjectAction(
 
     case "set-delivery-date": {
       if (p.installation.status !== "booked")
-        return err("Book your installation date first — delivery is planned around it.");
+        return err("Book your installation date first. Delivery is planned around it.");
       if (p.delivery.status === "dispatched" || p.delivery.status === "delivered")
         return err("Your equipment is already on the move.");
       const date = action.date.slice(0, 10);
@@ -899,7 +899,7 @@ export function applyProjectAction(
       });
       log(
         "delivery-dispatched",
-        `Your equipment is on its way with ${action.courier} — tracking ${action.trackingRef}.`,
+        `Your kit is on its way with ${action.courier}. Tracking: ${action.trackingRef}.`,
         "ops",
       );
       return { ok: true, project: p };
@@ -912,7 +912,7 @@ export function applyProjectAction(
       p.delivery.trackingEvents.push({ at: now, label: "Delivered", location: "Your address" });
       log(
         "delivery-delivered",
-        "Your equipment has been delivered — leave the boxes where they are, we handle the rest.",
+        "Your kit has landed. Leave the boxes where they are, we handle the rest.",
         "ops",
       );
       return { ok: true, project: p };
@@ -922,7 +922,7 @@ export function applyProjectAction(
       p.installation.installer = action.installer;
       log(
         "installer-assigned",
-        `${action.installer.name} will lead your installation — their profile is on your installation page.`,
+        `${action.installer.name} is leading your install. Their profile is on your installation page.`,
         "ops",
       );
       return { ok: true, project: p };
@@ -936,7 +936,7 @@ export function applyProjectAction(
       p.installation.completedAt = now;
       log(
         "installation-completed",
-        "Installation complete — welcome to properly conditioned air. Warranty and care docs are on their way.",
+        "Installation complete. Enjoy the cold air, your warranty and care docs are on the way.",
         "ops",
       );
       return { ok: true, project: p };
@@ -952,7 +952,7 @@ export function applyProjectAction(
   }
 }
 
-/** Fees accrued so far (date changes) plus the site-visit fee state — for the balance strip. */
+/** Fees accrued so far (date changes) plus the site-visit fee state, for the balance strip. */
 export function projectFees(project: Project): {
   changeFeesGbp: number;
   siteVisitPaidGbp: number;

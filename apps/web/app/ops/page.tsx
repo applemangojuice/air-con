@@ -4,7 +4,7 @@ import { SiteFooter } from "@/components/site/footer";
 import { SiteHeader } from "@/components/site/header";
 
 export const metadata: Metadata = {
-  title: "Platform — operations",
+  title: "Platform · operations",
   robots: { index: false },
 };
 
@@ -19,13 +19,13 @@ const modules = [
     id: "design",
     phase: "Year 1–2",
     title: "Design studio",
-    body: "Every AI-proposed design is editable: move indoor units, re-route pipes, swap outdoor units — price, labour and materials recalculate automatically.",
+    body: "Every AI-proposed design is editable: move indoor units, re-route pipes, swap outdoor units, and price, labour and materials recalculate automatically.",
   },
   {
     id: "templates",
     phase: "Year 2",
     title: "Installation template library",
-    body: "The moat. Victorian terrace, 1930s semi, townhouse, bungalow, flat — each template stores time, difficulty, materials, crew needs and outcomes.",
+    body: "The moat. Victorian terrace, 1930s semi, townhouse, bungalow, flat. Each template stores time, difficulty, materials, crew needs and outcomes.",
   },
   {
     id: "procurement",
@@ -71,7 +71,7 @@ export default function OpsPage() {
           The operating system for residential air conditioning
         </h1>
         <p className="mt-3 max-w-2xl text-ink-500">
-          Customer quoting is live — incoming self-surveys are in{" "}
+          Customer quoting is live. Incoming self-surveys are in{" "}
           <Link href="/ops/quotes" className="font-semibold text-accent-700 underline">
             quote requests
           </Link>
@@ -80,7 +80,7 @@ export default function OpsPage() {
             projects
           </Link>{" "}
           (quote → floor plan → final quote → site visit → delivery →
-          installation). These are the modules that follow — each one exists to
+          installation). These are the modules that follow, and each one exists to
           reduce skilled labour, standardise installations, or learn from every
           job.
         </p>
@@ -105,7 +105,7 @@ export default function OpsPage() {
             Every self-survey quote stores its full survey, the engine version
             and the computed price in Supabase (<code>quote_requests</code>).
             When these modules arrive, the historical data is already shaped for
-            them — quotes can be replayed against newer pricing rules from day
+            them: quotes can be replayed against newer pricing rules from day
             one.
           </p>
         </div>
