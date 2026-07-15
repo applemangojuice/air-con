@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { ARCHETYPES, getPermutation, suggestArchetypes } from "./archetypes.ts";
+import { ARCHETYPES, buildPresetRoom, getPermutation, suggestArchetypes } from "./archetypes.ts";
 import { generateQuote } from "./pricing.ts";
 import type { Survey } from "./types.ts";
 
@@ -11,6 +11,39 @@ test("archetype library has 15 archetypes, each with at least one permutation", 
     const ids = new Set(a.permutations.map((p) => p.id));
     assert.equal(ids.size, a.permutations.length, `${a.id} has duplicate permutation ids`);
   }
+});
+
+test("every archetype ships a stock floor plan with popular defaults", () => {
+  for (const a of ARCHETYPES) {
+    assert.ok(a.typicalRooms.length >= 2, `${a.id} has too few typical rooms`);
+    assert.ok(
+      a.typicalRooms.some((room) => room.popular),
+      `${a.id} has no popular (pre-ticked) rooms`,
+    );
+  }
+});
+
+test("preset rooms materialise deterministically and price without AI", () => {
+  const archetype = ARCHETYPES.find((a) => a.id === "thirties-semi")!;
+  const rooms = archetype.typicalRooms
+    .filter((room) => room.popular)
+    .map((room, i) => buildPresetRoom(archetype.id, room, i));
+  assert.deepEqual(
+    rooms,
+    archetype.typicalRooms.filter((room) => room.popular).map((room, i) => buildPresetRoom(archetype.id, room, i)),
+  );
+
+  const quote = generateQuote({
+    postcode: "SW1A 1AA",
+    addressLine: "1 Test Street",
+    archetypeId: archetype.id,
+    permutationId: archetype.permutations[0]!.id,
+    property: { type: "semi-detached", era: "1930-1979", bedrooms: 3, ownership: "owner" },
+    rooms,
+    outdoor: { location: archetype.permutations[0]!.outdoorLocation, photos: [] },
+    electrics: { condition: "unsure", photos: [] },
+  });
+  assert.ok(quote.totalGbp > 2000);
 });
 
 test("suggestArchetypes ranks the 1930s semi first for a 1930-1979 semi", () => {

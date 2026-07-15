@@ -124,6 +124,30 @@ outdoor/electrics confirmation (prefilled) → contact → fixed price.**
 The v2 step here is ARKit/RoomPlan replacing narration-guessed size bands
 with measured dimensions — the video flow is the on-ramp to that.
 
+## Minimising AI usage
+
+The AI is only load-bearing in one place — turning free-form narration into
+structured rooms. Everything else (archetype matching, permutation selection,
+heat load, pricing, confidence) is deterministic domain code. The capture
+design therefore runs on three tiers, cheapest first:
+
+| Tier | How the floor plan is made | AI used | Status |
+| --- | --- | --- | --- |
+| **1. Stock floor plans** | Each archetype ships `typicalRooms` — the known layout of that house type. Popular rooms are pre-drafted the moment the customer picks their install pattern; the rest are one-tap chips. Confirm-and-tweak, not describe. | None | **Default path, live** |
+| **2. On-device measurement** | Apple RoomPlan (LiDAR iPhones) emits parametric walls/windows/heights as structured data via Apple's framework; ARKit tap-to-measure on non-LiDAR devices. Replaces size *bands* with real dimensions. | None (on-device frameworks, no API cost) | v2 |
+| **3. Narrated video → extraction** | Whisper + Claude turn a walkthrough narration into rooms. | ~2p transcription + ~2p extraction per survey | Opt-in fallback |
+
+Consequences of tier 1 being the default:
+
+- The **video is evidence, not input**: customers are offered "Save for my
+  install team" (upload only, zero processing — engineers watch it before
+  confirming the price) ahead of "build my plan from the video".
+- The instant quote is **fully deterministic**: same selections → same price,
+  offline-capable, no latency, no per-survey cost.
+- AI processing runs only when a customer explicitly prefers talking to
+  tapping — and even then its output lands in the same confirm-and-tweak
+  editor.
+
 ## Why a native iOS capture app at all
 
 The web funnel is the acquisition surface — zero-install, link-from-an-ad.

@@ -1,6 +1,6 @@
 import { router } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import type { RoomType } from "@aircon/domain";
+import { buildPresetRoom, getArchetype, type RoomType } from "@aircon/domain";
 import { Screen } from "@/components/ui";
 import { ROOM_TYPE_LABEL, newRoom, useDraft } from "@/lib/store";
 import { theme } from "@/lib/theme";
@@ -20,6 +20,16 @@ const ADDABLE: RoomType[] = [
 export default function RoomsScreen() {
   const { draft, setSurvey } = useDraft();
   const rooms = draft.survey.rooms;
+  const archetype = draft.survey.archetypeId
+    ? getArchetype(draft.survey.archetypeId)
+    : undefined;
+
+  // Stock-floor-plan rooms not yet added — one tap adds them fully configured.
+  const remainingPresets = archetype
+    ? archetype.typicalRooms
+        .map((preset, i) => ({ preset, room: buildPresetRoom(archetype.id, preset, i) }))
+        .filter(({ room }) => !rooms.some((r) => r.id === room.id))
+    : [];
 
   function addRoom(type: RoomType) {
     const room = newRoom(type, rooms);
@@ -32,7 +42,11 @@ export default function RoomsScreen() {
       step={4}
       totalSteps={8}
       title="Which rooms should we cool?"
-      subtitle="Add every room you'd like a unit in. You can drop rooms later — the price updates instantly."
+      subtitle={
+        archetype
+          ? `We've drafted the usual rooms for a ${archetype.name.toLowerCase()}. Remove any you don't need, tap one to adjust it, or add more.`
+          : "Add every room you'd like a unit in. You can drop rooms later — the price updates instantly."
+      }
       onBack={() => router.back()}
       onNext={() => router.push("/survey/outdoor")}
       nextDisabled={rooms.length === 0}
@@ -67,9 +81,28 @@ export default function RoomsScreen() {
         </View>
       )}
 
+      {remainingPresets.length > 0 && (
+        <View>
+          <Text style={styles.addLabel}>
+            More rooms in a typical {archetype!.name.toLowerCase()}
+          </Text>
+          <View style={styles.chips}>
+            {remainingPresets.map(({ room }) => (
+              <Pressable
+                key={room.id}
+                style={[styles.chip, styles.presetChip]}
+                onPress={() => setSurvey({ rooms: [...rooms, room] })}
+              >
+                <Text style={styles.presetChipText}>+ {room.name}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      )}
+
       <View>
         <Text style={styles.addLabel}>
-          {rooms.length === 0 ? "Add your first room" : "Add another room"}
+          {rooms.length === 0 ? "Add your first room" : "Add a different room"}
         </Text>
         <View style={styles.chips}>
           {ADDABLE.map((type) => (
@@ -109,4 +142,6 @@ const styles = StyleSheet.create({
     paddingVertical: space(2),
   },
   chipText: { fontSize: 14, fontWeight: "500", color: colors.ink700 },
+  presetChip: { borderColor: colors.sage200, backgroundColor: colors.sage50 },
+  presetChipText: { fontSize: 14, fontWeight: "600", color: colors.sage700 },
 });

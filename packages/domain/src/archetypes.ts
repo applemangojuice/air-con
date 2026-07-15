@@ -1,4 +1,12 @@
-import type { OutdoorLocation, PropertyEra, PropertyType } from "./types.ts";
+import type {
+  FloorLevel,
+  OutdoorLocation,
+  PropertyEra,
+  PropertyType,
+  RoomSize,
+  RoomType,
+  SurveyRoom,
+} from "./types.ts";
 
 /**
  * The archetype library — the constraint that makes fixed pricing possible.
@@ -30,6 +38,16 @@ export interface InstallPermutation {
   checks: string[];
 }
 
+/** A room in the archetype's stock floor plan — the zero-AI capture path. */
+export interface RoomPreset {
+  name: string;
+  type: RoomType;
+  size: RoomSize;
+  floor: FloorLevel;
+  /** Rooms most customers cool — pre-ticked in the picker. */
+  popular?: boolean;
+}
+
 export interface HouseArchetype {
   id: string;
   name: string;
@@ -40,8 +58,22 @@ export interface HouseArchetype {
   /** "You probably live in one if…" recognisers. */
   recognisers: string[];
   matches: { types: PropertyType[]; eras: PropertyEra[] };
+  /**
+   * The stock floor plan: because we only serve known house types, we know
+   * their typical rooms. Customers confirm and tweak instead of describing —
+   * no transcription or extraction needed.
+   */
+  typicalRooms: RoomPreset[];
   permutations: InstallPermutation[];
 }
+
+const r = (
+  name: string,
+  type: RoomType,
+  size: RoomSize,
+  floor: FloorLevel,
+  popular = false,
+): RoomPreset => ({ name, type, size, floor, popular });
 
 const p = (
   id: string,
@@ -63,6 +95,13 @@ export const ARCHETYPES: HouseArchetype[] = [
       "Two-storey brick terrace with a rear kitchen outrigger and a small back yard or garden.",
     recognisers: ["Bay window at the front", "Rear addition/outrigger", "Solid brick walls", "Alley or yard access at the back"],
     matches: { types: ["terraced"], eras: ["pre-1930"] },
+    typicalRooms: [
+      r("Front reception", "living-room", "large", "ground", true),
+      r("Kitchen-diner", "kitchen-diner", "medium", "ground"),
+      r("Main bedroom", "bedroom", "medium", "first", true),
+      r("Bedroom 2", "bedroom", "medium", "first"),
+      r("Box room / office", "home-office", "small", "first"),
+    ],
     permutations: [
       p("rear-yard-multi", "Rear yard multi-split", "One outdoor unit in the back yard serving up to 4 rooms through the rear wall.", "ground-rear", 4,
         "Condensate and refrigerant lines drop down the rear elevation in discreet trunking; bedrooms served via the outrigger junction.", 0,
@@ -82,6 +121,14 @@ export const ARCHETYPES: HouseArchetype[] = [
     description: "Generous semi with high ceilings, bay windows, side return and solid walls.",
     recognisers: ["High ceilings (2.7 m+)", "Side return or passage", "Timber sash windows"],
     matches: { types: ["semi-detached", "detached"], eras: ["pre-1930"] },
+    typicalRooms: [
+      r("Living room", "living-room", "large", "ground", true),
+      r("Dining room", "other", "medium", "ground"),
+      r("Kitchen-diner", "kitchen-diner", "large", "ground"),
+      r("Main bedroom", "bedroom", "large", "first", true),
+      r("Bedroom 2", "bedroom", "medium", "first"),
+      r("Bedroom 3", "bedroom", "small", "first"),
+    ],
     permutations: [
       p("side-return-multi", "Side return multi-split", "Outdoor unit in the side return serving up to 4 rooms via a vertical riser.", "ground-side", 4,
         "A single tidy riser up the side elevation feeds front and rear rooms on both floors.", 0,
@@ -99,6 +146,13 @@ export const ARCHETYPES: HouseArchetype[] = [
       "The classic three-bed semi: bay front, two storeys, side passage or garage, decent rear garden.",
     recognisers: ["Curved or square front bay", "Side passage or attached garage", "Early cavity walls"],
     matches: { types: ["semi-detached"], eras: ["1930-1979"] },
+    typicalRooms: [
+      r("Living room", "living-room", "large", "ground", true),
+      r("Kitchen-diner", "kitchen-diner", "medium", "ground"),
+      r("Main bedroom", "bedroom", "medium", "first", true),
+      r("Bedroom 2", "bedroom", "medium", "first"),
+      r("Box room / office", "home-office", "small", "first"),
+    ],
     permutations: [
       p("side-passage-multi", "Side passage multi-split", "Outdoor unit beside the house serving up to 4 rooms — our most-installed pattern.", "ground-side", 4,
         "Vertical riser on the side elevation; short ceiling-void spurs to front and rear bedrooms.", 0,
@@ -118,6 +172,12 @@ export const ARCHETYPES: HouseArchetype[] = [
     description: "Two-storey brick terrace with a small front garden and a longer rear garden.",
     recognisers: ["Uniform street of matching houses", "Rear kitchen addition", "Shared side alleys every few houses"],
     matches: { types: ["terraced"], eras: ["1930-1979"] },
+    typicalRooms: [
+      r("Living room", "living-room", "large", "ground", true),
+      r("Kitchen-diner", "kitchen-diner", "medium", "ground"),
+      r("Main bedroom", "bedroom", "medium", "first", true),
+      r("Bedroom 2", "bedroom", "small", "first"),
+    ],
     permutations: [
       p("rear-garden-multi", "Rear garden multi-split", "Outdoor unit at the rear serving up to 4 rooms through the back wall.", "ground-rear", 4,
         "Rear elevation riser with trunked drops to each room.", 0,
@@ -134,6 +194,13 @@ export const ARCHETYPES: HouseArchetype[] = [
     description: "Solidly built semi or terrace with wide frontage, generous rooms and big gardens.",
     recognisers: ["Wide window openings", "Rendered or pebble-dashed walls", "Large front and rear gardens"],
     matches: { types: ["semi-detached", "terraced"], eras: ["1930-1979"] },
+    typicalRooms: [
+      r("Living room", "living-room", "large", "ground", true),
+      r("Kitchen-diner", "kitchen-diner", "large", "ground"),
+      r("Main bedroom", "bedroom", "medium", "first", true),
+      r("Bedroom 2", "bedroom", "medium", "first"),
+      r("Bedroom 3", "bedroom", "small", "first"),
+    ],
     permutations: [
       p("rear-garden-multi", "Rear garden multi-split", "Outdoor unit at the rear; simple runs through rendered cavity walls.", "ground-rear", 4,
         "Straightforward rear riser — these houses are our fastest installs.", 0,
@@ -150,6 +217,12 @@ export const ARCHETYPES: HouseArchetype[] = [
     description: "Single-storey with a loft, easy access all round and short pipe runs everywhere.",
     recognisers: ["Everything on one floor", "Shallow-pitch roof", "Driveway to the side"],
     matches: { types: ["bungalow"], eras: ["1930-1979", "1980-1999"] },
+    typicalRooms: [
+      r("Living room", "living-room", "large", "ground", true),
+      r("Kitchen-diner", "kitchen-diner", "medium", "ground"),
+      r("Main bedroom", "bedroom", "medium", "ground", true),
+      r("Bedroom 2", "bedroom", "small", "ground"),
+    ],
     permutations: [
       p("rear-multi", "Rear multi-split", "One outdoor unit at the rear serving up to 4 rooms — bungalows are ideal for this.", "ground-rear", 4,
         "Short horizontal runs at eaves level or through the loft to each room.", 0,
@@ -166,6 +239,14 @@ export const ARCHETYPES: HouseArchetype[] = [
     description: "Boxy detached with attached garage, shallow roof and generous plot.",
     recognisers: ["Integral or attached garage", "Large landing window", "Timber cladding panels"],
     matches: { types: ["detached"], eras: ["1930-1979"] },
+    typicalRooms: [
+      r("Living room", "living-room", "large", "ground", true),
+      r("Kitchen-diner", "kitchen-diner", "xl", "ground"),
+      r("Home office", "home-office", "small", "ground"),
+      r("Main bedroom", "bedroom", "large", "first", true),
+      r("Bedroom 2", "bedroom", "medium", "first"),
+      r("Bedroom 3", "bedroom", "small", "first"),
+    ],
     permutations: [
       p("garage-side-multi", "Garage-side multi-split", "Outdoor unit beside the garage; runs enter through the garage for a clean look.", "ground-side", 4,
         "Pipework crosses the garage ceiling then rises to bedrooms — almost nothing visible outside.", 0,
@@ -182,6 +263,13 @@ export const ARCHETYPES: HouseArchetype[] = [
     description: "Narrow-fronted three-storey home, often with an integral garage on the ground floor.",
     recognisers: ["Three floors", "Integral garage", "Small rear garden or courtyard"],
     matches: { types: ["terraced", "semi-detached"], eras: ["1930-1979", "1980-1999", "2000+"] },
+    typicalRooms: [
+      r("Living room", "living-room", "large", "first", true),
+      r("Kitchen-diner", "kitchen-diner", "medium", "ground"),
+      r("Home office", "home-office", "small", "ground"),
+      r("Main bedroom", "bedroom", "medium", "second-plus", true),
+      r("Bedroom 2", "bedroom", "medium", "second-plus"),
+    ],
     permutations: [
       p("courtyard-multi", "Courtyard multi-split", "Outdoor unit in the rear courtyard with a full-height riser.", "ground-rear", 4,
         "One riser serves all three floors; top-floor rooms need the longest runs (priced in).", 220,
@@ -198,6 +286,13 @@ export const ARCHETYPES: HouseArchetype[] = [
     description: "Developer-built detached or link-detached on an estate; brick with concrete tile roof.",
     recognisers: ["Estate cul-de-sac", "Integral garage", "uPVC windows from new"],
     matches: { types: ["detached", "semi-detached"], eras: ["1980-1999"] },
+    typicalRooms: [
+      r("Living room", "living-room", "large", "ground", true),
+      r("Kitchen-diner", "kitchen-diner", "medium", "ground"),
+      r("Main bedroom", "bedroom", "medium", "first", true),
+      r("Bedroom 2", "bedroom", "medium", "first"),
+      r("Bedroom 3", "bedroom", "small", "first"),
+    ],
     permutations: [
       p("rear-multi", "Rear multi-split", "Outdoor unit at the rear; insulated cavity walls make for tidy, quick drills.", "ground-rear", 4,
         "Rear riser plus loft spurs to front bedrooms.", 0,
@@ -214,6 +309,13 @@ export const ARCHETYPES: HouseArchetype[] = [
     description: "Modern developer home with high insulation — smaller units cool it easily.",
     recognisers: ["NHBC-era build", "Trickle vents", "Small but well-insulated rooms"],
     matches: { types: ["detached", "semi-detached", "terraced"], eras: ["2000+"] },
+    typicalRooms: [
+      r("Living room", "living-room", "medium", "ground", true),
+      r("Kitchen-diner", "kitchen-diner", "large", "ground"),
+      r("Main bedroom", "bedroom", "medium", "first", true),
+      r("Bedroom 2", "bedroom", "small", "first"),
+      r("Home office", "home-office", "small", "first"),
+    ],
     permutations: [
       p("rear-multi", "Rear multi-split", "Outdoor unit at the rear; downsized units thanks to insulation levels.", "ground-rear", 4,
         "Rear riser; runs sized for low loads.", 0,
@@ -230,6 +332,11 @@ export const ARCHETYPES: HouseArchetype[] = [
     description: "Purpose-built flat up to ~4 storeys with its own balcony or terrace.",
     recognisers: ["Own balcony/terrace", "Communal entrance", "Up to 4 storeys"],
     matches: { types: ["flat"], eras: ["1930-1979", "1980-1999", "2000+"] },
+    typicalRooms: [
+      r("Open-plan living/kitchen", "living-room", "large", "ground", true),
+      r("Main bedroom", "bedroom", "medium", "ground", true),
+      r("Bedroom 2", "bedroom", "small", "ground"),
+    ],
     permutations: [
       p("balcony-single", "Balcony single-split", "Compact outdoor unit on your balcony serving the living space.", "balcony", 1,
         "Short run from balcony through the external wall — minimal disruption.", 120,
@@ -246,6 +353,12 @@ export const ARCHETYPES: HouseArchetype[] = [
     description: "A flat carved out of a period house — solid walls, shared garden, freeholder consent needed.",
     recognisers: ["Period features", "Entrance hall shared with 1–3 flats", "Garden flat or upper maisonette"],
     matches: { types: ["flat"], eras: ["pre-1930"] },
+    typicalRooms: [
+      r("Living room", "living-room", "large", "ground", true),
+      r("Kitchen-diner", "kitchen-diner", "medium", "ground"),
+      r("Main bedroom", "bedroom", "medium", "ground", true),
+      r("Bedroom 2", "bedroom", "small", "ground"),
+    ],
     permutations: [
       p("garden-single", "Garden flat single/multi", "Ground-floor flats: outdoor unit in your garden section, up to 3 rooms.", "ground-rear", 3,
         "Rear elevation runs as per a terrace install.", 0,
@@ -262,6 +375,12 @@ export const ARCHETYPES: HouseArchetype[] = [
     description: "Solid stone or thick brick walls, small windows, often detached with outside space.",
     recognisers: ["Walls 40 cm+ thick", "Small windows", "Rural or village setting"],
     matches: { types: ["detached", "terraced"], eras: ["pre-1930"] },
+    typicalRooms: [
+      r("Living room", "living-room", "medium", "ground", true),
+      r("Kitchen-diner", "kitchen-diner", "medium", "ground"),
+      r("Main bedroom", "bedroom", "medium", "first", true),
+      r("Bedroom 2", "bedroom", "small", "first"),
+    ],
     permutations: [
       p("rear-single-pair", "Rear singles", "One or two single-splits where wall depth allows a clean core drill.", "ground-rear", 2,
         "Longer core drills through stone are priced in; runs kept short.", 280,
@@ -279,6 +398,10 @@ export const ARCHETYPES: HouseArchetype[] = [
       "A flat with no balcony or above the 4th floor — usually not installable at a fixed price.",
     recognisers: ["No private outside space", "Above 4th floor"],
     matches: { types: ["flat"], eras: ["1930-1979", "1980-1999", "2000+"] },
+    typicalRooms: [
+      r("Open-plan living/kitchen", "living-room", "large", "ground", true),
+      r("Main bedroom", "bedroom", "medium", "ground"),
+    ],
     permutations: [
       p("survey-required", "Bespoke survey required", "We can sometimes use plant decks or communal areas — needs a bespoke survey rather than an instant price.", "unsure", 2,
         "Depends entirely on building management and crane/lift access.", 0,
@@ -292,6 +415,13 @@ export const ARCHETYPES: HouseArchetype[] = [
     description: "Converted barn, chapel, school or other one-off — high spaces, unusual construction.",
     recognisers: ["Double-height spaces", "Exposed beams", "One-off construction"],
     matches: { types: ["detached"], eras: ["pre-1930", "1930-1979", "1980-1999", "2000+"] },
+    typicalRooms: [
+      r("Open-plan living space", "living-room", "xl", "ground", true),
+      r("Kitchen-diner", "kitchen-diner", "large", "ground"),
+      r("Main bedroom", "bedroom", "large", "first", true),
+      r("Bedroom 2", "bedroom", "medium", "first"),
+      r("Mezzanine office", "home-office", "small", "first"),
+    ],
     permutations: [
       p("ground-multi", "Ground-level multi-split", "Outdoor unit at ground level; high-wall or floor-console indoor units for tall spaces.", "ground-rear", 4,
         "Runs follow beam lines in agreed routes; every install is photographed for the design library.", 380,
@@ -326,4 +456,27 @@ export function getPermutation(
   permutationId: string,
 ): InstallPermutation | undefined {
   return getArchetype(archetypeId)?.permutations.find((p) => p.id === permutationId);
+}
+
+/**
+ * Materialise a stock-floor-plan room as a survey room (deterministic ids —
+ * the same preset always produces the same room). Glazing/orientation start
+ * at safe defaults the customer can tweak.
+ */
+export function buildPresetRoom(
+  archetypeId: string,
+  preset: RoomPreset,
+  index: number,
+): SurveyRoom {
+  return {
+    id: `${archetypeId}-preset-${index}`,
+    name: preset.name,
+    type: preset.type,
+    size: preset.size,
+    floor: preset.floor,
+    glazing: "medium",
+    orientation: "unsure",
+    hasExternalWall: true,
+    photos: [],
+  };
 }

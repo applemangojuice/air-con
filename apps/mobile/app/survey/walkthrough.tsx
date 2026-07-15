@@ -28,6 +28,7 @@ type Stage =
   | { name: "uploading" }
   | { name: "processing" }
   | { name: "done"; roomCount: number }
+  | { name: "saved" } // uploaded for engineer eyes only — no AI processing
   | { name: "fallback"; reason: string };
 
 /**
@@ -66,6 +67,21 @@ export default function WalkthroughScreen() {
       const asset = result.assets[0];
       setStage({ name: "recorded", uri: asset.uri, fileName: asset.fileName ?? "walkthrough.mp4" });
     }
+  }
+
+  /** Upload the video as evidence for the engineers — no AI processing at all. */
+  async function saveForReview(uri: string, fileName: string) {
+    const { archetypeId, permutationId, postcode } = draft.survey;
+    if (!archetypeId || !permutationId) return;
+    setStage({ name: "uploading" });
+    const created = await createVideoSurvey(archetypeId, permutationId, postcode, fileName);
+    const uploaded = created ? await uploadVideo(created.signedUrl, uri) : false;
+    if (uploaded) setStage({ name: "saved" });
+    else
+      setStage({
+        name: "fallback",
+        reason: "The video didn't upload — carry on, your rooms are already drafted below.",
+      });
   }
 
   async function buildPlan(uri: string, fileName: string) {
@@ -132,14 +148,14 @@ export default function WalkthroughScreen() {
       step={3}
       totalSteps={8}
       title="Film your walkthrough"
-      subtitle="One video, narrated by you, builds your floor plan. About 2–3 minutes is perfect."
+      subtitle="Your rooms are already drafted from your house type. A short narrated video lets us verify your fixed price — and it's how our engineers prepare."
       onBack={busy ? undefined : () => router.back()}
       onNext={
-        stage.name === "done" || stage.name === "fallback"
+        stage.name === "done" || stage.name === "fallback" || stage.name === "saved"
           ? () => router.push("/survey/rooms")
           : undefined
       }
-      nextLabel={stage.name === "done" ? "Review my rooms" : "Add rooms manually"}
+      nextLabel="Review my rooms"
     >
       <View style={styles.promptCard}>
         <Text style={styles.promptTitle}>What to film and say</Text>
@@ -162,8 +178,12 @@ export default function WalkthroughScreen() {
           <View style={styles.readyCard}>
             <Text style={styles.readyText}>✓ Video ready ({stage.fileName})</Text>
           </View>
-          <Pressable style={styles.primary} onPress={() => buildPlan(stage.uri, stage.fileName)}>
-            <Text style={styles.primaryText}>Upload &amp; build my plan</Text>
+          <Pressable style={styles.primary} onPress={() => saveForReview(stage.uri, stage.fileName)}>
+            <Text style={styles.primaryText}>Save for my install team</Text>
+            <Text style={styles.primaryHint}>Fastest — your rooms are already drafted</Text>
+          </Pressable>
+          <Pressable style={styles.secondary} onPress={() => buildPlan(stage.uri, stage.fileName)}>
+            <Text style={styles.secondaryText}>Or: build my plan from the video</Text>
           </Pressable>
           <Pressable onPress={record}>
             <Text style={styles.retake}>Re-record</Text>
@@ -194,6 +214,16 @@ export default function WalkthroughScreen() {
         </View>
       )}
 
+      {stage.name === "saved" && (
+        <View style={styles.doneCard}>
+          <Text style={styles.doneTitle}>Video saved ✓</Text>
+          <Text style={styles.doneBody}>
+            Our engineers will watch it before confirming your fixed price.
+            Your rooms are already drafted — review them next.
+          </Text>
+        </View>
+      )}
+
       {stage.name === "fallback" && (
         <View style={styles.fallbackCard}>
           <Text style={styles.fallbackText}>{stage.reason}</Text>
@@ -202,7 +232,7 @@ export default function WalkthroughScreen() {
 
       {stage.name === "idle" && (
         <Pressable onPress={() => router.push("/survey/rooms")}>
-          <Text style={styles.skip}>Skip the video — I&apos;ll add rooms myself</Text>
+          <Text style={styles.skip}>Skip the video — review my drafted rooms</Text>
         </Pressable>
       )}
     </Screen>
@@ -227,6 +257,14 @@ const styles = StyleSheet.create({
   },
   primaryText: { color: colors.white, fontWeight: "700", fontSize: 16 },
   primaryHint: { color: "rgba(255,255,255,0.75)", fontSize: 11 },
+  secondary: {
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.line,
+    paddingVertical: space(3),
+    alignItems: "center",
+  },
+  secondaryText: { color: colors.ink700, fontWeight: "600", fontSize: 14 },
   readyCard: {
     borderRadius: radius.md,
     borderWidth: 1,

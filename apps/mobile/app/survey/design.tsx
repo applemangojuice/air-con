@@ -1,6 +1,6 @@
 import { router } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { getArchetype } from "@aircon/domain";
+import { buildPresetRoom, getArchetype } from "@aircon/domain";
 import { Screen } from "@/components/ui";
 import { useDraft } from "@/lib/store";
 import { theme } from "@/lib/theme";
@@ -30,6 +30,15 @@ export default function DesignScreen() {
       permutationId,
       // The pattern decides where the outdoor unit lives — prefill it.
       outdoor: { ...draft.survey.outdoor, location: permutation.outdoorLocation },
+      // Zero-AI floor plan: start from the archetype's stock layout. The
+      // customer confirms/tweaks rooms instead of describing them.
+      rooms:
+        draft.survey.rooms.length === 0
+          ? archetype!.typicalRooms
+              .map((preset, i) => ({ preset, i }))
+              .filter(({ preset }) => preset.popular)
+              .map(({ preset, i }) => buildPresetRoom(archetype!.id, preset, i))
+          : draft.survey.rooms,
     });
     router.push("/survey/address");
   }
