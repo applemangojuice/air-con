@@ -21,7 +21,13 @@ import { TimelineStrip } from "@/components/project/timeline";
 const FORM_STEPS = 4;
 const RESULT = FORM_STEPS;
 
-export function QuoteWizard({ initialPostcode }: { initialPostcode?: string }) {
+export function QuoteWizard({
+  initialPostcode,
+  initialIntel,
+}: {
+  initialPostcode?: string;
+  initialIntel?: string;
+}) {
   const [draft, setDraft] = useState<QuoteDraft>(() =>
     newDraft(initialPostcode ? normalisePostcode(initialPostcode) : ""),
   );
@@ -63,6 +69,53 @@ export function QuoteWizard({ initialPostcode }: { initialPostcode?: string }) {
     setDraft((d) => ({ ...d, contact: { ...d.contact, ...update } }));
   const setLayout = (layout: KitchenLivingLayout) =>
     setDraft((d) => ({ ...d, layout }));
+
+  /**
+   * Property Intelligence prefill: the customer picked a known address (or
+   * arrived from their letter's link), so pre-answer the house questions
+   * from public records. The flow doesn't change, they just confirm.
+   */
+  async function applyIntel(intelId: string) {
+    try {
+      const res = await fetch(`/api/intel/property/${intelId}`);
+      if (!res.ok) return;
+      const data = (await res.json()) as {
+        addressLine: string;
+        postcode: string;
+        prefill: {
+          type?: Survey["property"]["type"];
+          era?: Survey["property"]["era"];
+          bedrooms?: number;
+          floorAreaM2?: number;
+        };
+      };
+      setDraft((d) => ({
+        ...d,
+        intelId,
+        prefilledFromIntel: Boolean(data.prefill.type || data.prefill.bedrooms),
+        survey: {
+          ...d.survey,
+          postcode: data.postcode,
+          addressLine: data.addressLine,
+          property: {
+            ...d.survey.property,
+            ...(data.prefill.type ? { type: data.prefill.type } : {}),
+            ...(data.prefill.era ? { era: data.prefill.era } : {}),
+            ...(data.prefill.bedrooms ? { bedrooms: data.prefill.bedrooms } : {}),
+            ...(data.prefill.floorAreaM2 ? { floorAreaM2: data.prefill.floorAreaM2 } : {}),
+          },
+        },
+      }));
+    } catch {
+      // Prefill is a bonus; the funnel works without it.
+    }
+  }
+
+  // Arriving from a per-address page: load that property's profile once.
+  useEffect(() => {
+    if (initialIntel) void applyIntel(initialIntel);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialIntel]);
 
   // Exclusions and outdoor options derive deterministically from the house
   // answers, recomputed live so the rooms screen always matches them.
@@ -163,6 +216,7 @@ export function QuoteWizard({ initialPostcode }: { initialPostcode?: string }) {
     setSurvey,
     setContact,
     setLayout,
+    applyIntel,
     step,
     totalSteps: FORM_STEPS,
     onNext: () => setStep(step + 1),

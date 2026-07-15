@@ -33,10 +33,12 @@ air-con/
 │       ├── heatload.ts       #   room load estimation + unit sizing
 │       ├── pricing.ts        #   deterministic fixed-price engine (versioned)
 │       ├── confidence.ts     #   Installation Confidence Score
-│       └── project.ts        #   the project workflow: stage machine, fees, SLA (pure reducer)
+│       ├── project.ts        #   the project workflow: stage machine, fees, SLA (pure reducer)
+│       └── intelligence.ts   #   Property Intelligence: classifier, prefill, priority, business case
 ├── docs/
 │   ├── capture-process.md    # design of the survey capture process (web + iOS)
-│   └── project-workflow.md   # quote → install timeline: stages, fees, SLA, electrics
+│   ├── project-workflow.md   # quote → install timeline: stages, fees, SLA, electrics
+│   └── property-intelligence.md # the property database: data sources, ETL, targeting
 └── supabase/
     └── migrations/           # SQL migrations (source of truth for the schema)
 ```

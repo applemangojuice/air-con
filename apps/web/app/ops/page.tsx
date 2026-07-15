@@ -75,14 +75,17 @@ export default function OpsPage() {
           <Link href="/ops/quotes" className="font-semibold text-accent-700 underline">
             quote requests
           </Link>
-          , and installations in flight are in{" "}
+          , installations in flight are in{" "}
           <Link href="/ops/projects" className="font-semibold text-accent-700 underline">
             projects
           </Link>{" "}
           (quote → floor plan → final quote → site visit → delivery →
-          installation). These are the modules that follow, and each one exists to
-          reduce skilled labour, standardise installations, or learn from every
-          job.
+          installation), and the book of every home we understand lives in{" "}
+          <Link href="/ops/intel" className="font-semibold text-accent-700 underline">
+            property intelligence
+          </Link>
+          . These are the modules that follow, and each one exists to reduce
+          skilled labour, standardise installations, or learn from every job.
         </p>
 
         <div className="mt-10 grid gap-4 sm:grid-cols-2">

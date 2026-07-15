@@ -17,6 +17,10 @@ export interface QuoteDraft {
   layout: KitchenLivingLayout;
   /** Server row id once the address+email step has saved the draft. */
   draftId?: string;
+  /** Property Intelligence id when the customer picked a known address. */
+  intelId?: string;
+  /** True when the house answers were pre-filled from public records. */
+  prefilledFromIntel?: boolean;
   /** Set once the customer has generated a default configuration. */
   configured: boolean;
 }

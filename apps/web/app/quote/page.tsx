@@ -10,9 +10,9 @@ export const metadata: Metadata = {
 export default async function QuotePage({
   searchParams,
 }: {
-  searchParams: Promise<{ postcode?: string }>;
+  searchParams: Promise<{ postcode?: string; intel?: string }>;
 }) {
-  const { postcode } = await searchParams;
+  const { postcode, intel } = await searchParams;
 
   return (
     <div className="min-h-dvh bg-cream">
@@ -28,7 +28,7 @@ export default async function QuotePage({
         </div>
       </header>
       <main>
-        <QuoteWizard initialPostcode={postcode} />
+        <QuoteWizard initialPostcode={postcode} initialIntel={intel} />
       </main>
     </div>
   );

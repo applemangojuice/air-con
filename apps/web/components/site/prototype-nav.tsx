@@ -14,6 +14,7 @@ const GROUPS: { title: string; links: { label: string; href: string }[] }[] = [
       { label: "Home", href: "/" },
       { label: "Get a quote", href: "/quote" },
       { label: "Project timeline (demo)", href: "/p/demo" },
+      { label: "Your street's page (demo)", href: "/a/demo" },
       { label: "Portal", href: "/portal" },
       { label: "How it works", href: "/how-it-works" },
     ],
@@ -22,6 +23,7 @@ const GROUPS: { title: string; links: { label: string; href: string }[] }[] = [
     title: "Admin",
     links: [
       { label: "Console", href: "/ops" },
+      { label: "Property intel", href: "/ops/intel" },
       { label: "Projects", href: "/ops/projects" },
       { label: "Quote requests", href: "/ops/quotes" },
     ],

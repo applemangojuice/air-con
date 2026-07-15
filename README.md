@@ -24,6 +24,15 @@ surfaces and a data model already shaped for it. See
   installer, and track the electrical plan. Backed by a pure, tested stage
   reducer in the domain package. See
   [docs/project-workflow.md](./docs/project-workflow.md).
+- **Property Intelligence Engine** (`/ops/intel` + `/a/[id]`): one master
+  record per property (UPRN-keyed) built from EPC, planning and conservation
+  open data plus manual audits. Prefills the quote funnel the moment a known
+  address is picked, generates a personalised landing page per address for
+  mailings, and powers the targeting analytics (filters, mailing CSV export,
+  campaign tagging, business-case maths). Demo dataset covers SW16/SW17 with
+  no database. See
+  [docs/property-intelligence.md](./docs/property-intelligence.md) for data
+  sources and import commands.
 - **Ops review** (`/ops/quotes` + `/ops/projects`): incoming surveys and
   in-flight installations (issue final quotes, record site-visit outcomes,
   dispatch equipment, assign installers), behind basic auth (`OPS_PASSWORD`).

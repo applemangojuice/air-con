@@ -11,6 +11,8 @@ export interface StepProps {
   setSurvey: (update: Partial<Survey>) => void;
   setContact: (update: Partial<Contact>) => void;
   setLayout: (layout: KitchenLivingLayout) => void;
+  /** Prefill the draft from a known property (Property Intelligence id). */
+  applyIntel?: (intelId: string) => void | Promise<void>;
   step: number;
   totalSteps: number;
   onNext: () => void;
@@ -81,6 +83,33 @@ function usePostcodeCheck(postcode: string, onGeo: (geo: SurveyGeo | undefined) 
   return check;
 }
 
+/** Postcode → known properties from the Property Intelligence Engine. */
+function useIntelAddresses(postcode: string) {
+  const [matches, setMatches] = useState<{ id: string; line1: string }[]>([]);
+  useEffect(() => {
+    if (!isValidUkPostcode(postcode)) {
+      setMatches([]);
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/intel/addresses?postcode=${encodeURIComponent(postcode)}`);
+        if (!res.ok || cancelled) return;
+        const data = (await res.json()) as { matches: { id: string; line1: string }[] };
+        if (!cancelled) setMatches(data.matches);
+      } catch {
+        if (!cancelled) setMatches([]);
+      }
+    }, 400);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [postcode]);
+  return matches;
+}
+
 /** Postcode → selectable address list (getAddress.io behind /api/addresses). */
 function useAddressList(postcode: string) {
   const [addresses, setAddresses] = useState<string[]>([]);
@@ -108,17 +137,28 @@ function useAddressList(postcode: string) {
   return addresses;
 }
 
-export function AddressStep({ draft, setSurvey, setContact, step, totalSteps, onNext, busy }: StepProps) {
+export function AddressStep({
+  draft,
+  setSurvey,
+  setContact,
+  applyIntel,
+  step,
+  totalSteps,
+  onNext,
+  busy,
+}: StepProps) {
   const { postcode, addressLine } = draft.survey;
   const email = draft.contact.email;
   const check = usePostcodeCheck(postcode, (geo) => setSurvey({ geo }));
+  const intelMatches = useIntelAddresses(postcode);
   const addresses = useAddressList(postcode);
   const [manual, setManual] = useState(false);
 
   const postcodeOk = isValidUkPostcode(postcode) && check.state !== "not-found";
   const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   const ready = postcodeOk && addressLine.trim().length >= 5 && emailOk;
-  const showPicker = addresses.length > 0 && !manual;
+  const showIntelPicker = intelMatches.length > 0 && !manual;
+  const showPicker = !showIntelPicker && addresses.length > 0 && !manual;
 
   return (
     <StepShell
@@ -148,7 +188,40 @@ export function AddressStep({ draft, setSurvey, setContact, step, totalSteps, on
 
       {postcodeOk && (
         <Field label="Your address">
-          {showPicker ? (
+          {showIntelPicker ? (
+            <>
+              <select
+                className={inputCls}
+                value={intelMatches.find((m) => m.line1 === addressLine)?.id ?? ""}
+                onChange={(e) => {
+                  const match = intelMatches.find((m) => m.id === e.target.value);
+                  if (!match) return;
+                  setSurvey({ addressLine: match.line1 });
+                  void applyIntel?.(match.id);
+                }}
+              >
+                <option value="" disabled>
+                  Tap your address…
+                </option>
+                {intelMatches.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.line1}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1.5 text-xs text-ink-300">
+                We already know the homes on your street, so picking yours
+                pre-fills the next step.
+              </p>
+              <button
+                type="button"
+                onClick={() => setManual(true)}
+                className="mt-1 text-xs font-medium text-accent-700 hover:underline"
+              >
+                My address isn&apos;t listed
+              </button>
+            </>
+          ) : showPicker ? (
             <>
               <select
                 className={inputCls}
@@ -237,6 +310,17 @@ export function HouseStep({
       onBack={onBack}
       nextLabel="Show my price"
     >
+      {draft.prefilledFromIntel && (
+        <div className="rounded-2xl border border-sage-200 bg-sage-50 p-4">
+          <p className="text-sm font-semibold text-sage-900">
+            We&apos;ve filled this in for you ✨
+          </p>
+          <p className="mt-1 text-sm text-sage-800">
+            These answers come from public records for {draft.survey.addressLine}. Give them a
+            once-over and fix anything that&apos;s off.
+          </p>
+        </div>
+      )}
       <Field label="What kind of home is it?">
         <OptionCards
           columns={3}
