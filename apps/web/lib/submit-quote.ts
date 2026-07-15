@@ -19,7 +19,7 @@ export async function submitQuote(draft: QuoteDraft): Promise<SubmissionState> {
     const res = await fetch("/api/quotes", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ survey, contact: draft.contact }),
+      body: JSON.stringify({ survey, contact: draft.contact, draftId: draft.draftId }),
     });
     if (!res.ok) return { status: "error" };
     const data = (await res.json()) as { demo: boolean; id?: string; emailed?: boolean };

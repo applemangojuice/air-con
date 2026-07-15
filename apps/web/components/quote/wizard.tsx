@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import type { Survey } from "@aircon/domain";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { buildDefaultConfig, type KitchenLivingLayout, type Survey } from "@aircon/domain";
 import {
   clearDraft,
   loadDraft,
@@ -12,18 +12,12 @@ import {
 } from "@/lib/quote-draft";
 import { submitQuote } from "@/lib/submit-quote";
 import { normalisePostcode } from "@/lib/format";
-import {
-  AddressStep,
-  ContactStep,
-  ElectricsStep,
-  OutdoorStep,
-  PropertyStep,
-  type StepProps,
-} from "./steps";
+import { AddressStep, DetailsStep, HouseStep, type StepProps } from "./steps";
 import { RoomsStep } from "./rooms-step";
 import { QuoteResult, type SubmissionState } from "./result";
 
-const FORM_STEPS = 6; // address, property, rooms, outdoor, electrics, contact
+// address+email → house → rooms(+price) → details
+const FORM_STEPS = 4;
 const RESULT = FORM_STEPS;
 
 export function QuoteWizard({ initialPostcode }: { initialPostcode?: string }) {
@@ -66,6 +60,83 @@ export function QuoteWizard({ initialPostcode }: { initialPostcode?: string }) {
     setDraft((d) => ({ ...d, survey: { ...d.survey, ...update } }));
   const setContact = (update: Partial<Contact>) =>
     setDraft((d) => ({ ...d, contact: { ...d.contact, ...update } }));
+  const setLayout = (layout: KitchenLivingLayout) =>
+    setDraft((d) => ({ ...d, layout }));
+
+  // Exclusions and outdoor options derive deterministically from the house
+  // answers — recomputed live so the rooms screen always matches them.
+  const config = useMemo(() => {
+    const p = draft.survey.property;
+    return buildDefaultConfig({
+      type: p.type,
+      era: p.era,
+      bedrooms: p.bedrooms,
+      bathrooms: p.bathrooms ?? 1,
+      layout: draft.layout,
+      floorAreaM2: p.floorAreaM2,
+    });
+  }, [draft.survey.property, draft.layout]);
+
+  /** Save-early: the enquiry exists in the database from the first step. */
+  async function saveServerDraft(current: QuoteDraft): Promise<string | undefined> {
+    try {
+      const res = await fetch("/api/quotes/draft", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: current.contact.email, survey: current.survey }),
+      });
+      if (!res.ok) return undefined;
+      const data = (await res.json()) as { demo: boolean; id?: string };
+      return data.id;
+    } catch {
+      return undefined;
+    }
+  }
+
+  function syncServerDraft(current: QuoteDraft) {
+    if (!current.draftId) return;
+    fetch(`/api/quotes/draft/${current.draftId}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ survey: current.survey }),
+    }).catch(() => undefined);
+  }
+
+  async function nextFromAddress() {
+    if (draft.draftId) {
+      setStep(1);
+      return;
+    }
+    setBusy(true);
+    const id = await saveServerDraft(draft);
+    setBusy(false);
+    if (id) setDraft((d) => ({ ...d, draftId: id }));
+    setStep(1);
+  }
+
+  function nextFromHouse() {
+    // (Re)generate the default rooms from the house answers, apply the
+    // auto-chosen outdoor position and install pattern, then show the price.
+    const updated: QuoteDraft = {
+      ...draft,
+      configured: true,
+      survey: {
+        ...draft.survey,
+        archetypeId: config.archetypeId,
+        permutationId: config.permutationId,
+        rooms: config.rooms,
+        outdoor: { ...draft.survey.outdoor, location: config.outdoorDefault },
+      },
+    };
+    setDraft(updated);
+    syncServerDraft(updated);
+    setStep(2);
+  }
+
+  function nextFromRooms() {
+    syncServerDraft(draft);
+    setStep(3);
+  }
 
   async function finish() {
     setBusy(true);
@@ -90,24 +161,29 @@ export function QuoteWizard({ initialPostcode }: { initialPostcode?: string }) {
     draft,
     setSurvey,
     setContact,
+    setLayout,
     step,
     totalSteps: FORM_STEPS,
     onNext: () => setStep(step + 1),
     onBack: step > 0 ? () => setStep(step - 1) : undefined,
+    busy,
   };
 
   switch (step) {
     case 0:
-      return <AddressStep {...common} />;
+      return <AddressStep {...common} onNext={nextFromAddress} />;
     case 1:
-      return <PropertyStep {...common} />;
+      return <HouseStep {...common} onNext={nextFromHouse} />;
     case 2:
-      return <RoomsStep {...common} />;
-    case 3:
-      return <OutdoorStep {...common} />;
-    case 4:
-      return <ElectricsStep {...common} />;
+      return (
+        <RoomsStep
+          {...common}
+          onNext={nextFromRooms}
+          excluded={config.excluded}
+          outdoorOptions={config.outdoorOptions}
+        />
+      );
     default:
-      return <ContactStep {...common} onNext={finish} busy={busy} />;
+      return <DetailsStep {...common} onNext={finish} />;
   }
 }

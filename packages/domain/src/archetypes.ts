@@ -145,7 +145,7 @@ export const ARCHETYPES: HouseArchetype[] = [
     description:
       "The classic three-bed semi: bay front, two storeys, side passage or garage, decent rear garden.",
     recognisers: ["Curved or square front bay", "Side passage or attached garage", "Early cavity walls"],
-    matches: { types: ["semi-detached"], eras: ["1930-1979"] },
+    matches: { types: ["semi-detached"], eras: ["1930-1950"] },
     typicalRooms: [
       r("Living room", "living-room", "large", "ground", true),
       r("Kitchen-diner", "kitchen-diner", "medium", "ground"),
@@ -171,7 +171,7 @@ export const ARCHETYPES: HouseArchetype[] = [
     eraLabel: "1930–1955",
     description: "Two-storey brick terrace with a small front garden and a longer rear garden.",
     recognisers: ["Uniform street of matching houses", "Rear kitchen addition", "Shared side alleys every few houses"],
-    matches: { types: ["terraced"], eras: ["1930-1979"] },
+    matches: { types: ["terraced"], eras: ["1930-1950"] },
     typicalRooms: [
       r("Living room", "living-room", "large", "ground", true),
       r("Kitchen-diner", "kitchen-diner", "medium", "ground"),
@@ -193,7 +193,7 @@ export const ARCHETYPES: HouseArchetype[] = [
     eraLabel: "1945–1970",
     description: "Solidly built semi or terrace with wide frontage, generous rooms and big gardens.",
     recognisers: ["Wide window openings", "Rendered or pebble-dashed walls", "Large front and rear gardens"],
-    matches: { types: ["semi-detached", "terraced"], eras: ["1930-1979"] },
+    matches: { types: ["semi-detached", "terraced"], eras: ["1930-1950"] },
     typicalRooms: [
       r("Living room", "living-room", "large", "ground", true),
       r("Kitchen-diner", "kitchen-diner", "large", "ground"),
@@ -216,7 +216,7 @@ export const ARCHETYPES: HouseArchetype[] = [
     eraLabel: "1955–1985",
     description: "Single-storey with a loft, easy access all round and short pipe runs everywhere.",
     recognisers: ["Everything on one floor", "Shallow-pitch roof", "Driveway to the side"],
-    matches: { types: ["bungalow"], eras: ["1930-1979", "1980-1999"] },
+    matches: { types: ["bungalow"], eras: ["1930-1950", "1950-2000"] },
     typicalRooms: [
       r("Living room", "living-room", "large", "ground", true),
       r("Kitchen-diner", "kitchen-diner", "medium", "ground"),
@@ -238,7 +238,7 @@ export const ARCHETYPES: HouseArchetype[] = [
     eraLabel: "1960–1980",
     description: "Boxy detached with attached garage, shallow roof and generous plot.",
     recognisers: ["Integral or attached garage", "Large landing window", "Timber cladding panels"],
-    matches: { types: ["detached"], eras: ["1930-1979"] },
+    matches: { types: ["detached"], eras: ["1930-1950"] },
     typicalRooms: [
       r("Living room", "living-room", "large", "ground", true),
       r("Kitchen-diner", "kitchen-diner", "xl", "ground"),
@@ -262,7 +262,7 @@ export const ARCHETYPES: HouseArchetype[] = [
     eraLabel: "1965–present",
     description: "Narrow-fronted three-storey home, often with an integral garage on the ground floor.",
     recognisers: ["Three floors", "Integral garage", "Small rear garden or courtyard"],
-    matches: { types: ["terraced", "semi-detached"], eras: ["1930-1979", "1980-1999", "2000+"] },
+    matches: { types: ["terraced", "semi-detached"], eras: ["1930-1950", "1950-2000", "2000+"] },
     typicalRooms: [
       r("Living room", "living-room", "large", "first", true),
       r("Kitchen-diner", "kitchen-diner", "medium", "ground"),
@@ -285,7 +285,7 @@ export const ARCHETYPES: HouseArchetype[] = [
     eraLabel: "1980–1999",
     description: "Developer-built detached or link-detached on an estate; brick with concrete tile roof.",
     recognisers: ["Estate cul-de-sac", "Integral garage", "uPVC windows from new"],
-    matches: { types: ["detached", "semi-detached"], eras: ["1980-1999"] },
+    matches: { types: ["detached", "semi-detached"], eras: ["1950-2000"] },
     typicalRooms: [
       r("Living room", "living-room", "large", "ground", true),
       r("Kitchen-diner", "kitchen-diner", "medium", "ground"),
@@ -331,7 +331,7 @@ export const ARCHETYPES: HouseArchetype[] = [
     eraLabel: "any era",
     description: "Purpose-built flat up to ~4 storeys with its own balcony or terrace.",
     recognisers: ["Own balcony/terrace", "Communal entrance", "Up to 4 storeys"],
-    matches: { types: ["flat"], eras: ["1930-1979", "1980-1999", "2000+"] },
+    matches: { types: ["flat"], eras: ["1930-1950", "1950-2000", "2000+"] },
     typicalRooms: [
       r("Open-plan living/kitchen", "living-room", "large", "ground", true),
       r("Main bedroom", "bedroom", "medium", "ground", true),
@@ -397,7 +397,7 @@ export const ARCHETYPES: HouseArchetype[] = [
     description:
       "A flat with no balcony or above the 4th floor — usually not installable at a fixed price.",
     recognisers: ["No private outside space", "Above 4th floor"],
-    matches: { types: ["flat"], eras: ["1930-1979", "1980-1999", "2000+"] },
+    matches: { types: ["flat"], eras: ["1930-1950", "1950-2000", "2000+"] },
     typicalRooms: [
       r("Open-plan living/kitchen", "living-room", "large", "ground", true),
       r("Main bedroom", "bedroom", "medium", "ground"),
@@ -414,7 +414,7 @@ export const ARCHETYPES: HouseArchetype[] = [
     eraLabel: "converted",
     description: "Converted barn, chapel, school or other one-off — high spaces, unusual construction.",
     recognisers: ["Double-height spaces", "Exposed beams", "One-off construction"],
-    matches: { types: ["detached"], eras: ["pre-1930", "1930-1979", "1980-1999", "2000+"] },
+    matches: { types: ["detached"], eras: ["pre-1930", "1930-1950", "1950-2000", "2000+"] },
     typicalRooms: [
       r("Open-plan living space", "living-room", "xl", "ground", true),
       r("Kitchen-diner", "kitchen-diner", "large", "ground"),

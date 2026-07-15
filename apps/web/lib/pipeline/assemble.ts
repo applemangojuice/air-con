@@ -39,7 +39,7 @@ export function assembleSurvey(
     permutationId: permutation.id,
     property: {
       type: archetype.matches.types[0] ?? "semi-detached",
-      era: archetype.matches.eras[0] ?? "1930-1979",
+      era: archetype.matches.eras[0] ?? "1930-1950",
       bedrooms: Math.max(1, extraction.rooms.filter((r) => r.type === "bedroom").length),
       ownership: "owner",
     },

@@ -22,7 +22,7 @@ function survey(rooms: SurveyRoom[], overrides: Partial<Survey> = {}): Survey {
   return {
     postcode: "SW1A 1AA",
     addressLine: "1 Test Street",
-    property: { type: "semi-detached", era: "1930-1979", bedrooms: 3, ownership: "owner" },
+    property: { type: "semi-detached", era: "1930-1950", bedrooms: 3, ownership: "owner" },
     rooms,
     outdoor: { location: "ground-rear", photos: [{ id: "p2", kind: "outdoor-location" }] },
     electrics: { condition: "modern-spare-ways", photos: [{ id: "p3", kind: "fuse-board" }] },

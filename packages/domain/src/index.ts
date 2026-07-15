@@ -3,6 +3,14 @@ export { estimateRoomLoadWatts, selectCapacityKw } from "./heatload.ts";
 export { generateQuote, ENGINE_VERSION } from "./pricing.ts";
 export { scoreConfidence } from "./confidence.ts";
 export {
+  LAYOUT_LABEL,
+  buildDefaultConfig,
+  type DefaultConfig,
+  type DefaultConfigInput,
+  type ExcludedRoom,
+  type KitchenLivingLayout,
+} from "./defaultconfig.ts";
+export {
   ARCHETYPES,
   buildPresetRoom,
   getArchetype,

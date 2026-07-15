@@ -31,7 +31,7 @@ export function newDraft(): QuoteDraft {
     survey: {
       postcode: "",
       addressLine: "",
-      property: { type: "semi-detached", era: "1930-1979", bedrooms: 3, ownership: "owner" },
+      property: { type: "semi-detached", era: "1930-1950", bedrooms: 3, ownership: "owner" },
       rooms: [],
       outdoor: { location: "ground-rear", photos: [] },
       electrics: { condition: "unsure", photos: [] },

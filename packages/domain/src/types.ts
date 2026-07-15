@@ -13,7 +13,7 @@ export type PropertyType =
   | "flat"
   | "bungalow";
 
-export type PropertyEra = "pre-1930" | "1930-1979" | "1980-1999" | "2000+";
+export type PropertyEra = "pre-1930" | "1930-1950" | "1950-2000" | "2000+";
 
 export type Ownership = "owner" | "renting";
 
@@ -72,6 +72,8 @@ export interface SurveyRoom {
   name: string;
   type: RoomType;
   size: RoomSize;
+  /** Actual floor area when known (m²) — preferred over the size band. */
+  areaM2?: number;
   floor: FloorLevel;
   glazing: GlazingLevel;
   orientation: Orientation;
@@ -99,6 +101,9 @@ export interface Survey {
     type: PropertyType;
     era: PropertyEra;
     bedrooms: number;
+    bathrooms?: number;
+    /** Rough total floor area of the home, if the customer knows it. */
+    floorAreaM2?: number;
     ownership: Ownership;
   };
   rooms: SurveyRoom[];

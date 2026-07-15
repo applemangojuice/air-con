@@ -38,7 +38,7 @@ test("preset rooms materialise deterministically and price without AI", () => {
     addressLine: "1 Test Street",
     archetypeId: archetype.id,
     permutationId: archetype.permutations[0]!.id,
-    property: { type: "semi-detached", era: "1930-1979", bedrooms: 3, ownership: "owner" },
+    property: { type: "semi-detached", era: "1930-1950", bedrooms: 3, ownership: "owner" },
     rooms,
     outdoor: { location: archetype.permutations[0]!.outdoorLocation, photos: [] },
     electrics: { condition: "unsure", photos: [] },
@@ -47,7 +47,7 @@ test("preset rooms materialise deterministically and price without AI", () => {
 });
 
 test("suggestArchetypes ranks the 1930s semi first for a 1930-1979 semi", () => {
-  const suggestions = suggestArchetypes({ type: "semi-detached", era: "1930-1979" });
+  const suggestions = suggestArchetypes({ type: "semi-detached", era: "1930-1950" });
   assert.equal(suggestions[0]!.id, "thirties-semi");
   assert.ok(suggestions.length >= 3);
 });
@@ -65,7 +65,7 @@ test("permutation adder and checks flow into the quote", () => {
     addressLine: "1 Test Street",
     archetypeId: "townhouse",
     permutationId: "courtyard-multi",
-    property: { type: "terraced", era: "1980-1999", bedrooms: 3, ownership: "owner" },
+    property: { type: "terraced", era: "1950-2000", bedrooms: 3, ownership: "owner" },
     rooms: [
       {
         id: "r1",

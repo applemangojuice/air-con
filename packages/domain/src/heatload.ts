@@ -54,7 +54,9 @@ const ROOM_TYPE_EXTRA_WATTS: Record<SurveyRoom["type"], number> = {
 };
 
 export function estimateRoomLoadWatts(room: SurveyRoom): number {
-  const volume = AREA_M2[room.size] * CEILING_HEIGHT_M;
+  // Real measured/allocated area beats the band midpoint when we have it.
+  const area = room.areaM2 && room.areaM2 > 0 ? room.areaM2 : AREA_M2[room.size];
+  const volume = area * CEILING_HEIGHT_M;
   const base =
     volume *
     BASE_WATTS_PER_M3 *

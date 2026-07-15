@@ -1,4 +1,4 @@
-import type { Survey, SurveyRoom, RoomType } from "@aircon/domain";
+import type { KitchenLivingLayout, Survey, SurveyRoom, RoomType } from "@aircon/domain";
 
 export type Timeframe = "asap" | "1-3-months" | "researching";
 
@@ -13,6 +13,12 @@ export interface Contact {
 export interface QuoteDraft {
   survey: Survey;
   contact: Contact;
+  /** Kitchen/living arrangement — drives the generated default rooms. */
+  layout: KitchenLivingLayout;
+  /** Server row id once the address+email step has saved the draft. */
+  draftId?: string;
+  /** Set once the customer has generated a default configuration. */
+  configured: boolean;
 }
 
 export function newDraft(postcode = ""): QuoteDraft {
@@ -20,12 +26,20 @@ export function newDraft(postcode = ""): QuoteDraft {
     survey: {
       postcode,
       addressLine: "",
-      property: { type: "semi-detached", era: "1930-1979", bedrooms: 3, ownership: "owner" },
+      property: {
+        type: "semi-detached",
+        era: "1930-1950",
+        bedrooms: 3,
+        bathrooms: 1,
+        ownership: "owner",
+      },
       rooms: [],
       outdoor: { location: "ground-rear", photos: [] },
       electrics: { condition: "unsure", photos: [] },
     },
     contact: { name: "", email: "", phone: "", timeframe: "1-3-months" },
+    layout: "separate",
+    configured: false,
   };
 }
 
@@ -55,7 +69,7 @@ export function newRoom(type: RoomType, existing: SurveyRoom[]): SurveyRoom {
   };
 }
 
-const STORAGE_KEY = "aircon.quote-draft.v1";
+const STORAGE_KEY = "aircon.quote-draft.v2";
 
 export function loadDraft(): QuoteDraft | null {
   try {

@@ -67,6 +67,43 @@ export function OptionCards<T extends string | number | boolean>({
   );
 }
 
+/** Compact 1…N+ number picker — narrow buttons in a single row. */
+export function NumberRow({
+  value,
+  onChange,
+  max,
+  maxLabel,
+}: {
+  value: number;
+  onChange: (value: number) => void;
+  max: number;
+  maxLabel?: string;
+}) {
+  const options = Array.from({ length: max }, (_, i) => i + 1);
+  return (
+    <div className="flex gap-1.5">
+      {options.map((n) => {
+        const selected = n === value;
+        return (
+          <button
+            key={n}
+            type="button"
+            aria-pressed={selected}
+            onClick={() => onChange(n)}
+            className={`h-11 flex-1 rounded-xl border text-sm font-semibold transition ${
+              selected
+                ? "border-accent-600 bg-accent-50 text-accent-700 ring-2 ring-accent-100"
+                : "border-line bg-white text-ink-900 hover:border-ink-300"
+            }`}
+          >
+            {n === max && maxLabel ? maxLabel : n}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export function StepShell({
   step,
   totalSteps,
