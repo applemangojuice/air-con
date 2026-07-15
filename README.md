@@ -36,6 +36,11 @@ surfaces and a data model already shaped for it. See
 - **Ops review** (`/ops/quotes` + `/ops/projects`): incoming surveys and
   in-flight installations (issue final quotes, record site-visit outcomes,
   dispatch equipment, assign installers), behind basic auth (`OPS_PASSWORD`).
+- **Scheduling & procurement** (`/ops/schedule` + `/ops/procurement`): live
+  projects laid onto a six-week crew board (conflicts flagged, street
+  batching surfaced) and turned into a weekly order book with per-install
+  pick lists and order-by dates. Pure, tested planners in
+  `packages/domain/src/operations.ts`.
 - **iOS capture app** (`apps/mobile`): Expo scaffold of the same survey flow
   with native camera capture and offline drafts, sharing the domain engine.
   See [docs/capture-process.md](./docs/capture-process.md) for the capture

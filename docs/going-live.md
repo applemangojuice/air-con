@@ -48,6 +48,6 @@ deployment's logs; `pnpm build` locally reproduces it).
 ## The admin console
 
 `/ops` is mission control: live modules (property intelligence, projects,
-quote requests, template library), the customer-side pages for reference,
-and the not-built-yet roadmap. Also reachable from the "Prototype" strip at
+quote requests, template library, schedule, procurement), the customer-side
+pages for reference, and the not-built-yet roadmap. Also reachable from the "Prototype" strip at
 the bottom of every page and the Platform column in the footer.

@@ -35,6 +35,16 @@ const live = [
     href: "/ops/templates",
     body: "Every house archetype and install pattern we fit: stock floor plans, pipe routes, price adders, pre-checks, and a sample price for each.",
   },
+  {
+    title: "Schedule",
+    href: "/ops/schedule",
+    body: "The next six weeks on one board: installs, site visits and deliveries from live projects, double-bookings flagged, street-batching wins surfaced.",
+  },
+  {
+    title: "Procurement",
+    href: "/ops/procurement",
+    body: "Booked installs turned into an order book: weekly purchase totals, per-install pick lists, and order-by dates from supplier lead times.",
+  },
 ];
 
 const customerSide = [
@@ -45,18 +55,6 @@ const customerSide = [
 ];
 
 const roadmap = [
-  {
-    id: "procurement",
-    phase: "Next",
-    title: "Procurement & warehouse",
-    body: "Auto-ordering against booked installs, supplier lead times, MOQ management and demand forecasting. The projects module already knows every booked install date and its kit.",
-  },
-  {
-    id: "scheduling",
-    phase: "Next",
-    title: "Scheduling & logistics",
-    body: "Crew routing, street batching and weather-aware planning. Install dates and postcodes already live on projects; this adds the calendar view and crew assignment.",
-  },
   {
     id: "installer",
     phase: "Later",

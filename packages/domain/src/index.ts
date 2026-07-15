@@ -4,6 +4,7 @@ export { generateQuote, ENGINE_VERSION } from "./pricing.ts";
 export { scoreConfidence } from "./confidence.ts";
 export * from "./project.ts";
 export * from "./intelligence.ts";
+export * from "./operations.ts";
 export {
   LAYOUT_LABEL,
   buildDefaultConfig,
