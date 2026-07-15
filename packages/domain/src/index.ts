@@ -6,6 +6,7 @@ export * from "./project.ts";
 export * from "./intelligence.ts";
 export * from "./operations.ts";
 export * from "./finance.ts";
+export * from "./investor.ts";
 export {
   LAYOUT_LABEL,
   buildDefaultConfig,

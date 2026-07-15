@@ -7,6 +7,7 @@ import {
   type PlanAssumptions,
 } from "@aircon/domain";
 import { gbp } from "@/lib/format";
+import { SeedCase } from "./seed-case";
 
 type ScenarioId = keyof typeof PLAN_SCENARIOS;
 const STORAGE_KEY = "dih.finance-plan.v1";
@@ -278,6 +279,8 @@ export function FinancePlanner() {
           </section>
         </div>
       </div>
+
+      <SeedCase plan={plan} a={a} />
     </div>
   );
 }

@@ -44,7 +44,11 @@ surfaces and a data model already shaped for it. See
 - **Business case & P&L planner** (`/ops/finance`): assumptions in, monthly
   P&L out. Unit economics with CAC from the mailing channel, cost dials,
   breakeven month, cash trough and the funding ask, three scenarios, cash
-  curve and CSV export. Model in `packages/domain/src/finance.ts`, tested.
+  curve and CSV export. Plus the full seed case: bottom-up TAM/SAM/SOM,
+  LTV:CAC with service-plan attach, round and dilution modelling, driver
+  sensitivity on the ask, and a milestone road to Series A whose dates are
+  computed from the live plan. Models in `packages/domain/src/finance.ts`
+  and `investor.ts`, tested.
 - **iOS capture app** (`apps/mobile`): Expo scaffold of the same survey flow
   with native camera capture and offline drafts, sharing the domain engine.
   See [docs/capture-process.md](./docs/capture-process.md) for the capture

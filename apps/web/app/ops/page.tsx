@@ -48,7 +48,7 @@ const live = [
   {
     title: "Business case & P&L",
     href: "/ops/finance",
-    body: "The planning model: assumptions in, monthly P&L out. Unit economics, cost dials, breakeven month, cash trough and the funding ask, with scenarios and CSV export.",
+    body: "The seed case end to end: monthly P&L with cost dials and scenarios, bottom-up TAM/SAM/SOM, LTV:CAC, the round and dilution, sensitivity on the ask, and the milestone road to Series A, all from one live model.",
   },
 ];
 
