@@ -29,6 +29,7 @@ const GROUPS: { title: string; links: { label: string; href: string }[] }[] = [
       { label: "Templates", href: "/ops/templates" },
       { label: "Schedule", href: "/ops/schedule" },
       { label: "Procurement", href: "/ops/procurement" },
+      { label: "Business case", href: "/ops/finance" },
     ],
   },
 ];

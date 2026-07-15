@@ -41,6 +41,10 @@ surfaces and a data model already shaped for it. See
   batching surfaced) and turned into a weekly order book with per-install
   pick lists and order-by dates. Pure, tested planners in
   `packages/domain/src/operations.ts`.
+- **Business case & P&L planner** (`/ops/finance`): assumptions in, monthly
+  P&L out. Unit economics with CAC from the mailing channel, cost dials,
+  breakeven month, cash trough and the funding ask, three scenarios, cash
+  curve and CSV export. Model in `packages/domain/src/finance.ts`, tested.
 - **iOS capture app** (`apps/mobile`): Expo scaffold of the same survey flow
   with native camera capture and offline drafts, sharing the domain engine.
   See [docs/capture-process.md](./docs/capture-process.md) for the capture

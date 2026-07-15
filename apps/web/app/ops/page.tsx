@@ -45,6 +45,11 @@ const live = [
     href: "/ops/procurement",
     body: "Booked installs turned into an order book: weekly purchase totals, per-install pick lists, and order-by dates from supplier lead times.",
   },
+  {
+    title: "Business case & P&L",
+    href: "/ops/finance",
+    body: "The planning model: assumptions in, monthly P&L out. Unit economics, cost dials, breakeven month, cash trough and the funding ask, with scenarios and CSV export.",
+  },
 ];
 
 const customerSide = [

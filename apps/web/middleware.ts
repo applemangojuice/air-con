@@ -29,5 +29,6 @@ export const config = {
     "/ops/templates/:path*",
     "/ops/schedule/:path*",
     "/ops/procurement/:path*",
+    "/ops/finance/:path*",
   ],
 };

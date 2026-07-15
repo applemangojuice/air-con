@@ -5,6 +5,7 @@ export { scoreConfidence } from "./confidence.ts";
 export * from "./project.ts";
 export * from "./intelligence.ts";
 export * from "./operations.ts";
+export * from "./finance.ts";
 export {
   LAYOUT_LABEL,
   buildDefaultConfig,
