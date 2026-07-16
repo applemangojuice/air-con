@@ -44,6 +44,12 @@
   --color-sage-900: #203247;
 }
 
+/* The marker lettering used by the wordmark, self-hosted via next/font.
+   `inline` because the value references the runtime var next/font sets. */
+@theme inline {
+  --font-brand: var(--font-marker), "Permanent Marker", "Marker Felt", cursive;
+}
+
 html {
   scroll-behavior: smooth;
 }

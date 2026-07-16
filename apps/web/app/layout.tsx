@@ -1,7 +1,19 @@
 import type { Metadata, Viewport } from "next";
+import localFont from "next/font/local";
 import { BRAND } from "@/lib/brand";
 import { PrototypeNav } from "@/components/site/prototype-nav";
 import "./globals.css";
+
+/**
+ * The brand lettering (wordmark, hero moments) is self-hosted so the logo
+ * can never fall back to a system font. Everything else keeps Caprasimo /
+ * Figtree from Google Fonts.
+ */
+const brandFont = localFont({
+  src: "./fonts/permanent-marker.woff2",
+  variable: "--font-marker",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "https://dang.ac"),
@@ -30,7 +42,7 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="min-h-dvh flex flex-col">
+      <body className={`${brandFont.variable} min-h-dvh flex flex-col`}>
         {children}
         <PrototypeNav />
       </body>

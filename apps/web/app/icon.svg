@@ -1,8 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <!-- Dang, It's Hot square mark: ink tile, white D, hot orange spark -->
+  <!-- Dang, It's Hot mark: ink tile, hot-orange brush swash, sticker D with
+       splash-blue offset shadow, snowflake wink. Same artwork as the Logo. -->
   <rect width="64" height="64" rx="16" fill="#1d212b"/>
-  <path d="M14 15h14c11.6 0 19 6.6 19 17s-7.4 17-19 17H14Zm9.5 8v18h4.2c6.2 0 10.5-3.4 10.5-9s-4.3-9-10.5-9Z" fill="#f8f5ef"/>
-  <path d="M52.5 14.5c1.5 0 2.6 1 2.6 2.5 0 3.4-1 12.6-2.6 12.6S49.9 20.4 49.9 17c0-1.5 1.1-2.5 2.6-2.5Z" fill="#f2711b"/>
-  <circle cx="52.5" cy="35.5" r="3.2" fill="#f2711b"/>
-  <path d="M45 43c2.6 2.2 5.4 3.3 9.4 3.1-1.2 3.4-4.2 5.4-7.6 4.9-2.9-.4-4.9-2.6-5-5.3-.1-1.4 1.2-2.7 3.2-2.7Z" fill="#47698a" opacity="0.9"/>
+  <path d="M4 46c9 5 21 7.5 33 6.5 9.5-.8 17.5-3.6 23-8l1.6 6.2C55 56 46 59.4 36 60 24 60.7 12 58 4.8 52.6Z" fill="#f2711b"/>
+  <path d="M56.5 36.5c2.2-.8 4.4-1.8 6.3-3l.9 4.1c-2 1.3-4.3 2.4-6.6 3.2Z" fill="#f2711b" opacity="0.85"/>
+  <g transform="rotate(-4 32 30)">
+    <path d="M17.5 12.5h13c11.2 0 18.4 6.3 18.4 16.2S41.7 45 30.5 45h-13Zm9 7.6v17.2h3.8c5.9 0 10-3.2 10-8.6s-4.1-8.6-10-8.6Z" fill="#47698a" transform="translate(2.6 2.6)"/>
+    <path d="M17.5 12.5h13c11.2 0 18.4 6.3 18.4 16.2S41.7 45 30.5 45h-13Zm9 7.6v17.2h3.8c5.9 0 10-3.2 10-8.6s-4.1-8.6-10-8.6Z" fill="#f8f5ef"/>
+  </g>
+  <g stroke="#f8f5ef" stroke-width="1.7" stroke-linecap="round">
+    <path d="M49 47v8M45.6 49l6.8 4M52.4 49l-6.8 4"/>
+  </g>
 </svg>
