@@ -2,59 +2,34 @@ import Link from "next/link";
 import { BRAND } from "@/lib/brand";
 import { Logo } from "./logo";
 
-const columns = [
-  {
-    title: "Customers",
-    links: [
-      { label: "Get a fixed price", href: "/quote" },
-      { label: "How it works", href: "/how-it-works" },
-      { label: "About us", href: "/about" },
-      { label: "Customer portal", href: "/portal" },
-    ],
-  },
-  {
-    title: "Platform",
-    links: [
-      { label: "Admin console", href: "/ops" },
-      { label: "Property intelligence", href: "/ops/intel" },
-      { label: "Projects", href: "/ops/projects" },
-      { label: "Template library", href: "/ops/templates" },
-    ],
-  },
-  {
-    title: "Company",
-    links: [
-      { label: `Email: ${BRAND.supportEmail}`, href: `mailto:${BRAND.supportEmail}` },
-      { label: `Call: ${BRAND.phoneDisplay}`, href: "#" },
-    ],
-  },
+/** Deliberately succinct: the three pages that matter, and a way to reach us. */
+const links = [
+  { label: "Get my price", href: "/quote" },
+  { label: "Our process", href: "/how-it-works" },
+  { label: "About us", href: "/about" },
 ];
 
 export function SiteFooter() {
   return (
     <footer className="ink-gradient mt-auto text-white">
-      <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6">
-        <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
+        <div className="flex flex-wrap items-center justify-between gap-6">
           <div>
             <Logo dark />
             <p className="mt-3 max-w-xs text-sm text-white/60">{BRAND.tagline}</p>
           </div>
-          {columns.map((col) => (
-            <div key={col.title}>
-              <h3 className="text-sm font-semibold text-white/80">{col.title}</h3>
-              <ul className="mt-3 space-y-2 text-sm text-white/60">
-                {col.links.map((l) => (
-                  <li key={l.label}>
-                    <Link href={l.href} className="hover:text-white">
-                      {l.label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
+          <nav className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-white/70">
+            {links.map((l) => (
+              <Link key={l.href} href={l.href} className="hover:text-white">
+                {l.label}
+              </Link>
+            ))}
+            <a href={`mailto:${BRAND.supportEmail}`} className="hover:text-white">
+              {BRAND.supportEmail}
+            </a>
+          </nav>
         </div>
-        <p className="mt-12 border-t border-white/10 pt-6 text-xs text-white/40">
+        <p className="mt-10 border-t border-white/10 pt-6 text-xs text-white/40">
           © {new Date().getFullYear()} {BRAND.legalName}. All installations by F-Gas certified
           engineers. Finance figures are illustrative until a lender is connected.
         </p>

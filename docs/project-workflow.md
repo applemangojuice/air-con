@@ -57,18 +57,15 @@ currently recorded on confirmation and invoiced (`pay-site-visit` action).
 Swap in a Stripe Payment Link / Checkout session at that action when payments
 land.
 
-## Date-change fees (escalating as the date approaches)
+## Date-change fees (a week's notice is free)
 
 Defined in `RESCHEDULE_FEES` and computed by `rescheduleFeeGbp(kind, daysNotice)`.
 The fee is always shown to the customer *before* they confirm a move.
 
 | Notice | Site visit | Delivery | Installation |
 | --- | --- | --- | --- |
-| 14+ days | free | free | free |
-| 7–13 days | free | £25 | £75 |
-| 3–6 days | free | £60 | £150 |
-| 1–2 days | £25 | £120 | £300 |
-| same-day | £50 | £120 | £300 |
+| 7+ days | free | free | free |
+| under 7 days | £25 | £60 | £150 |
 
 Fees accrue on the project (`projectFees`) and are added to the final balance.
 No card needed at the moment of change.

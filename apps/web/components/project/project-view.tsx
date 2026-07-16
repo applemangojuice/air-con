@@ -169,41 +169,35 @@ function SlaCard() {
   return (
     <section className="rounded-3xl border border-line bg-white p-5">
       <h2 className="font-bold">Our commitments to you</h2>
-      <p className="mt-1 text-xs text-ink-500">
-        If we miss one, you get the money off automatically. No chasing, no arguing.
-      </p>
-      <ul className="mt-3 space-y-2.5">
+      <ul className="mt-3 space-y-2">
         {SLA_COMMITMENTS.map((c) => (
-          <li key={c.id} className="text-sm">
-            <span className="font-medium">{c.promise}</span>
-            <span className="block text-xs text-sage-700">or {c.remedy}</span>
+          <li key={c.id} className="flex gap-2.5 text-sm font-medium">
+            <span aria-hidden className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent-400" />
+            {c.promise}
           </li>
         ))}
       </ul>
+      <p className="mt-3 text-xs text-ink-500">
+        Miss one and money comes off your bill automatically. No chasing, no arguing.
+      </p>
     </section>
   );
 }
 
 function FeesCard({ accrued }: { accrued: number }) {
+  const shortNotice = (kind: keyof typeof RESCHEDULE_FEES) =>
+    RESCHEDULE_FEES[kind].find((band) => band.minDaysNotice === 0)?.feeGbp ?? 0;
   return (
     <section className="rounded-3xl border border-line bg-white p-5">
       <h2 className="font-bold">Changing a date</h2>
-      <p className="mt-1 text-xs text-ink-500">
-        Move anything on the timeline whenever you need. Fees only kick in as the day gets close,
-        because by then couriers and crews are already booked.
+      <p className="mt-2 text-sm font-medium">
+        A week&apos;s notice or more: free. Closer than that, one flat short-notice fee.
       </p>
-      <div className="mt-3 space-y-3">
-        {(Object.keys(RESCHEDULE_FEES) as (keyof typeof RESCHEDULE_FEES)[]).map((kind) => (
-          <div key={kind} className="text-sm">
-            <p className="font-medium capitalize">{kind.replace("-", " ")}</p>
-            <p className="text-xs text-ink-500">
-              {RESCHEDULE_FEES[kind]
-                .map((band) => `${band.label}: ${band.feeGbp === 0 ? "free" : gbp(band.feeGbp)}`)
-                .join(" · ")}
-            </p>
-          </div>
-        ))}
-      </div>
+      <p className="mt-2 text-xs text-ink-500">
+        Short notice: site visit {gbp(shortNotice("site-visit"))} · delivery{" "}
+        {gbp(shortNotice("delivery"))} · installation {gbp(shortNotice("installation"))}. By then
+        couriers and crews are already booked.
+      </p>
       {accrued > 0 && (
         <p className="mt-3 rounded-xl bg-surface px-3 py-2 text-xs text-ink-700">
           Change fees so far: <strong>{gbp(accrued)}</strong>, added to your final balance.

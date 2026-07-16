@@ -11,6 +11,6 @@ export const BRAND = {
   legalName: "Dang It's Hot Ltd",
   tagline: "Cooling technologies for the UK. Keeping London cool.",
   strap: "Keeping London cool",
-  supportEmail: "hello@dangitshot.co.uk",
+  supportEmail: "hello@dang.ac",
   phoneDisplay: "0800 000 0000",
 } as const;

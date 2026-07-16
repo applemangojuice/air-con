@@ -9,11 +9,8 @@ export function SiteHeader() {
           <Logo />
         </Link>
         <nav className="flex items-center gap-1 sm:gap-2 text-sm font-medium text-ink-700">
-          <Link href="/how-it-works" className="hidden sm:block rounded-full px-3 py-2 hover:bg-surface">
-            How it works
-          </Link>
-          <Link href="/portal" className="hidden sm:block rounded-full px-3 py-2 hover:bg-surface">
-            My account
+          <Link href="/how-it-works" className="rounded-full px-3 py-2 hover:bg-surface">
+            Our process
           </Link>
           <Link
             href="/quote"

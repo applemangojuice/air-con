@@ -156,15 +156,15 @@ test("installation not approved at site visit blocks booking", () => {
   assert.ok(!result.ok);
 });
 
-test("reschedule fees escalate as the date approaches", () => {
+test("date changes are free with a week's notice, one flat fee inside it", () => {
   assert.equal(rescheduleFeeGbp("installation", 20), 0);
-  assert.equal(rescheduleFeeGbp("installation", 10), 75);
-  assert.equal(rescheduleFeeGbp("installation", 4), 150);
-  assert.equal(rescheduleFeeGbp("installation", 1), 300);
-  assert.equal(rescheduleFeeGbp("delivery", 8), 25);
-  assert.equal(rescheduleFeeGbp("delivery", 2), 120);
-  assert.equal(rescheduleFeeGbp("site-visit", 3), 0);
-  assert.equal(rescheduleFeeGbp("site-visit", 0), 50);
+  assert.equal(rescheduleFeeGbp("installation", 7), 0);
+  assert.equal(rescheduleFeeGbp("installation", 6), 150);
+  assert.equal(rescheduleFeeGbp("installation", 1), 150);
+  assert.equal(rescheduleFeeGbp("delivery", 8), 0);
+  assert.equal(rescheduleFeeGbp("delivery", 2), 60);
+  assert.equal(rescheduleFeeGbp("site-visit", 7), 0);
+  assert.equal(rescheduleFeeGbp("site-visit", 0), 25);
 });
 
 test("rescheduling installation close to the date charges the fee", () => {

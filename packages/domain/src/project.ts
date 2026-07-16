@@ -153,26 +153,22 @@ export interface FeeBand {
 }
 
 /**
- * Date-change fees escalate as the date approaches: the closer we are, the
- * more is already committed (courier slots, crew days, freed stock).
+ * Date-change fees, kept deliberately simple: a week or more of notice is
+ * free, anything closer pays one flat short-notice fee (by then couriers
+ * and crew days are already committed).
  */
 export const RESCHEDULE_FEES: Record<ReschedulableKind, FeeBand[]> = {
   "site-visit": [
-    { minDaysNotice: 2, feeGbp: 0, label: "2+ days notice" },
-    { minDaysNotice: 1, feeGbp: 25, label: "1 day notice" },
-    { minDaysNotice: 0, feeGbp: 50, label: "same-day" },
+    { minDaysNotice: 7, feeGbp: 0, label: "7+ days notice" },
+    { minDaysNotice: 0, feeGbp: 25, label: "short notice" },
   ],
   delivery: [
-    { minDaysNotice: 14, feeGbp: 0, label: "14+ days notice" },
-    { minDaysNotice: 7, feeGbp: 25, label: "7–13 days notice" },
-    { minDaysNotice: 3, feeGbp: 60, label: "3–6 days notice" },
-    { minDaysNotice: 0, feeGbp: 120, label: "under 3 days" },
+    { minDaysNotice: 7, feeGbp: 0, label: "7+ days notice" },
+    { minDaysNotice: 0, feeGbp: 60, label: "short notice" },
   ],
   installation: [
-    { minDaysNotice: 14, feeGbp: 0, label: "14+ days notice" },
-    { minDaysNotice: 7, feeGbp: 75, label: "7–13 days notice" },
-    { minDaysNotice: 3, feeGbp: 150, label: "3–6 days notice" },
-    { minDaysNotice: 0, feeGbp: 300, label: "under 3 days" },
+    { minDaysNotice: 7, feeGbp: 0, label: "7+ days notice" },
+    { minDaysNotice: 0, feeGbp: 150, label: "short notice" },
   ],
 };
 
@@ -191,27 +187,27 @@ export function rescheduleFeeGbp(kind: ReschedulableKind, daysNotice: number): n
 export const SLA_COMMITMENTS = [
   {
     id: "final-quote-1-day",
-    promise: "Final quote within 1 working day of you approving your floor plan",
+    promise: "Your final quote lands within one working day",
     remedy: "£50 off your install",
   },
   {
     id: "site-visit-on-time",
-    promise: "Your site visit starts within 15 minutes of the booked slot",
+    promise: "Your site visit starts on time",
     remedy: "Your £150 back, and it still counts off your price",
   },
   {
     id: "delivery-on-day",
-    promise: "Your kit arrives on the confirmed delivery date",
+    promise: "Your kit arrives on the agreed day",
     remedy: "£50 off, plus £25 for every extra day",
   },
   {
     id: "install-on-day",
-    promise: "Installation starts on the confirmed date",
+    promise: "Your install starts on the agreed day",
     remedy: "5% off your install price",
   },
   {
     id: "install-duration",
-    promise: "Handover done within the quoted number of install days",
+    promise: "Handover inside the quoted install days",
     remedy: "£100 off your install price",
   },
 ] as const;

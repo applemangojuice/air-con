@@ -558,7 +558,7 @@ export function DeliveryPanel({ project, busy, dispatch }: PanelProps) {
           </div>
           <p className="text-xs text-ink-300">
             Needs {DELIVERY_LEAD_DAYS}+ days for the courier, and must land at least the day
-            before installation. Fees rise as the booked date gets close.
+            before installation. A week&apos;s notice is free; closer than that is a flat fee.
           </p>
         </div>
       )}
