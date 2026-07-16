@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Dang, It's Hot square mark: ink tile, white D, hot orange spark -->
+  <rect width="64" height="64" rx="16" fill="#1d212b"/>
+  <path d="M14 15h14c11.6 0 19 6.6 19 17s-7.4 17-19 17H14Zm9.5 8v18h4.2c6.2 0 10.5-3.4 10.5-9s-4.3-9-10.5-9Z" fill="#f8f5ef"/>
+  <path d="M52.5 14.5c1.5 0 2.6 1 2.6 2.5 0 3.4-1 12.6-2.6 12.6S49.9 20.4 49.9 17c0-1.5 1.1-2.5 2.6-2.5Z" fill="#f2711b"/>
+  <circle cx="52.5" cy="35.5" r="3.2" fill="#f2711b"/>
+  <path d="M45 43c2.6 2.2 5.4 3.3 9.4 3.1-1.2 3.4-4.2 5.4-7.6 4.9-2.9-.4-4.9-2.6-5-5.3-.1-1.4 1.2-2.7 3.2-2.7Z" fill="#47698a" opacity="0.9"/>
+</svg>

@@ -43,11 +43,12 @@ air-con/
     └── migrations/           # SQL migrations (source of truth for the schema)
 ```
 
-Design system: the UI on both apps uses the **Organic** tokens from the
-owner's Claude Design project (cream/sand ground, terracotta + sage accents,
-Caprasimo/Figtree). Web: `apps/web/app/globals.css`; mobile:
-`apps/mobile/lib/theme.ts`. Change the look by re-syncing those two files
-from the design project.
+Design system: the UI on both apps uses the **Dang, It's Hot** brand tokens
+pulled from the collateral in `apps/web/public/brand/` (paper ground, ink
+blue-black, hot orange accent, splash blue second accent, Caprasimo/Figtree).
+Web: `apps/web/app/globals.css`; mobile: `apps/mobile/lib/theme.ts`. Change
+the look by editing those two files together; the square mark lives in
+`apps/web/app/icon.svg` and `components/site/logo.tsx`.
 
 ### Planned growth (create these when the feature ships, not before)
 

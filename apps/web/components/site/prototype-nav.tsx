@@ -17,6 +17,7 @@ const GROUPS: { title: string; links: { label: string; href: string }[] }[] = [
       { label: "Your street's page (demo)", href: "/a/demo" },
       { label: "Portal", href: "/portal" },
       { label: "How it works", href: "/how-it-works" },
+      { label: "About us", href: "/about" },
     ],
   },
   {

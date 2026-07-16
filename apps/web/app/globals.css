@@ -1,9 +1,12 @@
 @import "tailwindcss";
 
 /*
- * Tokens synced from the "Organic" Claude Design project (theme.json):
- * cream/sand ground, terracotta accent, sage second accent,
+ * Dang, It's Hot brand tokens, pulled from the collateral
+ * (public/brand/dang-its-hot.webp): paper-white ground, ink blue-black
+ * brush lettering, hot orange "It's Hot", watercolour splash blue.
  * Caprasimo display over Figtree, 16px radii growing into pills.
+ * Token names keep their historical slots so no component changes:
+ * cream = the ground, sage-* = the second accent (now splash blue).
  */
 @theme {
   --font-sans:
@@ -11,34 +14,34 @@
     Arial, sans-serif;
   --font-display: "Caprasimo", "Figtree", ui-serif, Georgia, serif;
 
-  /* ground */
-  --color-cream: #f5ead8; /* bg */
-  --color-surface: #ebddc5; /* surface */
-  --color-line: #ddcdae;
+  /* ground: the collateral's paper white, warmed a touch */
+  --color-cream: #f8f5ef; /* bg */
+  --color-surface: #efeade; /* surface */
+  --color-line: #ddd5c4;
 
-  /* warm text ramp derived from #201e1d */
-  --color-ink-950: #161412;
-  --color-ink-900: #201e1d;
-  --color-ink-700: #4a4540;
-  --color-ink-500: #746c63;
-  --color-ink-300: #a89e90;
+  /* ink ramp: the brush lettering's blue-black */
+  --color-ink-950: #14171e;
+  --color-ink-900: #1d212b;
+  --color-ink-700: #454b58;
+  --color-ink-500: #6e7482;
+  --color-ink-300: #a3a8b4;
 
-  /* terracotta accent ramp (#c67139) */
-  --color-accent-50: #faf1e6;
-  --color-accent-100: #f4dcc2;
-  --color-accent-400: #d68b56;
-  --color-accent-500: #c67139;
-  --color-accent-600: #aa5a29;
-  --color-accent-700: #884921;
+  /* hot orange accent ramp ("It's Hot", #f2711b) */
+  --color-accent-50: #fef3ea;
+  --color-accent-100: #fcdfc5;
+  --color-accent-400: #f78e45;
+  --color-accent-500: #f2711b;
+  --color-accent-600: #d55a0a;
+  --color-accent-700: #a84508;
 
-  /* sage second accent ramp (#7a8a5e) */
-  --color-sage-50: #f1f3ea;
-  --color-sage-100: #e3e8d3;
-  --color-sage-200: #ccd5b2;
-  --color-sage-500: #7a8a5e;
-  --color-sage-700: #57633f;
-  --color-sage-800: #454f31;
-  --color-sage-900: #343b24;
+  /* splash blue second accent ramp (the watercolour splash, #47698a) */
+  --color-sage-50: #eef3f8;
+  --color-sage-100: #dce7f0;
+  --color-sage-200: #bcd2e2;
+  --color-sage-500: #47698a;
+  --color-sage-700: #345373;
+  --color-sage-800: #2a415c;
+  --color-sage-900: #203247;
 }
 
 html {
@@ -65,17 +68,17 @@ body {
   background: var(--color-accent-100);
 }
 
-/* Warm wash used on hero panels — terracotta and sage glows on the ground. */
+/* Warm wash used on hero panels: hot orange and splash blue on paper. */
 .warm-gradient {
   background:
-    radial-gradient(1100px 480px at 85% -10%, rgba(198, 113, 57, 0.16), transparent 60%),
-    radial-gradient(900px 420px at 8% 0%, rgba(122, 138, 94, 0.15), transparent 55%),
-    linear-gradient(180deg, #f0e1c6 0%, #f5ead8 70%);
+    radial-gradient(1100px 480px at 85% -10%, rgba(242, 113, 27, 0.14), transparent 60%),
+    radial-gradient(900px 420px at 8% 0%, rgba(71, 105, 138, 0.13), transparent 55%),
+    linear-gradient(180deg, #f1ece1 0%, #f8f5ef 70%);
 }
 
-/* Deep warm panel (dark hero, footer) with a terracotta glow. */
+/* Deep ink panel (dark hero, footer) with a hot orange glow. */
 .ink-gradient {
   background:
-    radial-gradient(900px 400px at 85% 0%, rgba(198, 113, 57, 0.3), transparent 55%),
-    linear-gradient(160deg, #2b2521 0%, #161412 100%);
+    radial-gradient(900px 400px at 85% 0%, rgba(242, 113, 27, 0.28), transparent 55%),
+    linear-gradient(160deg, #2b3040 0%, #14171e 100%);
 }

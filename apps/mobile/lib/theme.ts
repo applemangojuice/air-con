@@ -1,32 +1,33 @@
 /**
- * Organic design system tokens (synced from the "Organic" Claude Design
- * project theme.json), the same values as apps/web/app/globals.css.
+ * Dang, It's Hot brand tokens, the same values as apps/web/app/globals.css:
+ * paper ground, ink blue-black, hot orange accent, splash blue second
+ * accent (kept in the historical sage-* slots).
  */
 export const theme = {
   colors: {
-    cream: "#f5ead8",
-    surface: "#ebddc5",
-    line: "#ddcdae",
+    cream: "#f8f5ef",
+    surface: "#efeade",
+    line: "#ddd5c4",
     white: "#ffffff",
 
-    ink950: "#161412",
-    ink900: "#201e1d",
-    ink700: "#4a4540",
-    ink500: "#746c63",
-    ink300: "#a89e90",
+    ink950: "#14171e",
+    ink900: "#1d212b",
+    ink700: "#454b58",
+    ink500: "#6e7482",
+    ink300: "#a3a8b4",
 
-    accent50: "#faf1e6",
-    accent100: "#f4dcc2",
-    accent400: "#d68b56",
-    accent500: "#c67139",
-    accent600: "#aa5a29",
-    accent700: "#884921",
+    accent50: "#fef3ea",
+    accent100: "#fcdfc5",
+    accent400: "#f78e45",
+    accent500: "#f2711b",
+    accent600: "#d55a0a",
+    accent700: "#a84508",
 
-    sage50: "#f1f3ea",
-    sage100: "#e3e8d3",
-    sage200: "#ccd5b2",
-    sage500: "#7a8a5e",
-    sage700: "#57633f",
+    sage50: "#eef3f8",
+    sage100: "#dce7f0",
+    sage200: "#bcd2e2",
+    sage500: "#47698a",
+    sage700: "#345373",
 
     amber50: "#fdf5e3",
     amber700: "#8a5a12",

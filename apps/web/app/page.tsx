@@ -40,9 +40,9 @@ export default function HomePage() {
     <>
       <SiteHeader />
       <main>
-        {/* Hero */}
+        {/* Hero: the collateral IS the header */}
         <section className="warm-gradient">
-          <div className="mx-auto max-w-6xl px-4 pb-20 pt-16 sm:px-6 sm:pt-24">
+          <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 pb-20 pt-14 sm:px-6 sm:pt-20 lg:grid-cols-[1fr_460px]">
             <div className="max-w-2xl">
               <p className="inline-flex items-center gap-2 rounded-full border border-accent-100 bg-white px-3 py-1 text-xs font-semibold text-accent-700">
                 <span className="h-1.5 w-1.5 rounded-full bg-accent-500" />
@@ -77,6 +77,14 @@ export default function HomePage() {
               <p className="mt-3 text-sm text-ink-300">
                 Free, under two minutes to your price, and it&apos;s fixed. Not an estimate.
               </p>
+            </div>
+            <div className="overflow-hidden rounded-3xl border border-line bg-white shadow-lg">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/brand/dang-its-hot.webp"
+                alt="Dang, It's Hot: cooling technologies for the UK. Keeping London cool."
+                className="w-full"
+              />
             </div>
           </div>
         </section>
@@ -114,19 +122,6 @@ export default function HomePage() {
                 <p className="mt-1.5 text-sm leading-relaxed text-ink-500">{p.body}</p>
               </div>
             ))}
-          </div>
-        </section>
-
-        {/* The brand */}
-        <section className="mx-auto max-w-6xl px-4 pt-20 sm:px-6">
-          <div className="overflow-hidden rounded-3xl border border-line bg-white">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/brand/dang-its-hot.webp"
-              alt="Dang, It's Hot: cooling technologies for the UK. Keeping London cool."
-              className="w-full"
-              loading="lazy"
-            />
           </div>
         </section>
 
