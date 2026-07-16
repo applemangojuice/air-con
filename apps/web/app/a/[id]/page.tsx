@@ -104,7 +104,8 @@ export default async function AddressPage({ params }: { params: Promise<{ id: st
         </h1>
         <p className="mt-3 text-ink-500">
           We install street by street in {intel.address.outcode}, and we&apos;ve done our homework
-          on homes like yours before knocking. Here&apos;s what we know already.
+          on homes like yours before knocking. Here&apos;s what we know already. Thorough, not
+          creepy: it&apos;s all public records, explained at the bottom.
         </p>
 
         {/* What we know */}

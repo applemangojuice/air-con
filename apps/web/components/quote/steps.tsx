@@ -165,7 +165,7 @@ export function AddressStep({
       step={step}
       totalSteps={totalSteps}
       title="Let's price your home"
-      subtitle="Just your address and email to start. Your quote saves as you go."
+      subtitle="Just your address and email to start. Quicker than finding where you put the fan last September."
       onNext={onNext}
       nextDisabled={!ready}
       busy={busy}
@@ -275,7 +275,8 @@ export function AddressStep({
           </p>
           <p className="mt-1 text-sm text-ink-500">
             A few taps about your house and your price pops up. No
-            salesperson, no waiting.
+            salesperson, no waiting, and nobody rings you &ldquo;just to
+            follow up&rdquo;.
           </p>
         </div>
       )}
@@ -305,7 +306,7 @@ export function HouseStep({
       step={step}
       totalSteps={totalSteps}
       title="Tell us about your house"
-      subtitle="These few answers build your home's layout. Your price is on the next screen."
+      subtitle="These few answers build your home's layout. Your price is on the next screen. Told you it was quick."
       onNext={onNext}
       onBack={onBack}
       nextLabel="Show my price"
@@ -466,7 +467,7 @@ export function DetailsStep({
       </Field>
       <p className="text-xs text-ink-300">
         We will never call you. Everything arrives by email, and only about
-        this quote.
+        this quote. We hate cold calls even more than you do.
       </p>
     </StepShell>
   );

@@ -53,6 +53,7 @@ export default function OurProcessPage() {
               We rebuilt the whole journey, from &ldquo;how much would it
               cost?&rdquo; to a quietly humming system, around one idea: answer
               every question before an engineer sets foot in your home.
+              Radical stuff, we know.
             </p>
           </div>
         </section>

@@ -28,8 +28,8 @@ export default function PortalPage() {
         <p className="mt-3 max-w-xl text-ink-500">
           The portal opens once you&apos;ve booked an installation. Everything
           about your system (quotes, contracts, progress, documents and
-          monitoring) will live here. Your installation itself already runs on
-          a live timeline:{" "}
+          monitoring) will live here. Meanwhile your installation already runs
+          on a live timeline, which frankly does most of the showing off:{" "}
           <Link href="/p/demo" className="font-semibold text-accent-700 underline">
             see a playable example
           </Link>

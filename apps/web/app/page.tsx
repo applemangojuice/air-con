@@ -7,7 +7,7 @@ const steps = [
   {
     n: "01",
     title: "Tell us about your home",
-    body: "A few taps about your house. If we already know your address, most of it is filled in for you. Under two minutes to your price.",
+    body: "A few taps about your house. If we already know your address, most of it is filled in for you. Under two minutes to your price. No ladder, no loft, no small talk.",
   },
   {
     n: "02",
@@ -17,14 +17,14 @@ const steps = [
   {
     n: "03",
     title: "Book your installation online",
-    body: "Pick a date, pay a deposit, and track everything in your portal. Most homes are installed in a single day.",
+    body: "Pick a date, pay a deposit, and track everything in your portal. Most homes are installed in a single day. Kettle on, job done.",
   },
 ];
 
 const promises = [
-  { title: "Fixed price, guaranteed", body: "The price you see is the price you pay. No surveyor upsell, no on-the-day extras." },
+  { title: "Fixed price, guaranteed", body: "The price you see is the price you pay. No surveyor upsell, no on-the-day extras, no sharp intake of breath." },
   { title: "5-year warranty", body: "Parts and labour included on every installation as standard." },
-  { title: "Certified engineers", body: "Every install by F-Gas certified engineers, photographed and quality-checked at each step." },
+  { title: "Certified engineers", body: "Every install by F-Gas certified engineers, photographed and quality-checked at each step. Boots wiped, mess binned." },
   { title: "Cooling and heating", body: "Modern systems heat efficiently in winter too. One unit, comfy all year." },
 ];
 
@@ -55,7 +55,8 @@ export default function HomePage() {
               <p className="mt-5 max-w-xl text-lg text-ink-500">
                 Proper air conditioning for your home, with a guaranteed fixed
                 price in under two minutes. No salesperson, no waiting a week
-                for a surveyor. Keeping London cool, street by street.
+                for a surveyor, no more sleeping on top of the duvet with a wet
+                flannel. Keeping London cool, street by street.
               </p>
 
               <form action="/quote" className="mt-8 flex max-w-md gap-2">
@@ -75,7 +76,8 @@ export default function HomePage() {
                 </button>
               </form>
               <p className="mt-3 text-sm text-ink-300">
-                Free, under two minutes to your price, and it&apos;s fixed. Not an estimate.
+                Free, under two minutes, and the price is the price. Not an
+                estimate, not a &ldquo;from&rdquo;, not a man with a clipboard.
               </p>
             </div>
             <div className="overflow-hidden rounded-3xl border border-line bg-white shadow-lg">
@@ -115,7 +117,14 @@ export default function HomePage() {
 
         {/* Promises */}
         <section className="border-y border-line bg-surface">
-          <div className="mx-auto grid max-w-6xl gap-6 px-4 py-16 sm:grid-cols-2 sm:px-6 lg:grid-cols-4">
+          <div className="mx-auto max-w-6xl px-4 pt-16 sm:px-6">
+            <h2 className="text-3xl font-display sm:text-4xl">Not your usual tradespeople</h2>
+            <p className="mt-2 max-w-2xl text-ink-500">
+              Professional to a fault, and all of it in writing. If we miss a
+              commitment, money comes off your bill automatically.
+            </p>
+          </div>
+          <div className="mx-auto grid max-w-6xl gap-6 px-4 py-12 sm:grid-cols-2 sm:px-6 lg:grid-cols-4">
             {promises.map((p) => (
               <div key={p.title}>
                 <h3 className="font-semibold">{p.title}</h3>
@@ -162,7 +171,8 @@ export default function HomePage() {
             </h2>
             <p className="mx-auto mt-3 max-w-md text-white/60">
               Two minutes on your phone. A guaranteed price at the end. No
-              obligation, no pushy calls.
+              obligation, no pushy calls. Worst case, you go back to your fan
+              knowing exactly what freedom costs.
             </p>
             <Link
               href="/quote"

@@ -54,7 +54,7 @@ export const STAGE_INFO: Record<ProjectStageId, StageInfo> = {
     id: "quote",
     label: "Quote",
     title: "Your instant quote",
-    strap: "A fixed price from your own survey. No pushy sales visit, no waiting by the phone.",
+    strap: "A fixed price from your own survey. No pushy sales visit, no waiting by the phone, no clipboard.",
     explainer: [
       "You told us about your place, we priced the whole job on the spot.",
       "Once your photos are checked the price is locked. It can go down, never up, unless you change the plan.",
@@ -932,7 +932,7 @@ export function applyProjectAction(
       p.installation.completedAt = now;
       log(
         "installation-completed",
-        "Installation complete. Enjoy the cold air, your warranty and care docs are on the way.",
+        "Installation complete. You are now officially allowed to be smug about your cool house. Warranty and care docs are on the way.",
         "ops",
       );
       return { ok: true, project: p };

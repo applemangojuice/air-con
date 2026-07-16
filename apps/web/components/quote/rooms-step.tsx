@@ -97,7 +97,7 @@ export function RoomsStep({
       step={step}
       totalSteps={totalSteps}
       title="Your home, your price"
-      subtitle="We've laid out your rooms from your answers. Untick any you don't want cooled and the price updates instantly."
+      subtitle="We've laid out your rooms from your answers. Untick any you don't want cooled and the price updates instantly. The hallway can fend for itself."
       onNext={onNext}
       onBack={onBack}
       nextDisabled={rooms.length === 0}
