@@ -10,8 +10,10 @@ watches `main`; every merge auto-deploys. This page is the checklist.
    pnpm workspaces are handled natively. First deploy happens on import.
 2. **Supabase**: create a project, then run every file in
    `supabase/migrations/` in order (SQL editor, or `supabase db push`).
-   As of now that's `0001` → `0006`. New migrations get run the same way
-   when they land.
+   As of now that's `0001` → `0006`. Note there are **two** `0006_*` files
+   (`0006_draft_quotes.sql` and `0006_property_intelligence.sql`) — run both;
+   they create independent tables. New migrations get run the same way when
+   they land.
 3. **Environment variables** (Vercel → Project → Settings → Environment
    Variables). From `apps/web/.env.example`:
    - `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`: persistence on. Without
@@ -22,9 +24,11 @@ watches `main`; every merge auto-deploys. This page is the checklist.
      yet in the property database. Free tier at getaddress.io.
    - `RESEND_API_KEY` + `EMAIL_FROM` + `NEXT_PUBLIC_APP_URL` (optional):
      quote emails.
-4. **Data**: download the EPC bulk files and run the importer
-   (see [property-intelligence.md](./property-intelligence.md)). Hit
-   **Recompute scores** on `/ops/intel` afterwards.
+4. **Data**: load the property book. The step-by-step is in
+   [loading-data.md](./loading-data.md) — start with the committed sample
+   CSVs to smoke-test the pipeline, then swap in the real EPC bulk downloads
+   (source detail in [property-intelligence.md](./property-intelligence.md)).
+   Hit **Recompute scores** on `/ops/intel` afterwards.
 
 ## How to check a deploy worked
 

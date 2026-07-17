@@ -23,6 +23,12 @@ Live surfaces:
 Everything works in demo mode with a deterministic SW16/SW17 sample, so the
 whole loop is walkable before a single row is imported.
 
+> **Just want to try the importer?** Ready-made sample CSVs in the exact
+> format below live in `apps/web/scripts/sample-data/` (regenerate or scale
+> them with `node scripts/make-sample-data.mjs`). They let you run the full
+> import → recompute pipeline against your own Supabase without waiting on the
+> real downloads. See [loading-data.md](./loading-data.md) for the walkthrough.
+
 ## Where to get the data (in order)
 
 ### 1. EPC register (the backbone). Do this first.

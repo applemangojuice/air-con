@@ -30,9 +30,10 @@ surfaces and a data model already shaped for it. See
   address is picked, generates a personalised landing page per address for
   mailings, and powers the targeting analytics (filters, mailing CSV export,
   campaign tagging, business-case maths). Demo dataset covers SW16/SW17 with
-  no database. See
-  [docs/property-intelligence.md](./docs/property-intelligence.md) for data
-  sources and import commands.
+  no database. **New here? [docs/loading-data.md](./docs/loading-data.md) is the
+  start-to-finish guide for getting data in** (demo mode, sample CSVs, or real
+  open-data downloads); [docs/property-intelligence.md](./docs/property-intelligence.md)
+  has the per-source detail.
 - **Ops review** (`/ops/quotes` + `/ops/projects`): incoming surveys and
   in-flight installations (issue final quotes, record site-visit outcomes,
   dispatch equipment, assign installers), behind basic auth (`OPS_PASSWORD`).
@@ -77,6 +78,9 @@ Runs in demo mode with no configuration (including the full project
 timeline at `/p/demo`). To persist quotes and projects, copy
 `apps/web/.env.example` to `apps/web/.env.local` and fill in your Supabase
 project, then run the files in `supabase/migrations/` against it in order.
+
+To load property data (demo, ready-made sample CSVs, or real open-data
+downloads), follow [docs/loading-data.md](./docs/loading-data.md).
 
 ## Deploy
 
