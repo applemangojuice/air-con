@@ -1,0 +1,112 @@
+name: Load property data
+
+# Loads the Property Intelligence book into your Supabase database without you
+# running anything locally. Trigger it from the Actions tab (Run workflow), or
+# turn on the weekly schedule below. It imports the data, then recomputes
+# archetypes + priority scores (the "Recompute scores" button, headless).
+#
+# One-time setup (all in the browser):
+#   1. Create a Supabase project and run every file in supabase/migrations/
+#      (SQL editor). The property tables are in 0006_property_intelligence.sql.
+#   2. Repo → Settings → Secrets and variables → Actions → New repository secret:
+#        SUPABASE_URL                = https://YOUR-PROJECT.supabase.co
+#        SUPABASE_SERVICE_ROLE_KEY   = (Supabase → Settings → API → service_role)
+# Then: Actions → "Load property data" → Run workflow.
+#
+# See docs/loading-data.md for the full walkthrough and the real-data path.
+
+on:
+  workflow_dispatch:
+    inputs:
+      source:
+        description: "Where the data comes from"
+        type: choice
+        options:
+          - sample
+        default: sample
+      outcodes:
+        description: "Outcodes to import (comma-separated)"
+        type: string
+        default: "SW16,SW17"
+      recompute:
+        description: "Recompute archetypes + priority after import"
+        type: boolean
+        default: true
+
+  # Refresh on a schedule. Meaningful once you point this at a live feed (e.g.
+  # the EPC API) rather than the static sample data — see docs/loading-data.md.
+  # Uncomment to enable:
+  # schedule:
+  #   - cron: "0 3 * * 1" # 03:00 UTC every Monday
+
+# Never let two loads write the same database at once.
+concurrency:
+  group: load-property-data
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  load:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      OUTCODES: ${{ inputs.outcodes || 'SW16,SW17' }}
+    steps:
+      - name: Check required secrets
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "::error::Missing repo secrets SUPABASE_URL and/or SUPABASE_SERVICE_ROLE_KEY."
+            echo "Add them under Settings → Secrets and variables → Actions → New repository secret."
+            echo "Values: Supabase → Settings → API (Project URL and the service_role key)."
+            exit 1
+          fi
+          echo "Supabase secrets present."
+
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate sample data
+        working-directory: apps/web
+        run: node scripts/make-sample-data.mjs
+
+      - name: Import EPC (creates the property records)
+        working-directory: apps/web
+        run: node scripts/import-intel.mjs epc scripts/sample-data/epc-certificates.csv --outcodes "$OUTCODES"
+
+      - name: Import planning (loft / extension flags)
+        working-directory: apps/web
+        run: node scripts/import-intel.mjs planning scripts/sample-data/planning.csv --outcodes "$OUTCODES"
+
+      - name: Import constraints (conservation / listed / Article 4)
+        working-directory: apps/web
+        run: node scripts/import-intel.mjs constraints scripts/sample-data/constraints.csv
+
+      - name: Recompute archetypes + priority scores
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.recompute }}
+        working-directory: apps/web
+        run: node --experimental-strip-types scripts/recompute-intel.mjs
+
+      - name: Summary
+        if: ${{ always() }}
+        run: |
+          {
+            echo "### Property data load"
+            echo ""
+            echo "- Source: \`${{ inputs.source || 'sample' }}\`"
+            echo "- Outcodes: \`$OUTCODES\`"
+            echo "- Recompute: \`${{ github.event_name != 'workflow_dispatch' || inputs.recompute }}\`"
+            echo ""
+            echo "Open \`/ops/intel\` to see the book. If numbers look raw, the recompute step was skipped — re-run with recompute on, or click **Recompute scores**."
+          } >> "$GITHUB_STEP_SUMMARY"

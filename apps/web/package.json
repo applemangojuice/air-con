@@ -6,7 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "data:sample": "node scripts/make-sample-data.mjs",
+    "data:import": "node scripts/import-intel.mjs",
+    "data:recompute": "node --experimental-strip-types scripts/recompute-intel.mjs",
+    "data:seed": "node scripts/make-sample-data.mjs && node scripts/import-intel.mjs epc scripts/sample-data/epc-certificates.csv --outcodes SW16,SW17 && node scripts/import-intel.mjs planning scripts/sample-data/planning.csv --outcodes SW16,SW17 && node scripts/import-intel.mjs constraints scripts/sample-data/constraints.csv && node --experimental-strip-types scripts/recompute-intel.mjs"
   },
   "dependencies": {
     "@aircon/domain": "workspace:*",

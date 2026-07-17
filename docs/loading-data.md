@@ -7,14 +7,18 @@ government data (EPC, planning, constraints). Everything else (the demo
 dataset, the funnel prefill, the mailing pages, the analytics) sits on top of
 that.
 
-There are three ways in, fastest first. Pick the one that matches what you're
-trying to do.
+There are a few ways in. Pick the one that matches what you're trying to do.
 
-| You want to… | Do this | Needs a database? | Time |
+| You want to… | Do this | Needs a database? | Runs where? |
 | --- | --- | --- | --- |
-| **Just see how it works** | Demo mode | No | 2 min |
-| **Run the real import pipeline now** | Sample CSVs → importer | Yes (Supabase) | 15 min |
-| **Load a real area for a campaign** | Open-data downloads → importer | Yes (Supabase) | a couple of hours |
+| **Just see how it works** | Demo mode | No | Your machine (`pnpm dev`) |
+| **Load data without touching a terminal** | **GitHub Actions** (below) | Yes (Supabase) | GitHub, one click |
+| **Run the real import pipeline locally** | Sample CSVs → importer | Yes (Supabase) | Your machine |
+| **Load a real area for a campaign** | Open-data downloads → importer | Yes (Supabase) | Either |
+
+**Don't want to run any commands yourself?** Jump to
+[Automatic loading with GitHub Actions](#automatic-loading-with-github-actions) —
+it does the whole import + recompute for you from the Actions tab.
 
 ---
 
@@ -44,7 +48,59 @@ Demo postcodes: `SW16 1AD`, `SW16 2BE`, `SW16 1CF`, `SW16 2DG`, `SW16 1EH`,
 `SW17 2FJ`, `SW17 1GA`, `SW17 2HB`, `SW17 1JC`, `SW17 2AD`.
 
 Nothing here persists — that's the point. When you're ready to load real rows,
-go to Path 2.
+use GitHub Actions (below) or Path 2.
+
+---
+
+## Automatic loading with GitHub Actions
+
+This is the "I don't run anything myself" path. A workflow
+(`.github/workflows/load-property-data.yml`) does the entire load on GitHub's
+runners — install, import EPC → planning → constraints, then recompute
+archetypes and priority scores (the `/ops/intel` **Recompute** button, run
+headless). You click one button; nothing runs on your machine.
+
+### One-time setup (all in the browser)
+
+1. **A Supabase database.** Create a project at
+   [supabase.com](https://supabase.com) and run every file in
+   `supabase/migrations/` in the SQL editor (the property tables are in
+   `0006_property_intelligence.sql`). This is the one thing that can't be
+   automated away — the data needs somewhere to live.
+2. **Two repository secrets.** In GitHub: **Settings → Secrets and variables →
+   Actions → New repository secret**. Add:
+   - `SUPABASE_URL` — `https://YOUR-PROJECT.supabase.co`
+   - `SUPABASE_SERVICE_ROLE_KEY` — Supabase → Settings → API → `service_role`
+     key (this is a secret; the workflow reads it, it never lands in the repo).
+
+### Running it
+
+- **GitHub → Actions tab → "Load property data" → Run workflow.** Optionally
+  set the outcodes (default `SW16,SW17`) and whether to recompute (default
+  yes), then **Run workflow**. Watch it go green, then open `/ops/intel` on
+  your deployment — the book is populated.
+- The run writes a short summary (source, outcodes, whether it recomputed) to
+  the workflow summary page.
+- If the Supabase secrets are missing, the first step fails immediately with a
+  message telling you exactly which secret to add — nothing half-runs.
+
+### Running it on a schedule
+
+The workflow ships with a weekly `schedule:` trigger **commented out**. A cron
+that re-imports the *static sample data* every night is pointless, so it's off
+by default. Turn it on once you point the workflow at a live feed (see below);
+uncomment the `schedule:` block in the workflow file.
+
+### Making it load *real* data automatically
+
+The workflow currently seeds the sample CSVs. To have it pull real data on a
+schedule instead, you need a live source the runner can fetch unattended —
+the **EPC API** (same free registration as the bulk download) is the natural
+one: add your EPC API key as another repo secret, add a step that fetches the
+latest certificates for your target local authorities into
+`epc-certificates.csv`, and enable the schedule. The import and recompute
+steps stay exactly as they are. (Happy to build this step when you want it —
+it needs your EPC key and which authorities to pull.)
 
 ---
 
@@ -106,10 +162,21 @@ enriched`, etc.).
 ### 2d. Recompute, then look
 
 The importer writes the raw records but leaves the derived fields (archetype,
-priority band) for the app to compute. Open **`/ops/intel`** and click
-**Recompute scores** — that runs the classifier and priority scoring across the
-book. Now the filters, priority bands, and business-case maths are live. Every
+priority band) for the app to compute. Either:
+
+- open **`/ops/intel`** and click **Recompute scores**, or
+- run it headless (what CI does): `node --experimental-strip-types
+  scripts/recompute-intel.mjs` — reuses the exact same domain classifier.
+
+Now the filters, priority bands, and business-case maths are live. Every
 address also has a page at `/a/<id>` and prefills the funnel.
+
+### Shortcut: one command for the whole sample seed
+
+From `apps/web`, with the Supabase env vars set, `pnpm data:seed` does all of
+2b → 2d in one go (generate → import EPC/planning/constraints → recompute).
+There are also `pnpm data:sample`, `pnpm data:import`, and `pnpm data:recompute`
+for the individual steps. The GitHub Actions workflow runs these same steps.
 
 ---
 
@@ -156,8 +223,10 @@ record. After a real import, hit **Recompute scores** again.
   Nothing is destroyed; history accumulates.
 
 Schema: `supabase/migrations/0006_property_intelligence.sql`. Importer:
-`apps/web/scripts/import-intel.mjs`. Sample data + generator:
+`apps/web/scripts/import-intel.mjs`. Headless recompute:
+`apps/web/scripts/recompute-intel.mjs`. Sample data + generator:
 `apps/web/scripts/sample-data/` and `apps/web/scripts/make-sample-data.mjs`.
+Automation: `.github/workflows/load-property-data.yml`.
 
 ---
 
@@ -179,3 +248,9 @@ Schema: `supabase/migrations/0006_property_intelligence.sql`. Importer:
 - **Everything's empty and you expected demo data** — you *have* Supabase
   configured (so it's reading the empty DB, not the demo set). Either import
   data, or unset the Supabase env vars to fall back to demo mode.
+- **The Actions workflow fails on the first step** — the `SUPABASE_URL` /
+  `SUPABASE_SERVICE_ROLE_KEY` repo secrets aren't set. Add them under Settings →
+  Secrets and variables → Actions.
+- **The Actions workflow fails on an import step with `relation ... does not
+  exist`** — the migrations haven't been run against that Supabase project. Run
+  them in the SQL editor, then re-run the workflow.

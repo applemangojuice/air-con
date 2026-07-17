@@ -79,8 +79,10 @@ timeline at `/p/demo`). To persist quotes and projects, copy
 `apps/web/.env.example` to `apps/web/.env.local` and fill in your Supabase
 project, then run the files in `supabase/migrations/` against it in order.
 
-To load property data (demo, ready-made sample CSVs, or real open-data
-downloads), follow [docs/loading-data.md](./docs/loading-data.md).
+To load property data, follow [docs/loading-data.md](./docs/loading-data.md):
+demo mode (no setup), a one-click **GitHub Actions** workflow that imports and
+recomputes for you (no local commands), ready-made sample CSVs, or real
+open-data downloads.
 
 ## Deploy
 
