@@ -5,6 +5,8 @@ export { scoreConfidence } from "./confidence.ts";
 export * from "./project.ts";
 export * from "./intelligence.ts";
 export * from "./operations.ts";
+export * from "./design.ts";
+export * from "./install.ts";
 export * from "./finance.ts";
 export * from "./investor.ts";
 export {
