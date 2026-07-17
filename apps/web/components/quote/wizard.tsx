@@ -1,7 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { buildDefaultConfig, type KitchenLivingLayout, type Survey } from "@aircon/domain";
+import {
+  buildDefaultConfig,
+  generateQuote,
+  type KitchenLivingLayout,
+  type Survey,
+} from "@aircon/domain";
 import {
   clearDraft,
   loadDraft,
@@ -11,6 +16,7 @@ import {
   type QuoteDraft,
 } from "@/lib/quote-draft";
 import { submitQuote } from "@/lib/submit-quote";
+import { track } from "@/lib/analytics-client";
 import { normalisePostcode } from "@/lib/format";
 import { AddressStep, DetailsStep, HouseStep, type StepProps } from "./steps";
 import { RoomsStep } from "./rooms-step";
@@ -164,6 +170,7 @@ export function QuoteWizard({
     setBusy(true);
     const id = await saveServerDraft(draft);
     setBusy(false);
+    track("quote_start", { postcode: draft.survey.postcode, draftSaved: Boolean(id) });
     if (id) setDraft((d) => ({ ...d, draftId: id }));
     setStep(1);
   }
@@ -197,6 +204,14 @@ export function QuoteWizard({
     const result = await submitQuote(draft);
     setSubmission(result);
     setBusy(false);
+    const quote = generateQuote(draft.survey);
+    track("quote_submit", {
+      status: result.status,
+      totalGbp: quote.totalGbp,
+      rooms: draft.survey.rooms.length,
+      postcode: draft.survey.postcode,
+    });
+    if (result.status === "error") track("quote_save_failed", { postcode: draft.survey.postcode });
     setStep(RESULT);
   }
 

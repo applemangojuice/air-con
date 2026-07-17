@@ -2,7 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import type { PropertyIntel } from "@aircon/domain";
-import { denormaliseIntel, queryIntel, tagCampaign, type IntelFilters } from "@/lib/intel-server";
+import {
+  denormaliseIntel,
+  queryIntel,
+  seedSampleBook,
+  tagCampaign,
+  type IntelFilters,
+} from "@/lib/intel-server";
 import { getServiceClient } from "@/lib/supabase-server";
 
 /** Behind the /ops basic-auth wall via middleware, like the other modules. */
@@ -68,5 +74,16 @@ export async function recomputeAction(): Promise<void> {
     from += page;
   }
   console.info(`recomputed ${updated} properties`);
+  revalidatePath("/ops/intel");
+}
+
+/**
+ * One-click seed of the SW16/SW17 sample book into the real table, so the
+ * intelligence view has something to explore before the EPC importer runs.
+ */
+export async function seedSampleBookAction(): Promise<void> {
+  const { inserted, error } = await seedSampleBook();
+  if (error) console.error("seed sample book failed:", error);
+  else console.info(`seeded ${inserted} sample properties`);
   revalidatePath("/ops/intel");
 }

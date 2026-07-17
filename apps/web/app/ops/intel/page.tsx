@@ -9,7 +9,7 @@ import {
 import { gbp } from "@/lib/format";
 import { queryIntel, type IntelFilters, type IntelRow } from "@/lib/intel-server";
 import { getServiceClient } from "@/lib/supabase-server";
-import { recomputeAction, tagCampaignAction } from "./actions";
+import { recomputeAction, seedSampleBookAction, tagCampaignAction } from "./actions";
 
 export const metadata: Metadata = {
   title: "Property intelligence · ops",
@@ -80,6 +80,7 @@ export default async function OpsIntelPage({ searchParams }: { searchParams: Pro
   const outcodes = [...new Set(everything.map((r) => r.outcode))].sort();
   const bc = businessCase(rows.length);
   const qs = filterQuery(filters);
+  const connectedButEmpty = !demo && everything.length === 0;
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
@@ -103,6 +104,26 @@ export default async function OpsIntelPage({ searchParams }: { searchParams: Pro
           </Link>
         </div>
       </div>
+
+      {/* Empty book: connected to Supabase but no properties imported yet.
+          This is the "Properties: 0" case — explain it and offer a one-click
+          sample seed so the view isn't a dead end. */}
+      {connectedButEmpty && (
+        <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 p-5">
+          <p className="font-semibold text-amber-800">No properties in the book yet</p>
+          <p className="mt-1 text-sm text-amber-700">
+            The database is connected but the <code>properties</code> table is empty — that&apos;s
+            why this reads 0. The SW16/SW17 sample homes you may have seen before only appear in
+            demo mode (no database). Seed the sample book to explore the tools now, or run the EPC
+            importer (see <code>docs/property-intelligence.md</code>) for the real thing.
+          </p>
+          <form action={seedSampleBookAction} className="mt-3">
+            <button className="rounded-full bg-amber-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-700">
+              Seed sample book (~240 homes)
+            </button>
+          </form>
+        </div>
+      )}
 
       {/* Coverage */}
       <div className="grid gap-3 sm:grid-cols-4">

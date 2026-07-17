@@ -1,7 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
+import { Suspense } from "react";
 import { BRAND } from "@/lib/brand";
 import { PrototypeNav } from "@/components/site/prototype-nav";
+import { Analytics } from "@/components/site/analytics";
 import "./globals.css";
 
 /**
@@ -45,6 +47,9 @@ export default function RootLayout({
       <body className={`${brandFont.variable} min-h-dvh flex flex-col`}>
         {children}
         <PrototypeNav />
+        <Suspense fallback={null}>
+          <Analytics />
+        </Suspense>
       </body>
     </html>
   );

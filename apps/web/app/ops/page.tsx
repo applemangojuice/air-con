@@ -31,9 +31,29 @@ const live = [
     body: "Incoming self-surveys with answers, computed loads, photos and status.",
   },
   {
+    title: "Usage analytics",
+    href: "/ops/analytics",
+    body: "Who's on the site and where they came from: visitors, sources, campaigns, geography, and the quote funnel from landing to saved. Cookieless, first-party.",
+  },
+  {
+    title: "System status",
+    href: "/ops/status",
+    body: "Is the database actually working? Live check of every table, storage bucket and env var, with the exact fix when something's red.",
+  },
+  {
     title: "Template library",
     href: "/ops/templates",
     body: "Every house archetype and install pattern we fit: stock floor plans, pipe routes, price adders, pre-checks, and a sample price for each.",
+  },
+  {
+    title: "Design studio",
+    href: "/ops/design",
+    body: "The engineering assistant: eight design rules score every property green, amber or red, then one button selects the full system: units, pipes, cables, breaker, refrigerant, the lot.",
+  },
+  {
+    title: "Installation OS",
+    href: "/ops/install",
+    body: "Airline-checklist installs built on required evidence: photos, readings, scans and signatures at every step. Jobs score themselves; humans review exceptions only.",
   },
   {
     title: "Schedule",
@@ -63,8 +83,8 @@ const roadmap = [
   {
     id: "installer",
     phase: "Later",
-    title: "Installer app",
-    body: "Job packs generated from the project + template, step-by-step workflows with photo verification, automatic commissioning docs. The mobile capture app shares the same domain package.",
+    title: "Installer mobile app",
+    body: "The Installation OS runsheet is live in this console; the phone app wraps it with a camera, barcode scanner and offline capture. Same domain package, same evidence rules.",
   },
   {
     id: "monitoring",
