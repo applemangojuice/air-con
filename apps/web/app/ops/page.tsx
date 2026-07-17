@@ -31,6 +31,16 @@ const live = [
     body: "Incoming self-surveys with answers, computed loads, photos and status.",
   },
   {
+    title: "Usage analytics",
+    href: "/ops/analytics",
+    body: "Who's on the site and where they came from: visitors, sources, campaigns, geography, and the quote funnel from landing to saved. Cookieless, first-party.",
+  },
+  {
+    title: "System status",
+    href: "/ops/status",
+    body: "Is the database actually working? Live check of every table, storage bucket and env var, with the exact fix when something's red.",
+  },
+  {
     title: "Template library",
     href: "/ops/templates",
     body: "Every house archetype and install pattern we fit: stock floor plans, pipe routes, price adders, pre-checks, and a sample price for each.",

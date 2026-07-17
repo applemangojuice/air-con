@@ -51,6 +51,42 @@ export async function saveIntel(supabase: SupabaseClient, intel: PropertyIntel):
   return !error;
 }
 
+/** How many properties are in the real book. null when unconfigured/unreachable. */
+export async function countProperties(): Promise<number | null> {
+  const supabase = getServiceClient();
+  if (!supabase) return null;
+  const { count, error } = await supabase
+    .from("properties")
+    .select("*", { count: "exact", head: true });
+  if (error) {
+    console.error("property count failed:", error.message);
+    return null;
+  }
+  return count ?? 0;
+}
+
+/**
+ * Seeds the real `properties` table with the SW16/SW17 sample book — the same
+ * ~240 believable homes the site shows in demo mode. Gives Property
+ * Intelligence something to explore before the EPC importer has run, so it
+ * never sits at a bare "0". Upserts, so it's safe to run twice and never
+ * clobbers real imported data (ids are stable per address).
+ */
+export async function seedSampleBook(): Promise<{ inserted: number; error?: string }> {
+  const supabase = getServiceClient();
+  if (!supabase) return { inserted: 0, error: "No database configured" };
+
+  const rows = demoDataset().map((intel) => ({ id: intel.id, ...denormaliseIntel(intel) }));
+  let inserted = 0;
+  for (let i = 0; i < rows.length; i += 200) {
+    const chunk = rows.slice(i, i + 200);
+    const { error } = await supabase.from("properties").upsert(chunk);
+    if (error) return { inserted, error: error.message };
+    inserted += chunk.length;
+  }
+  return { inserted };
+}
+
 export async function loadIntel(id: string): Promise<PropertyIntel | null> {
   // "/a/demo" and friends: a rich sample property that always exists.
   if (id === "demo") {

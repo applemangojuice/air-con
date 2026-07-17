@@ -1,5 +1,6 @@
 import type { Survey, SurveyPhoto } from "@aircon/domain";
 import { getPhotoFile } from "./photo-registry";
+import { getAttribution } from "./analytics-client";
 import type { QuoteDraft } from "./quote-draft";
 import type { SubmissionState } from "@/components/quote/result";
 
@@ -19,7 +20,12 @@ export async function submitQuote(draft: QuoteDraft): Promise<SubmissionState> {
     const res = await fetch("/api/quotes", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ survey, contact: draft.contact, draftId: draft.draftId }),
+      body: JSON.stringify({
+        survey,
+        contact: draft.contact,
+        draftId: draft.draftId,
+        attribution: getAttribution(),
+      }),
     });
     if (!res.ok) return { status: "error" };
     const data = (await res.json()) as { demo: boolean; id?: string; emailed?: boolean };

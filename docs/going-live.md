@@ -10,8 +10,10 @@ watches `main`; every merge auto-deploys. This page is the checklist.
    pnpm workspaces are handled natively. First deploy happens on import.
 2. **Supabase**: create a project, then run every file in
    `supabase/migrations/` in order (SQL editor, or `supabase db push`).
-   As of now that's `0001` → `0006`. New migrations get run the same way
-   when they land.
+   As of now that's `0001` → `0007`. New migrations get run the same way
+   when they land. Re-running is safe — they use `if not exists`. **If you
+   skip this step the site looks connected but saves nothing**, which is the
+   single most common cause of "my data isn't there" (see Troubleshooting).
 3. **Environment variables** (Vercel → Project → Settings → Environment
    Variables). From `apps/web/.env.example`:
    - `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`: persistence on. Without
@@ -44,6 +46,41 @@ watches `main`; every merge auto-deploys. This page is the checklist.
 If a deploy is missing, the usual suspects: the Vercel project is watching
 a different branch (should be `main`), or the build failed (open the
 deployment's logs; `pnpm build` locally reproduces it).
+
+## Troubleshooting: "it's not saving anything"
+
+**Start at `/ops/status`.** It runs a live check of every table, storage
+bucket and env var and tells you, in plain English, exactly what's missing
+and how to fix it. Almost every "my data isn't there" report is one of these:
+
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| Quotes don't save; funnel errors at the end | `quote_requests` table missing, or Supabase keys point at the wrong project | Run migrations `0001`–`0007`; verify `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` |
+| `/q/<id>` "failing to load quote" | The quote never saved (see above), so there's no row | Fix saving first; old lost leads can't be recovered unless you had email alerts on |
+| "Invalid path specified in URL" when uploading photos | The `survey-photos` storage bucket doesn't exist | Run migration `0001` (it creates the bucket) |
+| **Property intelligence shows 0** | `properties` table is empty — the importer/seed never ran. The SW16/SW17 "dummy" homes only show in demo mode (no database) | On `/ops/intel`, click **Seed sample book**, or run the EPC importer (`docs/property-intelligence.md`) |
+| Usage analytics page says "table missing" | Migration `0007` not run | Run `supabase/migrations/0007_analytics.sql` |
+
+**The key idea:** the site only falls back to safe "demo mode" (works, saves
+nothing) when Supabase is *unconfigured*. Once the keys are set but the schema
+isn't migrated, reads return empty and writes fail — and *that* looks like
+data loss. `/ops/status` exists so you never have to guess which it is.
+
+**Don't lose leads while you fix it.** With Resend configured
+(`RESEND_API_KEY` + `EMAIL_FROM`, optional `LEADS_NOTIFY_EMAIL`), every
+submission emails the team, and any submission that *fails* to save emails a
+"recover this by hand" alert with the customer's details. Turn this on before
+sharing the site widely.
+
+## Usage analytics
+
+`/ops/analytics` shows visitors, sessions, traffic sources, campaigns
+(via `utm_*` tags on your links), geography and the quote funnel from landing
+to saved. It's first-party and cookieless — a random id in the browser plus
+Vercel's edge geo (country/region/city, never the raw IP), no third-party
+trackers, nothing to consent to. Tag your mailing and ad links with
+`?utm_source=…&utm_campaign=…` and they flow straight into the dashboard, and
+every quote request stores the source it came from.
 
 ## The admin console
 
