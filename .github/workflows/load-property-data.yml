@@ -1,31 +1,48 @@
 name: Load property data
 
 # Loads the Property Intelligence book into your Supabase database without you
-# running anything locally. Trigger it from the Actions tab (Run workflow), or
-# turn on the weekly schedule below. It imports the data, then recomputes
-# archetypes + priority scores (the "Recompute scores" button, headless).
+# running anything locally. Two sources:
+#   - epc-api: fetch REAL certificates from the EPC Open Data API (default).
+#   - sample:  the built-in SW16/SW17 sample CSVs (no EPC key needed).
+# It imports the data, then recomputes archetypes + priority scores (the
+# /ops/intel "Recompute scores" button, headless).
 #
 # One-time setup (all in the browser):
-#   1. Create a Supabase project and run every file in supabase/migrations/
-#      (SQL editor). The property tables are in 0006_property_intelligence.sql.
+#   1. Supabase project with supabase/migrations/ applied (SQL editor).
 #   2. Repo → Settings → Secrets and variables → Actions → New repository secret:
 #        SUPABASE_URL                = https://YOUR-PROJECT.supabase.co
-#        SUPABASE_SERVICE_ROLE_KEY   = (Supabase → Settings → API → service_role)
-# Then: Actions → "Load property data" → Run workflow.
+#        SUPABASE_SERVICE_ROLE_KEY   = Supabase → Settings → API → service_role
+#      For the EPC API source, also add (free registration at
+#      https://epc.opendatacommunities.org/):
+#        EPC_API_EMAIL               = the email you registered with
+#        EPC_API_KEY                 = your EPC API key
 #
-# See docs/loading-data.md for the full walkthrough and the real-data path.
+# The weekly schedule below pulls just the newly-issued certificates (a new EPC
+# usually means a sale or renovation — a live marketing signal). Run it once
+# manually with an empty "since" to seed the full history first.
+#
+# See docs/loading-data.md for the full walkthrough.
 
 on:
   workflow_dispatch:
     inputs:
       source:
-        description: "Where the data comes from"
+        description: "Data source"
         type: choice
         options:
+          - epc-api
           - sample
-        default: sample
+        default: epc-api
+      since:
+        description: "EPC only: certificates lodged since YYYY-MM (empty = all history)"
+        type: string
+        default: ""
+      local_authority:
+        description: "EPC only: ONS codes (default = Lambeth, Wandsworth, Merton, Croydon)"
+        type: string
+        default: "E09000022,E09000032,E09000024,E09000008"
       outcodes:
-        description: "Outcodes to import (comma-separated)"
+        description: "Outcodes to keep on import"
         type: string
         default: "SW16,SW17"
       recompute:
@@ -33,11 +50,9 @@ on:
         type: boolean
         default: true
 
-  # Refresh on a schedule. Meaningful once you point this at a live feed (e.g.
-  # the EPC API) rather than the static sample data — see docs/loading-data.md.
-  # Uncomment to enable:
-  # schedule:
-  #   - cron: "0 3 * * 1" # 03:00 UTC every Monday
+  # Weekly pull of newly-issued EPCs, for marketing targeting. Uses the EPC API.
+  schedule:
+    - cron: "0 6 * * 1" # 06:00 UTC every Monday
 
 # Never let two loads write the same database at once.
 concurrency:
@@ -53,17 +68,25 @@ jobs:
     env:
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      EPC_API_EMAIL: ${{ secrets.EPC_API_EMAIL }}
+      EPC_API_KEY: ${{ secrets.EPC_API_KEY }}
+      SOURCE: ${{ inputs.source || 'epc-api' }}
       OUTCODES: ${{ inputs.outcodes || 'SW16,SW17' }}
+      LOCAL_AUTHORITY: ${{ inputs.local_authority || 'E09000022,E09000032,E09000024,E09000008' }}
     steps:
       - name: Check required secrets
         run: |
           if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
             echo "::error::Missing repo secrets SUPABASE_URL and/or SUPABASE_SERVICE_ROLE_KEY."
-            echo "Add them under Settings → Secrets and variables → Actions → New repository secret."
-            echo "Values: Supabase → Settings → API (Project URL and the service_role key)."
+            echo "Add them under Settings → Secrets and variables → Actions (values: Supabase → Settings → API)."
             exit 1
           fi
-          echo "Supabase secrets present."
+          if [ "$SOURCE" = "epc-api" ] && { [ -z "$EPC_API_EMAIL" ] || [ -z "$EPC_API_KEY" ]; }; then
+            echo "::error::Source is epc-api but EPC_API_EMAIL / EPC_API_KEY secrets are missing."
+            echo "Register free at https://epc.opendatacommunities.org/ and add them, or run with source=sample."
+            exit 1
+          fi
+          echo "Secrets OK for source=$SOURCE."
 
       - uses: actions/checkout@v4
 
@@ -77,22 +100,42 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Generate sample data
-        working-directory: apps/web
-        run: node scripts/make-sample-data.mjs
+      # Scheduled runs get "last month onward" so each week picks up new certs;
+      # manual runs use the "since" input (empty = full history).
+      - name: Resolve "since"
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            echo "SINCE=$(date -u -d "$(date -u +%Y-%m-01) -1 month" +%Y-%m)" >> "$GITHUB_ENV"
+          else
+            echo "SINCE=${{ inputs.since }}" >> "$GITHUB_ENV"
+          fi
 
-      - name: Import EPC (creates the property records)
+      # ---- source: epc-api (real data) ----
+      - name: Fetch EPC certificates
+        if: ${{ (inputs.source || 'epc-api') == 'epc-api' }}
         working-directory: apps/web
-        run: node scripts/import-intel.mjs epc scripts/sample-data/epc-certificates.csv --outcodes "$OUTCODES"
+        run: |
+          node scripts/fetch-epc.mjs \
+            --local-authority "$LOCAL_AUTHORITY" \
+            ${SINCE:+--since "$SINCE"} \
+            --out scripts/data/epc-certificates.csv
 
-      - name: Import planning (loft / extension flags)
+      - name: Import EPC (real)
+        if: ${{ (inputs.source || 'epc-api') == 'epc-api' }}
         working-directory: apps/web
-        run: node scripts/import-intel.mjs planning scripts/sample-data/planning.csv --outcodes "$OUTCODES"
+        run: node scripts/import-intel.mjs epc scripts/data/epc-certificates.csv --outcodes "$OUTCODES"
 
-      - name: Import constraints (conservation / listed / Article 4)
+      # ---- source: sample (no EPC key) ----
+      - name: Generate + import sample data
+        if: ${{ (inputs.source || 'epc-api') == 'sample' }}
         working-directory: apps/web
-        run: node scripts/import-intel.mjs constraints scripts/sample-data/constraints.csv
+        run: |
+          node scripts/make-sample-data.mjs
+          node scripts/import-intel.mjs epc scripts/sample-data/epc-certificates.csv --outcodes "$OUTCODES"
+          node scripts/import-intel.mjs planning scripts/sample-data/planning.csv --outcodes "$OUTCODES"
+          node scripts/import-intel.mjs constraints scripts/sample-data/constraints.csv
 
+      # ---- shared: recompute derived fields ----
       - name: Recompute archetypes + priority scores
         if: ${{ github.event_name != 'workflow_dispatch' || inputs.recompute }}
         working-directory: apps/web
@@ -104,9 +147,10 @@ jobs:
           {
             echo "### Property data load"
             echo ""
-            echo "- Source: \`${{ inputs.source || 'sample' }}\`"
-            echo "- Outcodes: \`$OUTCODES\`"
-            echo "- Recompute: \`${{ github.event_name != 'workflow_dispatch' || inputs.recompute }}\`"
+            echo "- Source: \`$SOURCE\`"
+            echo "- Outcodes kept: \`$OUTCODES\`"
+            [ "$SOURCE" = "epc-api" ] && echo "- Authorities: \`$LOCAL_AUTHORITY\`"
+            [ "$SOURCE" = "epc-api" ] && echo "- Since: \`${SINCE:-all history}\`"
             echo ""
-            echo "Open \`/ops/intel\` to see the book. If numbers look raw, the recompute step was skipped — re-run with recompute on, or click **Recompute scores**."
+            echo "Open \`/ops/status\` to confirm the tables are healthy and \`/ops/intel\` to see the book."
           } >> "$GITHUB_STEP_SUMMARY"

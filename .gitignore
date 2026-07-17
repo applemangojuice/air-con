@@ -15,6 +15,9 @@ build/
 .env.local
 .env.*.local
 
+# fetched property data (real EPC pulls; sample data under scripts/sample-data/ is committed)
+apps/web/scripts/data/
+
 # misc
 .DS_Store
 *.pem

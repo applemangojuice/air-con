@@ -56,9 +56,14 @@ use GitHub Actions (below) or Path 2.
 
 This is the "I don't run anything myself" path. A workflow
 (`.github/workflows/load-property-data.yml`) does the entire load on GitHub's
-runners — install, import EPC → planning → constraints, then recompute
-archetypes and priority scores (the `/ops/intel` **Recompute** button, run
-headless). You click one button; nothing runs on your machine.
+runners — fetch/generate the data, import it, then recompute archetypes and
+priority scores (the `/ops/intel` **Recompute** button, run headless). Nothing
+runs on your machine. It has two sources:
+
+- **`epc-api`** (default) — pulls **real** certificates from the EPC Open Data
+  API for your target boroughs.
+- **`sample`** — the built-in SW16/SW17 sample CSVs (no EPC key needed; good
+  for a first smoke test).
 
 ### One-time setup (all in the browser)
 
@@ -67,40 +72,53 @@ headless). You click one button; nothing runs on your machine.
    `supabase/migrations/` in the SQL editor (the property tables are in
    `0006_property_intelligence.sql`). This is the one thing that can't be
    automated away — the data needs somewhere to live.
-2. **Two repository secrets.** In GitHub: **Settings → Secrets and variables →
+2. **Repository secrets.** In GitHub: **Settings → Secrets and variables →
    Actions → New repository secret**. Add:
    - `SUPABASE_URL` — `https://YOUR-PROJECT.supabase.co`
    - `SUPABASE_SERVICE_ROLE_KEY` — Supabase → Settings → API → `service_role`
-     key (this is a secret; the workflow reads it, it never lands in the repo).
+     key (a secret; the workflow reads it, it never lands in the repo).
+   - For the `epc-api` source, also add (free registration at
+     [epc.opendatacommunities.org](https://epc.opendatacommunities.org/)):
+     - `EPC_API_EMAIL` — the email you registered with
+     - `EPC_API_KEY` — your EPC API key
+
+   These are the *same* Supabase values you already put in Vercel — copy them
+   across. The workflow needs its own copy; Vercel's env vars aren't visible to
+   GitHub Actions.
 
 ### Running it
 
-- **GitHub → Actions tab → "Load property data" → Run workflow.** Optionally
-  set the outcodes (default `SW16,SW17`) and whether to recompute (default
-  yes), then **Run workflow**. Watch it go green, then open `/ops/intel` on
-  your deployment — the book is populated.
-- The run writes a short summary (source, outcodes, whether it recomputed) to
-  the workflow summary page.
-- If the Supabase secrets are missing, the first step fails immediately with a
-  message telling you exactly which secret to add — nothing half-runs.
+- **GitHub → Actions tab → "Load property data" → Run workflow.** Inputs:
+  - **source** — `epc-api` (real) or `sample`.
+  - **since** — EPC only: `YYYY-MM` to fetch only certificates lodged since
+    then. Leave **empty on the first run** to seed the full history.
+  - **local_authority** — EPC only: ONS codes, default Lambeth + Wandsworth +
+    Merton + Croydon (the SW16/SW17 boroughs).
+  - **outcodes** — which outcodes to keep on import (default `SW16,SW17`).
+  - **recompute** — recompute archetypes + priority after import (default yes).
+- Watch it go green, then open `/ops/status` (is the DB healthy?) and
+  `/ops/intel` (the book) on your deployment.
+- If a required secret is missing, the first step fails immediately telling you
+  exactly which one — nothing half-runs.
 
-### Running it on a schedule
+### The weekly schedule (new EPCs → marketing signal)
 
-The workflow ships with a weekly `schedule:` trigger **commented out**. A cron
-that re-imports the *static sample data* every night is pointless, so it's off
-by default. Turn it on once you point the workflow at a live feed (see below);
-uncomment the `schedule:` block in the workflow file.
+The workflow runs every **Monday 06:00 UTC** (`schedule:` in the file) and, on
+those runs, pulls just the **newly-issued** certificates (from the start of the
+previous month onward). A fresh EPC usually means a sale or a renovation — a
+reason someone might want a system — so this list is a live marketing target.
+Re-importing is safe: the importer keeps the newest certificate per address and
+upserts, so nothing is duplicated and existing planning/audit state survives.
+The certificate's lodgement date is stored on each record
+(`intel.epc.lodgedAt`), ready for a "recently certified" filter later.
 
-### Making it load *real* data automatically
+**Recommended first run:** trigger it once manually with **source `epc-api`**
+and **since empty** to seed the full borough history, then let the Monday
+schedule keep it topped up with new certificates.
 
-The workflow currently seeds the sample CSVs. To have it pull real data on a
-schedule instead, you need a live source the runner can fetch unattended —
-the **EPC API** (same free registration as the bulk download) is the natural
-one: add your EPC API key as another repo secret, add a step that fetches the
-latest certificates for your target local authorities into
-`epc-certificates.csv`, and enable the schedule. The import and recompute
-steps stay exactly as they are. (Happy to build this step when you want it —
-it needs your EPC key and which authorities to pull.)
+> Planning and constraints don't have a clean bulk API, so the `epc-api` source
+> loads EPC only (the backbone). Enrich with planning/constraints via the
+> `sample` source or the manual importer (Path 3) when you have those files.
 
 ---
 
@@ -223,7 +241,8 @@ record. After a real import, hit **Recompute scores** again.
   Nothing is destroyed; history accumulates.
 
 Schema: `supabase/migrations/0006_property_intelligence.sql`. Importer:
-`apps/web/scripts/import-intel.mjs`. Headless recompute:
+`apps/web/scripts/import-intel.mjs`. Real EPC fetch:
+`apps/web/scripts/fetch-epc.mjs`. Headless recompute:
 `apps/web/scripts/recompute-intel.mjs`. Sample data + generator:
 `apps/web/scripts/sample-data/` and `apps/web/scripts/make-sample-data.mjs`.
 Automation: `.github/workflows/load-property-data.yml`.
