@@ -58,6 +58,11 @@ export default async function OpsQuoteDetailPage({
     const sb = getServiceClient();
     if (!sb) return;
     await sb.from("quote_requests").update({ status }).eq("id", id);
+    // Losing without knowing why is losing twice: declines log their reason.
+    const reason = formData.get("reason");
+    if (status === "declined" && typeof reason === "string" && reason) {
+      await sb.from("ops_notes").insert({ quote_id: id, note: `Declined — ${reason}` });
+    }
     revalidatePath(`/ops/quotes/${id}`);
     revalidatePath("/ops/quotes");
   }
@@ -133,7 +138,7 @@ export default async function OpsQuoteDetailPage({
       {/* Status */}
       <form action={setStatus} className="mt-6 flex flex-wrap items-center gap-2">
         <span className="text-sm font-semibold">Status: {q.status}</span>
-        {["new", "reviewed", "booked", "declined"]
+        {["new", "reviewed", "booked"]
           .filter((s) => s !== q.status)
           .map((s) => (
             <button
@@ -145,6 +150,31 @@ export default async function OpsQuoteDetailPage({
               mark {s}
             </button>
           ))}
+        {q.status !== "declined" && (
+          <>
+            <select
+              name="reason"
+              defaultValue=""
+              className="rounded-full border border-line bg-white px-2.5 py-1 text-xs outline-none focus:border-accent-500"
+            >
+              <option value="" disabled>
+                lost because…
+              </option>
+              {["price", "timing — not now", "went elsewhere", "landlord/freeholder said no", "planning/building constraint", "no response", "other"].map((r) => (
+                <option key={r} value={r}>
+                  {r}
+                </option>
+              ))}
+            </select>
+            <button
+              name="status"
+              value="declined"
+              className="rounded-full border border-red-200 px-3 py-1 text-xs font-medium text-red-600 transition hover:bg-red-50"
+            >
+              mark declined
+            </button>
+          </>
+        )}
       </form>
 
       {/* Working the lead: next action + activity log — the CRM loop. */}

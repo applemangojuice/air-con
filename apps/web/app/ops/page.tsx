@@ -25,7 +25,7 @@ async function pulse() {
   };
   const sevenDays = new Date(Date.now() - 7 * 86400_000).toISOString();
   const endOfToday = new Date(new Date().toISOString().slice(0, 10) + "T23:59:59Z").toISOString();
-  const [inbox, drafts, booked, properties, views7d, dueRes] = await Promise.all([
+  const [inbox, drafts, booked, properties, views7d, dueRes, unworked] = await Promise.all([
     count("quote_requests", (q) => q.in("status", tabByKey("inbox")!.statuses!)),
     count("quote_requests", (q) => q.in("status", tabByKey("drafts")!.statuses!)),
     count("quote_requests", (q) => q.in("status", tabByKey("booked")!.statuses!)),
@@ -39,8 +39,13 @@ async function pulse() {
       .neq("status", "declined")
       .order("next_action_at", { ascending: true })
       .limit(12),
+    // The exception list every field-service benchmark insists on:
+    // live leads with NO scheduled next move. Should always be empty.
+    count("quote_requests", (q) =>
+      q.in("status", tabByKey("inbox")!.statuses!).is("next_action_at", null),
+    ),
   ]);
-  return { inbox, drafts, booked, properties, views7d, due: dueRes.data ?? [] };
+  return { inbox, drafts, booked, properties, views7d, due: dueRes.data ?? [], unworked };
 }
 
 /**
@@ -187,6 +192,15 @@ export default async function OpsPage() {
             <Pulse label="Properties" value={stats.properties} href="/ops/intel" />
             <Pulse label="Views (7d)" value={stats.views7d} href="/ops/analytics" />
           </div>
+        )}
+
+        {stats && (stats.unworked ?? 0) > 0 && (
+          <p className="mt-3 text-sm text-red-600">
+            <Link href="/ops/quotes" className="font-semibold underline">
+              {stats.unworked} live lead{stats.unworked === 1 ? "" : "s"} with no next action
+            </Link>{" "}
+            — every open lead deserves a scheduled next move.
+          </p>
         )}
 
         {/* Today's chase list: the CRM loop's daily rhythm. */}
