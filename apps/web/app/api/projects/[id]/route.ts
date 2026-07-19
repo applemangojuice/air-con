@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import type { ProjectAction } from "@aircon/domain";
+import { notifyProjectAction } from "@/lib/project-notify";
 import { applyAndSave, loadProject } from "@/lib/projects-server";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -55,6 +57,9 @@ export async function POST(request: Request, { params }: Params) {
   const { id } = await params;
   if (!UUID_RE.test(id)) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
+  const limited = enforceRateLimit(request, "project-actions", 60, 600_000);
+  if (limited) return limited;
+
   const parsed = actionSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });
@@ -65,5 +70,7 @@ export async function POST(request: Request, { params }: Params) {
     if (result.error === "demo") return NextResponse.json({ ok: true, demo: true });
     return NextResponse.json({ error: result.error }, { status: result.status });
   }
+  // The transition committed; now it speaks (customer email + team alert).
+  await notifyProjectAction(result.project, parsed.data as ProjectAction);
   return NextResponse.json({ ok: true, project: result.project });
 }
