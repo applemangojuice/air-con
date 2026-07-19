@@ -224,9 +224,17 @@ function Shell({
           <h1 className="text-2xl font-display">Quote requests</h1>
           <p className="mt-1 text-sm text-ink-500">Customer self-survey submissions</p>
         </div>
-        <Link href="/ops" className="text-sm font-medium text-accent-700 hover:underline">
-          ← All modules
-        </Link>
+        <div className="flex items-center gap-3">
+          <a
+            href={`/ops/quotes/export?tab=${tab}`}
+            className="rounded-full border border-line px-4 py-2 text-sm font-semibold text-ink-700 transition hover:bg-surface"
+          >
+            Download CSV
+          </a>
+          <Link href="/ops" className="text-sm font-medium text-accent-700 hover:underline">
+            ← All modules
+          </Link>
+        </div>
       </div>
       <nav className="mb-6 flex flex-wrap gap-2">
         {TABS.map((t) => (

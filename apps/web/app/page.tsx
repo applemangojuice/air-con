@@ -2,6 +2,7 @@ import Link from "next/link";
 import { SiteHeader } from "@/components/site/header";
 import { SiteFooter } from "@/components/site/footer";
 import { PostcodeForm } from "@/components/site/postcode-form";
+import { ResumeBanner } from "@/components/site/resume-banner";
 import { BRAND } from "@/lib/brand";
 
 const steps = [
@@ -66,6 +67,7 @@ export default function HomePage() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(businessJsonLd) }}
       />
       <SiteHeader />
+      <ResumeBanner />
       <main>
         {/* Hero: the collateral IS the header */}
         <section className="warm-gradient">
@@ -176,6 +178,51 @@ export default function HomePage() {
                 <p className="mt-2 text-sm leading-relaxed text-ink-500">{p.body}</p>
               </Link>
             ))}
+          </div>
+        </section>
+
+        {/* Areas + FAQ: internal links that also answer "do you cover me?" */}
+        <section className="border-t border-line bg-surface">
+          <div className="mx-auto grid max-w-6xl gap-8 px-4 py-14 sm:px-6 md:grid-cols-2">
+            <div>
+              <h2 className="text-2xl font-display">Where we install</h2>
+              <p className="mt-2 text-sm text-ink-500">
+                Street by street across South London, starting where the terraces repeat and the
+                summers cook.
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Link
+                  href="/areas/sw16"
+                  className="rounded-full border border-line bg-white px-4 py-2 text-sm font-medium text-ink-700 transition hover:border-accent-400 hover:text-accent-700"
+                >
+                  Streatham (SW16) →
+                </Link>
+                <Link
+                  href="/areas/sw17"
+                  className="rounded-full border border-line bg-white px-4 py-2 text-sm font-medium text-ink-700 transition hover:border-accent-400 hover:text-accent-700"
+                >
+                  Tooting (SW17) →
+                </Link>
+              </div>
+              <p className="mt-3 text-xs text-ink-300">
+                Elsewhere? Your quote is still real — start it and we&apos;ll tell you when we
+                reach your street.
+              </p>
+            </div>
+            <div>
+              <h2 className="text-2xl font-display">The questions everyone asks</h2>
+              <ul className="mt-3 space-y-2 text-sm text-ink-700">
+                <li>Do I need planning permission? <span className="text-ink-300">Usually not.</span></li>
+                <li>Is it noisy? <span className="text-ink-300">Quieter than a library.</span></li>
+                <li>What about winter? <span className="text-ink-300">It heats too, efficiently.</span></li>
+              </ul>
+              <Link
+                href="/faq"
+                className="mt-4 inline-block text-sm font-semibold text-accent-700 hover:underline"
+              >
+                All ten answers, straight →
+              </Link>
+            </div>
           </div>
         </section>
 

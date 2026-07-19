@@ -2,11 +2,36 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { SiteFooter } from "@/components/site/footer";
 import { SiteHeader } from "@/components/site/header";
+import { getServiceClient } from "@/lib/supabase-server";
 
 export const metadata: Metadata = {
   title: "Admin console",
   robots: { index: false },
 };
+
+export const dynamic = "force-dynamic";
+
+/** The console's pulse: live numbers, or nulls in demo mode. */
+async function pulse() {
+  const supabase = getServiceClient();
+  if (!supabase) return null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const count = async (table: string, filter?: (q: any) => any) => {
+    let q = supabase.from(table).select("*", { count: "exact", head: true });
+    if (filter) q = filter(q);
+    const { count: n, error } = await q;
+    return error ? null : (n ?? 0);
+  };
+  const sevenDays = new Date(Date.now() - 7 * 86400_000).toISOString();
+  const [inbox, drafts, booked, properties, views7d] = await Promise.all([
+    count("quote_requests", (q) => q.in("status", ["new", "reviewed"])),
+    count("quote_requests", (q) => q.eq("status", "draft")),
+    count("quote_requests", (q) => q.eq("status", "booked")),
+    count("properties"),
+    count("analytics_events", (q) => q.eq("type", "page_view").gte("created_at", sevenDays)),
+  ]);
+  return { inbox, drafts, booked, properties, views7d };
+}
 
 /**
  * The admin console home. Live modules up top, honest status on the rest.
@@ -105,7 +130,20 @@ const roadmap = [
   },
 ];
 
-export default function OpsPage() {
+function Pulse({ label, value, href }: { label: string; value: number | null; href: string }) {
+  return (
+    <Link href={href} className="rounded-2xl border border-line bg-white p-4 transition hover:border-accent-400">
+      <p className="text-xs font-semibold uppercase tracking-wide text-ink-300">{label}</p>
+      <p className="mt-1 text-2xl font-display">
+        {value === null ? "—" : value.toLocaleString("en-GB")}
+      </p>
+    </Link>
+  );
+}
+
+export default async function OpsPage() {
+  const stats = await pulse();
+
   return (
     <>
       <SiteHeader />
@@ -120,6 +158,16 @@ export default function OpsPage() {
           (<code>OPS_PASSWORD</code>): your browser asks once, any username,
           that password.
         </p>
+
+        {stats && (
+          <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-5">
+            <Pulse label="Quote inbox" value={stats.inbox} href="/ops/quotes" />
+            <Pulse label="Unfinished" value={stats.drafts} href="/ops/quotes?tab=drafts" />
+            <Pulse label="Booked" value={stats.booked} href="/ops/quotes?tab=booked" />
+            <Pulse label="Properties" value={stats.properties} href="/ops/intel" />
+            <Pulse label="Views (7d)" value={stats.views7d} href="/ops/analytics" />
+          </div>
+        )}
 
         <h2 className="mt-10 text-xl font-display">Live now</h2>
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
