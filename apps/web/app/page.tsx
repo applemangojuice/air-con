@@ -97,8 +97,8 @@ export default function HomePage() {
 
               <PostcodeForm />
               <p className="mt-3 text-sm text-ink-300">
-                Free, under two minutes, and the price is the price. Not an
-                estimate, not a man with a clipboard.
+                Free, under two minutes, and the price is the price. No email
+                needed to see it, no salesperson, no man with a clipboard.
               </p>
               <p className="mt-4 text-sm font-semibold text-ink-700">
                 Single room from {gbp(from)} installed · whole 3-bed home from{" "}

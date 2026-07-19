@@ -38,6 +38,7 @@ export function PostcodeForm() {
         required
         value={postcode}
         onChange={(e) => setPostcode(e.target.value)}
+        aria-label="Your postcode"
         placeholder="Your postcode, e.g. SW1A 1AA"
         autoComplete="postal-code"
         className="w-full rounded-full border border-line bg-white px-5 py-3 text-base shadow-sm outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-100"
