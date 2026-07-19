@@ -42,26 +42,19 @@ export const metadata: Metadata = {
     template: `%s · ${BRAND.name}`,
   },
   description: DESCRIPTION,
+  // The share image itself comes from app/opengraph-image.tsx (a designed
+  // card rendered from brand tokens); Twitter falls back to og:image.
   openGraph: {
     type: "website",
     siteName: BRAND.name,
     title: `${BRAND.name} · Fixed-price home air conditioning`,
     description: DESCRIPTION,
     locale: "en_GB",
-    images: [
-      {
-        url: "/brand/dang-its-hot.webp",
-        width: 1400,
-        height: 933,
-        alt: `${BRAND.name} — cooling technologies for the UK`,
-      },
-    ],
   },
   twitter: {
     card: "summary_large_image",
     title: `${BRAND.name} · Fixed-price home air conditioning`,
     description: DESCRIPTION,
-    images: ["/brand/dang-its-hot.webp"],
   },
 };
 
@@ -80,7 +73,7 @@ export default function RootLayout({
         {/* Keyboard users skip the nav; visually hidden until focused. */}
         <a
           href="#main-content"
-          className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-full focus:bg-ink-900 focus:px-5 focus:py-3 focus:font-semibold focus:text-white"
+          className="no-print sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-full focus:bg-ink-900 focus:px-5 focus:py-3 focus:font-semibold focus:text-white"
         >
           Skip to content
         </a>

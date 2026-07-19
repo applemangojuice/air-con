@@ -87,3 +87,23 @@ body {
     radial-gradient(900px 400px at 85% 0%, rgba(242, 113, 27, 0.28), transparent 55%),
     linear-gradient(160deg, #2b3040 0%, #14171e 100%);
 }
+
+/* ------------------------------------------------------------------ */
+/* Print: collateral pages (letters, cards, one-pagers) and saved      */
+/* quotes print clean — no app chrome, true colours for brand marks.   */
+/* ------------------------------------------------------------------ */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: #ffffff;
+  }
+  .print-page {
+    break-after: page;
+  }
+  .print-exact {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

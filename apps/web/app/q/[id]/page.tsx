@@ -58,12 +58,21 @@ export default async function SavedQuotePage({
           </span>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-xl px-4 pb-24 pt-8 sm:px-0">
+      <main className="print-exact mx-auto w-full max-w-xl px-4 pb-24 pt-8 sm:px-0 print:pb-8">
         <p className="mb-4 text-sm text-ink-500">
           {data.customer_name} · {survey.addressLine}, {survey.postcode} · prepared {created}
         </p>
         <QuoteView quote={quote} roomCount={survey.rooms.length} />
-        <StartProjectPanel quoteId={data.id} existingProjectId={projectRow?.id ?? null} />
+        {/* Interactive booking UI has no meaning on paper. */}
+        <div className="no-print">
+          <StartProjectPanel quoteId={data.id} existingProjectId={projectRow?.id ?? null} />
+        </div>
+        {/* Print-only provenance so a PDF stands on its own. */}
+        <p className="mt-8 hidden border-t border-line pt-4 text-xs text-ink-500 print:block">
+          Fixed-price quote by Dang, It&apos;s Hot · quote ref {data.id.slice(0, 8)} · saved
+          online with finance options and booking at dang.ac/q/{data.id.slice(0, 8)}… · VAT
+          included · 5-year parts &amp; labour warranty
+        </p>
       </main>
     </div>
   );

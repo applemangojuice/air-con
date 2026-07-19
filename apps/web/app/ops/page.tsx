@@ -31,6 +31,11 @@ const live = [
     body: "Incoming self-surveys with answers, computed loads, photos and status.",
   },
   {
+    title: "Collateral",
+    href: "/ops/collateral",
+    body: "Print-ready pieces generated from the live platform: the street mailing letter (with per-address proofs), the A5 door-drop card, and the investor one-pager whose numbers come from the operating model.",
+  },
+  {
     title: "Usage analytics",
     href: "/ops/analytics",
     body: "Who's on the site and where they came from: visitors, sources, campaigns, geography, and the quote funnel from landing to saved. Cookieless, first-party.",

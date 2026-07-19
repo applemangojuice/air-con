@@ -39,7 +39,7 @@ export function PrototypeNav() {
   return (
     <nav
       aria-label="Prototype pages"
-      className="border-t border-line bg-surface/70 px-4 py-3 text-xs sm:px-6"
+      className="no-print border-t border-line bg-surface/70 px-4 py-3 text-xs sm:px-6"
     >
       <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-4 gap-y-1.5">
         <span className="font-semibold uppercase tracking-wide text-ink-300">Prototype</span>
