@@ -86,6 +86,13 @@ try {
   // 6. Result: a real price renders (demo mode: computed client-side).
   await page.waitForSelector("text=/£[0-9,]+/", { timeout: 15000 });
   check("price renders on result", true);
+
+  // 7. The journey continues: start the installation plan → the timeline.
+  await page.click('button:has-text("installation plan"), button:has-text("timeline")');
+  await page.waitForURL("**/p/**", { timeout: 15000 });
+  check("start-plan lands on the project timeline", page.url().includes("/p/"));
+  await page.waitForSelector("text=/site visit/i", { timeout: 15000 });
+  check("timeline renders the journey stages", true);
 } catch (err) {
   console.error("E2E failure:", err.message);
   fails.push(err.message);

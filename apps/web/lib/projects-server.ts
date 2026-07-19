@@ -10,6 +10,7 @@ import {
   type QuoteResult,
   type Survey,
 } from "@aircon/domain";
+import { notifyProjectCreated } from "./project-notify";
 import { getServiceClient } from "./supabase-server";
 
 /**
@@ -99,6 +100,9 @@ export async function createProjectForQuote(
     console.error("project insert failed:", error?.message);
     return { error: "Could not create project", status: 502 };
   }
+  // Fresh create only (races/revisits return above): the timeline-link email,
+  // so losing the browser tab never means losing the journey.
+  await notifyProjectCreated(data.id, quoteId);
   return { id: data.id };
 }
 

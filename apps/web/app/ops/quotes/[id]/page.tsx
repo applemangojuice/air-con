@@ -4,7 +4,17 @@ import { revalidatePath } from "next/cache";
 import type { Metadata } from "next";
 import type { QuoteResult, Survey, SurveyPhoto } from "@aircon/domain";
 import { gbp } from "@/lib/format";
-import { PREFERRED_START_LABEL, type BookingRequest } from "@/components/quote/booking-panel";
+// Legacy booking rows (the pre-timeline flow) still render on old records.
+type BookingRequest = {
+  preferredStart: "asap" | "2-4-weeks" | "1-2-months" | "flexible";
+  notes?: string;
+};
+const PREFERRED_START_LABEL: Record<BookingRequest["preferredStart"], string> = {
+  asap: "As soon as possible",
+  "2-4-weeks": "In 2\u20134 weeks",
+  "1-2-months": "In 1\u20132 months",
+  flexible: "Flexible",
+};
 import { PHOTO_BUCKET, getServiceClient } from "@/lib/supabase-server";
 
 export const metadata: Metadata = {

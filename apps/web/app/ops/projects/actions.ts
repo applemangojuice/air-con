@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import type { ElectricsPlanStatus, ProjectAction } from "@aircon/domain";
+import { notifyProjectAction } from "@/lib/project-notify";
 import { applyAndSave } from "@/lib/projects-server";
 
 /**
@@ -19,6 +20,9 @@ async function run(projectId: string, action: ProjectAction): Promise<void> {
   const result = await applyAndSave(projectId, action);
   if ("error" in result) {
     console.error(`ops action ${action.type} on ${projectId} rejected:`, result.error);
+  } else {
+    // Milestones speak to the customer no matter which side moved them.
+    await notifyProjectAction(result.project, action);
   }
   revalidatePath(`/ops/projects/${projectId}`);
   revalidatePath("/ops/projects");
