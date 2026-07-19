@@ -7,6 +7,7 @@ import type { QuoteDraft } from "@/lib/quote-draft";
 import { StartProjectPanel } from "@/components/project/start-project";
 import { TimelineStrip } from "@/components/project/timeline";
 import { QuoteView } from "./quote-view";
+import { ShareQuoteButton } from "./share-button";
 
 export type SubmissionState =
   | { status: "saved"; id: string; emailed: boolean }
@@ -50,6 +51,7 @@ export function QuoteResult({
       )}
 
       <StartProjectPanel quoteId={saved?.id ?? null} />
+      {saved && <ShareQuoteButton quoteId={saved.id} />}
 
       <button
         type="button"

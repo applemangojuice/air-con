@@ -1,7 +1,10 @@
 # Going live (and checking it worked)
 
 Everything ships on the `main` branch. Production is a Vercel project that
-watches `main`; every merge auto-deploys. This page is the checklist.
+watches `main`; every merge auto-deploys. This page is the checklist —
+and **`/ops/launch` is its live twin**: eight platform checks verified
+against the running site plus the launch-day walk, each with the exact fix
+when something's red. Start there.
 
 ## One-time setup
 
@@ -79,6 +82,15 @@ data loss. `/ops/status` exists so you never have to guess which it is.
 submission emails the team, and any submission that *fails* to save emails a
 "recover this by hand" alert with the customer's details. Turn this on before
 sharing the site widely.
+
+## Booking confirmations & the daily digest
+
+With Resend configured, every **booking** emails the customer a written
+confirmation (what happens next, price locked) and the team a 🎉 alert with
+the ops link. A second cron (`/api/cron/digest`, 06:00 UTC) emails the team
+one morning summary: yesterday's quotes, bookings, unfinished drafts and
+traffic, plus the standing pipeline — quiet days included, so silence is
+never ambiguous.
 
 ## Automated follow-up (abandoned quotes)
 
