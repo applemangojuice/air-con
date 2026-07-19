@@ -46,6 +46,10 @@ watches `main`; every merge auto-deploys. This page is the checklist.
 3. Data check (with Supabase connected): submit a test quote at `/quote`,
    then find it at `/ops/quotes`. Start its project from the saved quote
    page and find it at `/ops/projects`.
+4. Automated version of step 2's funnel walk:
+   `BASE_URL=https://your-domain pnpm --filter @aircon/web test:e2e`
+   drives the whole funnel in a headless browser (needs a local
+   Chromium; see the header of `apps/web/scripts/e2e-funnel.mjs`).
 
 If a deploy is missing, the usual suspects: the Vercel project is watching
 a different branch (should be `main`), or the build failed (open the
