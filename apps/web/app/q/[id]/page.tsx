@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import type { QuoteResult, Survey } from "@aircon/domain";
 import { StartProjectPanel } from "@/components/project/start-project";
 import { QuoteView } from "@/components/quote/quote-view";
+import { ShareQuoteButton } from "@/components/quote/share-button";
 import { Logo } from "@/components/site/logo";
 import { BRAND, appUrl } from "@/lib/brand";
 import { getServiceClient } from "@/lib/supabase-server";
@@ -67,6 +68,7 @@ export default async function SavedQuotePage({
         {/* Interactive booking UI has no meaning on paper. */}
         <div className="no-print">
           <StartProjectPanel quoteId={data.id} existingProjectId={projectRow?.id ?? null} />
+          <ShareQuoteButton quoteId={data.id} />
         </div>
         {/* Print-only provenance so a PDF stands on its own. */}
         <p className="mt-8 hidden border-t border-line pt-4 text-xs text-ink-500 print:block">

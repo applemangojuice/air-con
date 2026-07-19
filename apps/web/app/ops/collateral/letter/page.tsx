@@ -1,13 +1,9 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import {
-  classifyProperty,
-  defaultConfigFromIntel,
-  generateQuote,
-  prefillFromIntel,
-} from "@aircon/domain";
+import { classifyProperty, prefillFromIntel } from "@aircon/domain";
 import { BRAND, appHost, appUrl } from "@/lib/brand";
 import { gbp } from "@/lib/format";
+import { indicativeQuoteFromIntel } from "@/lib/intel-quote";
 import { loadIntel } from "@/lib/intel-server";
 
 export const metadata: Metadata = {
@@ -50,25 +46,7 @@ export default async function LetterPage({
   if (intel) {
     const cls = classifyProperty(intel);
     const prefill = prefillFromIntel(intel);
-    const config = defaultConfigFromIntel(intel);
-    const quote =
-      config && prefill.type && prefill.era
-        ? generateQuote({
-            postcode: intel.address.postcode,
-            addressLine: intel.address.line1,
-            archetypeId: config.archetypeId,
-            permutationId: config.permutationId,
-            property: {
-              type: prefill.type,
-              era: prefill.era,
-              bedrooms: prefill.bedrooms ?? 3,
-              ownership: "owner",
-            },
-            rooms: config.rooms,
-            outdoor: { location: config.outdoorDefault, photos: [] },
-            electrics: { condition: "unsure", photos: [] },
-          })
-        : null;
+    const indicative = indicativeQuoteFromIntel(intel);
 
     m = {
       addressLine: intel.address.line1,
@@ -84,7 +62,7 @@ export default async function LetterPage({
           : null,
         cls.archetypeName ? `A match for our “${cls.archetypeName}” install pattern` : null,
       ].filter(Boolean) as string[],
-      price: quote ? gbp(quote.totalGbp) : "«indicative_price»",
+      price: indicative ? gbp(indicative.quote.totalGbp) : "«indicative_price»",
       link: `${appUrl()}/a/${intel.id}`,
     };
   }

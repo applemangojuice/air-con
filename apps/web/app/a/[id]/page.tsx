@@ -3,14 +3,13 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import {
   classifyProperty,
-  defaultConfigFromIntel,
-  generateQuote,
   prefillFromIntel,
   type PropertyEra,
   type PropertyType,
 } from "@aircon/domain";
 import { Logo } from "@/components/site/logo";
 import { gbp } from "@/lib/format";
+import { indicativeQuoteFromIntel } from "@/lib/intel-quote";
 import { loadIntel } from "@/lib/intel-server";
 
 export const metadata: Metadata = {
@@ -49,25 +48,7 @@ export default async function AddressPage({ params }: { params: Promise<{ id: st
 
   const cls = classifyProperty(intel);
   const prefill = prefillFromIntel(intel);
-  const config = defaultConfigFromIntel(intel);
-  const quote =
-    config && prefill.type && prefill.era
-      ? generateQuote({
-          postcode: intel.address.postcode,
-          addressLine: intel.address.line1,
-          archetypeId: config.archetypeId,
-          permutationId: config.permutationId,
-          property: {
-            type: prefill.type,
-            era: prefill.era,
-            bedrooms: prefill.bedrooms ?? 3,
-            ownership: "owner",
-          },
-          rooms: config.rooms,
-          outdoor: { location: config.outdoorDefault, photos: [] },
-          electrics: { condition: "unsure", photos: [] },
-        })
-      : null;
+  const indicative = indicativeQuoteFromIntel(intel);
 
   const funnelHref = `/quote?intel=${encodeURIComponent(intel.id)}&postcode=${encodeURIComponent(intel.address.postcode)}`;
 
@@ -134,11 +115,11 @@ export default async function AddressPage({ params }: { params: Promise<{ id: st
         </section>
 
         {/* Proposed system + price */}
-        {quote && config && (
+        {indicative && (
           <section className="mt-6 rounded-3xl border border-line bg-white p-6">
             <h2 className="font-bold">What we&apos;d propose</h2>
             <ul className="mt-3 space-y-2">
-              {config.rooms.map((room) => (
+              {indicative.rooms.map((room) => (
                 <li key={room.id} className="flex items-center justify-between gap-3 text-sm">
                   <span>{room.name}</span>
                   <span className="rounded-full bg-sage-50 px-2.5 py-0.5 text-xs font-semibold text-sage-700">
@@ -151,7 +132,7 @@ export default async function AddressPage({ params }: { params: Promise<{ id: st
               <p className="text-xs font-semibold uppercase tracking-wide text-ink-300">
                 Indicative fixed price, installed
               </p>
-              <p className="mt-1 text-3xl font-display">{gbp(quote.totalGbp)}</p>
+              <p className="mt-1 text-3xl font-display">{gbp(indicative.quote.totalGbp)}</p>
               <p className="mt-1 text-xs text-ink-500">
                 Locks in once you confirm a few details. It can come down if you want fewer rooms.
               </p>
