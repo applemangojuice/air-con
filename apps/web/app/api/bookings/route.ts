@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { getServiceClient } from "@/lib/supabase-server";
 
 const bodySchema = z.object({
@@ -9,6 +10,9 @@ const bodySchema = z.object({
 });
 
 export async function POST(request: Request) {
+  const limited = enforceRateLimit(request, "bookings", 10, 600_000);
+  if (limited) return limited;
+
   const parsed = bodySchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid booking" }, { status: 400 });

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { generateQuote, type Survey } from "@aircon/domain";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { surveySchema } from "@/lib/schemas";
 import { getServiceClient } from "@/lib/supabase-server";
 
@@ -15,6 +16,10 @@ const bodySchema = z.object({
  * progresses and finalised by POST /api/quotes with the same id.
  */
 export async function POST(request: Request) {
+  // One draft insert per funnel entry; stop scripted row-stuffing.
+  const limited = enforceRateLimit(request, "draft", 10, 600_000);
+  if (limited) return limited;
+
   const parsed = bodySchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid draft" }, { status: 400 });

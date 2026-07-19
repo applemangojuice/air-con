@@ -15,6 +15,9 @@ export function SiteHeader() {
           <Link href="/how-it-works" className="rounded-full px-3 py-2 hover:bg-surface">
             Our process
           </Link>
+          <Link href="/faq" className="hidden rounded-full px-3 py-2 hover:bg-surface sm:block">
+            FAQ
+          </Link>
           <Link
             href="/quote"
             className="rounded-full bg-accent-600 px-4 py-2 font-semibold text-white shadow-sm transition hover:bg-accent-700"

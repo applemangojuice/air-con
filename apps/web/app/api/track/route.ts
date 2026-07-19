@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { getServiceClient } from "@/lib/supabase-server";
 
 /**
@@ -34,6 +35,10 @@ function hostOf(referrer?: string): string | null {
 }
 
 export async function POST(request: Request) {
+  // Generous (a real visitor fires a handful/min) but stops write floods.
+  const limited = enforceRateLimit(request, "track", 120, 60_000);
+  if (limited) return limited;
+
   // Beacons arrive as text/plain; parse defensively either way.
   const raw = await request.text().catch(() => "");
   let json: unknown;

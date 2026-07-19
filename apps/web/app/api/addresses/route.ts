@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { isValidUkPostcode } from "@/lib/format";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 /**
  * Postcode → address list, so the first line autofills instead of being
@@ -8,6 +9,10 @@ import { isValidUkPostcode } from "@/lib/format";
  * Unconfigured → { configured: false } and the UI falls back to manual entry.
  */
 export async function GET(request: Request) {
+  // Proxies a metered third-party API; don't let a loop spend the quota.
+  const limited = enforceRateLimit(request, "addresses", 30, 60_000);
+  if (limited) return limited;
+
   const postcode = new URL(request.url).searchParams.get("postcode") ?? "";
   if (!isValidUkPostcode(postcode)) {
     return NextResponse.json({ error: "Invalid postcode" }, { status: 400 });

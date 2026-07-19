@@ -2,11 +2,17 @@ import Link from "next/link";
 import { BRAND } from "@/lib/brand";
 import { Logo } from "./logo";
 
-/** Deliberately succinct: the three pages that matter, and a way to reach us. */
+/** Deliberately succinct: the pages that matter, and a way to reach us. */
 const links = [
   { label: "Get my price", href: "/quote" },
   { label: "Our process", href: "/how-it-works" },
+  { label: "FAQ", href: "/faq" },
   { label: "About us", href: "/about" },
+];
+
+const legalLinks = [
+  { label: "Privacy", href: "/privacy" },
+  { label: "Terms", href: "/terms" },
 ];
 
 export function SiteFooter() {
@@ -29,10 +35,19 @@ export function SiteFooter() {
             </a>
           </nav>
         </div>
-        <p className="mt-10 border-t border-white/10 pt-6 text-xs text-white/40">
-          © {new Date().getFullYear()} {BRAND.legalName}. All installations by F-Gas certified
-          engineers. Finance figures are illustrative until a lender is connected.
-        </p>
+        <div className="mt-10 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-6 text-xs text-white/40">
+          <p>
+            © {new Date().getFullYear()} {BRAND.legalName}. All installations by F-Gas certified
+            engineers. Finance figures are illustrative until a lender is connected.
+          </p>
+          <nav className="flex gap-4">
+            {legalLinks.map((l) => (
+              <Link key={l.href} href={l.href} className="hover:text-white/70">
+                {l.label}
+              </Link>
+            ))}
+          </nav>
+        </div>
       </div>
     </footer>
   );

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { generateQuote, type Survey } from "@aircon/domain";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { UUID_RE, surveySchema } from "@/lib/schemas";
 import { getServiceClient } from "@/lib/supabase-server";
 
@@ -33,6 +34,10 @@ const bodySchema = z.object({
 });
 
 export async function POST(request: Request) {
+  // A human submits a handful of quotes at most; block scripted spam.
+  const limited = enforceRateLimit(request, "quotes", 10, 600_000);
+  if (limited) return limited;
+
   const parsed = bodySchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid survey" }, { status: 400 });

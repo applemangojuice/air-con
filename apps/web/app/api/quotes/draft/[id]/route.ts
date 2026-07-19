@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { generateQuote, type Survey } from "@aircon/domain";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { UUID_RE, surveySchema } from "@/lib/schemas";
 import { getServiceClient } from "@/lib/supabase-server";
 
@@ -15,6 +16,9 @@ export async function PATCH(
   if (!UUID_RE.test(id)) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
+  // Fires once per funnel step; 60/10min is far above honest usage.
+  const limited = enforceRateLimit(request, "draft-sync", 60, 600_000);
+  if (limited) return limited;
   const parsed = bodySchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid draft" }, { status: 400 });

@@ -7,9 +7,10 @@ import { Analytics } from "@/components/site/analytics";
 import "./globals.css";
 
 /**
- * The brand lettering (wordmark, hero moments) is self-hosted so the logo
- * can never fall back to a system font. Everything else keeps Caprasimo /
- * Figtree from Google Fonts.
+ * All three faces are self-hosted (Caprasimo + Figtree were previously a
+ * render-blocking Google Fonts stylesheet): no third-party request in the
+ * critical path, fonts served same-origin with immutable caching, and the
+ * build never depends on fonts.googleapis.com being reachable.
  */
 const brandFont = localFont({
   src: "./fonts/permanent-marker.woff2",
@@ -17,14 +18,51 @@ const brandFont = localFont({
   display: "swap",
 });
 
+const displayFont = localFont({
+  src: "./fonts/caprasimo.woff2",
+  variable: "--font-caprasimo",
+  display: "swap",
+  weight: "400",
+});
+
+const sansFont = localFont({
+  src: "./fonts/figtree-variable.woff2",
+  variable: "--font-figtree",
+  display: "swap",
+  weight: "300 900",
+});
+
+const DESCRIPTION =
+  "Get a fixed price for home air conditioning in minutes. Complete a guided photo survey of your home and book your installation online.";
+
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "https://dang.ac"),
   title: {
     default: `${BRAND.name} · ${BRAND.tagline}`,
     template: `%s · ${BRAND.name}`,
   },
-  description:
-    "Get a fixed price for home air conditioning in minutes. Complete a guided photo survey of your home and book your installation online.",
+  description: DESCRIPTION,
+  openGraph: {
+    type: "website",
+    siteName: BRAND.name,
+    title: `${BRAND.name} · Fixed-price home air conditioning`,
+    description: DESCRIPTION,
+    locale: "en_GB",
+    images: [
+      {
+        url: "/brand/dang-its-hot.webp",
+        width: 1400,
+        height: 933,
+        alt: `${BRAND.name} — cooling technologies for the UK`,
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: `${BRAND.name} · Fixed-price home air conditioning`,
+    description: DESCRIPTION,
+    images: ["/brand/dang-its-hot.webp"],
+  },
 };
 
 export const viewport: Viewport = {
@@ -36,16 +74,20 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en-GB">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Caprasimo&family=Figtree:wght@400;600;700&display=swap"
-          rel="stylesheet"
-        />
-      </head>
-      <body className={`${brandFont.variable} min-h-dvh flex flex-col`}>
-        {children}
+      <body
+        className={`${brandFont.variable} ${displayFont.variable} ${sansFont.variable} min-h-dvh flex flex-col`}
+      >
+        {/* Keyboard users skip the nav; visually hidden until focused. */}
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-full focus:bg-ink-900 focus:px-5 focus:py-3 focus:font-semibold focus:text-white"
+        >
+          Skip to content
+        </a>
+        {/* display:contents wrapper: an anchor target without touching layout. */}
+        <div id="main-content" tabIndex={-1} className="contents">
+          {children}
+        </div>
         <PrototypeNav />
         <Suspense fallback={null}>
           <Analytics />

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { PHOTO_BUCKET, getServiceClient } from "@/lib/supabase-server";
 
 const bodySchema = z.object({
@@ -16,6 +17,10 @@ const bodySchema = z.object({
 
 /** Mints a short-lived signed upload URL so photos go straight to Storage. */
 export async function POST(request: Request) {
+  // A survey has at most a few dozen photos; stop signed-URL farming.
+  const limited = enforceRateLimit(request, "uploads", 60, 600_000);
+  if (limited) return limited;
+
   const parsed = bodySchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });

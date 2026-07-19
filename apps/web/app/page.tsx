@@ -35,9 +35,35 @@ const platform = [
   { title: "Smart monitoring", body: "Energy use, running costs and predictive maintenance for every system.", href: "/ops#monitoring", status: "Planned" },
 ];
 
+/** LocalBusiness structured data: name, area, offer. Keeps search results rich. */
+const businessJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "HVACBusiness",
+  name: BRAND.name,
+  legalName: BRAND.legalName,
+  description:
+    "Fixed-price residential air conditioning: guided self-survey, instant guaranteed quote, certified installation.",
+  email: BRAND.supportEmail,
+  areaServed: { "@type": "City", name: "London" },
+  url: process.env.NEXT_PUBLIC_APP_URL ?? "https://dang.ac",
+  priceRange: "££",
+  makesOffer: {
+    "@type": "Offer",
+    itemOffered: {
+      "@type": "Service",
+      name: "Home air conditioning installation",
+      description: "Fixed-price installation with 5-year parts and labour warranty",
+    },
+  },
+};
+
 export default function HomePage() {
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(businessJsonLd) }}
+      />
       <SiteHeader />
       <main>
         {/* Hero: the collateral IS the header */}
