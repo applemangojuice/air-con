@@ -17,8 +17,10 @@ const bodySchema = z.object({
 
 /** Mints a short-lived signed upload URL so photos go straight to Storage. */
 export async function POST(request: Request) {
-  // A survey has at most a few dozen photos; stop signed-URL farming.
-  const limited = enforceRateLimit(request, "uploads", 60, 600_000);
+  // Stop signed-URL farming while leaving room for several photo-heavy
+  // surveys and retries behind one shared IP — a tripped limit here means
+  // silently missing photos, so err generous.
+  const limited = enforceRateLimit(request, "uploads", 240, 600_000);
   if (limited) return limited;
 
   const parsed = bodySchema.safeParse(await request.json().catch(() => null));

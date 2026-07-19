@@ -186,6 +186,7 @@ export function RoomsStep({
                 <Field label="Room name">
                   <input
                     className={inputCls}
+                    data-no-submit=""
                     value={room.name}
                     onChange={(e) => updateRoom(room.id, { name: e.target.value })}
                   />

@@ -158,19 +158,32 @@ export function QuoteWizard({
     fetch(`/api/quotes/draft/${current.draftId}`, {
       method: "PATCH",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ survey: current.survey }),
+      // Email travels too: a corrected address must reach the server draft,
+      // or the follow-up email goes to the typo.
+      body: JSON.stringify({ survey: current.survey, email: current.contact.email }),
     }).catch(() => undefined);
   }
 
   async function nextFromAddress() {
-    if (draft.draftId) {
+    // Enter submits without blurring, so normalise the postcode here rather
+    // than relying on the field's onBlur having fired.
+    const normalised: QuoteDraft = {
+      ...draft,
+      survey: { ...draft.survey, postcode: normalisePostcode(draft.survey.postcode) },
+    };
+    setDraft(normalised);
+    if (normalised.draftId) {
+      // Returning visitor (resume banner / follow-up email): still counts as
+      // entering the funnel, and the sync carries any corrected email.
+      track("quote_start", { postcode: normalised.survey.postcode, resumed: true });
+      syncServerDraft(normalised);
       setStep(1);
       return;
     }
     setBusy(true);
-    const id = await saveServerDraft(draft);
+    const id = await saveServerDraft(normalised);
     setBusy(false);
-    track("quote_start", { postcode: draft.survey.postcode, draftSaved: Boolean(id) });
+    track("quote_start", { postcode: normalised.survey.postcode, draftSaved: Boolean(id) });
     if (id) setDraft((d) => ({ ...d, draftId: id }));
     setStep(1);
   }
@@ -214,6 +227,9 @@ export function QuoteWizard({
       postcode: draft.survey.postcode,
     });
     if (result.status === "error") track("quote_save_failed", { postcode: draft.survey.postcode });
+    // The quote now lives at its permanent /q link; clear the local draft so
+    // the homepage resume banner stops offering to "finish" a finished quote.
+    if (result.status === "saved" || result.status === "demo") clearDraft();
     setStep(RESULT);
   }
 

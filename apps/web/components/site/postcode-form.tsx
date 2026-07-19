@@ -20,6 +20,10 @@ export function PostcodeForm() {
 
   return (
     <form
+      // Native fallback: before hydration (or with JS off) the browser still
+      // GETs /quote?postcode=… exactly like the old server-rendered form.
+      action="/quote"
+      method="get"
       className="mt-8 flex max-w-md gap-2"
       onSubmit={(e) => {
         e.preventDefault();

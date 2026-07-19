@@ -147,6 +147,18 @@ export function StepShell({
         e.preventDefault();
         if (onNext && !nextDisabled && !busy) onNext();
       }}
+      onKeyDown={(e) => {
+        // Inputs inside sub-editors (e.g. renaming a room) opt out of
+        // Enter-to-advance: Enter there commits the field, not the step.
+        if (
+          e.key === "Enter" &&
+          e.target instanceof HTMLInputElement &&
+          e.target.dataset.noSubmit !== undefined
+        ) {
+          e.preventDefault();
+          e.target.blur();
+        }
+      }}
     >
       {/* Progress */}
       <div className="mb-8">

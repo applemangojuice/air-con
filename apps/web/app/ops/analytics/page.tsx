@@ -79,14 +79,24 @@ export default async function OpsAnalyticsPage({
             <Stat label="Events logged" value={num(s.totalEvents)} hint="All types" />
           </div>
 
-          {s.serverErrors > 0 && (
+          {(s.serverErrors > 0 || s.clientErrors > 0) && (
             <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-              <strong>{num(s.serverErrors)} server-side failures</strong> in this window (failed
-              database writes and similar). Check{" "}
-              <Link href="/ops/status" className="underline">
-                system status
-              </Link>{" "}
-              and the Vercel logs.
+              {s.serverErrors > 0 && (
+                <p>
+                  <strong>{num(s.serverErrors)} server-side failures</strong> (failed database
+                  writes and similar) — check{" "}
+                  <Link href="/ops/status" className="underline">
+                    system status
+                  </Link>{" "}
+                  and the Vercel logs.
+                </p>
+              )}
+              {s.clientErrors > 0 && (
+                <p className={s.serverErrors > 0 ? "mt-1" : ""}>
+                  <strong>{num(s.clientErrors)} customer-side crashes</strong> (the error page was
+                  shown in their browser) — check the Vercel logs for the digests.
+                </p>
+              )}
             </div>
           )}
 

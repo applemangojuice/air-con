@@ -30,7 +30,14 @@ export function rateLimit(key: string, limit: number, windowMs: number): RateLim
 
   let w = windows.get(key);
   if (!w) {
-    if (windows.size >= MAX_KEYS) windows.clear(); // crude but bounded
+    // Bound memory by evicting oldest-inserted keys (Map preserves insertion
+    // order) rather than clearing everything — a key-spraying attacker must
+    // not be able to reset every active window, including their own.
+    while (windows.size >= MAX_KEYS) {
+      const oldest = windows.keys().next().value;
+      if (oldest === undefined) break;
+      windows.delete(oldest);
+    }
     w = { hits: [] };
     windows.set(key, w);
   }
@@ -44,11 +51,16 @@ export function rateLimit(key: string, limit: number, windowMs: number): RateLim
   return { ok: true, retryAfterSeconds: 0 };
 }
 
-/** Best client identity we can get behind Vercel's proxy. */
+/**
+ * Best client identity we can get behind Vercel's proxy. SAFE ON VERCEL
+ * ONLY: Vercel overwrites x-forwarded-for with the true client IP. Behind an
+ * append-style proxy (default nginx, generic LBs) the first hop is
+ * client-forgeable, so if this app ever moves off Vercel, re-key this to the
+ * proxy-verified header of that platform.
+ */
 export function clientKey(request: Request): string {
   const h = request.headers;
   const forwarded = h.get("x-forwarded-for");
-  // First hop is the client; later hops are proxies.
   const ip = forwarded?.split(",")[0]?.trim() || h.get("x-real-ip") || "unknown";
   return ip;
 }

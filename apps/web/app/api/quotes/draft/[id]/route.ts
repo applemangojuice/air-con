@@ -5,7 +5,11 @@ import { enforceRateLimit } from "@/lib/rate-limit";
 import { UUID_RE, surveySchema } from "@/lib/schemas";
 import { getServiceClient } from "@/lib/supabase-server";
 
-const bodySchema = z.object({ survey: surveySchema });
+const bodySchema = z.object({
+  survey: surveySchema,
+  /** A corrected email must reach the draft, or follow-ups go to the typo. */
+  email: z.string().email().max(200).optional(),
+});
 
 /** Update a draft in place as the customer moves through the funnel. */
 export async function PATCH(
@@ -32,6 +36,7 @@ export async function PATCH(
   const { error } = await supabase
     .from("quote_requests")
     .update({
+      ...(parsed.data.email ? { email: parsed.data.email } : {}),
       postcode: survey.postcode,
       address_line: survey.addressLine,
       engine_version: quote.engineVersion,

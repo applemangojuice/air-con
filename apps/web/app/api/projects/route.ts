@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createProjectForQuote } from "@/lib/projects-server";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 const bodySchema = z.object({ quoteId: z.string().uuid() });
 
 /** Start (or resume) the project for a saved quote. Idempotent. */
 export async function POST(request: Request) {
+  const limited = enforceRateLimit(request, "projects", 20, 600_000);
+  if (limited) return limited;
+
   const parsed = bodySchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });

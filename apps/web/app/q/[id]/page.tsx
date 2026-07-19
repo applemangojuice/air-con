@@ -69,9 +69,10 @@ export default async function SavedQuotePage({
         </div>
         {/* Print-only provenance so a PDF stands on its own. */}
         <p className="mt-8 hidden border-t border-line pt-4 text-xs text-ink-500 print:block">
-          Fixed-price quote by Dang, It&apos;s Hot · quote ref {data.id.slice(0, 8)} · saved
-          online with finance options and booking at dang.ac/q/{data.id.slice(0, 8)}… · VAT
-          included · 5-year parts &amp; labour warranty
+          Fixed-price quote by Dang, It&apos;s Hot · quote ref {data.id.slice(0, 8)} · VAT
+          included · 5-year parts &amp; labour warranty. Saved online with finance options and
+          booking at{" "}
+          {`${(process.env.NEXT_PUBLIC_APP_URL ?? "https://dang.ac").replace(/\/$/, "")}/q/${data.id}`}
         </p>
       </main>
     </div>

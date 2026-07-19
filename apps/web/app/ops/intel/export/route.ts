@@ -20,7 +20,10 @@ export async function GET(request: Request) {
 
   const base = (process.env.NEXT_PUBLIC_APP_URL ?? url.origin).replace(/\/$/, "");
   const esc = (v: string | number | null) => {
-    const s = String(v ?? "");
+    let s = String(v ?? "");
+    // Formula-injection guard: address data can carry hostile prefixes and
+    // this file is opened in Excel/Sheets — neutralise =+-@ prefixes.
+    if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
     return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   const header = "address,postcode,priority_band,priority_score,archetype,epc_rating,floor_area_m2,landing_url";

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { gbp } from "@/lib/format";
+import { fmtDay, gbp } from "@/lib/format";
 import { getServiceClient } from "@/lib/supabase-server";
 
 export const metadata: Metadata = {
@@ -39,6 +39,7 @@ interface QuoteRow {
   status: string;
   timeframe: string | null;
   utm_source: string | null;
+  follow_up_sent_at: string | null;
 }
 
 export default async function OpsQuotesPage({
@@ -68,7 +69,7 @@ export default async function OpsQuotesPage({
   let query = supabase
     .from("quote_requests")
     .select(
-      "id, created_at, customer_name, email, postcode, total_gbp, room_count, confidence_score, confidence_band, status, timeframe, utm_source",
+      "id, created_at, customer_name, email, postcode, total_gbp, room_count, confidence_score, confidence_band, status, timeframe, utm_source, follow_up_sent_at",
     )
     .order("created_at", { ascending: false })
     .limit(200);
@@ -115,6 +116,7 @@ export default async function OpsQuotesPage({
                 <th className="px-4 py-3">Rooms</th>
                 <th className="px-4 py-3">Total</th>
                 <th className="px-4 py-3">Confidence</th>
+                <th className="px-4 py-3">Timeframe</th>
                 <th className="px-4 py-3">Source</th>
                 <th className="px-4 py-3">Status</th>
                 {tab.key === "drafts" && <th className="px-4 py-3">Follow up</th>}
@@ -124,10 +126,7 @@ export default async function OpsQuotesPage({
               {quotes.map((q) => (
                 <tr key={q.id} className="hover:bg-surface/50">
                   <td className="whitespace-nowrap px-4 py-3 text-ink-500">
-                    {new Date(q.created_at).toLocaleDateString("en-GB", {
-                      day: "numeric",
-                      month: "short",
-                    })}
+                    {fmtDay(q.created_at)}
                   </td>
                   <td className="px-4 py-3">
                     <Link
@@ -148,6 +147,9 @@ export default async function OpsQuotesPage({
                     <span className="text-xs text-ink-300">({q.confidence_band})</span>
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-ink-500">
+                    {q.timeframe ?? "—"}
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-3 text-ink-500">
                     {q.utm_source ?? "—"}
                   </td>
                   <td className="px-4 py-3">
@@ -159,12 +161,20 @@ export default async function OpsQuotesPage({
                   </td>
                   {tab.key === "drafts" && (
                     <td className="whitespace-nowrap px-4 py-3">
-                      <a
-                        className="font-semibold text-accent-700 hover:underline"
-                        href={followUpMailto(q)}
-                      >
-                        Email them →
-                      </a>
+                      {q.follow_up_sent_at ? (
+                        // The cron already sent the one promised nudge —
+                        // don't offer a second email.
+                        <span className="text-xs text-ink-300">
+                          Nudged {fmtDay(q.follow_up_sent_at)}
+                        </span>
+                      ) : (
+                        <a
+                          className="font-semibold text-accent-700 hover:underline"
+                          href={followUpMailto(q)}
+                        >
+                          Email them →
+                        </a>
+                      )}
                     </td>
                   )}
                 </tr>

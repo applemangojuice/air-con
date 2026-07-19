@@ -57,6 +57,7 @@ export interface AnalyticsSummary {
     quoteFailed: number;
   };
   serverErrors: number;
+  clientErrors: number;
 }
 
 function topN(counts: Map<string, number>, n: number): Count[] {
@@ -100,26 +101,37 @@ export async function analyticsSummary(windowDays = 30): Promise<AnalyticsSummar
       quoteFailed: 0,
     },
     serverErrors: 0,
+    clientErrors: 0,
   };
 
   const supabase = getServiceClient();
   if (!supabase) return empty;
 
   const since = new Date(Date.now() - windowDays * 86400_000).toISOString();
-  const { data, error } = await supabase
-    .from("analytics_events")
-    .select(
-      "created_at, visitor_id, session_id, type, path, referrer_host, utm_source, utm_campaign, country, region, city, device, meta",
-    )
-    .gte("created_at", since)
-    .order("created_at", { ascending: false })
-    .limit(50000);
 
-  if (error) {
-    return { ...empty, configured: true, hasTable: false, error: error.message };
+  // Paged fetch: Supabase's server-side Max Rows cap (default 1000) silently
+  // clips any single .limit(), so pull pages of 1000 up to our own ceiling.
+  const rows: AnalyticsEventRow[] = [];
+  const PAGE = 1000;
+  const MAX_EVENTS = 50000;
+  for (let from = 0; from < MAX_EVENTS; from += PAGE) {
+    const { data, error } = await supabase
+      .from("analytics_events")
+      .select(
+        "created_at, visitor_id, session_id, type, path, referrer_host, utm_source, utm_campaign, country, region, city, device, meta",
+      )
+      .gte("created_at", since)
+      .order("created_at", { ascending: false })
+      .range(from, from + PAGE - 1);
+    if (error) {
+      if (rows.length === 0) {
+        return { ...empty, configured: true, hasTable: false, error: error.message };
+      }
+      break; // partial data beats none; the page boundary error is logged
+    }
+    rows.push(...((data ?? []) as AnalyticsEventRow[]));
+    if (!data || data.length < PAGE) break;
   }
-
-  const rows = (data ?? []) as AnalyticsEventRow[];
   const sevenDaysAgo = Date.now() - 7 * 86400_000;
 
   const visitors = new Set<string>();
@@ -138,6 +150,7 @@ export async function analyticsSummary(windowDays = 30): Promise<AnalyticsSummar
   let pageViews = 0;
   let pageViews7d = 0;
   let serverErrors = 0;
+  let clientErrors = 0;
   const funnel = {
     quotePageViews: 0,
     quoteStarts: 0,
@@ -190,6 +203,8 @@ export async function analyticsSummary(windowDays = 30): Promise<AnalyticsSummar
       funnel.quoteFailed++;
     } else if (r.type === "server_error") {
       serverErrors++;
+    } else if (r.type === "client_error") {
+      clientErrors++;
     }
   }
   funnel.quoteSaved = Math.max(0, funnel.quoteSubmits - funnel.quoteFailed);
@@ -222,6 +237,7 @@ export async function analyticsSummary(windowDays = 30): Promise<AnalyticsSummar
     cities: topN(cities, 10),
     funnel,
     serverErrors,
+    clientErrors,
   };
 }
 

@@ -35,8 +35,9 @@ function hostOf(referrer?: string): string | null {
 }
 
 export async function POST(request: Request) {
-  // Generous (a real visitor fires a handful/min) but stops write floods.
-  const limited = enforceRateLimit(request, "track", 120, 60_000);
+  // Generous — one IP can be a whole CGNAT carrier or office, and beacons
+  // can't see a 429 (sendBeacon fires and forgets) — but still a flood brake.
+  const limited = enforceRateLimit(request, "track", 600, 60_000);
   if (limited) return limited;
 
   // Beacons arrive as text/plain; parse defensively either way.

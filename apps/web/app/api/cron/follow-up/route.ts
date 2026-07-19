@@ -42,7 +42,7 @@ export async function GET(request: Request) {
 
   const { data, error } = await supabase
     .from("quote_requests")
-    .select("id, email, postcode, total_gbp")
+    .select("id, email, postcode, created_at")
     .eq("status", "draft")
     .is("follow_up_sent_at", null)
     .gt("created_at", weekAgo)
@@ -55,26 +55,70 @@ export async function GET(request: Request) {
     return NextResponse.json({ ok: false, reason: error.message }, { status: 500 });
   }
 
+  // One nudge per PERSON, and never to someone who already finished: drop
+  // drafts whose email has any non-draft quote (they completed on another
+  // device/row), and collapse multiple drafts per email to the newest.
+  let candidates = data ?? [];
+  if (candidates.length > 0) {
+    const emails = [...new Set(candidates.map((d) => d.email))];
+    const { data: finished } = await supabase
+      .from("quote_requests")
+      .select("email")
+      .in("email", emails)
+      .neq("status", "draft");
+    const finishedEmails = new Set((finished ?? []).map((r) => r.email));
+    const newestPerEmail = new Map<string, (typeof candidates)[number]>();
+    for (const d of candidates) {
+      if (finishedEmails.has(d.email)) continue;
+      const prev = newestPerEmail.get(d.email);
+      if (!prev || d.created_at > prev.created_at) newestPerEmail.set(d.email, d);
+    }
+    candidates = [...newestPerEmail.values()];
+  }
+
+  // Claim the whole batch atomically: only rows this run actually flips
+  // (returned by select) get emailed, so overlapping runs can't double-send.
+  const { data: claimed, error: claimErr } = await supabase
+    .from("quote_requests")
+    .update({ follow_up_sent_at: new Date().toISOString() })
+    .in("id", candidates.map((d) => d.id))
+    .is("follow_up_sent_at", null)
+    .select("id");
+  if (claimErr) {
+    console.error("follow-up claim failed:", claimErr.message);
+    return NextResponse.json({ ok: false, reason: claimErr.message }, { status: 500 });
+  }
+  const claimedIds = new Set((claimed ?? []).map((r) => r.id));
+  const toSend = candidates.filter((d) => claimedIds.has(d.id));
+
   const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "https://dang.ac").replace(/\/$/, "");
   let sent = 0;
   const failed: string[] = [];
 
-  for (const draft of data ?? []) {
-    // Claim before sending: a crash mid-batch must never double-email.
-    const { error: claimErr } = await supabase
-      .from("quote_requests")
-      .update({ follow_up_sent_at: new Date().toISOString() })
-      .eq("id", draft.id)
-      .is("follow_up_sent_at", null);
-    if (claimErr) continue;
-
-    const ok = await sendFollowUp(apiKey, from, draft.email, draft.postcode, appUrl);
-    if (ok) sent++;
-    else failed.push(draft.id);
+  // Small parallel chunks: fast enough to finish inside the function budget,
+  // slow enough to stay under Resend's rate limit.
+  for (let i = 0; i < toSend.length; i += 5) {
+    const chunk = toSend.slice(i, i + 5);
+    const results = await Promise.all(
+      chunk.map((d) => sendFollowUp(apiKey, from, d.email, d.postcode, appUrl)),
+    );
+    results.forEach((ok, j) => {
+      if (ok) sent++;
+      else failed.push(chunk[j].id);
+    });
   }
 
-  console.info(`follow-up cron: ${sent} sent, ${failed.length} failed`);
-  return NextResponse.json({ ok: true, sent, failed: failed.length });
+  // A send that FAILED in-band (not a crash) releases its claim, so the next
+  // daily run retries instead of the lead losing their only nudge.
+  if (failed.length > 0) {
+    await supabase
+      .from("quote_requests")
+      .update({ follow_up_sent_at: null })
+      .in("id", failed);
+  }
+
+  console.info(`follow-up cron: ${sent} sent, ${failed.length} failed (released for retry)`, failed);
+  return NextResponse.json({ ok: true, sent, failed: failed.length, failedIds: failed });
 }
 
 async function sendFollowUp(

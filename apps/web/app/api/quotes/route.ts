@@ -35,8 +35,10 @@ const bodySchema = z.object({
 });
 
 export async function POST(request: Request) {
-  // A human submits a handful of quotes at most; block scripted spam.
-  const limited = enforceRateLimit(request, "quotes", 10, 600_000);
+  // A brake on scripted spam, sized for shared IPs (CGNAT, office wifi): a
+  // whole household or demo room fits, a bot loop doesn't. The save-early
+  // draft row is the backstop if a legitimate burst ever trips this.
+  const limited = enforceRateLimit(request, "quotes", 30, 600_000);
   if (limited) return limited;
 
   const parsed = bodySchema.safeParse(await request.json().catch(() => null));
@@ -90,6 +92,20 @@ export async function POST(request: Request) {
       .single();
     if (error) saveError = error.message;
     id = data?.id ?? null;
+
+    // Already finalised (double-submit, browser Back): idempotent success —
+    // return the existing quote instead of inserting a duplicate row and
+    // emailing the customer twice.
+    if (!id) {
+      const { data: existing } = await supabase
+        .from("quote_requests")
+        .select("id, status")
+        .eq("id", draftId)
+        .maybeSingle();
+      if (existing && existing.status !== "draft") {
+        return NextResponse.json({ ok: true, demo: false, id: existing.id, emailed: false });
+      }
+    }
   }
   if (!id) {
     const { data, error } = await supabase
@@ -103,8 +119,10 @@ export async function POST(request: Request) {
       // Safety net: never lose a lead to a database hiccup. Email the details
       // to the team so it can be recovered by hand, then tell the client the
       // quote is still valid.
-      await alertLeadLost(contact, quote.totalGbp, survey.postcode, saveError);
-      await logServerEvent("server_error", { where: "quote_insert", error: saveError });
+      await Promise.all([
+        alertLeadLost(contact, quote.totalGbp, survey.postcode, saveError),
+        logServerEvent("server_error", { where: "quote_insert", error: saveError }),
+      ]);
       return NextResponse.json({ error: "Could not save quote", saved: false }, { status: 502 });
     }
     id = data.id;

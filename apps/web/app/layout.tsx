@@ -42,19 +42,17 @@ export const metadata: Metadata = {
     template: `%s · ${BRAND.name}`,
   },
   description: DESCRIPTION,
-  // The share image itself comes from app/opengraph-image.tsx (a designed
-  // card rendered from brand tokens); Twitter falls back to og:image.
+  // The share image comes from app/opengraph-image.tsx. Deliberately NO
+  // og/twitter title or description here: Next only falls back to each
+  // page's own <title>/description when the parent didn't set them, so
+  // setting them at the root would stamp the homepage text on every page.
   openGraph: {
     type: "website",
     siteName: BRAND.name,
-    title: `${BRAND.name} · Fixed-price home air conditioning`,
-    description: DESCRIPTION,
     locale: "en_GB",
   },
   twitter: {
     card: "summary_large_image",
-    title: `${BRAND.name} · Fixed-price home air conditioning`,
-    description: DESCRIPTION,
   },
 };
 

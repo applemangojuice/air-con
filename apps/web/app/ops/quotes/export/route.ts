@@ -23,20 +23,34 @@ export async function GET(request: Request) {
     return new Response("No database configured", { status: 503 });
   }
 
-  let query = supabase
-    .from("quote_requests")
-    .select(
-      "id, created_at, status, customer_name, email, phone, timeframe, postcode, address_line, total_gbp, room_count, confidence_score, confidence_band, source, utm_source, referrer, booked_at, follow_up_sent_at",
-    )
-    .order("created_at", { ascending: false })
-    .limit(5000);
-  if (statuses) query = query.in("status", statuses);
-
-  const { data, error } = await query;
-  if (error) return new Response(`Export failed: ${error.message}`, { status: 500 });
+  // Paged fetch: the server-side Max Rows cap (default 1000) silently clips
+  // a single query, and an export must be complete.
+  const rows: Record<string, unknown>[] = [];
+  const PAGE = 1000;
+  const MAX_ROWS = 20000;
+  for (let from = 0; from < MAX_ROWS; from += PAGE) {
+    let query = supabase
+      .from("quote_requests")
+      .select(
+        "id, created_at, status, customer_name, email, phone, timeframe, postcode, address_line, total_gbp, room_count, confidence_score, confidence_band, source, utm_source, referrer, booked_at, follow_up_sent_at",
+      )
+      .order("created_at", { ascending: false })
+      .range(from, from + PAGE - 1);
+    if (statuses) query = query.in("status", statuses);
+    const { data, error } = await query;
+    if (error) return new Response(`Export failed: ${error.message}`, { status: 500 });
+    rows.push(...(data ?? []));
+    if (!data || data.length < PAGE) break;
+  }
+  const data = rows as {
+    [k: string]: string | number | null;
+  }[];
 
   const esc = (v: string | number | null) => {
-    const s = String(v ?? "");
+    let s = String(v ?? "");
+    // Formula-injection guard: names/referrers come from the public funnel
+    // and this file is opened in Excel/Sheets — neutralise =+-@ prefixes.
+    if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
     return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   const header =
