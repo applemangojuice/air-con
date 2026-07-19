@@ -1,0 +1,36 @@
+# Daily probe of the live site's /api/health. The endpoint returns:
+#   200 "ok"       — database connected, every table + bucket present
+#   200 "demo"     — no database configured (fine for previews, not for prod)
+#   503 "degraded" — connected but missing schema: data is being LOST
+#
+# A failing run (red ✗ on the Actions tab + GitHub's failure email to the
+# repo watchers) is the alarm. Set the SITE_URL repository variable
+# (Settings → Secrets and variables → Actions → Variables) to your live
+# domain; it defaults to https://dang.ac.
+
+name: Health check
+
+on:
+  schedule:
+    - cron: "0 7 * * *" # daily 07:00 UTC
+  workflow_dispatch: {}
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe /api/health
+        run: |
+          URL="${{ vars.SITE_URL || 'https://dang.ac' }}"
+          echo "Probing $URL/api/health"
+          BODY=$(curl -sS --max-time 30 "$URL/api/health") || { echo "::error::Site unreachable"; exit 1; }
+          echo "$BODY"
+          STATUS=$(echo "$BODY" | python3 -c "import json,sys; print(json.load(sys.stdin).get('status',''))")
+          if [ "$STATUS" = "degraded" ]; then
+            echo "::error::Database is connected but unhealthy (missing tables/buckets). Data may be being lost. Open /ops/status."
+            exit 1
+          fi
+          if [ "$STATUS" = "demo" ]; then
+            echo "::warning::Site is running in demo mode — nothing is being persisted."
+          fi
+          echo "Status: $STATUS"

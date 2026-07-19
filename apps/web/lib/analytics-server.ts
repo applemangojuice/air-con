@@ -20,6 +20,7 @@ export interface AnalyticsEventRow {
   region: string | null;
   city: string | null;
   device: string | null;
+  meta: Record<string, unknown> | null;
 }
 
 export interface Count {
@@ -49,10 +50,13 @@ export interface AnalyticsSummary {
   funnel: {
     quotePageViews: number;
     quoteStarts: number;
+    quoteConfiguredHouse: number;
+    quoteChoseRooms: number;
     quoteSubmits: number;
     quoteSaved: number;
     quoteFailed: number;
   };
+  serverErrors: number;
 }
 
 function topN(counts: Map<string, number>, n: number): Count[] {
@@ -86,7 +90,16 @@ export async function analyticsSummary(windowDays = 30): Promise<AnalyticsSummar
     devices: [],
     countries: [],
     cities: [],
-    funnel: { quotePageViews: 0, quoteStarts: 0, quoteSubmits: 0, quoteSaved: 0, quoteFailed: 0 },
+    funnel: {
+      quotePageViews: 0,
+      quoteStarts: 0,
+      quoteConfiguredHouse: 0,
+      quoteChoseRooms: 0,
+      quoteSubmits: 0,
+      quoteSaved: 0,
+      quoteFailed: 0,
+    },
+    serverErrors: 0,
   };
 
   const supabase = getServiceClient();
@@ -96,7 +109,7 @@ export async function analyticsSummary(windowDays = 30): Promise<AnalyticsSummar
   const { data, error } = await supabase
     .from("analytics_events")
     .select(
-      "created_at, visitor_id, session_id, type, path, referrer_host, utm_source, utm_campaign, country, region, city, device",
+      "created_at, visitor_id, session_id, type, path, referrer_host, utm_source, utm_campaign, country, region, city, device, meta",
     )
     .gte("created_at", since)
     .order("created_at", { ascending: false })
@@ -124,7 +137,16 @@ export async function analyticsSummary(windowDays = 30): Promise<AnalyticsSummar
 
   let pageViews = 0;
   let pageViews7d = 0;
-  const funnel = { quotePageViews: 0, quoteStarts: 0, quoteSubmits: 0, quoteSaved: 0, quoteFailed: 0 };
+  let serverErrors = 0;
+  const funnel = {
+    quotePageViews: 0,
+    quoteStarts: 0,
+    quoteConfiguredHouse: 0,
+    quoteChoseRooms: 0,
+    quoteSubmits: 0,
+    quoteSaved: 0,
+    quoteFailed: 0,
+  };
 
   for (const r of rows) {
     const ts = new Date(r.created_at).getTime();
@@ -158,10 +180,16 @@ export async function analyticsSummary(windowDays = 30): Promise<AnalyticsSummar
       }
     } else if (r.type === "quote_start") {
       funnel.quoteStarts++;
+    } else if (r.type === "quote_step") {
+      const step = (r.meta as { step?: string } | null)?.step;
+      if (step === "house") funnel.quoteConfiguredHouse++;
+      else if (step === "rooms") funnel.quoteChoseRooms++;
     } else if (r.type === "quote_submit") {
       funnel.quoteSubmits++;
     } else if (r.type === "quote_save_failed") {
       funnel.quoteFailed++;
+    } else if (r.type === "server_error") {
+      serverErrors++;
     }
   }
   funnel.quoteSaved = Math.max(0, funnel.quoteSubmits - funnel.quoteFailed);
@@ -193,5 +221,24 @@ export async function analyticsSummary(windowDays = 30): Promise<AnalyticsSummar
     countries: topN(countries, 10),
     cities: topN(cities, 10),
     funnel,
+    serverErrors,
   };
+}
+
+/**
+ * Server-side event logging, for failures the browser never sees (a quote
+ * insert erroring, a cron batch failing). Fire-and-forget: never throws,
+ * never blocks the caller's response on analytics.
+ */
+export async function logServerEvent(
+  type: string,
+  meta?: Record<string, unknown>,
+): Promise<void> {
+  try {
+    const supabase = getServiceClient();
+    if (!supabase) return;
+    await supabase.from("analytics_events").insert({ type, meta: meta ?? null });
+  } catch {
+    // analytics must never take the caller down with it
+  }
 }

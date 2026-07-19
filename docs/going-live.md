@@ -10,7 +10,7 @@ watches `main`; every merge auto-deploys. This page is the checklist.
    pnpm workspaces are handled natively. First deploy happens on import.
 2. **Supabase**: create a project, then run every file in
    `supabase/migrations/` in order (SQL editor, or `supabase db push`).
-   As of now that's `0001` → `0007`. Note there are **two** `0006_*` files
+   As of now that's `0001` → `0008`. Note there are **two** `0006_*` files
    (`0006_draft_quotes.sql` and `0006_property_intelligence.sql`) — run both;
    they create independent tables. Re-running is safe — they use `if not
    exists`. **If you skip this step the site looks connected but saves
@@ -75,6 +75,22 @@ data loss. `/ops/status` exists so you never have to guess which it is.
 submission emails the team, and any submission that *fails* to save emails a
 "recover this by hand" alert with the customer's details. Turn this on before
 sharing the site widely.
+
+## Automated follow-up (abandoned quotes)
+
+People who give their address and email but never finish are warm leads. With
+`CRON_SECRET` set (any long random string) and Resend configured, a Vercel
+cron (`apps/web/vercel.json`) runs daily at 10:00 UTC and sends **one**
+friendly nudge to drafts that are 24 hours – 7 days old, then never emails
+them again (`follow_up_sent_at`, migration `0008`). The Unfinished tab on
+`/ops/quotes` shows the same list for manual follow-up.
+
+## Uptime alarm
+
+`.github/workflows/health-check.yml` probes `/api/health` daily and fails
+the run (GitHub emails the watchers) if the database is degraded — i.e. the
+site is up but data is being lost. Set the `SITE_URL` repository variable to
+your live domain, and use **Run workflow** to test it any time.
 
 ## Usage analytics
 

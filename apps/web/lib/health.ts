@@ -153,6 +153,13 @@ function envReport(): EnvCheck[] {
       note: "Postcode → address lookup for the funnel. Optional.",
     },
     {
+      key: "CRON_SECRET",
+      label: "Follow-up cron",
+      set: has("CRON_SECRET"),
+      required: false,
+      note: "Enables the daily abandoned-quote follow-up email (needs Resend too).",
+    },
+    {
       key: "NEXT_PUBLIC_APP_URL",
       label: "Public app URL",
       set: has("NEXT_PUBLIC_APP_URL"),

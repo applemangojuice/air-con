@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { generateQuote, type Survey } from "@aircon/domain";
+import { logServerEvent } from "@/lib/analytics-server";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { UUID_RE, surveySchema } from "@/lib/schemas";
 import { getServiceClient } from "@/lib/supabase-server";
@@ -103,6 +104,7 @@ export async function POST(request: Request) {
       // to the team so it can be recovered by hand, then tell the client the
       // quote is still valid.
       await alertLeadLost(contact, quote.totalGbp, survey.postcode, saveError);
+      await logServerEvent("server_error", { where: "quote_insert", error: saveError });
       return NextResponse.json({ error: "Could not save quote", saved: false }, { status: 502 });
     }
     id = data.id;

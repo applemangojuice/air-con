@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test tests/*.test.ts",
     "data:sample": "node scripts/make-sample-data.mjs",
     "data:fetch-epc": "node scripts/fetch-epc.mjs",
     "data:import": "node scripts/import-intel.mjs",
