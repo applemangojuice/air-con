@@ -13,8 +13,16 @@ export const dynamic = "force-dynamic";
  * First-party usage analytics: who's on the site, where they came from, and
  * how far they get through the quote funnel. Cookieless, no third parties.
  */
-export default async function OpsAnalyticsPage() {
-  const s = await analyticsSummary(30);
+const WINDOWS = [7, 30, 90];
+
+export default async function OpsAnalyticsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ days?: string }>;
+}) {
+  const { days: daysParam } = await searchParams;
+  const days = WINDOWS.includes(Number(daysParam)) ? Number(daysParam) : 30;
+  const s = await analyticsSummary(days);
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
@@ -25,9 +33,24 @@ export default async function OpsAnalyticsPage() {
             First-party, cookieless. Last {s.windowDays} days unless noted.
           </p>
         </div>
-        <Link href="/ops" className="text-sm font-medium text-accent-700 hover:underline">
-          ← All modules
-        </Link>
+        <div className="flex items-center gap-3">
+          <nav className="flex gap-1 rounded-full border border-line p-1 text-sm">
+            {WINDOWS.map((w) => (
+              <Link
+                key={w}
+                href={w === 30 ? "/ops/analytics" : `/ops/analytics?days=${w}`}
+                className={`rounded-full px-3 py-1 font-semibold ${
+                  days === w ? "bg-ink-900 text-white" : "text-ink-500 hover:bg-surface"
+                }`}
+              >
+                {w}d
+              </Link>
+            ))}
+          </nav>
+          <Link href="/ops" className="text-sm font-medium text-accent-700 hover:underline">
+            ← All modules
+          </Link>
+        </div>
       </div>
 
       {!s.configured && (

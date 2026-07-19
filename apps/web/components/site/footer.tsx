@@ -10,6 +10,11 @@ const links = [
   { label: "About us", href: "/about" },
 ];
 
+const areaLinks = [
+  { label: "Streatham (SW16)", href: "/areas/sw16" },
+  { label: "Tooting (SW17)", href: "/areas/sw17" },
+];
+
 const legalLinks = [
   { label: "Privacy", href: "/privacy" },
   { label: "Terms", href: "/terms" },
@@ -34,6 +39,14 @@ export function SiteFooter() {
               {BRAND.supportEmail}
             </a>
           </nav>
+        </div>
+        <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-white/50">
+          <span className="font-semibold text-white/60">Where we install:</span>
+          {areaLinks.map((l) => (
+            <Link key={l.href} href={l.href} className="hover:text-white/80">
+              {l.label}
+            </Link>
+          ))}
         </div>
         <div className="mt-10 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-6 text-xs text-white/40">
           <p>

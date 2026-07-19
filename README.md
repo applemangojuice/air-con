@@ -57,6 +57,19 @@ surfaces and a data model already shaped for it. See
 - **Pricing engine** (`packages/domain`): deterministic, versioned, tested.
 - **Persistence**: quotes + photos into Supabase when configured; graceful
   demo mode when not.
+- **Usage analytics** (`/ops/analytics`): first-party, cookieless — visitors,
+  sources, campaigns (UTM), geography, and the quote funnel step by step.
+  Every quote stores its acquisition source.
+- **System status** (`/ops/status` + `/api/health`): live check of every
+  table, bucket and env var, with the exact fix when something's red; a
+  daily GitHub Action fails loudly if production degrades.
+- **Lead recovery**: unfinished quotes surface as a follow-up worklist on
+  `/ops/quotes`, and a daily cron sends one friendly nudge email
+  automatically (`CRON_SECRET` + Resend).
+- **Launch surface**: `/faq`, `/areas/sw16` + `/areas/sw17` local landing
+  pages, `/privacy` + `/terms` (UK GDPR), robots/sitemap/OG/JSON-LD,
+  security headers + per-IP rate limiting, self-hosted fonts, error
+  boundaries, web manifest.
 - **Placeholders**: `/portal` (customer), `/ops` (internal modules), `/how-it-works`.
 - **Design**: the Organic design system (from the owner's Claude Design
   project) across web and mobile.

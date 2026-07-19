@@ -97,7 +97,11 @@ export default function HomePage() {
               <img
                 src="/brand/dang-its-hot.webp"
                 alt="Dang, It's Hot: cooling technologies for the UK. Keeping London cool."
-                className="w-full"
+                className="h-auto w-full"
+                width={1400}
+                height={933}
+                fetchPriority="high"
+                decoding="async"
               />
             </div>
           </div>

@@ -219,6 +219,27 @@ async function sendQuoteEmail(
     maximumFractionDigits: 0,
   }).format(totalGbp);
 
+  // Deliverability-safe branding: one table, inline styles, system fonts,
+  // no images. Looks intentional in every client, lands in no spam folders.
+  const html = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;color:#1d212b">
+  <tr><td style="padding:28px 24px 20px">
+    <span style="font-size:20px;font-weight:700">Dang, <span style="color:#f2711b">It's Hot</span></span>
+  </td></tr>
+  <tr><td style="padding:0 24px">
+    <p style="margin:0 0 14px">Hi ${escapeHtml(name)},</p>
+    <p style="margin:0 0 6px;color:#6e7482;font-size:14px">Your fixed installation price, VAT included:</p>
+    <p style="margin:0 0 16px;font-size:36px;font-weight:700">${total}</p>
+    <p style="margin:0 0 20px;color:#454b58">That's the actual price, not an estimate — your full quote with the system design, price breakdown and finance options is saved at the link below, and it doesn't expire.</p>
+    <p style="margin:0 0 24px">
+      <a href="${link}" style="display:inline-block;background:#d55a0a;color:#ffffff;text-decoration:none;font-weight:600;padding:12px 28px;border-radius:999px">View my quote</a>
+    </p>
+    <p style="margin:0 0 6px;font-size:13px;color:#6e7482">Or copy this link:</p>
+    <p style="margin:0 0 24px;font-size:13px"><a href="${link}" style="color:#a84508">${link}</a></p>
+    <p style="margin:0 0 28px;color:#454b58">You can book your installation from that page whenever you're ready. No calls, no chasing.</p>
+    <p style="margin:0 0 28px;color:#a3a8b4;font-size:12px;border-top:1px solid #ddd5c4;padding-top:16px">Dang, It's Hot · Cooling technologies for the UK · Keeping London cool</p>
+  </td></tr>
+</table>`;
+
   try {
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -227,11 +248,7 @@ async function sendQuoteEmail(
         from,
         to: [email],
         subject: `Your fixed price: ${total} installed`,
-        html: `<p>Hi ${escapeHtml(name)},</p>
-<p>Your fixed installation price is <strong>${total}</strong> (VAT included).</p>
-<p>Your full quote (system design, price breakdown and finance options) is saved here:</p>
-<p><a href="${link}">${link}</a></p>
-<p>You can book your installation from that page whenever you're ready. The link doesn't expire.</p>`,
+        html,
       }),
     });
     if (!res.ok) console.error("quote email failed:", res.status, await res.text());
