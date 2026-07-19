@@ -1,6 +1,8 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { followUpMailto } from "@/lib/follow-up";
 import { fmtDay, gbp } from "@/lib/format";
+import { QUOTE_TABS, tabByKey } from "./tabs";
 import { getServiceClient } from "@/lib/supabase-server";
 
 export const metadata: Metadata = {
@@ -17,14 +19,6 @@ const STATUS_CLS: Record<string, string> = {
   booked: "bg-sage-100 text-sage-700",
   declined: "bg-red-50 text-red-600",
 };
-
-/** The tabs, in funnel order. `undefined` filter = everything. */
-const TABS: { key: string; label: string; statuses?: string[] }[] = [
-  { key: "inbox", label: "Inbox", statuses: ["new", "reviewed"] },
-  { key: "drafts", label: "Unfinished (follow up)", statuses: ["draft"] },
-  { key: "booked", label: "Booked", statuses: ["booked"] },
-  { key: "all", label: "Everything" },
-];
 
 interface QuoteRow {
   id: string;
@@ -48,7 +42,7 @@ export default async function OpsQuotesPage({
   searchParams: Promise<{ tab?: string }>;
 }) {
   const { tab: tabKey } = await searchParams;
-  const tab = TABS.find((t) => t.key === tabKey) ?? TABS[0];
+  const tab = tabByKey(tabKey) ?? QUOTE_TABS[0];
 
   const supabase = getServiceClient();
 
@@ -170,7 +164,7 @@ export default async function OpsQuotesPage({
                       ) : (
                         <a
                           className="font-semibold text-accent-700 hover:underline"
-                          href={followUpMailto(q)}
+                          href={followUpMailto(q.email, q.postcode)}
                         >
                           Email them →
                         </a>
@@ -187,27 +181,11 @@ export default async function OpsQuotesPage({
   );
 }
 
-/** Pre-written follow-up: friendly, short, no pressure. */
-function followUpMailto(q: QuoteRow): string {
-  const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "https://dang.ac").replace(/\/$/, "");
-  const subject = `Your air conditioning price for ${q.postcode}`;
-  const body = `Hi,
-
-You started getting a fixed price for air conditioning at ${q.postcode} and got most of the way through — your price is one tap away if you'd like to finish:
-
-${appUrl}/quote
-
-If now isn't the time, no problem at all (and no follow-up barrage, promise).
-
-Dang, It's Hot`;
-  return `mailto:${encodeURIComponent(q.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-}
-
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function tabCounts(supabase: any): Promise<Record<string, number>> {
   const counts: Record<string, number> = {};
   await Promise.all(
-    TABS.filter((t) => t.statuses).map(async (t) => {
+    QUOTE_TABS.filter((t) => t.statuses).map(async (t) => {
       const { count } = await supabase
         .from("quote_requests")
         .select("*", { count: "exact", head: true })
@@ -247,7 +225,7 @@ function Shell({
         </div>
       </div>
       <nav className="mb-6 flex flex-wrap gap-2">
-        {TABS.map((t) => (
+        {QUOTE_TABS.map((t) => (
           <Link
             key={t.key}
             href={t.key === "inbox" ? "/ops/quotes" : `/ops/quotes?tab=${t.key}`}

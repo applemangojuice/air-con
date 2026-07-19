@@ -1,12 +1,5 @@
 import { getServiceClient } from "@/lib/supabase-server";
-
-/** Same tab → status mapping as the quotes page. */
-const TAB_STATUSES: Record<string, string[] | undefined> = {
-  inbox: ["new", "reviewed"],
-  drafts: ["draft"],
-  booked: ["booked"],
-  all: undefined,
-};
+import { tabByKey } from "../tabs";
 
 /**
  * CSV of quote requests for the selected tab — the owner's data, one click,
@@ -15,8 +8,11 @@ const TAB_STATUSES: Record<string, string[] | undefined> = {
  */
 export async function GET(request: Request) {
   const url = new URL(request.url);
-  const tab = url.searchParams.get("tab") ?? "all";
-  const statuses = TAB_STATUSES[tab];
+  const tabKey = url.searchParams.get("tab") ?? "all";
+  const tab = tabByKey(tabKey);
+  // Unknown tab must NOT silently export everything.
+  if (!tab) return new Response("Unknown tab", { status: 400 });
+  const statuses = tab.statuses;
 
   const supabase = getServiceClient();
   if (!supabase) {
@@ -82,7 +78,7 @@ export async function GET(request: Request) {
   return new Response([header, ...lines].join("\n"), {
     headers: {
       "content-type": "text/csv; charset=utf-8",
-      "content-disposition": `attachment; filename="quotes-${tab}.csv"`,
+      "content-disposition": `attachment; filename="quotes-${tab.key}.csv"`,
     },
   });
 }

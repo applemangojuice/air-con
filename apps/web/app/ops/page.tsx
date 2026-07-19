@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { SiteFooter } from "@/components/site/footer";
 import { SiteHeader } from "@/components/site/header";
 import { getServiceClient } from "@/lib/supabase-server";
+import { tabByKey } from "./quotes/tabs";
 
 export const metadata: Metadata = {
   title: "Admin console",
@@ -24,9 +25,9 @@ async function pulse() {
   };
   const sevenDays = new Date(Date.now() - 7 * 86400_000).toISOString();
   const [inbox, drafts, booked, properties, views7d] = await Promise.all([
-    count("quote_requests", (q) => q.in("status", ["new", "reviewed"])),
-    count("quote_requests", (q) => q.eq("status", "draft")),
-    count("quote_requests", (q) => q.eq("status", "booked")),
+    count("quote_requests", (q) => q.in("status", tabByKey("inbox")!.statuses!)),
+    count("quote_requests", (q) => q.in("status", tabByKey("drafts")!.statuses!)),
+    count("quote_requests", (q) => q.in("status", tabByKey("booked")!.statuses!)),
     count("properties"),
     count("analytics_events", (q) => q.eq("type", "page_view").gte("created_at", sevenDays)),
   ]);
@@ -69,6 +70,11 @@ const live = [
     title: "System status",
     href: "/ops/status",
     body: "Is the database actually working? Live check of every table, storage bucket and env var, with the exact fix when something's red.",
+  },
+  {
+    title: "Launch readiness",
+    href: "/ops/launch",
+    body: "Are we ready to go public? Eight live platform checks plus the launch-day walk: domain, email deliverability, the money path end-to-end, uptime alarm.",
   },
   {
     title: "Template library",

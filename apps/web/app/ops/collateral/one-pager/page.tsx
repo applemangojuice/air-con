@@ -8,7 +8,7 @@ import {
   marketModel,
   roundModel,
 } from "@aircon/domain";
-import { BRAND } from "@/lib/brand";
+import { BRAND, appHost } from "@/lib/brand";
 import { gbp } from "@/lib/format";
 
 export const metadata: Metadata = {
@@ -57,7 +57,7 @@ export default function OnePagerPage() {
         <header className="flex items-start justify-between">
           <div>
             <p className="text-2xl font-bold">
-              Dang, <span className="text-accent-500">It&apos;s Hot</span>
+              {BRAND.nameLead} <span className="text-accent-500">{BRAND.nameHot}</span>
             </p>
             <p className="mt-1 text-ink-500">
               The operating system for residential air conditioning
@@ -66,7 +66,7 @@ export default function OnePagerPage() {
           <div className="text-right text-xs text-ink-500">
             <p>Seed round</p>
             <p>{BRAND.supportEmail}</p>
-            <p>dang.ac</p>
+            <p>{appHost()}</p>
           </div>
         </header>
 

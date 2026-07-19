@@ -1,8 +1,9 @@
 import type { MetadataRoute } from "next";
+import { appUrl } from "@/lib/brand";
 
 /** The public marketing surface. Private/per-customer routes stay out. */
 export default function sitemap(): MetadataRoute.Sitemap {
-  const base = (process.env.NEXT_PUBLIC_APP_URL ?? "https://dang.ac").replace(/\/$/, "");
+  const base = appUrl();
   const page = (path: string, priority: number): MetadataRoute.Sitemap[number] => ({
     url: `${base}${path}`,
     lastModified: new Date(),

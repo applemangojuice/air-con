@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { BRAND } from "@/lib/brand";
+import { BRAND, appHost } from "@/lib/brand";
 
 export const metadata: Metadata = {
   title: "Door-drop card · collateral · ops",
@@ -29,7 +29,7 @@ export default function DoorDropCardPage() {
       {/* Front */}
       <main className="print-exact mx-auto my-8 flex aspect-[210/148] max-w-xl flex-col justify-between bg-cream p-10 shadow-lg print:my-0 print:aspect-auto print:min-h-dvh print:max-w-none print:shadow-none print-page">
         <p className="text-xl font-bold">
-          Dang, <span className="text-accent-500">It&apos;s Hot</span>
+          {BRAND.nameLead} <span className="text-accent-500">{BRAND.nameHot}</span>
         </p>
         <div>
           <p className="text-4xl font-display leading-tight">
@@ -45,7 +45,7 @@ export default function DoorDropCardPage() {
           </p>
         </div>
         <p className="text-lg font-bold">
-          dang.ac <span className="mx-2 font-normal text-ink-300">·</span>
+          {appHost()} <span className="mx-2 font-normal text-ink-300">·</span>
           <span className="font-normal text-ink-500">your price, no salesperson</span>
         </p>
       </main>
@@ -69,7 +69,7 @@ export default function DoorDropCardPage() {
         </ul>
         <div className="mt-auto rounded-2xl bg-surface p-4 text-center">
           <p className="font-display text-xl">
-            dang.ac<span className="text-accent-600">/quote</span>
+            {appHost()}<span className="text-accent-600">/quote</span>
           </p>
           <p className="mt-1 text-xs text-ink-500">
             Two minutes, phone in hand. Or email {BRAND.supportEmail} and a human replies.

@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { ImageResponse } from "next/og";
+import { BRAND } from "@/lib/brand";
 
 /**
  * The social share card: what the site looks like when a link lands in
@@ -9,7 +10,7 @@ import { ImageResponse } from "next/og";
  * so shares look designed rather than like a screenshot.
  */
 
-export const alt = "Dang, It's Hot — fixed-price home air conditioning";
+export const alt = `${BRAND.name} — fixed-price home air conditioning`;
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -34,8 +35,8 @@ export default async function OgImage() {
         }}
       >
         <div style={{ display: "flex", fontSize: 40, color: "#1d212b" }}>
-          <span style={{ fontFamily: "Caprasimo" }}>Dang,&nbsp;</span>
-          <span style={{ fontFamily: "Caprasimo", color: "#f2711b" }}>It&apos;s Hot</span>
+          <span style={{ fontFamily: "Caprasimo" }}>{BRAND.nameLead}&nbsp;</span>
+          <span style={{ fontFamily: "Caprasimo", color: "#f2711b" }}>{BRAND.nameHot}</span>
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
@@ -79,7 +80,7 @@ export default async function OgImage() {
             Get my fixed price
           </div>
           <div style={{ color: "#a3a8b4", display: "flex" }}>
-            Keeping London cool, street by street
+            {BRAND.strap}, street by street
           </div>
         </div>
       </div>

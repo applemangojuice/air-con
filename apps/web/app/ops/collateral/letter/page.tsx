@@ -6,7 +6,7 @@ import {
   generateQuote,
   prefillFromIntel,
 } from "@aircon/domain";
-import { BRAND } from "@/lib/brand";
+import { BRAND, appHost, appUrl } from "@/lib/brand";
 import { gbp } from "@/lib/format";
 import { loadIntel } from "@/lib/intel-server";
 
@@ -70,7 +70,6 @@ export default async function LetterPage({
           })
         : null;
 
-    const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "https://dang.ac").replace(/\/$/, "");
     m = {
       addressLine: intel.address.line1,
       postcode: intel.address.postcode,
@@ -86,7 +85,7 @@ export default async function LetterPage({
         cls.archetypeName ? `A match for our “${cls.archetypeName}” install pattern` : null,
       ].filter(Boolean) as string[],
       price: quote ? gbp(quote.totalGbp) : "«indicative_price»",
-      link: `${appUrl}/a/${intel.id}`,
+      link: `${appUrl()}/a/${intel.id}`,
     };
   }
 
@@ -117,12 +116,12 @@ export default async function LetterPage({
       <main className="print-exact mx-auto my-8 max-w-3xl bg-white px-12 py-14 shadow-lg print:my-0 print:max-w-none print:px-0 print:py-0 print:shadow-none">
         <header className="flex items-start justify-between">
           <p className="text-2xl font-bold">
-            Dang, <span className="text-accent-500">It&apos;s Hot</span>
+            {BRAND.nameLead} <span className="text-accent-500">{BRAND.nameHot}</span>
           </p>
           <div className="text-right text-xs leading-relaxed text-ink-500">
             <p>{BRAND.legalName}</p>
             <p>{BRAND.supportEmail}</p>
-            <p>dang.ac</p>
+            <p>{appHost()}</p>
           </div>
         </header>
 
