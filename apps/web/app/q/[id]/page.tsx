@@ -5,6 +5,7 @@ import type { QuoteResult, Survey } from "@aircon/domain";
 import { StartProjectPanel } from "@/components/project/start-project";
 import { QuoteView } from "@/components/quote/quote-view";
 import { Logo } from "@/components/site/logo";
+import { BRAND, appUrl } from "@/lib/brand";
 import { getServiceClient } from "@/lib/supabase-server";
 
 export const metadata: Metadata = {
@@ -69,10 +70,10 @@ export default async function SavedQuotePage({
         </div>
         {/* Print-only provenance so a PDF stands on its own. */}
         <p className="mt-8 hidden border-t border-line pt-4 text-xs text-ink-500 print:block">
-          Fixed-price quote by Dang, It&apos;s Hot · quote ref {data.id.slice(0, 8)} · VAT
+          Fixed-price quote by {BRAND.name} · quote ref {data.id.slice(0, 8)} · VAT
           included · 5-year parts &amp; labour warranty. Saved online with finance options and
           booking at{" "}
-          {`${(process.env.NEXT_PUBLIC_APP_URL ?? "https://dang.ac").replace(/\/$/, "")}/q/${data.id}`}
+          {`${appUrl()}/q/${data.id}`}
         </p>
       </main>
     </div>

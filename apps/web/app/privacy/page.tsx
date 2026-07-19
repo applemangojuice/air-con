@@ -6,7 +6,7 @@ import { BRAND } from "@/lib/brand";
 
 export const metadata: Metadata = {
   title: "Privacy policy",
-  description: "How Dang, It's Hot collects, uses and protects your personal data.",
+  description: `How ${BRAND.name} collects, uses and protects your personal data.`,
 };
 
 /**

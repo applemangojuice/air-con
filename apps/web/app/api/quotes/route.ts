@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { generateQuote, type Survey } from "@aircon/domain";
 import { logServerEvent } from "@/lib/analytics-server";
+import { appUrl } from "@/lib/brand";
+import { brandedEmail, escapeHtml, sendEmail, sendTeamEmail } from "@/lib/email";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { UUID_RE, surveySchema } from "@/lib/schemas";
 import { getServiceClient } from "@/lib/supabase-server";
@@ -137,32 +139,6 @@ export async function POST(request: Request) {
 type Contact = { name: string; email: string; phone: string; timeframe: string };
 type Attribution = { referrer?: string; utmSource?: string; utmCampaign?: string } | undefined;
 
-/** Where lead alerts go. Falls back to the address EMAIL_FROM sends as. */
-function leadsInbox(): string | null {
-  if (process.env.LEADS_NOTIFY_EMAIL) return process.env.LEADS_NOTIFY_EMAIL;
-  const from = process.env.EMAIL_FROM;
-  if (!from) return null;
-  const match = from.match(/<([^>]+)>/);
-  return match ? match[1] : from;
-}
-
-/** Best-effort plain email via Resend. No-ops when Resend isn't configured. */
-async function sendTeamEmail(subject: string, html: string): Promise<void> {
-  const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.EMAIL_FROM;
-  const to = leadsInbox();
-  if (!apiKey || !from || !to) return;
-  try {
-    await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
-      body: JSON.stringify({ from, to: [to], subject, html }),
-    });
-  } catch (err) {
-    console.error("team email failed:", err);
-  }
-}
-
 async function notifyNewLead(
   contact: Contact,
   totalGbp: number,
@@ -170,7 +146,7 @@ async function notifyNewLead(
   id: string,
   attribution: Attribution,
 ): Promise<void> {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ?? "";
+  const base = appUrl();
   const source = attribution?.utmCampaign || attribution?.utmSource || attribution?.referrer || "direct";
   await sendTeamEmail(
     `New quote: ${escapeHtml(contact.name)} · ${gbpText(totalGbp)}`,
@@ -183,7 +159,7 @@ async function notifyNewLead(
   <li>Total: ${gbpText(totalGbp)}</li>
   <li>Came from: ${escapeHtml(source)}</li>
 </ul>
-${appUrl ? `<p><a href="${appUrl}/ops/quotes/${id}">Open in ops →</a></p>` : ""}`,
+<p><a href="${base}/ops/quotes/${id}">Open in ops →</a></p>`,
   );
 }
 
@@ -206,7 +182,7 @@ lead is <strong>not</strong> in the system. Reach out to them directly.</p>
   <li>Indicative total: ${gbpText(totalGbp)}</li>
 </ul>
 <p>Database error: <code>${escapeHtml(reason)}</code></p>
-<p>Check <a href="${(process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/$/, "")}/ops/status">/ops/status</a> — the schema is probably not fully migrated.</p>`,
+<p>Check <a href="${appUrl()}/ops/status">/ops/status</a> — the schema is probably not fully migrated.</p>`,
   );
 }
 
@@ -218,33 +194,19 @@ function gbpText(totalGbp: number): string {
   }).format(totalGbp);
 }
 
-/** Best-effort quote email via Resend. Returns false when not configured or failed. */
+/** Best-effort quote email. Returns false when not configured or failed. */
 async function sendQuoteEmail(
   name: string,
   email: string,
   quoteId: string,
   totalGbp: number,
 ): Promise<boolean> {
-  const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.EMAIL_FROM;
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
-  if (!apiKey || !from || !appUrl) return false;
-
-  const link = `${appUrl.replace(/\/$/, "")}/q/${quoteId}`;
-  const total = new Intl.NumberFormat("en-GB", {
-    style: "currency",
-    currency: "GBP",
-    maximumFractionDigits: 0,
-  }).format(totalGbp);
-
-  // Deliverability-safe branding: one table, inline styles, system fonts,
-  // no images. Looks intentional in every client, lands in no spam folders.
-  const html = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;color:#1d212b">
-  <tr><td style="padding:28px 24px 20px">
-    <span style="font-size:20px;font-weight:700">Dang, <span style="color:#f2711b">It's Hot</span></span>
-  </td></tr>
-  <tr><td style="padding:0 24px">
-    <p style="margin:0 0 14px">Hi ${escapeHtml(name)},</p>
+  const link = `${appUrl()}/q/${quoteId}`;
+  const total = gbpText(totalGbp);
+  return sendEmail(
+    email,
+    `Your fixed price: ${total} installed`,
+    brandedEmail(`<p style="margin:0 0 14px">Hi ${escapeHtml(name)},</p>
     <p style="margin:0 0 6px;color:#6e7482;font-size:14px">Your fixed installation price, VAT included:</p>
     <p style="margin:0 0 16px;font-size:36px;font-weight:700">${total}</p>
     <p style="margin:0 0 20px;color:#454b58">That's the actual price, not an estimate — your full quote with the system design, price breakdown and finance options is saved at the link below, and it doesn't expire.</p>
@@ -253,30 +215,8 @@ async function sendQuoteEmail(
     </p>
     <p style="margin:0 0 6px;font-size:13px;color:#6e7482">Or copy this link:</p>
     <p style="margin:0 0 24px;font-size:13px"><a href="${link}" style="color:#a84508">${link}</a></p>
-    <p style="margin:0 0 28px;color:#454b58">You can book your installation from that page whenever you're ready. No calls, no chasing.</p>
-    <p style="margin:0 0 28px;color:#a3a8b4;font-size:12px;border-top:1px solid #ddd5c4;padding-top:16px">Dang, It's Hot · Cooling technologies for the UK · Keeping London cool</p>
-  </td></tr>
-</table>`;
-
-  try {
-    const res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
-      body: JSON.stringify({
-        from,
-        to: [email],
-        subject: `Your fixed price: ${total} installed`,
-        html,
-      }),
-    });
-    if (!res.ok) console.error("quote email failed:", res.status, await res.text());
-    return res.ok;
-  } catch (err) {
-    console.error("quote email failed:", err);
-    return false;
-  }
+    <p style="margin:0 0 28px;color:#454b58">You can book your installation from that page whenever you're ready. No calls, no chasing.</p>`),
+  );
 }
 
-function escapeHtml(value: string): string {
-  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
+

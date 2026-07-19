@@ -1,4 +1,7 @@
 import { NextResponse } from "next/server";
+import { appUrl } from "@/lib/brand";
+import { brandedEmail, emailConfigured, sendEmail } from "@/lib/email";
+import { followUpLines, followUpSubject } from "@/lib/follow-up";
 import { getServiceClient } from "@/lib/supabase-server";
 
 /**
@@ -30,9 +33,7 @@ export async function GET(request: Request) {
   const supabase = getServiceClient();
   if (!supabase) return NextResponse.json({ ok: true, demo: true, sent: 0 });
 
-  const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.EMAIL_FROM;
-  if (!apiKey || !from) {
+  if (!emailConfigured()) {
     return NextResponse.json({ ok: false, reason: "email not configured", sent: 0 });
   }
 
@@ -91,7 +92,6 @@ export async function GET(request: Request) {
   const claimedIds = new Set((claimed ?? []).map((r) => r.id));
   const toSend = candidates.filter((d) => claimedIds.has(d.id));
 
-  const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "https://dang.ac").replace(/\/$/, "");
   let sent = 0;
   const failed: string[] = [];
 
@@ -100,7 +100,7 @@ export async function GET(request: Request) {
   for (let i = 0; i < toSend.length; i += 5) {
     const chunk = toSend.slice(i, i + 5);
     const results = await Promise.all(
-      chunk.map((d) => sendFollowUp(apiKey, from, d.email, d.postcode, appUrl)),
+      chunk.map((d) => sendFollowUp(d.email, d.postcode)),
     );
     results.forEach((ok, j) => {
       if (ok) sent++;
@@ -121,36 +121,20 @@ export async function GET(request: Request) {
   return NextResponse.json({ ok: true, sent, failed: failed.length, failedIds: failed });
 }
 
-async function sendFollowUp(
-  apiKey: string,
-  from: string,
-  to: string,
-  postcode: string,
-  appUrl: string,
-): Promise<boolean> {
-  try {
-    const res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
-      body: JSON.stringify({
-        from,
-        to: [to],
-        subject: `Your air conditioning price for ${postcode} is one tap away`,
-        html: `<p>Hi,</p>
-<p>You started getting a fixed price for air conditioning at ${escapeHtml(postcode)} and got most of the way there. Your answers are saved on the device you used — picking up where you left off takes about a minute:</p>
-<p><a href="${appUrl}/quote">Finish my quote</a></p>
-<p>If now isn't the time, no problem: this is the only nudge we'll send. No calls, no follow-up barrage.</p>
-<p>Stay cool,<br/>Dang, It's Hot</p>`,
-      }),
-    });
-    if (!res.ok) console.error("follow-up email failed:", res.status, await res.text());
-    return res.ok;
-  } catch (err) {
-    console.error("follow-up email failed:", err);
-    return false;
-  }
+async function sendFollowUp(to: string, postcode: string): Promise<boolean> {
+  const [greeting, opener, link, promise, signoff] = followUpLines(postcode);
+  return sendEmail(
+    to,
+    followUpSubject(postcode),
+    brandedEmail(`<p style="margin:0 0 14px">${esc(greeting)}</p>
+<p style="margin:0 0 14px">${esc(opener)}</p>
+<p style="margin:0 0 24px"><a href="${appUrl()}/quote" style="display:inline-block;background:#d55a0a;color:#ffffff;text-decoration:none;font-weight:600;padding:12px 28px;border-radius:999px">Finish my quote</a></p>
+<p style="margin:0 0 14px;font-size:13px"><a href="${link}" style="color:#a84508">${link}</a></p>
+<p style="margin:0 0 14px">${esc(promise)}</p>
+<p style="margin:0 0 28px">${esc(signoff).replace(/\n/g, "<br/>")}</p>`),
+  );
 }
 
-function escapeHtml(value: string): string {
+function esc(value: string): string {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
