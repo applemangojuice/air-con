@@ -35,6 +35,7 @@ export const config = {
     "/ops/status/:path*",
     "/ops/collateral/:path*",
     "/ops/launch/:path*",
+    "/ops/review/:path*",
     "/ops/design/:path*",
     "/ops/install/:path*",
   ],

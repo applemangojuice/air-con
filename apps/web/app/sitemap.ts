@@ -14,6 +14,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     page("/", 1),
     page("/quote", 0.9),
     page("/how-it-works", 0.8),
+    page("/guides/air-conditioning-cost-uk", 0.8),
     page("/areas/sw16", 0.8),
     page("/areas/sw17", 0.8),
     page("/faq", 0.7),

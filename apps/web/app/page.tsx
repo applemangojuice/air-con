@@ -4,6 +4,8 @@ import { SiteFooter } from "@/components/site/footer";
 import { PostcodeForm } from "@/components/site/postcode-form";
 import { ResumeBanner } from "@/components/site/resume-banner";
 import { BRAND } from "@/lib/brand";
+import { examplePrices, fromPrice } from "@/lib/example-prices";
+import { gbp } from "@/lib/format";
 
 const steps = [
   {
@@ -60,6 +62,11 @@ const businessJsonLd = {
 };
 
 export default function HomePage() {
+  // Price anchoring, computed by the real engine at build time — the #1
+  // unknown for AC buyers is "what will this cost?", so answer it in the hero.
+  const from = fromPrice();
+  const prices = examplePrices();
+
   return (
     <>
       <script
@@ -91,7 +98,14 @@ export default function HomePage() {
               <PostcodeForm />
               <p className="mt-3 text-sm text-ink-300">
                 Free, under two minutes, and the price is the price. Not an
-                estimate, not a &ldquo;from&rdquo;, not a man with a clipboard.
+                estimate, not a man with a clipboard.
+              </p>
+              <p className="mt-4 text-sm font-semibold text-ink-700">
+                Single room from {gbp(from)} installed · whole 3-bed home from{" "}
+                {gbp(Math.min(prices.threeBedTerrace, prices.threeBedSemi))} · VAT included ·{" "}
+                <Link href="/guides/air-conditioning-cost-uk" className="text-accent-700 hover:underline">
+                  full cost guide →
+                </Link>
               </p>
             </div>
             <div className="overflow-hidden rounded-3xl border border-line bg-white shadow-lg">
