@@ -24,14 +24,23 @@ async function pulse() {
     return error ? null : (n ?? 0);
   };
   const sevenDays = new Date(Date.now() - 7 * 86400_000).toISOString();
-  const [inbox, drafts, booked, properties, views7d] = await Promise.all([
+  const endOfToday = new Date(new Date().toISOString().slice(0, 10) + "T23:59:59Z").toISOString();
+  const [inbox, drafts, booked, properties, views7d, dueRes] = await Promise.all([
     count("quote_requests", (q) => q.in("status", tabByKey("inbox")!.statuses!)),
     count("quote_requests", (q) => q.in("status", tabByKey("drafts")!.statuses!)),
     count("quote_requests", (q) => q.in("status", tabByKey("booked")!.statuses!)),
     count("properties"),
     count("analytics_events", (q) => q.eq("type", "page_view").gte("created_at", sevenDays)),
+    supabase
+      .from("quote_requests")
+      .select("id, customer_name, email, postcode, next_action, next_action_at")
+      .not("next_action_at", "is", null)
+      .lte("next_action_at", endOfToday)
+      .neq("status", "declined")
+      .order("next_action_at", { ascending: true })
+      .limit(12),
   ]);
-  return { inbox, drafts, booked, properties, views7d };
+  return { inbox, drafts, booked, properties, views7d, due: dueRes.data ?? [] };
 }
 
 /**
@@ -60,6 +69,11 @@ const live = [
     title: "Collateral",
     href: "/ops/collateral",
     body: "Print-ready pieces generated from the live platform: the street mailing letter (with per-address proofs), the A5 door-drop card, and the investor one-pager whose numbers come from the operating model.",
+  },
+  {
+    title: "Business review",
+    href: "/ops/review",
+    body: "Plan vs actual, automated: quotes, bookings, conversion and booked value month by month against the operating model, with the week-on-week strip and the 15-minute weekly agenda.",
   },
   {
     title: "Usage analytics",
@@ -173,6 +187,33 @@ export default async function OpsPage() {
             <Pulse label="Properties" value={stats.properties} href="/ops/intel" />
             <Pulse label="Views (7d)" value={stats.views7d} href="/ops/analytics" />
           </div>
+        )}
+
+        {/* Today's chase list: the CRM loop's daily rhythm. */}
+        {stats && stats.due.length > 0 && (
+          <section className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+            <h2 className="text-sm font-bold text-amber-800">
+              Due today ({stats.due.length})
+            </h2>
+            <ul className="mt-2 space-y-1.5">
+              {stats.due.map((d) => (
+                <li key={d.id} className="flex flex-wrap items-baseline gap-x-2 text-sm">
+                  <Link
+                    href={`/ops/quotes/${d.id}`}
+                    className="font-semibold text-accent-700 hover:underline"
+                  >
+                    {d.customer_name ?? d.email}
+                  </Link>
+                  <span className="text-ink-500">
+                    {d.postcode} · {d.next_action}
+                  </span>
+                  {d.next_action_at && new Date(d.next_action_at) < new Date(new Date().toISOString().slice(0, 10)) && (
+                    <span className="text-xs font-semibold text-red-600">overdue</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </section>
         )}
 
         <h2 className="mt-10 text-xl font-display">Live now</h2>

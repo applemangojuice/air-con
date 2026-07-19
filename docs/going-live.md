@@ -13,7 +13,7 @@ when something's red. Start there.
    pnpm workspaces are handled natively. First deploy happens on import.
 2. **Supabase**: create a project, then run every file in
    `supabase/migrations/` in order (SQL editor, or `supabase db push`).
-   As of now that's `0001` → `0008`. Note there are **two** `0006_*` files
+   As of now that's `0001` → `0009`. Note there are **two** `0006_*` files
    (`0006_draft_quotes.sql` and `0006_property_intelligence.sql`) — run both;
    they create independent tables. Re-running is safe — they use `if not
    exists`. **If you skip this step the site looks connected but saves

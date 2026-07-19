@@ -155,7 +155,9 @@ export function AddressStep({
   const [manual, setManual] = useState(false);
 
   const postcodeOk = isValidUkPostcode(postcode) && check.state !== "not-found";
-  const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  // Optional at this step (price before personal details — the proven
+  // conversion pattern): empty is fine, a typo'd address is not.
+  const emailOk = email === "" || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   const ready = postcodeOk && addressLine.trim().length >= 5 && emailOk;
   const showIntelPicker = intelMatches.length > 0 && !manual;
   const showPicker = !showIntelPicker && addresses.length > 0 && !manual;
@@ -165,7 +167,7 @@ export function AddressStep({
       step={step}
       totalSteps={totalSteps}
       title="Let's price your home"
-      subtitle="Just your address and email to start. Quicker than finding where you put the fan last September."
+      subtitle="Just your address to start. Quicker than finding where you put the fan last September."
       onNext={onNext}
       nextDisabled={!ready}
       busy={busy}
@@ -257,7 +259,7 @@ export function AddressStep({
         </Field>
       )}
 
-      <Field label="Email" hint="So you can come back to your quote. We'll never call you.">
+      <Field label="Email (optional)" hint="Saves your quote so you can come back to it. Skip it and you still get your price. We never call either way.">
         <input
           className={inputCls}
           type="email"
@@ -421,7 +423,8 @@ export function DetailsStep({
 }: StepProps) {
   const c = draft.contact;
   const p = draft.survey.property;
-  const ready = c.name.trim().length >= 2;
+  const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c.email);
+  const ready = c.name.trim().length >= 2 && emailOk;
 
   return (
     <StepShell
@@ -443,6 +446,18 @@ export function DetailsStep({
           onChange={(e) => setContact({ name: e.target.value })}
         />
       </Field>
+      {!draft.draftId && (
+        <Field label="Email" hint="Where your permanent quote link goes. Still no calls.">
+          <input
+            className={inputCls}
+            type="email"
+            value={c.email}
+            autoComplete="email"
+            placeholder="you@example.com"
+            onChange={(e) => setContact({ email: e.target.value })}
+          />
+        </Field>
+      )}
       <Field label="Do you own the property?">
         <OptionCards
           value={p.ownership}

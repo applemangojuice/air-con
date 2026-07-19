@@ -5,6 +5,7 @@ import { Logo } from "./logo";
 /** Deliberately succinct: the pages that matter, and a way to reach us. */
 const links = [
   { label: "Get my price", href: "/quote" },
+  { label: "What it costs", href: "/guides/air-conditioning-cost-uk" },
   { label: "Our process", href: "/how-it-works" },
   { label: "FAQ", href: "/faq" },
   { label: "About us", href: "/about" },

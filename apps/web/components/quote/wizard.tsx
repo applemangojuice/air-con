@@ -160,7 +160,7 @@ export function QuoteWizard({
       headers: { "content-type": "application/json" },
       // Email travels too: a corrected address must reach the server draft,
       // or the follow-up email goes to the typo.
-      body: JSON.stringify({ survey: current.survey, email: current.contact.email }),
+      body: JSON.stringify({ survey: current.survey, email: current.contact.email || undefined }),
     }).catch(() => undefined);
   }
 
@@ -177,6 +177,12 @@ export function QuoteWizard({
       // entering the funnel, and the sync carries any corrected email.
       track("quote_start", { postcode: normalised.survey.postcode, resumed: true });
       syncServerDraft(normalised);
+      setStep(1);
+      return;
+    }
+    if (!normalised.contact.email) {
+      // No email given (price-before-details path): local draft only.
+      track("quote_start", { postcode: normalised.survey.postcode, draftSaved: false });
       setStep(1);
       return;
     }
