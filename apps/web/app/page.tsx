@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { SiteHeader } from "@/components/site/header";
 import { SiteFooter } from "@/components/site/footer";
+import { PostcodeForm } from "@/components/site/postcode-form";
 import { BRAND } from "@/lib/brand";
 
 const steps = [
@@ -85,22 +86,7 @@ export default function HomePage() {
                 flannel. Keeping London cool, street by street.
               </p>
 
-              <form action="/quote" className="mt-8 flex max-w-md gap-2">
-                <input
-                  type="text"
-                  name="postcode"
-                  required
-                  placeholder="Your postcode, e.g. SW1A 1AA"
-                  autoComplete="postal-code"
-                  className="w-full rounded-full border border-line bg-white px-5 py-3 text-base shadow-sm outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-100"
-                />
-                <button
-                  type="submit"
-                  className="shrink-0 rounded-full bg-ink-900 px-5 py-3 font-semibold text-white transition hover:bg-ink-700"
-                >
-                  Start
-                </button>
-              </form>
+              <PostcodeForm />
               <p className="mt-3 text-sm text-ink-300">
                 Free, under two minutes, and the price is the price. Not an
                 estimate, not a &ldquo;from&rdquo;, not a man with a clipboard.

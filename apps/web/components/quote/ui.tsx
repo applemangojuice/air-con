@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 
 export const inputCls =
   "w-full rounded-full border border-line bg-white px-5 py-3 text-base outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-100";
@@ -127,8 +127,27 @@ export function StepShell({
   nextDisabled?: boolean;
   busy?: boolean;
 }) {
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  // Speed: land the cursor in the first empty text field of each step, so
+  // typing starts immediately (postcode, then name) without a tap.
+  useEffect(() => {
+    const first = contentRef.current?.querySelector<HTMLInputElement>(
+      'input[type="text"], input[type="email"], input[type="tel"], input:not([type])',
+    );
+    if (first && !first.value) first.focus({ preventScroll: true });
+  }, [step]);
+
   return (
-    <div className="mx-auto w-full max-w-xl px-4 pb-24 pt-8 sm:px-0">
+    // A form so Enter in any field advances the step — every child button
+    // declares type="button", so submit can only mean "continue".
+    <form
+      className="mx-auto w-full max-w-xl px-4 pb-24 pt-8 sm:px-0"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (onNext && !nextDisabled && !busy) onNext();
+      }}
+    >
       {/* Progress */}
       <div className="mb-8">
         <div className="flex items-center justify-between text-xs font-medium text-ink-300">
@@ -148,7 +167,9 @@ export function StepShell({
       <h1 className="text-2xl font-display sm:text-3xl">{title}</h1>
       {subtitle && <p className="mt-2 text-ink-500">{subtitle}</p>}
 
-      <div className="mt-8 space-y-6">{children}</div>
+      <div ref={contentRef} className="mt-8 space-y-6">
+        {children}
+      </div>
 
       {(onBack || onNext) && (
         <div className="mt-10 flex items-center gap-3">
@@ -163,8 +184,7 @@ export function StepShell({
           )}
           {onNext && (
             <button
-              type="button"
-              onClick={onNext}
+              type="submit"
               disabled={nextDisabled || busy}
               className="flex-1 rounded-full bg-accent-600 px-5 py-3 font-semibold text-white shadow-sm transition hover:bg-accent-700 disabled:cursor-not-allowed disabled:opacity-40"
             >
@@ -173,6 +193,6 @@ export function StepShell({
           )}
         </div>
       )}
-    </div>
+    </form>
   );
 }

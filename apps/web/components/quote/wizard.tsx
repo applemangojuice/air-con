@@ -191,11 +191,13 @@ export function QuoteWizard({
     };
     setDraft(updated);
     syncServerDraft(updated);
+    track("quote_step", { step: "house", to: "rooms" });
     setStep(2);
   }
 
   function nextFromRooms() {
     syncServerDraft(draft);
+    track("quote_step", { step: "rooms", to: "details", rooms: draft.survey.rooms.length });
     setStep(3);
   }
 

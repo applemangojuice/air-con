@@ -63,7 +63,9 @@ export default async function OpsQuoteDetailPage({
 
       <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-display">{q.customer_name}</h1>
+          <h1 className="text-2xl font-display">
+            {q.customer_name ?? `${q.email} (didn't finish)`}
+          </h1>
           <p className="mt-1 text-sm text-ink-500">
             {survey.addressLine}, {q.postcode}
             {survey.geo?.district ? ` · ${survey.geo.district}` : ""} ·{" "}
