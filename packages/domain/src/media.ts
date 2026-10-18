@@ -107,7 +107,132 @@ export interface MediaItem {
   locked: boolean;
 }
 
-/** zod-free manual validation, clamps to 0..1, drops junk. */
+/* ------------------------------------------------------------------ */
+/* Validation (F2)                                                     */
+/* ------------------------------------------------------------------ */
+
+/** At most this many shapes on one photo; more is junk or abuse. */
+export const MAX_ANNOTATION_SHAPES = 200;
+/** Points on one route line. */
+export const MAX_ROUTE_POINTS = 64;
+export const MAX_ANNOTATION_LABEL = 80;
+export const MAX_ANNOTATION_NOTE = 280;
+/** Boxes smaller than this (as a share of the photo) are a slip of the finger, not a unit. */
+const MIN_BOX = 0.005;
+
+const finite = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
+const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
+/** Control characters out, whitespace collapsed, trimmed, cut to `max` characters (never mid-surrogate). */
+const cleanText = (v: unknown, max: number): string => {
+  if (typeof v !== "string") return "";
+  const flat = v.replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim();
+  return Array.from(flat).slice(0, max).join("").trim();
+};
+const record = (v: unknown): Record<string, unknown> | null =>
+  typeof v === "object" && v !== null && !Array.isArray(v) ? (v as Record<string, unknown>) : null;
+
+function pointOf(v: unknown): Point | null {
+  const r = record(v);
+  const x = finite(r?.x);
+  const y = finite(r?.y);
+  return x === null || y === null ? null : { x: clamp01(x), y: clamp01(y) };
+}
+
+/**
+ * Validate a drawing from the browser (zod-free, so the domain stays
+ * dependency-free). Never throws: anything that isn't a known shape with
+ * usable coordinates is dropped, coordinates are clamped to the photo
+ * (0..1), boxes are kept inside it, labels are trimmed and cut short,
+ * ids are made safe and unique, and at most 200 shapes survive. A
+ * measurement keeps its label (it's the point of the shape), so one
+ * without a label is dropped.
+ */
 export function validateAnnotations(input: unknown): Annotation[] {
-  throw new Error("not implemented: validateAnnotations (F2)");
+  if (!Array.isArray(input)) return [];
+  const out: Annotation[] = [];
+  const ids = new Set<string>();
+  const idFor = (raw: unknown, i: number) => {
+    let id = typeof raw === "string" && /^[A-Za-z0-9_-]{1,64}$/.test(raw) ? raw : `a${i + 1}`;
+    const stem = id.slice(0, 56);
+    for (let n = 2; ids.has(id); n++) id = `${stem}-${n}`;
+    ids.add(id);
+    return id;
+  };
+  // Look a little past the cap, so a few junk entries don't push real shapes out.
+  for (const [i, raw] of input.slice(0, MAX_ANNOTATION_SHAPES * 2).entries()) {
+    if (out.length >= MAX_ANNOTATION_SHAPES) break;
+    const a = record(raw);
+    if (!a) continue;
+    const label = cleanText(a.label, MAX_ANNOTATION_LABEL);
+    const withLabel = label ? { label } : {};
+    switch (a.type) {
+      case "indoor-unit":
+      case "outdoor-unit": {
+        const x = finite(a.x);
+        const y = finite(a.y);
+        const w = finite(a.w);
+        const h = finite(a.h);
+        if (x === null || y === null || w === null || h === null) continue;
+        // A box dragged up or left arrives with a negative size: normalise it,
+        // then cut it to the photo (an in-bounds box comes back untouched).
+        const fit = (start: number, size: number) => {
+          const s = size < 0 ? start + size : start;
+          const len = Math.abs(size);
+          const c = clamp01(s);
+          return { at: c, len: Math.max(0, Math.min(len - (c - s), 1 - c)) };
+        };
+        const bx = fit(x, w);
+        const by = fit(y, h);
+        if (bx.len < MIN_BOX || by.len < MIN_BOX) continue;
+        out.push({ id: idFor(a.id, i), type: a.type, x: bx.at, y: by.at, w: bx.len, h: by.len, ...withLabel });
+        break;
+      }
+      case "core-hole": {
+        const p = pointOf(a);
+        if (p) out.push({ id: idFor(a.id, i), type: "core-hole", ...p, ...withLabel });
+        break;
+      }
+      case "route": {
+        if (a.kind !== "pipe" && a.kind !== "condensate" && a.kind !== "cable") continue;
+        const points = (Array.isArray(a.points) ? a.points : [])
+          .slice(0, MAX_ROUTE_POINTS)
+          .map(pointOf)
+          .filter((p): p is Point => p !== null);
+        if (points.length < 2) continue;
+        out.push({ id: idFor(a.id, i), type: "route", kind: a.kind, points, ...withLabel });
+        break;
+      }
+      case "obstacle": {
+        const p = pointOf(a);
+        if (p) out.push({ id: idFor(a.id, i), type: "obstacle", ...p, label: label || "Obstacle" });
+        break;
+      }
+      case "measure": {
+        const from = pointOf(a.from);
+        const to = pointOf(a.to);
+        if (from && to && label) out.push({ id: idFor(a.id, i), type: "measure", from, to, label });
+        break;
+      }
+      case "note": {
+        const p = pointOf(a);
+        const text = cleanText(a.text, MAX_ANNOTATION_NOTE);
+        if (p && text) out.push({ id: idFor(a.id, i), type: "note", ...p, text });
+        break;
+      }
+      default:
+        break;
+    }
+  }
+  return out;
+}
+
+/**
+ * A measurement as it's saved: always marked as the surveyor's estimate
+ * ("≈ 3.2 m"), so no drawing ever reads as a verified dimension. A label
+ * that already says it's approximate is left alone.
+ */
+export function estimateLabel(label: string): string {
+  const t = cleanText(label, MAX_ANNOTATION_LABEL - 2);
+  if (!t) return "";
+  return /^(≈|~|approx|about|est)/i.test(t) ? t : `≈ ${t}`;
 }
