@@ -4,6 +4,7 @@ import {
   catalogueItemErrors,
   catalogueToCsv,
   compatibilityRuleErrors,
+  mergeCsvRow,
   planSeedMerge,
   type CatalogueItem,
   type CompatibilityRule,
@@ -281,21 +282,25 @@ export interface CsvPreview {
 }
 
 /** What an import would do, row by row, without writing anything. */
+/** The rows of an import laid over what's stored (columns the file doesn't have are kept), with their problems. */
+async function parseImport(csv: string): Promise<{ merged: { item: CatalogueItem; before: CatalogueItem | undefined }[]; errors: string[] }> {
+  const { items, errors, columns } = catalogueFromCsv(csv);
+  const existing = new Map((await catalogueRepo.listByIds(items.map((i) => i.id))).map((i) => [i.id, i]));
+  const merged = items.map((i) => ({ item: mergeCsvRow(existing.get(i.id), i, columns), before: existing.get(i.id) }));
+  const problems = merged.flatMap(({ item }) => catalogueItemErrors(item).map((e) => `${item.id}: ${e}`));
+  return { merged: merged.filter(({ item }) => catalogueItemErrors(item).length === 0), errors: [...errors, ...problems] };
+}
+
 export async function previewCsv(csv: string): Promise<CsvPreview> {
   if (csv.length > CSV_MAX_BYTES) return { rows: [], errors: ["That file is over 2 MB. Split it and import in parts."], counts: { new: 0, update: 0, same: 0 } };
-  const { items, errors } = catalogueFromCsv(csv);
-  const extraErrors = items.flatMap((i) => catalogueItemErrors(i).map((e) => `${i.id}: ${e}`));
-  const existing = new Map((await catalogueRepo.listByIds(items.map((i) => i.id))).map((i) => [i.id, i]));
-  const rows = items
-    .filter((i) => catalogueItemErrors(i).length === 0)
-    .map((i) => {
-      const before = existing.get(i.id);
-      const change: "new" | "update" | "same" = !before ? "new" : JSON.stringify(sortKeys(before)) === JSON.stringify(sortKeys(i)) ? "same" : "update";
-      return { id: i.id, label: i.label, kind: i.kind, change };
-    });
+  const { merged, errors } = await parseImport(csv);
+  const rows = merged.map(({ item: i, before }) => {
+    const change: "new" | "update" | "same" = !before ? "new" : JSON.stringify(sortKeys(before)) === JSON.stringify(sortKeys(i)) ? "same" : "update";
+    return { id: i.id, label: i.label, kind: i.kind, change };
+  });
   return {
     rows,
-    errors: [...errors, ...extraErrors],
+    errors,
     counts: {
       new: rows.filter((r) => r.change === "new").length,
       update: rows.filter((r) => r.change === "update").length,
@@ -321,9 +326,9 @@ function sortKeys(v: unknown): unknown {
 export async function applyCsv(csv: string, actor: StaffMember): Promise<Result<{ written: number; skipped: number; errors: string[] }>> {
   if (csv.length > CSV_MAX_BYTES) return fail("That file is over 2 MB. Split it and import in parts.");
   const preview = await previewCsv(csv);
-  const { items } = catalogueFromCsv(csv);
+  const { merged } = await parseImport(csv);
   const wanted = new Set(preview.rows.filter((r) => r.change !== "same").map((r) => r.id));
-  const toWrite = items.filter((i) => wanted.has(i.id));
+  const toWrite = merged.map((m) => m.item).filter((i) => wanted.has(i.id));
   if (toWrite.length) await catalogueRepo.upsertMany(toWrite);
   await audit({ actor, action: "catalogue.import-csv", entity: "catalogue", detail: { written: toWrite.length, errors: preview.errors.length, ids: toWrite.map((i) => i.id).slice(0, 200) } });
   return { ok: true, value: { written: toWrite.length, skipped: preview.counts.same, errors: preview.errors } };

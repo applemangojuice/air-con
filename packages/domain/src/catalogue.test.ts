@@ -16,6 +16,7 @@ import {
   isConnectable,
   isCustomerSafe,
   isStale,
+  mergeCsvRow,
   modelMatches,
   parseCsv,
   planSeedMerge,
@@ -239,6 +240,28 @@ test("CSV import: quoted £ costs, a missing header, an empty file", () => {
   assert.match(catalogueFromCsv("id,label\nx,y").errors[0]!, /missing: kind/);
   assert.deepEqual(catalogueFromCsv("").errors, ["The file is empty."]);
   assert.deepEqual(parseCsv('a,"b\n""c"""\r\n\r\nd'), [["a", 'b\n"c"'], ["d"]]);
+});
+
+test("a partial CSV (a price list) only changes the columns it has", () => {
+  const stored = item("panasonic-cs-tz25ckew");
+  const csv = 'id,kind,label,costGbpExVat,costSupplier,costObservedAt\r\npanasonic-cs-tz25ckew,indoor,Panasonic TZ 2.5 kW,412.50,DEMO Trade Counter,2026-10-18\r\n';
+  const { items, errors, columns } = catalogueFromCsv(csv);
+  assert.deepEqual(errors, []);
+  assert.deepEqual(columns, ["id", "kind", "label", "costGbpExVat", "costSupplier", "costObservedAt"]);
+  const merged = mergeCsvRow(stored, items[0]!, columns);
+  assert.equal(merged.costPence, 41_250);
+  assert.deepEqual(merged.costSource, { supplier: "DEMO Trade Counter", observedAt: "2026-10-18" });
+  // Everything the file didn't mention is as it was.
+  assert.deepEqual(merged.specs, stored.specs);
+  assert.deepEqual(merged.sources, stored.sources);
+  assert.equal(merged.confidence, stored.confidence);
+  assert.equal(merged.notes, stored.notes);
+  assert.equal(merged.model, stored.model);
+  // A brand-new id is the row as read.
+  assert.deepEqual(mergeCsvRow(undefined, items[0]!, columns), items[0]);
+  // A full export round-trips through the merge unchanged.
+  const full = catalogueFromCsv(catalogueToCsv([stored]));
+  assert.deepEqual(mergeCsvRow(stored, full.items[0]!, full.columns), stored);
 });
 
 /* ------------------------------------------------------------------ */

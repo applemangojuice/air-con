@@ -76,7 +76,7 @@ export function CsvImport() {
       <Card>
         <h2 className="font-display text-xl text-ink-900">1. Choose the file</h2>
         <p className="mt-1 text-sm text-ink-500">
-          Start from an export so the columns match. Costs are pounds ex VAT; leave a cost blank for “not priced”.
+          Start from an export so the columns match. Columns you leave out keep what's stored, so a supplier price list only needs id, kind, label and the cost columns. Costs are pounds ex VAT; a blank cost means “not priced”.
         </p>
         <label className="mt-4 flex min-h-12 cursor-pointer flex-wrap items-center gap-3 rounded-2xl border border-dashed border-line bg-surface/50 px-4 py-3 text-sm hover:border-ink-300">
           <span className="inline-flex min-h-10 items-center rounded-full border border-line bg-white px-4 font-semibold text-ink-900">Choose a CSV file</span>

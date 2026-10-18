@@ -576,15 +576,15 @@ const TIERS = new Set(["standard", "premium"]);
  * out, so the caller can show the errors before anything is applied.
  * Unknown columns are ignored; `id`, `kind` and `label` are required.
  */
-export function catalogueFromCsv(csv: string): { items: CatalogueItem[]; errors: string[] } {
+export function catalogueFromCsv(csv: string): { items: CatalogueItem[]; errors: string[]; columns: string[] } {
   const rows = parseCsv(csv);
   const errors: string[] = [];
-  if (rows.length === 0) return { items: [], errors: ["The file is empty."] };
+  if (rows.length === 0) return { items: [], errors: ["The file is empty."], columns: [] };
   const header = rows[0]!.map((h) => h.trim());
   const at = new Map(header.map((h, i) => [h, i]));
   const missing = ["id", "kind", "label"].filter((h) => !at.has(h));
-  if (missing.length) return { items: [], errors: [`The header row is missing: ${missing.join(", ")}. Export the catalogue to get a template.`] };
-  if (rows.length - 1 > CSV_MAX_ROWS) return { items: [], errors: [`That's ${rows.length - 1} rows; import at most ${CSV_MAX_ROWS} at a time.`] };
+  if (missing.length) return { items: [], errors: [`The header row is missing: ${missing.join(", ")}. Export the catalogue to get a template.`], columns: header };
+  if (rows.length - 1 > CSV_MAX_ROWS) return { items: [], errors: [`That's ${rows.length - 1} rows; import at most ${CSV_MAX_ROWS} at a time.`], columns: header };
 
   const items: CatalogueItem[] = [];
   const seen = new Set<string>();
@@ -745,7 +745,53 @@ export function catalogueFromCsv(csv: string): { items: CatalogueItem[]; errors:
     };
     items.push(item);
   });
-  return { items, errors };
+  return { items, errors, columns: header.filter((h) => CATALOGUE_CSV_COLUMNS.includes(h)) };
+}
+
+const COST_SOURCE_COLUMN: Record<string, keyof NonNullable<CatalogueItem["costSource"]>> = {
+  costSupplier: "supplier",
+  costUrl: "url",
+  costObservedAt: "observedAt",
+  costVatIncluded: "vatIncluded",
+  costNote: "note",
+};
+
+/**
+ * An imported row laid over what's stored: only the columns the file has
+ * change anything, so a price list with just id, kind, label and the cost
+ * columns updates prices and leaves specs, sources and notes alone. A blank
+ * cell in a column that is there clears that field (or sets its default).
+ */
+export function mergeCsvRow(existing: CatalogueItem | undefined, incoming: CatalogueItem, columns: string[]): CatalogueItem {
+  if (!existing) return incoming;
+  const out = JSON.parse(JSON.stringify(existing)) as Record<string, unknown> & CatalogueItem;
+  const src = incoming as unknown as Record<string, unknown>;
+  for (const col of columns) {
+    if (col === "costGbpExVat") {
+      out.costPence = incoming.costPence;
+    } else if (col in COST_SOURCE_COLUMN) {
+      const key = COST_SOURCE_COLUMN[col]!;
+      const cs: Record<string, unknown> = { ...(out.costSource ?? {}) };
+      const v = incoming.costSource?.[key];
+      if (v === undefined) delete cs[key];
+      else cs[key] = v;
+      if (Object.keys(cs).length) out.costSource = cs as CatalogueItem["costSource"];
+      else delete out.costSource;
+    } else if (col.startsWith(SPEC_COLUMN_PREFIX)) {
+      const key = col.slice(SPEC_COLUMN_PREFIX.length) as keyof EquipmentSpecs;
+      const specs: Record<string, unknown> = { ...(out.specs ?? {}) };
+      const v = incoming.specs?.[key];
+      if (v === undefined) delete specs[key];
+      else specs[key] = v;
+      if (Object.keys(specs).length) out.specs = specs as Partial<EquipmentSpecs>;
+      else delete out.specs;
+    } else {
+      const v = src[col];
+      if (v === undefined) delete out[col];
+      else out[col] = v;
+    }
+  }
+  return out;
 }
 
 /* ------------------------------------------------------------------ */

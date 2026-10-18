@@ -612,7 +612,7 @@ export function DesignStudio(props: DesignStudioProps) {
       </div>
 
       {/* Phones: the next action stays in reach. */}
-      {(primary || dirty) && (
+      {(dirty || (primary && !(design.status === "approved" && !editing))) && (
         <div className="sticky bottom-0 z-20 -mx-4 mt-6 border-t border-line bg-cream/95 px-4 py-3 backdrop-blur lg:hidden">
           <div className="flex items-center gap-3">
             <p className="min-w-0 flex-1 text-xs text-ink-500" aria-hidden>

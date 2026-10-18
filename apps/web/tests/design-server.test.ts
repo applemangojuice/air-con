@@ -174,6 +174,18 @@ test("catalogue: create, update, validation, CSV preview and apply, research see
   const second = await catalogue.loadResearchedCatalogue(false, TECH);
   assert.equal(second.items.added, 0);
   assert.equal((await catalogue.getItem("panasonic-cs-tz25ckew"))!.costPence, 33_300);
+  // A supplier price list (id, kind, label and cost columns only) updates prices and nothing else.
+  const priceList = "id,kind,label,costGbpExVat,costSupplier\npanasonic-cu-tz25cke,outdoor,Panasonic TZ 2.5 kW outdoor,512.00,Test supplier\n";
+  const before = (await catalogue.getItem("panasonic-cu-tz25cke"))!;
+  const pricePreview = await catalogue.previewCsv(priceList);
+  assert.equal(pricePreview.counts.update, 1);
+  const priced = await catalogue.applyCsv(priceList, TECH);
+  assert.ok(priced.ok);
+  const after = (await catalogue.getItem("panasonic-cu-tz25cke"))!;
+  assert.equal(after.costPence, 51_200);
+  assert.deepEqual(after.specs, before.specs);
+  assert.deepEqual(after.sources, before.sources);
+
   const third = await catalogue.loadResearchedCatalogue(true, TECH);
   assert.ok(third.items.replaced > 100);
   assert.equal((await catalogue.getItem("panasonic-cs-tz25ckew"))!.costPence, null);
