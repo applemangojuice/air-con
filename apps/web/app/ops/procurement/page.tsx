@@ -4,6 +4,7 @@ import { OPS_CAPACITY, buildProcurementPlan } from "@aircon/domain";
 import { fmtDay } from "@/lib/format";
 import { loadScheduledJobs } from "@/lib/ops-server";
 import { getServiceClient } from "@/lib/supabase-server";
+import { requireStaff } from "@/lib/auth/server";
 
 export const metadata: Metadata = {
   title: "Procurement · admin",
@@ -18,6 +19,7 @@ export const dynamic = "force-dynamic";
  * (supplier lead time), and the aggregated weekly totals to order against.
  */
 export default async function ProcurementPage() {
+  await requireStaff("projects.view-all");
   const demo = !getServiceClient();
   const jobs = await loadScheduledJobs();
   const plan = buildProcurementPlan(jobs, new Date().toISOString());

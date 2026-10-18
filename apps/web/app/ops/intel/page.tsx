@@ -10,6 +10,7 @@ import { gbp } from "@/lib/format";
 import { queryIntel, type IntelFilters, type IntelRow } from "@/lib/intel-server";
 import { getServiceClient } from "@/lib/supabase-server";
 import { recomputeAction, seedSampleBookAction, tagCampaignAction } from "./actions";
+import { requireStaff } from "@/lib/auth/server";
 
 export const metadata: Metadata = {
   title: "Property intelligence · ops",
@@ -55,6 +56,7 @@ function filterQuery(f: IntelFilters): string {
 }
 
 export default async function OpsIntelPage({ searchParams }: { searchParams: Promise<Search> }) {
+  await requireStaff("projects.view-all");
   const sp = await searchParams;
   const filters = readFilters(sp);
   const demo = !getServiceClient();

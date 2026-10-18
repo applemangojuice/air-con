@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { PLAN_BASE, buildPlan } from "@aircon/domain";
 import { gbp } from "@/lib/format";
 import { getServiceClient } from "@/lib/supabase-server";
+import { requireStaff } from "@/lib/auth/server";
 
 export const metadata: Metadata = {
   title: "Business review · ops",
@@ -107,6 +108,7 @@ function Delta({ now, prev }: { now: number; prev: number }) {
 }
 
 export default async function ReviewPage() {
+  await requireStaff("finance.view-margin");
   const data = await actuals();
   const plan = buildPlan(PLAN_BASE);
 

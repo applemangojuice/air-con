@@ -1,4 +1,4 @@
-import { outcodeOf, type Project, type ScheduledJob } from "@aircon/domain";
+import { outcodeOf, type Project, type ProjectV1, type ScheduledJob } from "@aircon/domain";
 import { getServiceClient } from "./supabase-server";
 
 /**
@@ -23,7 +23,25 @@ export async function loadScheduledJobs(): Promise<ScheduledJob[]> {
   }
 
   return (data ?? []).map((row) => {
-    const project = row.project as Project;
+    // Interim: v2 snapshots (schemaVersion 2) map onto the same planning
+    // slice; v1 rows read exactly as before.
+    const snapshot = row.project as Project | ProjectV1;
+    if ("schemaVersion" in snapshot && snapshot.schemaVersion === 2) {
+      return {
+        projectId: row.id,
+        customer: row.customer_name,
+        postcode: row.postcode,
+        outcode: outcodeOf(row.postcode),
+        stage: row.current_stage,
+        installOn: snapshot.booking.startDate,
+        installDays: snapshot.booking.installDays,
+        siteVisitAt: snapshot.survey.scheduledFor,
+        deliveryOn: snapshot.kit.expectedDate,
+        systems: snapshot.quoteSummary.systems,
+        roomUnits: snapshot.quoteSummary.roomDesigns.map((r) => r.unitLabel),
+      };
+    }
+    const project = snapshot as ProjectV1;
     return {
       projectId: row.id,
       customer: row.customer_name,

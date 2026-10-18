@@ -1,8 +1,15 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { STAGE_INFO, type ProjectStageId } from "@aircon/domain";
+// Interim: rows can hold v1 or v2 stage ids until the board is rebuilt for v2.
+import {
+  STAGE_INFO,
+  STAGE_INFO_V1,
+  type ProjectStageId,
+  type ProjectStageIdV1,
+} from "@aircon/domain";
 import { fmtDay, fmtDayTime } from "@/lib/format";
 import { getServiceClient } from "@/lib/supabase-server";
+import { requireStaff } from "@/lib/auth/server";
 
 export const metadata: Metadata = {
   title: "Projects · ops",
@@ -20,6 +27,7 @@ const STAGE_CLS: Record<string, string> = {
 };
 
 export default async function OpsProjectsPage() {
+  await requireStaff("projects.view-all");
   const supabase = getServiceClient();
 
   if (!supabase) {
@@ -101,7 +109,9 @@ export default async function OpsProjectsPage() {
                     >
                       {p.completed
                         ? "complete"
-                        : (STAGE_INFO[p.current_stage as ProjectStageId]?.label ?? p.current_stage)}
+                        : (STAGE_INFO_V1[p.current_stage as ProjectStageIdV1]?.label ??
+                          STAGE_INFO[p.current_stage as ProjectStageId]?.label ??
+                          p.current_stage)}
                     </span>
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-ink-500">

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { getServiceClient } from "@/lib/supabase-server";
+import { requireStaff } from "@/lib/auth/server";
 
 export const metadata: Metadata = {
   title: "Collateral · ops",
@@ -42,6 +43,7 @@ const pieces = [
 ];
 
 export default async function CollateralPage() {
+  await requireStaff("projects.view-all");
   // A real property id makes the letter-proof link one click instead of a hunt.
   let proofId: string | null = null;
   const supabase = getServiceClient();

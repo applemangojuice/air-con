@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { FinancePlanner } from "@/components/ops/finance-planner";
+import { requireStaff } from "@/lib/auth/server";
 
 export const metadata: Metadata = {
   title: "Business case · admin",
@@ -12,7 +13,8 @@ export const metadata: Metadata = {
  * line is a dial) and raising investment (the cash trough is the ask).
  * All maths lives in @aircon/domain/finance.ts, pure and tested.
  */
-export default function FinancePage() {
+export default async function FinancePage() {
+  await requireStaff("finance.view-margin");
   return (
     <main className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">

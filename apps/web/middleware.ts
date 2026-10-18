@@ -1,42 +1,47 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { SESSION_COOKIE, verifySession } from "@/lib/auth/session";
 
 /**
- * HTTP Basic auth for internal ops pages. Set OPS_PASSWORD to enable.
- * (Interim measure, replaced by Supabase Auth roles when the portal lands.)
+ * The staff wall (contract §C): /ops and /field need a valid, unexpired,
+ * correctly signed staff session, or the request goes to /login and comes
+ * back afterwards. Edge-safe: the cookie's HMAC is checked here with Web
+ * Crypto, no database.
+ *
+ * This only answers "is this a signed-in staff member?". What they may do
+ * is checked in each page and action against the live staff record
+ * (requireStaff), so a role change applies at once. The one coarse rule
+ * here: subcontractors never see the ops console, only their field jobs.
+ *
+ * Customer pages check access in the page itself, not here.
  */
-export function middleware(request: NextRequest) {
-  const password = process.env.OPS_PASSWORD;
-  if (!password) return NextResponse.next(); // pages render a setup notice instead
+export async function middleware(request: NextRequest) {
+  const { pathname, search } = request.nextUrl;
+  const session = await verifySession(request.cookies.get(SESSION_COOKIE)?.value);
 
-  const header = request.headers.get("authorization");
-  if (header?.startsWith("Basic ")) {
-    const decoded = atob(header.slice(6));
-    const pass = decoded.slice(decoded.indexOf(":") + 1);
-    if (pass === password) return NextResponse.next();
+  if (!session || session.kind !== "staff") {
+    const login = request.nextUrl.clone();
+    login.pathname = "/login";
+    login.search = `?next=${encodeURIComponent(`${pathname}${search}`)}`;
+    // 302, not Next's default 307: a 307 would replay a POST (a server
+    // action on an expired session) at /login, body and all.
+    return NextResponse.redirect(login, 302);
   }
 
-  return new NextResponse("Authentication required", {
-    status: 401,
-    headers: { "WWW-Authenticate": 'Basic realm="ops", charset="UTF-8"' },
-  });
+  if (session.external && (pathname === "/ops" || pathname.startsWith("/ops/"))) {
+    const field = request.nextUrl.clone();
+    field.pathname = "/field";
+    field.search = "";
+    return NextResponse.redirect(field, 302);
+  }
+
+  // Pages read this to send a signed-out or under-permissioned visitor back
+  // to the right place (lib/auth/server.ts). Always overwritten, never trusted
+  // from the client.
+  const forwarded = new Headers(request.headers);
+  forwarded.set("x-dih-path", `${pathname}${search}`);
+  return NextResponse.next({ request: { headers: forwarded } });
 }
 
 export const config = {
-  matcher: [
-    "/ops",
-    "/ops/quotes/:path*",
-    "/ops/projects/:path*",
-    "/ops/intel/:path*",
-    "/ops/templates/:path*",
-    "/ops/schedule/:path*",
-    "/ops/procurement/:path*",
-    "/ops/finance/:path*",
-    "/ops/analytics/:path*",
-    "/ops/status/:path*",
-    "/ops/collateral/:path*",
-    "/ops/launch/:path*",
-    "/ops/review/:path*",
-    "/ops/design/:path*",
-    "/ops/install/:path*",
-  ],
+  matcher: ["/ops", "/ops/:path*", "/field", "/field/:path*"],
 };

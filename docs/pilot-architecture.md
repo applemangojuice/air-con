@@ -986,3 +986,52 @@ leaves a `// INTEGRATION:` note.
 Inventory and warehouse stock, supplier scraping, WhatsApp, recurring
 billing, server-side PDF rendering, a native installer app, RLS policies,
 multi-crew optimisation, AI heat load, LiDAR.
+
+## K. Deviations (foundation, as built)
+
+Where the foundation had to differ from the text above, and why. Everything
+else is as written.
+
+1. **`DEFAULT_PROPOSAL_ASSUMPTIONS`** replaces `proposal.ts`'s
+   `DEFAULT_ASSUMPTIONS`: `intelligence.ts` already exports that name
+   through `index.ts`.
+2. **v1 kept side by side until F1/F7 land.** `project-v1.ts` is the frozen
+   v1 machine with `V1`-suffixed exports (`ProjectV1`,
+   `applyProjectActionV1`, …), and `lib/projects-server.ts` stays as v1
+   persistence for the pages not yet rebuilt (`/p/[id]`, `/how-it-works`,
+   `/ops/projects/**`, `/api/projects/**`). It reads a v2 snapshot as "not
+   found", so a v1 page never runs a v1 action over v2 data. The old names
+   (`loadProject`, `applyAndSave`, …) for v2 callers live in
+   `lib/project-service.ts`. Delete both v1 modules once nothing imports them.
+3. **`dispatch` errors carry `status`** (the HTTP code a route should
+   answer) alongside `error` and `blockers`.
+4. **Local signed URLs sign the operation:** `?op=get|put|upsert&exp=…&sig=…`,
+   so a read URL can't be replayed as an upload. `put` never overwrites
+   (like a Supabase signed upload URL).
+5. **`DATA_BACKEND=none`** forces demo mode outside production, to check the
+   public demo pages.
+6. **Middleware redirects are explicit 302s**, not Next's default 307,
+   which would replay a server action's POST at `/login`. External staff who
+   open `/ops/**` are sent to `/field`.
+7. **Break-glass sessions last 12 hours**, not 30 days. Without a database,
+   an `ADMIN_EMAILS` address gets a synthetic admin so the legacy console
+   still opens.
+8. **On-screen magic links** appear only in development, or for DEMO staff
+   on a demo deployment: showing a real person's link would let anyone sign
+   in as them. Portal sign-in links last 60 minutes; links embedded in
+   customer emails last 30 days, as specified.
+9. **The accepted-proposal trigger is stricter:** besides the options, the
+   acceptance record, project, version and `accepted_at` are frozen, and a
+   proposal that was accepted and then superseded stays frozen.
+10. **Kit:** no `Timeline` wrapper. The portal timeline stays in
+    `components/project/timeline.tsx`, which F1 rewrites for v2.
+    `ModeBanner` is server-only, so it's imported from
+    `components/kit/mode-banner`, not the kit index.
+11. **§A7 is enforced by a test.** Every page, route handler and server
+    action under `app/ops` and `app/field` calls a guard itself
+    (`tests/route-guards.test.ts`). Middleware only proves the cookie is
+    signed; it can't see a deactivation, and a server action can be invoked
+    from any route. The legacy ops pages now call `requireStaff`:
+    `projects.view-all` by default, `finance.view-margin` for finance and
+    review, `settings.edit` for launch, and `projects.edit` for their
+    actions. Feature agents rewriting those pages keep a guard.

@@ -28,7 +28,32 @@ export function fmtDayTime(iso: string): string {
   return `${DAY_NAMES[d.getUTCDay()]} ${d.getUTCDate()} ${MONTH_NAMES[d.getUTCMonth()]}, ${hh}:${mm}`;
 }
 
-const POSTCODE_RE = /^[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}$/i;
+/** "3 Nov 2026" from an ISO date or datetime (the date part, as stored). */
+export function fmtDate(iso: string): string {
+  const d = new Date(`${iso.slice(0, 10)}T12:00:00Z`);
+  if (Number.isNaN(d.getTime())) return iso;
+  return `${d.getUTCDate()} ${MONTH_NAMES[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+}
+
+/** "1,234,567" from a whole number, without Intl (runtime-stable). */
+function groupThousands(whole: number): string {
+  return String(whole).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
+
+/**
+ * Money from integer pence: "£1,234", or "£1,234.50" when there are pence.
+ * Negative amounts (credits, discounts) read "-£150".
+ */
+export function money(pence: number): string {
+  if (!Number.isFinite(pence)) return "£-";
+  const p = Math.round(pence);
+  const abs = Math.abs(p);
+  const pounds = groupThousands(Math.floor(abs / 100));
+  const rest = abs % 100;
+  return `${p < 0 ? "-" : ""}£${pounds}${rest ? `.${String(rest).padStart(2, "0")}` : ""}`;
+}
+
+const POSTCODE_RE =/^[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}$/i;
 
 export function isValidUkPostcode(value: string): boolean {
   return POSTCODE_RE.test(value.trim());

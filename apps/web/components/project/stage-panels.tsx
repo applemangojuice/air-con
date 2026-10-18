@@ -1,16 +1,17 @@
 "use client";
 
 import { useMemo, useState } from "react";
+// Interim: the legacy v1 machine, until the portal is rewritten for v2.
 import {
   DELIVERY_LEAD_DAYS,
   INSTALL_LEAD_DAYS,
   SITE_VISIT,
   SITE_VISIT_MODE_LABEL,
   daysBetween,
-  rescheduleFeeGbp,
-  stageState,
-  type Project,
-  type ProjectAction,
+  rescheduleFeeGbpV1 as rescheduleFeeGbp,
+  stageStateV1 as stageState,
+  type ProjectV1 as Project,
+  type ProjectActionV1 as ProjectAction,
   type SiteVisitMode,
 } from "@aircon/domain";
 import { fmtDay, fmtDayTime, gbp } from "@/lib/format";

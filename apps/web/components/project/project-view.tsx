@@ -1,18 +1,19 @@
 "use client";
 
 import { useMemo, useState } from "react";
+// Interim: the legacy v1 machine, until the portal is rewritten for v2.
 import {
   RESCHEDULE_FEES,
   SLA_COMMITMENTS,
-  applyProjectAction,
-  currentStage,
-  isProjectComplete,
-  projectFees,
-  projectTimeline,
-  stageState,
-  type Project,
-  type ProjectAction,
-  type ProjectStageId,
+  applyProjectActionV1 as applyProjectAction,
+  currentStageV1 as currentStage,
+  isProjectCompleteV1 as isProjectComplete,
+  projectFeesV1 as projectFees,
+  projectTimelineV1 as projectTimeline,
+  stageStateV1 as stageState,
+  type ProjectV1 as Project,
+  type ProjectActionV1 as ProjectAction,
+  type ProjectStageIdV1 as ProjectStageId,
 } from "@aircon/domain";
 import { fmtDayTime, gbp } from "@/lib/format";
 import { ProjectTimeline } from "./timeline";

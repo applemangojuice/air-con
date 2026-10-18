@@ -1,12 +1,14 @@
 import { getServiceClient } from "@/lib/supabase-server";
 import { tabByKey } from "../tabs";
+import { requireStaffApi } from "@/lib/auth/server";
 
 /**
  * CSV of quote requests for the selected tab — the owner's data, one click,
- * ready for a spreadsheet or a CRM import. Behind the same /ops basic-auth
- * wall as the page (middleware matcher).
+ * ready for a spreadsheet or a CRM import. Same staff sign-in as the page.
  */
 export async function GET(request: Request) {
+  const staff = await requireStaffApi(request, "projects.view-all");
+  if (staff instanceof Response) return staff;
   const url = new URL(request.url);
   const tabKey = url.searchParams.get("tab") ?? "all";
   const tab = tabByKey(tabKey);

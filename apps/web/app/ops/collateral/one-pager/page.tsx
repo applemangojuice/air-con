@@ -10,6 +10,7 @@ import {
 } from "@aircon/domain";
 import { BRAND, appHost } from "@/lib/brand";
 import { gbp } from "@/lib/format";
+import { requireStaff } from "@/lib/auth/server";
 
 export const metadata: Metadata = {
   title: "Investor one-pager · collateral · ops",
@@ -33,7 +34,8 @@ function gbpShort(amount: number): string {
  * computed by the same @aircon/domain models that power /ops/finance —
  * change an assumption there, reprint here, nothing drifts.
  */
-export default function OnePagerPage() {
+export default async function OnePagerPage() {
+  await requireStaff("projects.view-all");
   const plan = buildPlan(PLAN_BASE);
   const ltv = ltvModel(PLAN_BASE, INVESTOR_BASE);
   const market = marketModel(PLAN_BASE, INVESTOR_BASE, plan);

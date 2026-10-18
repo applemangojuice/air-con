@@ -1,0 +1,250 @@
+/**
+ * Pilot settings: the business's configuration in one JSON document.
+ *
+ * Everything that is a business decision rather than code lives here: tax
+ * treatment, margins, labour rates, deposit policy, service area, warranty
+ * wording, legal review state. The defaults are deliberately conservative
+ * (no VAT claims, no warranty years, terms flagged unreviewed) so nothing
+ * customer-facing overstates what's been decided.
+ *
+ * Stored as one row in the `settings` table and merged over these defaults
+ * on read, so a new setting never needs a data migration.
+ */
+
+/* ------------------------------------------------------------------ */
+/* Tax                                                                 */
+/* ------------------------------------------------------------------ */
+
+export type TaxCodeId = "standard-20" | "reduced-5" | "zero-esm" | "outside-scope";
+
+/** Working summaries, not tax advice: the accountant confirms the code in use. */
+export const TAX_CODES: Record<TaxCodeId, { label: string; ratePct: number; note: string }> = {
+  "standard-20": {
+    label: "Standard rate VAT (20%)",
+    ratePct: 20,
+    note: "The default for VAT-registered work that doesn't qualify for relief, including cooling-only units.",
+  },
+  "reduced-5": {
+    label: "Reduced rate VAT (5%)",
+    ratePct: 5,
+    note: "Energy-saving materials in homes from 1 April 2027, when the zero rate ends. Accountant to confirm.",
+  },
+  "zero-esm": {
+    label: "Zero-rated energy-saving materials (0%)",
+    ratePct: 0,
+    note: "Qualifying air-source heat pumps installed in homes, until 31 March 2027. Units used for cooling only don't qualify. Accountant to confirm.",
+  },
+  "outside-scope": {
+    label: "No VAT (not VAT registered)",
+    ratePct: 0,
+    note: "We aren't VAT registered, so no VAT is charged and none is shown.",
+  },
+};
+
+/* ------------------------------------------------------------------ */
+/* Shape                                                               */
+/* ------------------------------------------------------------------ */
+
+export interface DiscountCode {
+  code: string;
+  label: string;
+  pct?: number;
+  amountPence?: number;
+  reason: string;
+  active: boolean;
+}
+
+export interface PilotSettings {
+  company: {
+    legalName: string;
+    tradingName: string;
+    companyNumber?: string;
+    registeredAddress?: string;
+    phone: string;
+    email: string;
+    vatNumber?: string;
+    fgasCompanyCert?: { body: string; number: string; expiresOn?: string };
+    insurance?: { provider: string; policy: string; expiresOn?: string };
+    bank?: { accountName: string; sortCode: string; accountNumber: string };
+  };
+  tax: { vatRegistered: boolean; defaultTaxCode: TaxCodeId; accountantConfirmed: boolean; rationale: string };
+  pricing: {
+    minMarginPct: number;
+    contingencyPct: number;
+    overheadPerJobPence: number;
+    quoteValidityDays: number;
+    requireEngineerSignoff: boolean;
+    labourRates: {
+      installerDayPence: number;
+      electricianDayPence: number;
+      techLeadDayPence: number;
+      surveyorHourPence: number;
+    };
+    premiumUpliftPct: number; // fallback uplift when a premium option is priced off the engine list price
+  };
+  discounts: DiscountCode[];
+  payments: {
+    depositPct: number;
+    depositTiming: "on-acceptance" | "before-kit-order";
+    balanceDueDays: number;
+    methods: ("card" | "bank-transfer")[];
+    invoicePrefix: string;
+    nextInvoiceNumber: number;
+  };
+  scheduling: {
+    installBlockDays: number;
+    surveySlotTimes: string[];
+    surveyDurationMinutes: number;
+    surveyFeeGbp: number;
+    cancellationDays: number;
+    workingDays: number[] /* 1=Mon … 5=Fri */;
+  };
+  serviceArea: { outcodes: string[] };
+  sla: { enabled: boolean };
+  warranty: { workmanshipYears: number | null; manufacturerSummary: string | null };
+  legal: { termsVersion: string; termsReviewed: boolean; cancellationReviewed: boolean };
+  comms: { smsSenderId: string; disabledEvents: string[] };
+  finance: { lenderConfigured: boolean };
+  features: { showPrototypeNav: boolean };
+}
+
+/* ------------------------------------------------------------------ */
+/* Defaults                                                            */
+/* ------------------------------------------------------------------ */
+
+export const DEFAULT_SETTINGS: PilotSettings = {
+  company: {
+    legalName: "Dang It's Hot Ltd",
+    tradingName: "Dang, It's Hot",
+    phone: "0800 000 0000",
+    email: "hello@dang.ac",
+  },
+  tax: {
+    vatRegistered: false,
+    defaultTaxCode: "outside-scope",
+    accountantConfirmed: false,
+    rationale: "Not VAT registered during the pilot, so no VAT is charged.",
+  },
+  pricing: {
+    minMarginPct: 25,
+    contingencyPct: 5,
+    overheadPerJobPence: 0,
+    quoteValidityDays: 30,
+    requireEngineerSignoff: true,
+    // Placeholders until the pilots tell us the real numbers.
+    labourRates: {
+      installerDayPence: 22_000,
+      electricianDayPence: 25_000,
+      techLeadDayPence: 28_000,
+      surveyorHourPence: 4_000,
+    },
+    premiumUpliftPct: 18,
+  },
+  discounts: [
+    { code: "PILOT15", label: "Pilot discount (15%)", pct: 15, reason: "Early pilot home", active: true },
+    { code: "PILOT30", label: "Pilot discount (30%)", pct: 30, reason: "Founding pilot home", active: true },
+    { code: "PILOTCUSTOM", label: "Pilot discount", amountPence: 0, reason: "Set per job, with a reason", active: true },
+  ],
+  payments: {
+    depositPct: 0,
+    depositTiming: "on-acceptance",
+    balanceDueDays: 7,
+    methods: ["bank-transfer", "card"],
+    invoicePrefix: "DIH",
+    nextInvoiceNumber: 1,
+  },
+  scheduling: {
+    installBlockDays: 3,
+    surveySlotTimes: ["10:00", "13:00", "16:00"],
+    surveyDurationMinutes: 90,
+    surveyFeeGbp: 0,
+    cancellationDays: 14,
+    workingDays: [1, 2, 3, 4, 5],
+  },
+  serviceArea: {
+    outcodes: [
+      "SW2", "SW4", "SW11", "SW12", "SW16", "SW17", "SW18", "SW19",
+      "SE19", "SE25", "SE27", "CR0", "CR2", "CR4", "CR7", "CR8", "E3",
+    ],
+  },
+  sla: { enabled: false },
+  // No warranty claims anywhere until these are set.
+  warranty: { workmanshipYears: null, manufacturerSummary: null },
+  legal: { termsVersion: "pilot-draft-1", termsReviewed: false, cancellationReviewed: false },
+  comms: { smsSenderId: "DangItsHot", disabledEvents: [] },
+  finance: { lenderConfigured: false },
+  features: { showPrototypeNav: false },
+};
+
+/* ------------------------------------------------------------------ */
+/* Merge                                                               */
+/* ------------------------------------------------------------------ */
+
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
+/**
+ * Stored over default, key by key. Objects recurse, arrays replace whole,
+ * primitives must match the default's type (a `null` default accepts a
+ * number or string). Keys the defaults leave out (optional company details)
+ * pass through as stored.
+ */
+function mergeValue(def: unknown, stored: unknown): unknown {
+  if (stored === undefined) return clone(def);
+  if (def === undefined) return clone(stored);
+  if (isPlainObject(def)) {
+    if (!isPlainObject(stored)) return clone(def);
+    const out: Record<string, unknown> = {};
+    for (const key of new Set([...Object.keys(def), ...Object.keys(stored)])) {
+      const v = mergeValue(def[key], stored[key]);
+      if (v !== undefined) out[key] = v;
+    }
+    return out;
+  }
+  if (Array.isArray(def)) return Array.isArray(stored) ? clone(stored) : clone(def);
+  if (def === null) {
+    return stored === null || typeof stored === "number" || typeof stored === "string" ? stored : null;
+  }
+  if (typeof def === "number") return typeof stored === "number" && Number.isFinite(stored) ? stored : def;
+  return typeof stored === typeof def ? stored : def;
+}
+
+function clone<T>(v: T): T {
+  return v === undefined ? v : (JSON.parse(JSON.stringify(v)) as T);
+}
+
+/** Deep-merge stored JSON over the defaults, tolerant of missing or junk keys. */
+export function mergeSettings(stored: unknown): PilotSettings {
+  return mergeValue(DEFAULT_SETTINGS, isPlainObject(stored) ? stored : {}) as PilotSettings;
+}
+
+/* ------------------------------------------------------------------ */
+/* Helpers                                                             */
+/* ------------------------------------------------------------------ */
+
+/** "sw16 2be" → "SW16"; "SW16" → "SW16"; "SW162BE" → "SW16". */
+function outcode(postcode: string): string {
+  const clean = postcode.toUpperCase().replace(/[^A-Z0-9 ]/g, "").trim();
+  const spaced = clean.split(/\s+/)[0] ?? "";
+  if (clean.includes(" ")) return spaced;
+  // No space: strip a trailing inward code (digit + two letters) when present.
+  return /^[A-Z]{1,2}\d[A-Z\d]?\d[A-Z]{2}$/.test(clean) ? clean.slice(0, -3) : clean;
+}
+
+/** Postcode or bare outcode against the configured list. An empty list covers nowhere. */
+export function isInServiceArea(settings: PilotSettings, postcode: string): boolean {
+  const oc = outcode(postcode);
+  if (!oc) return false;
+  return settings.serviceArea.outcodes.some((o) => o.toUpperCase().trim() === oc);
+}
+
+/**
+ * The code proposals default to: outside-scope until VAT registered. A
+ * registered business can't charge outside-scope on a home install, so a
+ * leftover outside-scope default falls back to the standard rate.
+ */
+export function effectiveTaxCode(settings: PilotSettings): TaxCodeId {
+  if (!settings.tax.vatRegistered) return "outside-scope";
+  return settings.tax.defaultTaxCode === "outside-scope" ? "standard-20" : settings.tax.defaultTaxCode;
+}

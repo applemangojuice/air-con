@@ -8,6 +8,7 @@ import {
   type QcScorecard,
 } from "@aircon/domain";
 import { fmtDay } from "@/lib/format";
+import { requireStaff } from "@/lib/auth/server";
 
 export const metadata: Metadata = {
   title: "Installation OS · admin",
@@ -37,7 +38,8 @@ function Tick({ ok }: { ok: boolean }) {
   );
 }
 
-export default function InstallOsPage() {
+export default async function InstallOsPage() {
+  await requireStaff("projects.view-all");
   const jobs = demoInstallJobs(new Date().toISOString());
   const scored = jobs.map((job) => ({ job, score: scoreInstallation(job) }));
   const needsHuman = scored.filter((s) => s.score.qaStatus === "exceptions");

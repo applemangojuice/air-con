@@ -4,6 +4,7 @@ import { OPS_CAPACITY, buildSchedule, type ScheduleDay } from "@aircon/domain";
 import { fmtDay } from "@/lib/format";
 import { loadScheduledJobs } from "@/lib/ops-server";
 import { getServiceClient } from "@/lib/supabase-server";
+import { requireStaff } from "@/lib/auth/server";
 
 export const metadata: Metadata = {
   title: "Schedule · admin",
@@ -18,6 +19,7 @@ export const dynamic = "force-dynamic";
  * light up, and repeated outcodes surface as street-batching wins.
  */
 export default async function SchedulePage() {
+  await requireStaff("projects.view-all");
   const demo = !getServiceClient();
   const jobs = await loadScheduledJobs();
   const schedule = buildSchedule(jobs, new Date().toISOString(), 6);

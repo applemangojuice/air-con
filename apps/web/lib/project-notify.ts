@@ -1,4 +1,5 @@
-import type { Project, ProjectAction } from "@aircon/domain";
+// Interim: the legacy v1 machine. v2 transitions speak through lib/comms (notifyForAction).
+import type { ProjectActionV1 as ProjectAction, ProjectV1 as Project } from "@aircon/domain";
 import { appUrl } from "./brand";
 import { brandedEmail, escapeHtml, sendEmail, sendTeamEmail } from "./email";
 import { fmtDay, fmtDayTime, gbp } from "./format";

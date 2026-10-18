@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { analyticsSummary, type AnalyticsSummary, type Count } from "@/lib/analytics-server";
+import { requireStaff } from "@/lib/auth/server";
 
 export const metadata: Metadata = {
   title: "Usage analytics · ops",
@@ -20,6 +21,7 @@ export default async function OpsAnalyticsPage({
 }: {
   searchParams: Promise<{ days?: string }>;
 }) {
+  await requireStaff("projects.view-all");
   const { days: daysParam } = await searchParams;
   const days = WINDOWS.includes(Number(daysParam)) ? Number(daysParam) : 30;
   const s = await analyticsSummary(days);

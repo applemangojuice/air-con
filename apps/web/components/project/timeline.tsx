@@ -1,10 +1,11 @@
 "use client";
 
+// Interim: the legacy v1 machine, until the portal is rewritten for v2.
 import {
-  PROJECT_STAGES,
-  STAGE_INFO,
-  type ProjectStageId,
-  type TimelineEntry,
+  PROJECT_STAGES_V1 as PROJECT_STAGES,
+  STAGE_INFO_V1 as STAGE_INFO,
+  type ProjectStageIdV1 as ProjectStageId,
+  type TimelineEntryV1 as TimelineEntry,
 } from "@aircon/domain";
 import { fmtDay } from "@/lib/format";
 

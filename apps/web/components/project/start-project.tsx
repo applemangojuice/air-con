@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { PROJECT_STAGES, SITE_VISIT, STAGE_INFO } from "@aircon/domain";
+// Interim: the legacy v1 stages, until the portal is rewritten for v2.
+import { PROJECT_STAGES_V1 as PROJECT_STAGES, SITE_VISIT, STAGE_INFO_V1 as STAGE_INFO } from "@aircon/domain";
 import { gbp } from "@/lib/format";
 
 /**

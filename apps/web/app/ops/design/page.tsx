@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { DesignStudio } from "@/components/ops/design-studio";
+import { requireStaff } from "@/lib/auth/server";
 
 export const metadata: Metadata = {
   title: "Design studio · admin",
@@ -11,7 +12,8 @@ export const metadata: Metadata = {
  * The engineering assistant: rules engine first, equipment selection second.
  * One button turns a property into a buildable spec with traffic lights.
  */
-export default function DesignPage() {
+export default async function DesignPage() {
+  await requireStaff("projects.view-all");
   return (
     <main className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
       <div className="mb-6 flex items-center justify-between">

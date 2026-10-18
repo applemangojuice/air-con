@@ -1,14 +1,17 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import type { ElectricsPlanStatus, ProjectAction } from "@aircon/domain";
+// Interim: the legacy v1 machine, until these move to dispatch() in lib/project-service.ts.
+import type { ElectricsPlanStatus, ProjectActionV1 as ProjectAction } from "@aircon/domain";
+import { requireStaff } from "@/lib/auth/server";
 import { notifyProjectAction } from "@/lib/project-notify";
 import { applyAndSave } from "@/lib/projects-server";
 
 /**
- * Ops-side transitions. These run behind the /ops basic-auth wall (see
- * middleware.ts). Server actions POST to the page's own URL, so the same
- * wall covers them. Customer actions go through /api/projects instead.
+ * Ops-side transitions. Middleware only lets signed-in staff reach /ops
+ * (server actions POST to the page's own URL, so it covers them too); each
+ * action also checks the live staff record can edit projects. Customer
+ * actions go through /api/projects instead.
  */
 
 /**
@@ -17,6 +20,7 @@ import { applyAndSave } from "@/lib/projects-server";
  * here means a stale page, and the revalidate refreshes it either way.
  */
 async function run(projectId: string, action: ProjectAction): Promise<void> {
+  await requireStaff("projects.edit");
   const result = await applyAndSave(projectId, action);
   if ("error" in result) {
     console.error(`ops action ${action.type} on ${projectId} rejected:`, result.error);

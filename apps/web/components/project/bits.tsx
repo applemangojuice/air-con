@@ -1,7 +1,12 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { STAGE_INFO, type ProjectStageId, type StageState } from "@aircon/domain";
+// Interim: the legacy v1 machine, until the portal is rewritten for v2.
+import {
+  STAGE_INFO_V1 as STAGE_INFO,
+  type ProjectStageIdV1 as ProjectStageId,
+  type StageStateV1 as StageState,
+} from "@aircon/domain";
 
 /** Wrapper for every stage detail panel, with the future-preview treatment. */
 export function StagePanel({

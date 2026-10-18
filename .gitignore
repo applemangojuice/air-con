@@ -18,6 +18,10 @@ build/
 # fetched property data (real EPC pulls; sample data under scripts/sample-data/ is committed)
 apps/web/scripts/data/
 
+# local data backend (DATA_BACKEND=file): tables and uploaded files
+apps/web/.data/
+.data/
+
 # misc
 .DS_Store
 *.pem

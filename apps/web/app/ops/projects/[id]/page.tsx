@@ -1,7 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { PROJECT_STAGES, STAGE_INFO, projectFees, stageState } from "@aircon/domain";
+// Interim: the legacy v1 machine, until the command centre moves to v2.
+import {
+  PROJECT_STAGES_V1 as PROJECT_STAGES,
+  STAGE_INFO_V1 as STAGE_INFO,
+  projectFeesV1 as projectFees,
+  stageStateV1 as stageState,
+} from "@aircon/domain";
 import { fmtDay, fmtDayTime, gbp } from "@/lib/format";
 import { loadProject } from "@/lib/projects-server";
 import {
@@ -12,6 +18,7 @@ import {
   markDelivered,
   markDispatched,
 } from "../actions";
+import { requireStaff } from "@/lib/auth/server";
 
 export const metadata: Metadata = {
   title: "Project · ops",
@@ -32,6 +39,7 @@ export default async function OpsProjectPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  await requireStaff("projects.view-all");
   const { id } = await params;
   if (!UUID_RE.test(id)) notFound();
   const project = await loadProject(id);

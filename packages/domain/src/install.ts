@@ -1,3 +1,8 @@
+import type { CatalogueItem } from "./catalogue.ts";
+import type { DesignRecord } from "./design-record.ts";
+import type { StaffMember, StepRequirement } from "./staff.ts";
+import type { MeasuredSurvey } from "./survey-visit.ts";
+
 /**
  * The Installation Operating System.
  *
@@ -67,6 +72,16 @@ export interface InstallStep {
   /** What this step instance covers: a room, a system, a penetration. */
   item?: string;
   evidence: EvidenceSpec[];
+  // Pilot runsheet (v2) fields; the demo runsheet leaves them unset.
+  /** Which day of the three-day install the step belongs to. */
+  day?: 1 | 2 | 3;
+  /** Only someone meeting this may record it (refrigerant, electrics, sign-off). */
+  requires?: StepRequirement;
+  /** A failure here stops the job until the technical lead reviews it. */
+  critical?: boolean;
+  /** N/A is allowed, with a reason. */
+  allowNa?: boolean;
+  guidance?: string;
 }
 
 export interface InstallPhaseDef {
@@ -281,6 +296,11 @@ export interface EvidenceRecord {
   at: string; // ISO timestamp, stamped on capture
   gps?: { lat: number; lng: number };
   by: string;
+  /** Client-generated, so an offline retry is idempotent. */
+  id?: string;
+  byStaffId?: string;
+  /** The photo, video or signature in the media library. */
+  mediaId?: string;
 }
 
 export type QaStatus = "in-progress" | "auto-approved" | "exceptions" | "signed-off";
@@ -545,4 +565,101 @@ export function demoInstallJobs(todayIso: string): InstallJob[] {
       todayIso,
     ),
   ];
+}
+
+/* ------------------------------------------------------------------ */
+/* Pilot runsheet (v2): outcomes, reviews, commissioning (F6)          */
+/* ------------------------------------------------------------------ */
+
+/**
+ * The pilot install builds on everything above: runsheets come from the
+ * approved design and map onto three days, steps record an outcome (with a
+ * reason for anything but a pass), gated steps check the recorder's
+ * qualifications, and exceptions wait for the technical lead.
+ *
+ * Foundation ships the types; F6 owns the logic.
+ */
+
+export type StepOutcome = "pass" | "fail" | "blocked" | "na";
+
+export interface StepStatusRecord {
+  stepId: string;
+  outcome: StepOutcome;
+  reason?: string;
+  at: string;
+  by: string;
+  byStaffId?: string;
+  issueId?: string;
+}
+
+export interface ExceptionReview {
+  specId: string;
+  resolution: "accepted" | "recapture-required";
+  reason: string;
+  by: string;
+  at: string;
+}
+
+export interface CommissioningResult {
+  system: string;
+  strengthTestBar?: number;
+  holdBar?: number;
+  vacuumMicrons?: number;
+  decayMicrons?: number;
+  additionalChargeG?: number;
+  coolingSplitC: Record<string, number>;
+  heatingSplitC: Record<string, number>;
+  noiseDb?: number;
+  serials: { item: string; serial: string }[];
+}
+
+export interface CommissioningRecord {
+  signedBy: { staffId: string; name: string; qualificationRef: string };
+  at: string;
+  results: CommissioningResult[];
+  notes?: string;
+}
+
+export interface InstallJobV2 extends InstallJob {
+  projectId: string;
+  designId?: string;
+  templateVersion: string;
+  stepStatuses: StepStatusRecord[];
+  exceptionReviews: ExceptionReview[];
+  commissioning?: CommissioningRecord;
+}
+
+export const INSTALL_TEMPLATE_VERSION: string = "draft"; // F6: replace
+
+export function runsheetFromDesign(
+  design: DesignRecord,
+  variantId: string,
+  catalogue: CatalogueItem[],
+  measured?: MeasuredSurvey,
+): InstallStep[] {
+  throw new Error("not implemented: runsheetFromDesign (F6)");
+}
+
+export function stepsForDay(steps: InstallStep[], day: number): InstallStep[] {
+  throw new Error("not implemented: stepsForDay (F6)");
+}
+
+export function runsheetProgress(job: InstallJobV2): {
+  complete: boolean;
+  openExceptions: number;
+  missing: number;
+  blocked: number;
+  walkthroughDone: boolean;
+  byDay: { day: number; done: number; total: number }[];
+} {
+  throw new Error("not implemented: runsheetProgress (F6)");
+}
+
+export function canRecord(step: InstallStep, staff: StaffMember, onIso: string): { ok: boolean; reason?: string } {
+  throw new Error("not implemented: canRecord (F6)");
+}
+
+/** Derive commissioning results from the evidence log. */
+export function commissioningFromJob(job: InstallJobV2): CommissioningResult[] {
+  throw new Error("not implemented: commissioningFromJob (F6)");
 }

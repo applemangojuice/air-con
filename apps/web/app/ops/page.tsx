@@ -4,6 +4,7 @@ import { SiteFooter } from "@/components/site/footer";
 import { SiteHeader } from "@/components/site/header";
 import { getServiceClient } from "@/lib/supabase-server";
 import { tabByKey } from "./quotes/tabs";
+import { requireStaff } from "@/lib/auth/server";
 
 export const metadata: Metadata = {
   title: "Admin console",
@@ -50,8 +51,7 @@ async function pulse() {
 
 /**
  * The admin console home. Live modules up top, honest status on the rest.
- * Subpages sit behind basic auth (OPS_PASSWORD): browser prompts, any
- * username, that password.
+ * Every page here needs a staff sign-in (middleware plus requireStaff).
  */
 
 const live = [
@@ -167,6 +167,7 @@ function Pulse({ label, value, href }: { label: string; value: number | null; hr
 }
 
 export default async function OpsPage() {
+  await requireStaff("projects.view-all");
   const stats = await pulse();
 
   return (
@@ -179,9 +180,7 @@ export default async function OpsPage() {
         <h1 className="mt-4 text-4xl font-display">Mission control</h1>
         <p className="mt-3 max-w-2xl text-ink-500">
           Everything the team runs the business from. The modules below are
-          live now; subpages are protected by the ops password
-          (<code>OPS_PASSWORD</code>): your browser asks once, any username,
-          that password.
+          live now, and every page here needs a staff sign-in.
         </p>
 
         {stats && (

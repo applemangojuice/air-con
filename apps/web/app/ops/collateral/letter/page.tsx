@@ -5,6 +5,7 @@ import { BRAND, appHost, appUrl } from "@/lib/brand";
 import { gbp } from "@/lib/format";
 import { indicativeQuoteFromIntel } from "@/lib/intel-quote";
 import { loadIntel } from "@/lib/intel-server";
+import { requireStaff } from "@/lib/auth/server";
 
 export const metadata: Metadata = {
   title: "Mailing letter · collateral · ops",
@@ -26,6 +27,7 @@ export default async function LetterPage({
 }: {
   searchParams: Promise<{ intel?: string }>;
 }) {
+  await requireStaff("projects.view-all");
   const { intel: intelId } = await searchParams;
   const intel = intelId ? await loadIntel(intelId) : null;
 

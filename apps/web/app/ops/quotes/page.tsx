@@ -4,6 +4,7 @@ import { followUpMailto } from "@/lib/follow-up";
 import { fmtDay, gbp } from "@/lib/format";
 import { QUOTE_TABS, tabByKey } from "./tabs";
 import { getServiceClient } from "@/lib/supabase-server";
+import { requireStaff } from "@/lib/auth/server";
 
 export const metadata: Metadata = {
   title: "Quote requests · ops",
@@ -41,6 +42,7 @@ export default async function OpsQuotesPage({
 }: {
   searchParams: Promise<{ tab?: string }>;
 }) {
+  await requireStaff("projects.view-all");
   const { tab: tabKey } = await searchParams;
   const tab = tabByKey(tabKey) ?? QUOTE_TABS[0];
 
@@ -53,7 +55,7 @@ export default async function OpsQuotesPage({
           <p className="font-semibold text-ink-900">Demo mode, no database connected</p>
           <p className="mt-2">
             Set <code>SUPABASE_URL</code> and <code>SUPABASE_SERVICE_ROLE_KEY</code> to see
-            customer quote requests here. Set <code>OPS_PASSWORD</code> to protect this page.
+            customer quote requests here.
           </p>
         </div>
       </Shell>

@@ -16,6 +16,7 @@ const PREFERRED_START_LABEL: Record<BookingRequest["preferredStart"], string> = 
   flexible: "Flexible",
 };
 import { PHOTO_BUCKET, getServiceClient } from "@/lib/supabase-server";
+import { requireStaff } from "@/lib/auth/server";
 
 export const metadata: Metadata = {
   title: "Quote detail · ops",
@@ -29,6 +30,7 @@ export default async function OpsQuoteDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  await requireStaff("projects.view-all");
   const { id } = await params;
   const supabase = getServiceClient();
   if (!supabase) notFound();
@@ -62,6 +64,7 @@ export default async function OpsQuoteDetailPage({
 
   async function setStatus(formData: FormData) {
     "use server";
+    await requireStaff("projects.edit");
     const status = formData.get("status");
     if (typeof status !== "string" || !["new", "reviewed", "booked", "declined"].includes(status))
       return;
@@ -79,6 +82,7 @@ export default async function OpsQuoteDetailPage({
 
   async function addNote(formData: FormData) {
     "use server";
+    await requireStaff("projects.edit");
     const note = String(formData.get("note") ?? "").trim();
     if (!note || note.length > 4000) return;
     const sb = getServiceClient();
@@ -89,6 +93,7 @@ export default async function OpsQuoteDetailPage({
 
   async function setNextAction(formData: FormData) {
     "use server";
+    await requireStaff("projects.edit");
     const action = String(formData.get("action") ?? "").trim();
     const dueRaw = String(formData.get("due") ?? "").trim();
     const sb = getServiceClient();

@@ -1,12 +1,14 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+// Interim: the legacy v1 machine for the pages not yet rebuilt on v2. New
+// code uses lib/project-service.ts (v2: migrate on read, gates, audit, comms).
 import {
-  applyProjectAction,
-  createProject,
-  currentStage,
+  applyProjectActionV1 as applyProjectAction,
+  createProjectV1 as createProject,
+  currentStageV1 as currentStage,
   generateQuote,
-  isProjectComplete,
-  type Project,
-  type ProjectAction,
+  isProjectCompleteV1 as isProjectComplete,
+  type ProjectActionV1 as ProjectAction,
+  type ProjectV1 as Project,
   type QuoteResult,
   type Survey,
 } from "@aircon/domain";
@@ -17,7 +19,21 @@ import { getServiceClient } from "./supabase-server";
  * Server-side project persistence. The JSONB snapshot is the truth; the
  * denormalised columns exist for ops list views and are recomputed on every
  * save so they can never drift.
+ *
+ * Legacy (v1) only. A v2 snapshot (created by lib/project-service.ts) reads
+ * as "not found" here, so a v1 page never renders it or runs a v1 action
+ * over it.
  */
+
+/** v2 snapshots carry schemaVersion 2; v1 snapshots have none. */
+function isV1Snapshot(snapshot: unknown): snapshot is Project {
+  return (
+    typeof snapshot === "object" &&
+    snapshot !== null &&
+    (snapshot as { schemaVersion?: unknown }).schemaVersion === undefined &&
+    "siteVisit" in snapshot
+  );
+}
 
 function denormalise(project: Project) {
   return {
@@ -37,7 +53,7 @@ export async function loadProject(id: string): Promise<Project | null> {
   const supabase = getServiceClient();
   if (!supabase) return null;
   const { data } = await supabase.from("projects").select("project").eq("id", id).single();
-  return (data?.project as Project) ?? null;
+  return isV1Snapshot(data?.project) ? data.project : null;
 }
 
 export async function saveProject(supabase: SupabaseClient, project: Project): Promise<boolean> {
@@ -115,9 +131,9 @@ export async function applyAndSave(
   if (!supabase) return { error: "demo", status: 200 };
 
   const { data } = await supabase.from("projects").select("project").eq("id", id).single();
-  if (!data) return { error: "Project not found", status: 404 };
+  if (!data || !isV1Snapshot(data.project)) return { error: "Project not found", status: 404 };
 
-  const result = applyProjectAction(data.project as Project, action, new Date().toISOString());
+  const result = applyProjectAction(data.project, action, new Date().toISOString());
   if (!result.ok) return { error: result.error, status: 409 };
 
   const saved = await saveProject(supabase, result.project);

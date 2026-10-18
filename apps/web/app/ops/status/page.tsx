@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { healthReport, type HealthReport } from "@/lib/health";
+import { requireStaff } from "@/lib/auth/server";
 
 export const metadata: Metadata = {
   title: "System status · ops",
@@ -15,6 +16,7 @@ export const dynamic = "force-dynamic";
  * which table or bucket is missing and what it breaks for customers.
  */
 export default async function OpsStatusPage() {
+  await requireStaff("projects.view-all");
   const report = await healthReport();
 
   return (

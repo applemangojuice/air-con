@@ -9,9 +9,13 @@ import {
   tagCampaign,
   type IntelFilters,
 } from "@/lib/intel-server";
+import { requireStaff } from "@/lib/auth/server";
 import { getServiceClient } from "@/lib/supabase-server";
 
-/** Behind the /ops basic-auth wall via middleware, like the other modules. */
+/**
+ * Server actions are reachable by id from any route, not just /ops, so each
+ * one checks the staff session itself (contract §A7).
+ */
 
 function filtersFromForm(form: FormData): IntelFilters {
   const s = (k: string) => String(form.get(k) ?? "").trim() || undefined;
@@ -27,6 +31,7 @@ function filtersFromForm(form: FormData): IntelFilters {
 
 /** Stamp the current filtered set as a mailed campaign. */
 export async function tagCampaignAction(form: FormData): Promise<void> {
+  await requireStaff("projects.edit");
   const campaign = String(form.get("campaign") ?? "").trim();
   if (!campaign) return;
   const rows = await queryIntel(filtersFromForm(form));
@@ -45,6 +50,7 @@ export async function tagCampaignAction(form: FormData): Promise<void> {
  * to the app, so archetypes and scores land here.
  */
 export async function recomputeAction(): Promise<void> {
+  await requireStaff("projects.edit");
   const supabase = getServiceClient();
   if (!supabase) return; // demo data recomputes on the fly
 
@@ -82,6 +88,7 @@ export async function recomputeAction(): Promise<void> {
  * intelligence view has something to explore before the EPC importer runs.
  */
 export async function seedSampleBookAction(): Promise<void> {
+  await requireStaff("projects.edit");
   const { inserted, error } = await seedSampleBook();
   if (error) console.error("seed sample book failed:", error);
   else console.info(`seeded ${inserted} sample properties`);

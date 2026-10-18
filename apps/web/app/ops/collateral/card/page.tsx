@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { BRAND, appHost } from "@/lib/brand";
+import { requireStaff } from "@/lib/auth/server";
 
 export const metadata: Metadata = {
   title: "Door-drop card · collateral · ops",
@@ -12,7 +13,8 @@ export const metadata: Metadata = {
  * to PDF gives two pages — the printer's front and back. Un-addressed, so
  * it works for whole-street drops where we haven't matched every UPRN yet.
  */
-export default function DoorDropCardPage() {
+export default async function DoorDropCardPage() {
+  await requireStaff("projects.view-all");
   return (
     <>
       <div className="no-print border-b border-line bg-surface px-4 py-3 text-sm">

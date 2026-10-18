@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import type { ProjectAction } from "@aircon/domain";
+// Interim: the legacy v1 machine, until the portal moves to v2 (lib/project-service.ts).
+import type { ProjectActionV1 as ProjectAction } from "@aircon/domain";
 import { notifyProjectAction } from "@/lib/project-notify";
 import { applyAndSave, loadProject } from "@/lib/projects-server";
 import { enforceRateLimit } from "@/lib/rate-limit";
@@ -9,7 +10,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 /**
  * Customer actions only. ops-* actions never come through the public API;
- * they run as server actions behind the /ops basic-auth wall.
+ * they run as server actions behind the /ops staff sign-in.
  */
 const actionSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("approve-floor-plan") }),

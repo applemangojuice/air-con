@@ -1,5 +1,5 @@
 import { getServiceClient } from "./supabase-server";
-import { PHOTO_BUCKET, VIDEO_BUCKET } from "./supabase-server";
+import { MEDIA_BUCKET, PHOTO_BUCKET, VIDEO_BUCKET } from "./supabase-server";
 
 /**
  * Database self-check. Every symptom of "the site isn't saving anything"
@@ -76,6 +76,27 @@ const TABLES: { table: string; label: string; impact: string }[] = [
     label: "Analytics events",
     impact: "Usage analytics aren't recorded — no visitor, source or funnel data.",
   },
+  // Pilot platform (migration 0010): without these nobody can sign in.
+  {
+    table: "staff",
+    label: "Staff",
+    impact: "Nobody can sign in to /ops or /field: there's nowhere to keep the team.",
+  },
+  {
+    table: "login_tokens",
+    label: "Sign-in links",
+    impact: "Magic sign-in links can't be issued or checked.",
+  },
+  {
+    table: "messages",
+    label: "Message outbox",
+    impact: "Customer and team messages aren't recorded or sent.",
+  },
+  {
+    table: "audit_log",
+    label: "Audit log",
+    impact: "Sign-ins and changes aren't recorded against who made them.",
+  },
 ];
 
 async function checkTable(
@@ -125,11 +146,25 @@ function envReport(): EnvCheck[] {
       note: "Server-side writes. Pair with SUPABASE_URL.",
     },
     {
+      key: "SESSION_SECRET",
+      label: "Session secret",
+      set: has("SESSION_SECRET"),
+      required: true,
+      note: "Signs staff and customer sessions. Without it production signs nobody in.",
+    },
+    {
+      key: "ADMIN_EMAILS",
+      label: "Admin emails",
+      set: has("ADMIN_EMAILS"),
+      required: false,
+      note: "Comma list. The first sign-in from one of these creates its admin account.",
+    },
+    {
       key: "OPS_PASSWORD",
-      label: "Ops password",
+      label: "Break-glass password",
       set: has("OPS_PASSWORD"),
       required: false,
-      note: "Locks these admin pages. Unset = anyone with the link can view.",
+      note: "Optional: lets an admin email sign in with this password when email is down.",
     },
     {
       key: "RESEND_API_KEY",
@@ -188,6 +223,7 @@ export async function healthReport(): Promise<HealthReport> {
   const buckets = await Promise.all([
     checkBucket(supabase, PHOTO_BUCKET, "Survey photos"),
     checkBucket(supabase, VIDEO_BUCKET, "Survey videos"),
+    checkBucket(supabase, MEDIA_BUCKET, "Project media"),
   ]);
 
   // If every table errors identically, the project itself is unreachable

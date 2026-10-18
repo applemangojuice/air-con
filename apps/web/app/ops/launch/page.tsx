@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { healthReport } from "@/lib/health";
 import { appUrl } from "@/lib/brand";
 import { getServiceClient } from "@/lib/supabase-server";
+import { requireStaff } from "@/lib/auth/server";
 
 export const metadata: Metadata = {
   title: "Launch readiness · ops",
@@ -39,26 +40,28 @@ async function liveChecks(): Promise<{ checks: Check[]; score: number; total: nu
         ? "All tables present."
         : `Missing: ${report.tables.filter((t) => !t.ok).map((t) => t.table).join(", ")}`
       : "SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY not set — demo mode, nothing saves.",
-    fix: "Run supabase/migrations 0001→0008 in the SQL editor; check /ops/status.",
+    fix: "Run supabase/migrations 0001→0010 in the SQL editor; check /ops/status.",
   });
 
   checks.push({
-    label: "Photo & video storage buckets",
+    label: "Photo, video & project media buckets",
     ok: report.buckets.every((b) => b.ok),
     detail: report.buckets.every((b) => b.ok)
-      ? "Both buckets present."
-      : "Missing bucket — photo uploads will fail with 'invalid path'.",
-    fix: "Migration 0001 creates survey-photos; 0004 creates survey-videos.",
+      ? "All buckets present."
+      : `Missing: ${report.buckets.filter((b) => !b.ok).map((b) => b.bucket).join(", ")}. Uploads there fail with 'invalid path'.`,
+    fix: "Migration 0001 creates survey-photos, 0004 survey-videos, 0010 project-media.",
   });
 
   const env = (k: string) => report.env.find((e) => e.key === k)?.set ?? false;
   checks.push({
-    label: "Ops console password",
-    ok: env("OPS_PASSWORD"),
-    detail: env("OPS_PASSWORD")
-      ? "Set — /ops is gated."
-      : "NOT SET: anyone with the URL can read leads, bookings and traffic.",
-    fix: "Set OPS_PASSWORD in Vercel env vars and redeploy.",
+    label: "Staff sign-in",
+    ok: env("SESSION_SECRET") && env("ADMIN_EMAILS"),
+    detail: !env("SESSION_SECRET")
+      ? "SESSION_SECRET NOT SET: nobody can sign in to /ops or /field in production."
+      : env("ADMIN_EMAILS")
+        ? "Sessions are signed; the first sign-in from an ADMIN_EMAILS address becomes admin."
+        : "Sessions are signed, but ADMIN_EMAILS is empty, so there's no way to create the first admin.",
+    fix: "Set SESSION_SECRET (a long random string) and ADMIN_EMAILS in Vercel env vars and redeploy.",
   });
 
   checks.push({
@@ -155,6 +158,7 @@ const MANUAL: { label: string; how: string }[] = [
 ];
 
 export default async function LaunchPage() {
+  await requireStaff("settings.edit");
   const { checks, score, total } = await liveChecks();
   const ready = score === total;
 
