@@ -8,6 +8,7 @@ import { loadBooking } from "@/lib/booking-server";
 import { fmtDate, fmtDay, money } from "@/lib/format";
 import { isUuid } from "@/lib/repo/base";
 import { ActionForm } from "./_f5/action-form";
+import { WrapBadge } from "./_f5/wrap-badge";
 import { JobHeader } from "./_f5/job-header";
 import { assignCrewAction, confirmBookingAction, earlyStartEvidenceAction, requestDepositAction, setDatesAction } from "./actions";
 import { CrewForm, DatesForm } from "./booking-forms";
@@ -180,13 +181,18 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
 
       <Section className="mt-8" title="Crew" description="Each person's certificates are checked on the install dates. F-gas and Part P are required; a technical lead signs commissioning.">
         <Card>
-          <div className="mb-4 flex flex-wrap gap-2">
-            {REQS.map((r) => (
-              <Badge key={r} tone={view.coverage[r].length ? "success" : r === "tech-lead" ? "warn" : "danger"} dot>
-                {REQUIREMENT_LABEL[r]}: {view.coverage[r].length ? view.coverage[r].join(", ") : "nobody on the crew"}
-              </Badge>
-            ))}
-          </div>
+          <ul className="mb-4 flex flex-wrap gap-2">
+            {REQS.map((r) => {
+              const covered = view.coverage[r].length > 0;
+              return (
+                <li key={r} className="max-w-full">
+                  <WrapBadge tone={covered ? "success" : r === "tech-lead" ? "warn" : "danger"}>
+                    {REQUIREMENT_LABEL[r]}: {covered ? view.coverage[r].join(", ") : "nobody on the crew"}
+                  </WrapBadge>
+                </li>
+              );
+            })}
+          </ul>
           <CrewForm
             action={assignCrewAction.bind(null, p.id)}
             team={view.team}

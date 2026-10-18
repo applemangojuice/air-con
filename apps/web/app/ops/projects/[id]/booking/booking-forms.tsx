@@ -8,6 +8,7 @@ import { workingDatesFrom } from "../../../calendar/calendar-model";
 import { ActionForm } from "./_f5/action-form";
 import type { ActionState } from "./_f5/action-state";
 import type { TeamMemberView } from "@/lib/booking-server";
+import { WrapBadge } from "./_f5/wrap-badge";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
@@ -172,10 +173,10 @@ export function CrewForm({
       </Fieldset>
       <ul className="mt-3 flex flex-wrap gap-2" aria-live="polite">
         {REQS.map((r) => (
-          <li key={r}>
-            <Badge tone={covered[r] ? "success" : r === "tech-lead" ? "warn" : "danger"} dot>
+          <li key={r} className="max-w-full">
+            <WrapBadge tone={covered[r] ? "success" : r === "tech-lead" ? "warn" : "danger"}>
               {covered[r] ? `${REQUIREMENT_LABEL[r]}: covered` : `No ${REQUIREMENT_LABEL[r].toLowerCase()} picked`}
-            </Badge>
+            </WrapBadge>
           </li>
         ))}
       </ul>
