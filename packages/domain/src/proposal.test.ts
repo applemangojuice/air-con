@@ -21,6 +21,7 @@ import {
   recomputeOption,
   reviseProposal,
   whyThisSize,
+  withoutDiscountLine,
   type AcceptanceRecord,
   type OptionContext,
   type ProposalRecord,
@@ -432,4 +433,22 @@ test("proposalDocumentContent: the same before and after the customer views or a
   assert.equal(JSON.stringify(proposalDocumentContent(p)), JSON.stringify(proposalDocumentContent(accepted)));
   const changed = { ...p, validUntil: "2026-12-01" };
   assert.notEqual(JSON.stringify(proposalDocumentContent(p)), JSON.stringify(proposalDocumentContent(changed)));
+});
+
+test("withoutDiscountLine: an older record's discount line is folded in, so the lines still add up and show no 'was' price", () => {
+  const lines = [
+    { id: "a", label: "Bedroom", amountPence: 350_308, kind: "system" as const },
+    { id: "b", label: "Living room", amountPence: 408_692, kind: "system" as const },
+    { id: "d", label: "Pilot discount", amountPence: -113_850, kind: "discount" as const },
+    { id: "v", label: "VAT", amountPence: 129_030, kind: "fee" as const },
+  ];
+  const out = withoutDiscountLine(lines, 645_150);
+  assert.equal(out.some((l) => l.kind === "discount"), false);
+  assert.equal(out.filter((l) => l.kind === "system").reduce((a, l) => a + l.amountPence, 0), 645_150);
+  assert.equal(out.find((l) => l.id === "v")!.amountPence, 129_030, "fees untouched");
+  assert.ok(out[0]!.amountPence < 350_308);
+  const plain = [{ id: "a", label: "A", amountPence: 100, kind: "system" as const }];
+  assert.deepEqual(withoutDiscountLine(plain, 100), plain);
+  const safe = customerSafeProposal({ ...issued(), options: [{ ...issued().options[0]!, priceLines: lines, pricing: { ...issued().options[0]!.pricing, netPence: 645_150, totalPence: 774_180, taxPence: 129_030 } }] });
+  assert.equal(safe.options[0]!.priceLines.reduce((a, l) => a + l.amountPence, 0), 774_180);
 });

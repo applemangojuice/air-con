@@ -707,6 +707,28 @@ export function reviseProposal(p: ProposalRecord, newId: string, now: string): P
 }
 
 /**
+ * Price lines with any discount line folded into the others, so they still
+ * add up to the total the customer pays and no "was" price can be read off
+ * them. The fee lines (VAT) stay as they are; the rest are scaled to the
+ * net, the last taking the rounding.
+ */
+export function withoutDiscountLine(lines: PriceLine[], netPence: number): PriceLine[] {
+  if (!lines.some((l) => l.kind === "discount")) return lines.map((l) => ({ ...l }));
+  const kept = lines.filter((l) => l.kind !== "discount");
+  const base = kept.filter((l) => l.kind !== "fee");
+  const gross = base.reduce((a, l) => a + l.amountPence, 0);
+  if (base.length === 0 || gross <= 0) return kept.map((l) => ({ ...l }));
+  let left = netPence;
+  const last = kept.indexOf(base[base.length - 1]!);
+  return kept.map((l, i) => {
+    if (l.kind === "fee") return { ...l };
+    const amount = i === last ? left : Math.round((netPence * l.amountPence) / gross);
+    left -= amount;
+    return { ...l, amountPence: amount };
+  });
+}
+
+/**
  * What customers may see: no cost lines, margins, costs, pricing inputs,
  * overrides or internal notes, and no list price or discount amount (the
  * customer sees their pilot price, never a "was £X"). The labour plan keeps
@@ -722,7 +744,7 @@ export function customerSafeProposal(p: ProposalRecord): ProposalRecord {
         ...o,
         costLines: [],
         labour: { crewSize: o.labour.crewSize, installerDays: 0, electricianDays: 0, techLeadDays: 0 },
-        priceLines: o.priceLines.filter((l) => l.kind !== "discount"),
+        priceLines: withoutDiscountLine(o.priceLines, pricing.netPence),
         pricing: {
           ...pricing,
           listNetPence: pricing.netPence,
