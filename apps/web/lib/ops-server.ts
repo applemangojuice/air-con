@@ -1,159 +1,73 @@
-import { outcodeOf, type Project, type ProjectV1, type ScheduledJob } from "@aircon/domain";
+import { currentStage, migrateProject, outcodeOf, type Project, type PurchaseOrder, type ScheduledJob } from "@aircon/domain";
+import * as purchaseOrdersRepo from "./repo/purchaseOrders";
 import { getServiceClient } from "./supabase-server";
 
 /**
- * Jobs for the scheduling and procurement modules: the thin planning slice
- * of every live project. Real mode reads the projects table; demo mode
- * fabricates a believable SW16/SW17 fortnight so both pages are explorable
- * with no database.
+ * Every live project, read once for the cross-project ops screens (the
+ * calendar, purchasing, crew capacity). v1 rows are lifted to v2 on read,
+ * exactly as project-service does, so nothing here touches the v1 machine.
+ *
+ * No database means no projects: these screens say so rather than showing
+ * made-up jobs.
  */
 
-export async function loadScheduledJobs(): Promise<ScheduledJob[]> {
-  const supabase = getServiceClient();
-  if (!supabase) return demoScheduledJobs(new Date().toISOString());
-
-  const { data, error } = await supabase
-    .from("projects")
-    .select("id, customer_name, postcode, current_stage, completed, project")
-    .eq("completed", false)
-    .limit(500);
-  if (error) {
-    console.error("jobs query failed:", error.message);
-    return [];
-  }
-
-  return (data ?? []).map((row) => {
-    // Interim: v2 snapshots (schemaVersion 2) map onto the same planning
-    // slice; v1 rows read exactly as before.
-    const snapshot = row.project as Project | ProjectV1;
-    if ("schemaVersion" in snapshot && snapshot.schemaVersion === 2) {
-      return {
-        projectId: row.id,
-        customer: row.customer_name,
-        postcode: row.postcode,
-        outcode: outcodeOf(row.postcode),
-        stage: row.current_stage,
-        installOn: snapshot.booking.startDate,
-        installDays: snapshot.booking.installDays,
-        siteVisitAt: snapshot.survey.scheduledFor,
-        deliveryOn: snapshot.kit.expectedDate,
-        systems: snapshot.quoteSummary.systems,
-        roomUnits: snapshot.quoteSummary.roomDesigns.map((r) => r.unitLabel),
-      };
-    }
-    const project = snapshot as ProjectV1;
-    return {
-      projectId: row.id,
-      customer: row.customer_name,
-      postcode: row.postcode,
-      outcode: outcodeOf(row.postcode),
-      stage: row.current_stage,
-      installOn: project.installation.date,
-      installDays: project.installation.installDays,
-      siteVisitAt: project.siteVisit.scheduledFor,
-      deliveryOn: project.delivery.expectedDate,
-      systems: project.quoteSummary.systems,
-      roomUnits: project.quoteSummary.roomDesigns.map((r) => r.unitLabel),
-    };
-  });
+export interface OpsProject {
+  id: string;
+  project: Project;
 }
-
-/* ------------------------------------------------------------------ */
-/* Demo jobs                                                           */
-/* ------------------------------------------------------------------ */
-
-function addDays(iso: string, days: number): string {
-  const d = new Date(`${iso.slice(0, 10)}T12:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
-}
-
-/** Next weekday at or after the offset, so demo installs skip weekends. */
-function weekday(todayIso: string, offset: number): string {
-  let date = addDays(todayIso, offset);
-  for (let i = 0; i < 3; i++) {
-    const dow = new Date(`${date}T12:00:00Z`).getUTCDay();
-    if (dow !== 0 && dow !== 6) break;
-    date = addDays(date, 1);
-  }
-  return date;
-}
-
-const IU = "2.5 kW wall-mounted indoor unit";
-const IU_BIG = "3.5 kW wall-mounted indoor unit";
 
 /**
- * A believable pipeline: installs over the next three weeks (including one
- * deliberate double-booking to show the conflict flag), site visits this
- * week, deliveries tracking install dates.
+ * Projects for scheduling: not closed, or closed recently enough to still
+ * matter on a calendar (`includeClosed`). Unreadable snapshots are skipped
+ * and logged, never fatal to the page.
  */
-export function demoScheduledJobs(todayIso: string): ScheduledJob[] {
-  const d = (offset: number) => weekday(todayIso, offset);
-  const job = (
-    projectId: string,
-    customer: string,
-    postcode: string,
-    stage: string,
-    fields: Partial<ScheduledJob>,
-  ): ScheduledJob => ({
-    projectId,
-    customer,
-    postcode,
-    outcode: outcodeOf(postcode),
-    stage,
-    installDays: 1,
-    systems: ["3.5 kW multi-split outdoor unit (serves 3 rooms)"],
-    roomUnits: [IU, IU, IU_BIG],
-    ...fields,
-  });
+export async function loadOpsProjects(opts: { includeClosed?: boolean; limit?: number } = {}): Promise<OpsProject[]> {
+  const db = getServiceClient();
+  if (!db) return [];
+  let q = db.from("projects").select("id, customer_id, completed, project");
+  if (!opts.includeClosed) q = q.eq("completed", false);
+  const { data, error } = await q.limit(opts.limit ?? 500);
+  if (error) throw new Error(`ops projects: ${error.message}`);
+  const out: OpsProject[] = [];
+  for (const row of data ?? []) {
+    try {
+      const project = migrateProject(row.project);
+      if (row.customer_id && !project.customer.customerId) project.customer.customerId = String(row.customer_id);
+      out.push({ id: String(row.id), project: { ...project, id: String(row.id) } });
+    } catch (err) {
+      console.error(`[ops] project ${String(row.id)} has an unreadable snapshot:`, err);
+    }
+  }
+  return out;
+}
 
-  return [
-    job("demo-j1", "Alex Morgan", "SW16 2BE", "delivery", {
-      installOn: d(3),
-      deliveryOn: addDays(d(3), -2),
-      installDays: 1,
-    }),
-    job("demo-j2", "Priya Shah", "SW17 2FJ", "delivery", {
-      installOn: d(5),
-      deliveryOn: addDays(d(5), -2),
-      installDays: 2,
-      systems: ["5.0 kW multi-split outdoor unit (serves 4 rooms)"],
-      roomUnits: [IU, IU, IU, IU_BIG],
-    }),
-    // Same day as demo-j2's day two: the conflict the calendar should flag.
-    job("demo-j3", "Marcus Webb", "SW17 2AB", "delivery", {
-      installOn: addDays(d(5), 1),
-      deliveryOn: addDays(d(5), -1),
-      installDays: 1,
-    }),
-    job("demo-j4", "Leila Ahmed", "SW16 1AB", "installation", {
-      installOn: d(9),
-      deliveryOn: addDays(d(9), -2),
-      installDays: 1,
-      systems: ["2.5 kW outdoor unit"],
-      roomUnits: [IU],
-    }),
-    job("demo-j5", "Tom Osei", "SW17 2FJ", "installation", {
-      installOn: d(11),
-      deliveryOn: addDays(d(11), -2),
-      installDays: 1,
-    }),
-    job("demo-j6", "Nina Kovacs", "SW16 2BE", "installation", {
-      installOn: d(16),
-      deliveryOn: addDays(d(16), -2),
-      installDays: 2,
-      systems: ["5.0 kW multi-split outdoor unit (serves 4 rooms)"],
-      roomUnits: [IU, IU, IU, IU],
-    }),
-    // Site-visit stage: in the diary but no install date yet.
-    job("demo-j7", "Jordan Price", "SW17 2AB", "site-visit", {
-      siteVisitAt: `${d(1)}T13:00:00.000Z`,
-    }),
-    job("demo-j8", "Sofia Rossi", "SW16 1AB", "site-visit", {
-      siteVisitAt: `${d(2)}T10:00:00.000Z`,
-    }),
-    job("demo-j9", "Dev Patel", "SW16 2BE", "site-visit", {
-      siteVisitAt: `${d(2)}T16:00:00.000Z`,
-    }),
-  ];
+/** Every purchase order, grouped by project id. */
+export async function loadPurchaseOrdersByProject(): Promise<Map<string, PurchaseOrder[]>> {
+  if (!getServiceClient()) return new Map();
+  const all = await purchaseOrdersRepo.list();
+  const out = new Map<string, PurchaseOrder[]>();
+  for (const po of all) out.set(po.projectId, [...(out.get(po.projectId) ?? []), po]);
+  return out;
+}
+
+/**
+ * The thin planning slice the older operations planners take (operations.ts
+ * ScheduledJob), from v2 projects: booking dates, the survey time, the kit
+ * ETA and the quoted systems.
+ */
+export async function loadScheduledJobs(): Promise<ScheduledJob[]> {
+  const projects = await loadOpsProjects();
+  return projects.map(({ id, project: p }) => ({
+    projectId: id,
+    customer: p.customer.name,
+    postcode: p.customer.postcode,
+    outcode: outcodeOf(p.customer.postcode),
+    stage: currentStage(p),
+    ...(p.booking.startDate ? { installOn: p.booking.startDate } : {}),
+    installDays: p.booking.installDays,
+    ...(p.survey.scheduledFor ? { siteVisitAt: p.survey.scheduledFor } : {}),
+    ...(p.kit.expectedDate ? { deliveryOn: p.kit.expectedDate } : {}),
+    systems: p.quoteSummary.systems,
+    roomUnits: p.quoteSummary.roomDesigns.map((r) => r.unitLabel),
+  }));
 }

@@ -1,5 +1,5 @@
-import type { GateId } from "./project.ts";
-import type { StaffMember, StaffRole } from "./staff.ts";
+import type { GateId, Project } from "./project.ts";
+import { can, type StaffMember, type StaffRole } from "./staff.ts";
 
 /**
  * The compliance checklist: every permission, safety and certification
@@ -10,7 +10,15 @@ import type { StaffMember, StaffRole } from "./staff.ts";
  * overridden. Internal-process items can be overridden by an admin with a
  * reason. Readiness reads these items to decide what blocks a gate.
  *
- * Foundation ships the types; F5 owns the template and the review logic.
+ * Working summaries from docs/research (uk-consumer-legal.md §6–7,
+ * commissioning-standards.md §5–7), not legal advice: where the guidance
+ * says "confirm", a professional confirms.
+ *
+ * Three items are automatic (design approval, commissioning sign-off,
+ * warranty registration): they follow the project's own records through
+ * `syncCompliance` and can't be approved by hand. Planning is never
+ * concluded automatically: the survey's checklist moves `planning-pd` to
+ * "under review", and only a reviewer's written outcome approves it.
  */
 
 export type ComplianceStatus =
@@ -20,6 +28,24 @@ export type ComplianceStatus =
   | "approved"
   | "rejected"
   | "not-applicable";
+
+export const COMPLIANCE_STATUSES: readonly ComplianceStatus[] = [
+  "not-started",
+  "evidence-required",
+  "under-review",
+  "approved",
+  "rejected",
+  "not-applicable",
+];
+
+export const COMPLIANCE_STATUS_TEXT: Record<ComplianceStatus, string> = {
+  "not-started": "Not started",
+  "evidence-required": "Evidence needed",
+  "under-review": "Waiting for review",
+  approved: "Approved",
+  rejected: "Rejected",
+  "not-applicable": "Not applicable",
+};
 
 export interface ComplianceTemplateItem {
   key: string;
@@ -40,7 +66,27 @@ export interface ComplianceTemplateItem {
   guidance: string;
   evidenceHint: string;
   auto?: "design-approved" | "commissioning-signed" | "warranty-registered";
+  /** May it honestly be marked not applicable (with a reason)? Default true. */
+  allowNa?: boolean;
+  /** "note": approval needs the reviewer's written outcome, evidence alone isn't enough. Default: evidence or a note. */
+  approvalNeeds?: "evidence-or-note" | "note";
+  /** Where a new checklist starts this item. Default "not-started". */
+  initialStatus?: ComplianceStatus;
+  /** The rule behind it, in a few words. */
+  basis?: string;
 }
+
+export const COMPLIANCE_CATEGORY_LABEL: Record<ComplianceTemplateItem["category"], string> = {
+  permissions: "Permissions",
+  planning: "Planning",
+  safety: "Safety",
+  electrical: "Electrical",
+  refrigerant: "Refrigerant",
+  design: "Design",
+  commissioning: "Commissioning",
+  warranty: "Warranty",
+  consumer: "Consumer law",
+};
 
 /**
  * Keys: ownership-authority, planning-pd, designations, noise-assessment,
@@ -49,8 +95,320 @@ export interface ComplianceTemplateItem {
  * working-at-height, rams, equipment-compatibility, design-approval,
  * commissioning-approval, electrical-certificate, warranty-registration,
  * cancellation-and-consent.
+ *
+ * Statutory: planning (PD, designations, noise), asbestos, electrical (Part P
+ * scope and certificate), F-gas (company, engineers, commissioning), working
+ * at height, the risk assessment, and the consumer cancellation rules.
  */
-export const COMPLIANCE_TEMPLATE: ComplianceTemplateItem[] = []; // F5: replace
+export const COMPLIANCE_TEMPLATE: ComplianceTemplateItem[] = [
+  /* ---------------- before the proposal goes out ---------------- */
+  {
+    key: "ownership-authority",
+    label: "Owner's authority to contract",
+    category: "permissions",
+    statutory: false,
+    gate: "proposal-issue",
+    ownerRole: "surveyor",
+    allowNa: false,
+    basis: "Internal: the right person signs",
+    guidance:
+      "Confirm the person accepting owns the home, or has the owner's written permission: the landlord for a tenant, the freeholder or managing agent for a leasehold flat. The survey records the tenure and the decision maker.",
+    evidenceHint:
+      "The survey's tenure and signatory answers. For a leaseholder or tenant, the freeholder's or landlord's written consent.",
+  },
+  {
+    key: "planning-pd",
+    label: "Permitted development checks (Class G)",
+    category: "planning",
+    statutory: true,
+    gate: "proposal-issue",
+    ownerRole: "tech-lead",
+    allowNa: false,
+    approvalNeeds: "note",
+    initialStatus: "evidence-required",
+    basis: "GPDO 2015 Sch 2 Part 14 Class G, as amended from 29 May 2025",
+    guidance:
+      "England, Class G as amended by SI 2025/560: the system is not used solely for cooling; the outdoor unit is 1.5 m³ or less (0.6 m³ on a block of flats); one unit on a house that isn't detached, two on a detached house; not on a pitched roof or within 1 m of a flat roof's edge; the MCS 020(a) noise calculation passes; not a listed building; the designated-land and highway-facing wall rules are met. A flat in a mixed-use building gets no permitted development. We never conclude \"no planning needed\": the technical lead writes the outcome (\"PD checks passed\" or \"planning route needed\"). Verify the current Class G text.",
+    evidenceHint:
+      "The survey's permitted development checklist, the MCS 020(a) calculation and the outdoor unit's spec sheet (for volume). Write the outcome in the note.",
+  },
+  {
+    key: "designations",
+    label: "Listed building, conservation area and Article 4",
+    category: "planning",
+    statutory: true,
+    gate: "proposal-issue",
+    ownerRole: "surveyor",
+    allowNa: false,
+    basis: "GPDO Class G.2(i)–(k); Article 4 directions",
+    guidance:
+      "Check the council's planning map and the National Heritage List: a listed building (no permitted development; listed building consent needed), a conservation area or World Heritage Site (no unit on a wall or roof facing a road, or nearer the road than the house), and any Article 4 direction that removes Class G rights.",
+    evidenceHint: "A screenshot or link from the council's map and the heritage list, with the date you checked.",
+  },
+  {
+    key: "noise-assessment",
+    label: "Noise at the nearest neighbour (MCS 020(a))",
+    category: "planning",
+    statutory: true,
+    gate: "proposal-issue",
+    ownerRole: "tech-lead",
+    allowNa: false,
+    basis: "MCS 020(a), required by Class G.1",
+    guidance:
+      "Run the MCS 020(a) calculation for the chosen outdoor unit and position. It needs the unit's sound power (LWA) from the datasheet or EPREL fiche, the distance to the nearest neighbour's habitable-room window and the reflective surfaces nearby. The figure usually quoted is 42 dB(A): confirm it against the current MCS 020(a) issue. Without the unit's LWA, this can't be approved.",
+    evidenceHint: "The completed calculation (PDF or a photo of the worksheet), where the LWA came from, and the measured distance.",
+  },
+  {
+    key: "manufacturer-requirements",
+    label: "Manufacturer installation requirements",
+    category: "design",
+    statutory: false,
+    gate: "proposal-issue",
+    ownerRole: "tech-lead",
+    basis: "Manufacturer manuals and warranty terms",
+    guidance:
+      "From the installation manual for each chosen model: maximum pipe length and height difference, pre-charged length and extra charge per metre, breaker size, clearances, condensate fall, and anything the warranty depends on (accredited installer, registration deadline).",
+    evidenceHint: "The manual pages or links for the chosen models, and a note of anything that changed the design.",
+  },
+  {
+    key: "equipment-compatibility",
+    label: "Equipment combination verified",
+    category: "design",
+    statutory: false,
+    gate: "proposal-issue",
+    ownerRole: "tech-lead",
+    basis: "Manufacturer combination tables",
+    guidance:
+      "Every multi-split combination must come from the manufacturer's combination table: which indoor models, total connected capacity, pipe lengths per room and in total. Single splits use the matched indoor and outdoor pair. Provisional catalogue figures are checked against the datasheet.",
+    evidenceHint: "The combination table page, or the design's compatibility check.",
+  },
+  {
+    key: "design-approval",
+    label: "Design signed off by the technical lead",
+    category: "design",
+    statutory: false,
+    gate: "proposal-issue",
+    ownerRole: "tech-lead",
+    auto: "design-approved",
+    allowNa: false,
+    basis: "Internal: engineer sign-off before a price is fixed",
+    guidance:
+      "Updates itself when a technical lead with a current F-gas certificate approves the design on the design page.",
+    evidenceHint: "The design's approval record (who, their certificate, when).",
+  },
+
+  /* ---------------- before the booking is confirmed ---------------- */
+  {
+    key: "electrical-scope",
+    label: "Electrical scope and Part P route",
+    category: "electrical",
+    statutory: true,
+    gate: "booking",
+    ownerRole: "electrician",
+    allowNa: false,
+    basis: "Building Regulations 2010 reg 12(6A), Part P",
+    guidance:
+      "A new circuit for the outdoor unit is notifiable electrical work. Agree the circuit, protective device, cable route and isolator with an electrician registered with a competent person scheme, who self-certifies it. Without one, a building notice goes to the council before work starts. Check the board: a spare way, the RCD type, earthing, and any asbestos flash guard in an old fuse box.",
+    evidenceHint: "The electrician's scope note or quote, their scheme registration number, and a photo of the board.",
+  },
+  {
+    key: "fgas-company",
+    label: "Company F-gas certificate",
+    category: "refrigerant",
+    statutory: true,
+    gate: "booking",
+    ownerRole: "admin",
+    allowNa: false,
+    basis: "F-gas regulations: company certification for split systems",
+    guidance:
+      "Installing and commissioning split systems needs company F-gas certification (REFCOM or another approved body). If we don't hold it, the refrigerant work runs under a certified company, and their certificate goes in the handover pack. Check it's current on the install dates.",
+    evidenceHint: "The company certificate: body, number and expiry (in settings), or the subcontracting company's certificate.",
+  },
+  {
+    key: "fgas-engineer",
+    label: "Engineer F-gas certificates",
+    category: "refrigerant",
+    statutory: true,
+    gate: "booking",
+    ownerRole: "admin",
+    allowNa: false,
+    basis: "F-gas regulations: personal certification",
+    guidance:
+      "Everyone who handles refrigerant (brazing, pressure testing, evacuation, charging, leak checks) needs a current F-gas certificate: Category I unless the technical lead has confirmed otherwise. The booking page lists each crew member's certificates and expiry dates.",
+    evidenceHint: "Certificate number and expiry for each engineer on the crew (from their staff record).",
+  },
+
+  /* ---------------- before install day 1 ---------------- */
+  {
+    key: "outdoor-siting",
+    label: "Outdoor unit siting and defrost drainage",
+    category: "planning",
+    statutory: false,
+    gate: "ready-to-install",
+    ownerRole: "surveyor",
+    basis: "Class G.3 conditions; manufacturer clearances",
+    guidance:
+      "Manufacturer clearances for airflow and servicing, a solid base or a rated bracket, sited to keep its look and noise to a minimum (a permitted development condition), and defrost water led to a gully, gravel or soakaway: never across a path, step, drive or onto the neighbour's land.",
+    evidenceHint: "An annotated photo of the chosen spot, the measured clearances, and the drainage route.",
+  },
+  {
+    key: "structural-fixings",
+    label: "Wall and bracket fixings",
+    category: "safety",
+    statutory: false,
+    gate: "ready-to-install",
+    ownerRole: "tech-lead",
+    basis: "Good practice; manufacturer bracket ratings",
+    guidance:
+      "Check the wall can carry the bracket and unit (its weight plus service loads), the fixings suit the wall (solid brick, cavity, timber frame, render), and core holes miss lintels and structural timbers.",
+    evidenceHint: "The wall type from the survey, the bracket and fixing spec, and a photo of the wall.",
+  },
+  {
+    key: "asbestos",
+    label: "Asbestos check before drilling",
+    category: "safety",
+    statutory: true,
+    gate: "ready-to-install",
+    ownerRole: "surveyor",
+    basis: "Control of Asbestos Regulations 2012",
+    guidance:
+      "Before drilling or disturbing anything in a home built before 2000, assess whether asbestos could be there: textured ceilings, old fuse-board flash guards, soffits, floor tiles. Suspected asbestos stops the work until it's tested or avoided. It's never \"probably fine\". Not applicable only for a home built in 2000 or later, with the reason written down.",
+    evidenceHint: "The survey's asbestos answer, photos of the drilling spots and the fuse board, and any test result.",
+  },
+  {
+    key: "concealed-services",
+    label: "Hidden pipes and cables",
+    category: "safety",
+    statutory: false,
+    gate: "ready-to-install",
+    ownerRole: "installer",
+    basis: "Good practice; BS 7671 safe zones",
+    guidance:
+      "Scan every drilling and fixing spot for cables, water and gas pipes, keep clear of cable safe zones, and check the far side of the wall before core drilling.",
+    evidenceHint: "A photo of the marked-out positions after scanning.",
+  },
+  {
+    key: "working-at-height",
+    label: "Working at height plan",
+    category: "safety",
+    statutory: true,
+    gate: "ready-to-install",
+    ownerRole: "tech-lead",
+    basis: "Work at Height Regulations 2005",
+    guidance:
+      "Plan any work off the ground (a high bracket, first-floor holes from outside): avoid it where you can, otherwise the right access (a tower put up by someone PASMA trained, a podium or scaffold) and no long tasks off a ladder. Not applicable only when everything is done from the ground or from inside.",
+    evidenceHint: "The access method, who's trained (PASMA or IPAF), and a photo of the position.",
+  },
+  {
+    key: "rams",
+    label: "Risk assessment and method statement",
+    category: "safety",
+    statutory: true,
+    gate: "ready-to-install",
+    ownerRole: "tech-lead",
+    allowNa: false,
+    basis: "Management of Health and Safety at Work Regulations 1999",
+    guidance:
+      "Write the risk assessment and method statement for this home: access, height, drilling, electrics, refrigerant, nitrogen and brazing, pets and children. The crew read it before day 1.",
+    evidenceHint: "The RAMS document, and the crew's acknowledgement.",
+  },
+  {
+    key: "cancellation-and-consent",
+    label: "Cancellation rights, contract copy and early start",
+    category: "consumer",
+    statutory: true,
+    gate: "ready-to-install",
+    ownerRole: "admin",
+    allowNa: false,
+    basis: "Consumer Contracts Regulations 2013 regs 10, 12, 29–31, 36",
+    guidance:
+      "The pre-contract information and cancellation form went out before acceptance, the contract confirmation reached the customer before work starts, and either the cancellation period has ended or the customer's early-start request is on a durable medium (their own email, or a signed form). Legal review required.",
+    evidenceHint:
+      "The confirmation email in messages, the customer's early-start email or signed form, and the cancellation dates on the booking page.",
+  },
+
+  /* ---------------- at commissioning ---------------- */
+  {
+    key: "commissioning-approval",
+    label: "Commissioning results signed off",
+    category: "commissioning",
+    statutory: true,
+    gate: "commissioned",
+    ownerRole: "tech-lead",
+    auto: "commissioning-signed",
+    allowNa: false,
+    basis: "F-gas leak check and records; manufacturer commissioning",
+    guidance:
+      "Updates itself when the technical lead signs commissioning: strength and tightness test, evacuation and decay, refrigerant added and the F-gas label, heating and cooling performance, condensate and defrost drainage.",
+    evidenceHint: "The commissioning record.",
+  },
+
+  /* ---------------- before the job closes ---------------- */
+  {
+    key: "electrical-certificate",
+    label: "Electrical certificate and notification",
+    category: "electrical",
+    statutory: true,
+    gate: "closed",
+    ownerRole: "electrician",
+    allowNa: false,
+    basis: "BS 7671; Building Regulations 2010 reg 20(3)",
+    guidance:
+      "A BS 7671 Electrical Installation Certificate for the new circuit, and the scheme's Building Regulations compliance certificate, which must reach the customer within 30 days of completion. The job can't close without it.",
+    evidenceHint: "The EIC (PDF or photo) and the scheme's notification reference.",
+  },
+  {
+    key: "warranty-registration",
+    label: "Manufacturer warranty registered",
+    category: "warranty",
+    statutory: false,
+    gate: "closed",
+    ownerRole: "admin",
+    auto: "warranty-registered",
+    basis: "Manufacturer warranty terms",
+    guidance:
+      "Updates itself when the warranty is recorded as registered. Register within the manufacturer's deadline (some give 90 days from commissioning; check each brand's terms).",
+    evidenceHint: "The manufacturer's registration confirmation.",
+  },
+];
+
+/** The template entry for a key (checklists made from an older template may hold keys this one lacks). */
+export function complianceTemplateFor(key: string): ComplianceTemplateItem | undefined {
+  return COMPLIANCE_TEMPLATE.find((t) => t.key === key);
+}
+
+/** The groups the checklist is shown in, in journey order, with when each one is actually enforced. */
+export const COMPLIANCE_GATE_GROUPS: { gate: GateId; title: string; enforced: string }[] = [
+  {
+    gate: "proposal-issue",
+    title: "Before the proposal goes out",
+    enforced: "Checked at ready to install: statutory items block day 1 until approved or not applicable.",
+  },
+  {
+    gate: "booking",
+    title: "Before the booking is confirmed",
+    enforced: "Checked at ready to install: statutory items block day 1 until approved or not applicable.",
+  },
+  {
+    gate: "ready-to-install",
+    title: "Before install day 1",
+    enforced: "Statutory items block day 1; the rest are flagged.",
+  },
+  { gate: "commissioned", title: "At commissioning", enforced: "Statutory items block commissioning sign-off." },
+  { gate: "closed", title: "Before the job closes", enforced: "Statutory items block closing the job." },
+];
+
+export interface ComplianceHistoryEntry {
+  at: string;
+  by: string;
+  byStaffId?: string;
+  from: ComplianceStatus;
+  to: ComplianceStatus;
+  note?: string;
+  overrideReason?: string;
+  /** Evidence added in this step. */
+  mediaIds?: string[];
+}
 
 export interface ComplianceItem {
   id: string;
@@ -66,13 +424,73 @@ export interface ComplianceItem {
   reviewedBy?: string;
   reviewedAt?: string;
   overrideReason?: string;
+  /** The reviewer's staff id, alongside their name. */
+  reviewedByStaffId?: string;
+  /** Every change, oldest first. */
+  history?: ComplianceHistoryEntry[];
+  /** The blocking issue raised when this item was rejected, until it's approved again. */
+  blockerIssueId?: string;
+  /** The latest written evidence (what someone checked), which counts as evidence like a file. */
+  evidenceNote?: string;
 }
 
 export function instantiateCompliance(projectId: string, makeId: () => string): ComplianceItem[] {
-  throw new Error("not implemented: instantiateCompliance (F5)");
+  return COMPLIANCE_TEMPLATE.map((t) => ({
+    id: makeId(),
+    projectId,
+    key: t.key,
+    label: t.label,
+    category: t.category,
+    statutory: t.statutory,
+    gate: t.gate,
+    status: t.initialStatus ?? "not-started",
+    mediaIds: [],
+  }));
 }
 
-/** Statutory items cannot be overridden to approved without evidence and a qualified reviewer. */
+/** Done, as far as readiness is concerned. */
+export function isComplianceSettled(item: Pick<ComplianceItem, "status">): boolean {
+  return item.status === "approved" || item.status === "not-applicable";
+}
+
+const AUTO_SOURCE: Record<NonNullable<ComplianceTemplateItem["auto"]>, string> = {
+  "design-approved": "the design is approved",
+  "commissioning-signed": "commissioning is signed off",
+  "warranty-registered": "the warranty is recorded as registered",
+};
+
+const AUTO_REOPEN: Record<NonNullable<ComplianceTemplateItem["auto"]>, string> = {
+  "design-approved": "the design is no longer the approved version",
+  "commissioning-signed": "commissioning is no longer signed off",
+  "warranty-registered": "the warranty is no longer recorded as registered",
+};
+
+function withHistory(item: ComplianceItem, entry: ComplianceHistoryEntry): ComplianceHistoryEntry[] {
+  return [...(item.history ?? []), entry];
+}
+
+/** Drops undefined keys so the stored item stays JSON-clean. */
+function clean(item: ComplianceItem): ComplianceItem {
+  return JSON.parse(JSON.stringify(item)) as ComplianceItem;
+}
+
+/**
+ * Move an item to a new status, as `reviewer`.
+ *
+ *  * approved: needs `compliance.review`, and evidence (an attached file) or
+ *    a written note of what was checked. Statutory items can never be
+ *    overridden, and some (planning) need the written outcome itself.
+ *    Internal items may be approved without evidence only by an admin with
+ *    an override reason, which is recorded.
+ *  * not-applicable: `compliance.review` plus the reason, and only where
+ *    "doesn't apply" can be true (never planning, F-gas, Part P, RAMS…).
+ *  * rejected: `compliance.review` plus the reason (the server raises a
+ *    blocking issue from it).
+ *  * not-started / evidence-required / under-review: anyone who can review
+ *    or edit the project; reopening an approved item needs a reviewer and a
+ *    reason.
+ * Automatic items follow the project's records and can't be approved by hand.
+ */
 export function reviewCompliance(
   item: ComplianceItem,
   to: ComplianceStatus,
@@ -81,5 +499,214 @@ export function reviewCompliance(
   overrideReason: string | undefined,
   now: string,
 ): { ok: true; item: ComplianceItem } | { ok: false; error: string } {
-  throw new Error("not implemented: reviewCompliance (F5)");
+  const fail = (error: string) => ({ ok: false as const, error });
+  if (!COMPLIANCE_STATUSES.includes(to)) return fail("Unknown status.");
+  if (!reviewer.active) return fail("Only an active staff member can change the checklist.");
+  if (to === item.status) return fail(`This is already ${COMPLIANCE_STATUS_TEXT[to].toLowerCase()}.`);
+
+  const t = complianceTemplateFor(item.key);
+  const text = note?.trim() || undefined;
+  const override = overrideReason?.trim() || undefined;
+  const reviews = can(reviewer, "compliance.review");
+  const hasEvidence = item.mediaIds.length > 0 || Boolean(item.evidenceNote?.trim());
+  const statutory = item.statutory || Boolean(t?.statutory);
+  let usedOverride: string | undefined;
+
+  if (override && !(to === "approved" && !statutory)) {
+    return fail(
+      statutory
+        ? "Statutory items can't be overridden. Attach the evidence, or write down what you checked."
+        : "An override only applies when approving.",
+    );
+  }
+
+  switch (to) {
+    case "approved": {
+      if (t?.auto) return fail(`This one updates itself when ${AUTO_SOURCE[t.auto]}.`);
+      if (!reviews) return fail(`${reviewer.name} can't approve compliance items: that needs the compliance review permission.`);
+      if (statutory) {
+        if ((t?.approvalNeeds ?? "evidence-or-note") === "note" && !text) {
+          return fail("Write the outcome in the note (for example \"PD checks passed\" or \"planning route needed\"): evidence alone can't approve this.");
+        }
+        if (!hasEvidence && !text) return fail("Attach the evidence, or write down what you checked, before approving.");
+      } else if (!hasEvidence && !text) {
+        if (!override) return fail("Attach evidence or write a note. To approve without either, an admin overrides with a reason.");
+        if (!reviewer.roles.includes("admin")) return fail("Only an admin can approve without evidence (with a reason).");
+        usedOverride = override;
+      }
+      break;
+    }
+    case "not-applicable": {
+      if (!reviews) return fail(`${reviewer.name} can't mark compliance items not applicable: that needs the compliance review permission.`);
+      if (t && t.allowNa === false) return fail(`"${item.label}" always applies, so it can't be marked not applicable.`);
+      if (!text) return fail("Say why it doesn't apply.");
+      break;
+    }
+    case "rejected": {
+      if (!reviews) return fail(`${reviewer.name} can't reject compliance items: that needs the compliance review permission.`);
+      if (!text) return fail("Say why it's rejected and what's needed.");
+      break;
+    }
+    default: {
+      const reopening = isComplianceSettled(item);
+      if (reopening) {
+        if (!reviews) return fail("Only a reviewer can reopen an approved item.");
+        if (!text) return fail("Say why you're reopening it.");
+      } else if (!reviews && !can(reviewer, "projects.edit") && !can(reviewer, "install.work")) {
+        return fail(`${reviewer.name} can't change the checklist.`);
+      }
+      if (t?.auto && reopening) return fail(`This one updates itself when ${AUTO_SOURCE[t.auto]}.`);
+    }
+  }
+
+  const decided = to === "approved" || to === "not-applicable" || to === "rejected";
+  const next: ComplianceItem = {
+    ...item,
+    status: to,
+    ...(text ? { note: text } : {}),
+    history: withHistory(item, {
+      at: now,
+      by: reviewer.name,
+      byStaffId: reviewer.id,
+      from: item.status,
+      to,
+      ...(text ? { note: text } : {}),
+      ...(usedOverride ? { overrideReason: usedOverride } : {}),
+    }),
+  };
+  if (decided) {
+    next.reviewedBy = reviewer.name;
+    next.reviewedByStaffId = reviewer.id;
+    next.reviewedAt = now;
+  } else {
+    delete next.reviewedBy;
+    delete next.reviewedByStaffId;
+    delete next.reviewedAt;
+  }
+  if (usedOverride) next.overrideReason = usedOverride;
+  else delete next.overrideReason;
+  return { ok: true, item: clean(next) };
+}
+
+/**
+ * Add evidence (files) and/or a note. An item still waiting for evidence
+ * (or rejected) moves to "waiting for review"; a settled one keeps its
+ * status, with the addition in its history.
+ */
+export function addComplianceEvidence(
+  item: ComplianceItem,
+  input: { mediaIds?: string[]; note?: string },
+  by: { name: string; staffId?: string },
+  now: string,
+): { ok: true; item: ComplianceItem } | { ok: false; error: string } {
+  const added = [...new Set((input.mediaIds ?? []).map((m) => m.trim()).filter(Boolean))].filter((m) => !item.mediaIds.includes(m));
+  const text = input.note?.trim() || undefined;
+  if (added.length === 0 && !text) return { ok: false, error: "Add a file or write a note first." };
+  if (!by.name.trim()) return { ok: false, error: "Who's adding this?" };
+  const moves = item.status === "not-started" || item.status === "evidence-required" || item.status === "rejected";
+  const to: ComplianceStatus = moves ? "under-review" : item.status;
+  const next: ComplianceItem = {
+    ...item,
+    status: to,
+    mediaIds: [...item.mediaIds, ...added],
+    ...(text ? { note: text, evidenceNote: text } : {}),
+    history: withHistory(item, {
+      at: now,
+      by: by.name,
+      ...(by.staffId ? { byStaffId: by.staffId } : {}),
+      from: item.status,
+      to,
+      ...(text ? { note: text } : {}),
+      ...(added.length ? { mediaIds: added } : {}),
+    }),
+  };
+  return { ok: true, item: clean(next) };
+}
+
+const lastEventAt = (p: Project, type: string) => [...p.events].reverse().find((e) => e.type === type)?.at;
+
+/**
+ * Bring the automatic items into line with the project's own records, and
+ * move the planning check to "waiting for review" once the survey (with its
+ * permitted development checklist) is in. Returns only the items that
+ * changed. Never approves planning, and never approves anything the
+ * project hasn't recorded.
+ */
+export function syncCompliance(items: ComplianceItem[], project: Project, now: string): ComplianceItem[] {
+  const changed: ComplianceItem[] = [];
+  const set = (item: ComplianceItem, to: ComplianceStatus, by: string, at: string, note: string) => {
+    const next: ComplianceItem = {
+      ...item,
+      status: to,
+      history: withHistory(item, { at: now, by, from: item.status, to, note }),
+    };
+    if (to === "approved") {
+      next.reviewedBy = by;
+      next.reviewedAt = at;
+      delete next.reviewedByStaffId;
+      delete next.overrideReason;
+    } else {
+      delete next.reviewedBy;
+      delete next.reviewedAt;
+      delete next.reviewedByStaffId;
+    }
+    changed.push(clean(next));
+  };
+
+  for (const item of items) {
+    const auto = complianceTemplateFor(item.key)?.auto;
+    if (auto) {
+      if (item.status === "not-applicable") continue; // a reviewer decided it doesn't apply
+      let done: { by: string; at: string } | null = null;
+      if (auto === "design-approved" && project.design.status === "approved") {
+        done = { by: project.design.approvedBy ?? "Technical lead", at: project.design.approvedAt ?? now };
+      }
+      if (auto === "commissioning-signed" && project.handover.status !== "pending") {
+        done = { by: project.handover.commissionedBy ?? "Technical lead", at: project.handover.commissionedAt ?? now };
+      }
+      if (auto === "warranty-registered" && project.handover.warrantyRegistered) {
+        done = { by: "Recorded on the project", at: lastEventAt(project, "warranty-registered") ?? now };
+      }
+      if (done && item.status !== "approved") {
+        set(item, "approved", done.by, done.at, `Updated automatically: ${AUTO_SOURCE[auto]}.`);
+      } else if (!done && item.status === "approved") {
+        set(item, "under-review", "System", now, `Reopened automatically: ${AUTO_REOPEN[auto]}.`);
+      }
+      continue;
+    }
+    if (
+      item.key === "planning-pd" &&
+      project.survey.status === "submitted" &&
+      (item.status === "not-started" || item.status === "evidence-required")
+    ) {
+      set(
+        item,
+        "under-review",
+        "System",
+        now,
+        "The survey's permitted development checklist is in. A technical lead confirms the outcome: planning is never concluded automatically.",
+      );
+    }
+  }
+  return changed;
+}
+
+/** Counts for a summary strip: how far the checklist is, and what still holds a gate. */
+export function complianceProgress(items: ComplianceItem[]): {
+  total: number;
+  settled: number;
+  open: number;
+  statutoryOpen: number;
+  rejected: number;
+  awaitingReview: number;
+} {
+  const open = items.filter((i) => !isComplianceSettled(i));
+  return {
+    total: items.length,
+    settled: items.length - open.length,
+    open: open.length,
+    statutoryOpen: open.filter((i) => i.statutory).length,
+    rejected: items.filter((i) => i.status === "rejected").length,
+    awaitingReview: items.filter((i) => i.status === "under-review").length,
+  };
 }
