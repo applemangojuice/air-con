@@ -8,8 +8,8 @@ import { PROJECT_STAGES, STAGE_INFO, type ProjectStageId } from "@aircon/domain"
 export function JourneyStrip({ current = "price" }: { current?: ProjectStageId }) {
   const currentIdx = PROJECT_STAGES.indexOf(current);
   return (
-    <nav aria-label="Your journey">
-      <ol className="flex flex-wrap items-center justify-center gap-x-1.5 gap-y-1">
+    <div>
+      <ol aria-label="Your journey" className="flex flex-wrap items-center justify-center gap-x-1.5 gap-y-1">
         {PROJECT_STAGES.map((stage, i) => {
           const state = i < currentIdx ? "done" : i === currentIdx ? "now" : "later";
           return (
@@ -40,6 +40,6 @@ export function JourneyStrip({ current = "price" }: { current?: ProjectStageId }
           );
         })}
       </ol>
-    </nav>
+    </div>
   );
 }

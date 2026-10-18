@@ -146,6 +146,9 @@ export async function POST(request: Request) {
     source,
     // Consents ride in the attribution JSON (no migration needed): who agreed
     // to what, when, and in which words (UK GDPR Art 7(1)).
+    // INTEGRATION(F1/F7): when a project (and its customers row) is created
+    // from this quote, copy attribution.consents.operational/marketing into
+    // customers.ops_consent / marketing_consent so marketing sends can check it.
     attribution: { ...(attribution ?? {}), consents: consentRecord },
     referrer: attribution?.referrer ?? null,
     utm_source: attribution?.utmSource ?? null,
