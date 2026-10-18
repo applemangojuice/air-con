@@ -50,7 +50,7 @@ import { getSettings } from "./settings-server";
  *    a verified Stripe event, a person recording money they've seen, or the
  *    clearly labelled demo simulator. The row is written first; applying it
  *    to the invoice, the project, the receipt and the email follows, and is
- *    finished by a retry if anything in between fails (`appliedAt`).
+ *    finished by a retry if anything in between fails (`pendingApply`).
  *  * The project's totals move only through the reducer (invoice-issued,
  *    payment-recorded, deposit-paid), so the customer's timeline says what
  *    happened.
@@ -314,6 +314,7 @@ export async function issueInvoice(projectId: string, input: IssueInput, staff: 
     ...(input.notes?.trim() ? { notes: input.notes.trim() } : {}),
     ...(input.requestId ? { requestId: input.requestId } : {}),
     ...extra,
+    issuing: true,
   });
   await audit({ actor: staff, action: "invoice.issue", entity: "invoice", entityId: invoice.id, detail: { projectId, number: invoice.number, kind: invoice.kind, totalPence: invoice.totalPence } });
   const finished = await finishIssue(invoice, staff);
@@ -333,6 +334,8 @@ export async function issueInvoice(projectId: string, input: IssueInput, staff: 
  */
 export async function finishIssue(invoice: Invoice, actor: StaffMember): Promise<{ invoice: Invoice; warning?: string }> {
   let inv = invoice;
+  // Only invoices this module numbered carry the flag; anything else is complete as it stands.
+  if (!inv.issuing) return { invoice: inv };
   const warnings: string[] = [];
   const project = await loadProject(inv.projectId);
   if (!project) return { invoice: inv, warning: "The project couldn't be read." };
@@ -349,8 +352,8 @@ export async function finishIssue(invoice: Invoice, actor: StaffMember): Promise
           company: documentCompany(settings),
           customer: documentCustomer(project),
           issuedAt: inv.issuedAt ?? new Date().toISOString(),
-          invoice: inv,
-          payments,
+          invoice: customerInvoice(inv),
+          payments: payments.map(customerPayment),
           payTo: {
             methods: settings.payments.methods.filter((m) => m !== "card" || card.available),
             ...(settings.company.bank ? { bank: settings.company.bank } : {}),
@@ -404,7 +407,29 @@ export async function finishIssue(invoice: Invoice, actor: StaffMember): Promise
       warnings.push(sent.status === "no-recipient" ? "there's no email address to send it to" : "the email didn't go (see Messages)");
     }
   }
+  if (warnings.length === 0) {
+    const saved = await mutateRow<Invoice>("invoices", inv.id, invoicesRepo, (cur) => {
+      const { issuing: _done, ...rest } = cur;
+      void _done;
+      return { ok: true, value: rest };
+    });
+    if (saved.ok) inv = saved.value;
+  }
   return { invoice: inv, ...(warnings.length ? { warning: `Issued, but ${warnings.join("; ")}.` } : {}) };
+}
+
+/** An invoice as the customer's document shows it: no internal bookkeeping. */
+export function customerInvoice(inv: Invoice): Invoice {
+  const { requestId: _r, issuing: _i, recordedOnProjectAt: _p, notes: _n, createdBy: _c, ...rest } = inv;
+  void [_r, _i, _p, _n, _c];
+  return rest;
+}
+
+/** A payment as a receipt shows it: no internal bookkeeping. */
+export function customerPayment(pay: Payment): Payment {
+  const { pendingApply: _p, appliedAt: _a, recordedAt: _r, eventId: _e, ...rest } = pay;
+  void [_p, _a, _r, _e];
+  return rest;
 }
 
 /* ------------------------------------------------------------------ */
@@ -449,10 +474,10 @@ export async function recordPayment(
     if (!invoice || invoice.projectId !== payment.projectId) return fail("That invoice isn't on this project.", 404);
     if (opts.refuseVoid && invoice.status === "void") return fail("That invoice is void.");
   }
-  const row: Payment = { ...payment, id: payment.id ?? crypto.randomUUID(), recordedAt: new Date().toISOString() };
+  const row: Payment = { ...payment, id: payment.id ?? crypto.randomUUID(), recordedAt: new Date().toISOString(), pendingApply: true };
   const { payment: stored, duplicate } = await paymentsRepo.insertIdempotent(row);
   if (duplicate) {
-    const stale = !stored.appliedAt && Date.now() - Date.parse(stored.recordedAt ?? stored.receivedAt) > STALE_APPLY_MS;
+    const stale = stored.pendingApply === true && Date.now() - Date.parse(stored.recordedAt ?? stored.receivedAt) > STALE_APPLY_MS;
     if (!stale) return { ok: true, value: { payment: stored, duplicate: true }, message: "Already recorded." };
   }
   await audit({
@@ -463,7 +488,18 @@ export async function recordPayment(
     detail: { projectId: stored.projectId, invoiceId: stored.invoiceId, amountPence: stored.amountPence, provider: stored.provider },
   });
   const applied = await applyRecordedPayment(stored.id, actor);
-  return { ok: true, value: { payment: stored, duplicate }, ...(applied.warning ? { warning: applied.warning } : {}) };
+  const fresh = (await paymentsRepo.get(stored.id)) ?? stored;
+  return { ok: true, value: { payment: fresh, duplicate }, ...(applied.warning ? { warning: applied.warning } : {}) };
+}
+
+/** The "finish applying" button: a payment left part-way (pendingApply) gets the rest done. */
+export async function finishPayment(projectId: string, paymentId: string, staff: StaffMember): Promise<Outcome<Payment>> {
+  const payment = await paymentsRepo.get(paymentId);
+  if (!payment || payment.projectId !== projectId) return fail("That payment isn't on this project.", 404);
+  if (!payment.pendingApply) return { ok: true, value: payment, message: "Already fully applied." };
+  const applied = await applyRecordedPayment(paymentId, staff);
+  const fresh = (await paymentsRepo.get(paymentId)) ?? payment;
+  return { ok: true, value: fresh, message: fresh.pendingApply ? "Still not finished." : "Done: invoice, totals and receipt.", ...(applied.warning ? { warning: applied.warning } : {}) };
 }
 
 /** Apply a stored payment (once per process at a time). */
@@ -477,7 +513,7 @@ export function applyRecordedPayment(paymentId: string, actor: ActorInput): Prom
 
 async function applyNow(paymentId: string, actor: ActorInput): Promise<{ warning?: string }> {
   const payment = await paymentsRepo.get(paymentId);
-  if (!payment || payment.appliedAt) return {};
+  if (!payment || !payment.pendingApply) return {};
   const warnings: string[] = [];
   let invoice: Invoice | null = null;
 
@@ -508,7 +544,9 @@ async function applyNow(paymentId: string, actor: ActorInput): Promise<{ warning
   }
 
   try {
-    await paymentsRepo.update({ ...payment, appliedAt: new Date().toISOString() });
+    const { pendingApply: _pending, ...applied } = payment;
+    void _pending;
+    await paymentsRepo.update({ ...applied, appliedAt: new Date().toISOString() });
   } catch (err) {
     console.error(`[money] marking payment ${payment.id} applied failed:`, err);
   }
@@ -527,8 +565,8 @@ async function applyNow(paymentId: string, actor: ActorInput): Promise<{ warning
             company: documentCompany(settings),
             customer: documentCustomer(project),
             issuedAt: new Date().toISOString(),
-            payment,
-            ...(invoice ? { invoice } : {}),
+            payment: customerPayment(payment),
+            ...(invoice ? { invoice: customerInvoice(invoice) } : {}),
           },
           {
             title: `Receipt${invoice ? ` for ${invoice.number}` : ""}`,
@@ -664,6 +702,51 @@ export async function simulateCardPayment(projectId: string, invoiceId: string, 
     { kind: "system", name: "demo payment simulator" },
     { refuseVoid: true },
   );
+}
+
+/**
+ * A card payment Stripe has confirmed: from a signature-verified webhook, or
+ * a Checkout Session read back from Stripe's API after the redirect (never
+ * from the redirect itself). Idempotent on the session id, so the webhook
+ * and the return page can both run it.
+ */
+export async function recordStripePayment(facts: {
+  sessionId: string;
+  invoiceId: string;
+  projectId: string;
+  amountPence: number;
+  paymentIntent?: string;
+  receivedAt: string;
+  eventId: string;
+}): Promise<Outcome<{ payment: Payment; duplicate: boolean }>> {
+  const invoice = await invoicesRepo.get(facts.invoiceId);
+  if (!invoice || invoice.projectId !== facts.projectId) {
+    console.error(`[stripe] session ${facts.sessionId} names invoice ${facts.invoiceId} on ${facts.projectId}, which doesn't match our records`);
+    return fail("That invoice isn't on that project.", 404);
+  }
+  const result = await recordPayment(
+    {
+      projectId: facts.projectId,
+      invoiceId: facts.invoiceId,
+      method: "card",
+      provider: "stripe",
+      providerRef: facts.sessionId,
+      amountPence: facts.amountPence,
+      status: "succeeded",
+      receivedAt: facts.receivedAt,
+      ...(facts.paymentIntent ? { reference: facts.paymentIntent } : {}),
+      eventId: facts.eventId,
+    },
+    { kind: "system", name: "Stripe" },
+  );
+  if (result.ok && !result.value.duplicate && invoice.status === "void") {
+    await notify("team-alert", {
+      projectId: facts.projectId,
+      data: { title: `Card payment on a void invoice: ${invoice.number}`, lines: ["The money arrived and is recorded. Refund it, or set it against another invoice."], urgent: true },
+      discriminator: `void-payment:${facts.sessionId}`,
+    });
+  }
+  return result;
 }
 
 /** Invoices the customer still owes something on, with what's left on each. */

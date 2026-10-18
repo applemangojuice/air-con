@@ -150,6 +150,21 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   );
 }
 
+/** The one-line label in a month cell. */
+function shortTitle(e: CalEvent): string {
+  const note = STATE_NOTE[e.state];
+  switch (e.kind) {
+    case "install":
+      return `Day ${e.dayN ?? "?"}${e.ofDays ? `/${e.ofDays}` : ""}${note ? `, ${note}` : ""}`;
+    case "survey":
+      return e.state === "done" ? "Survey, done" : "Survey";
+    case "delivery":
+      return e.state === "done" ? "Kit delivered" : "Kit due";
+    case "handover":
+      return e.state === "planned" ? "Handover (planned)" : e.title;
+  }
+}
+
 function EventChip({ e, clash, compact = false }: { e: CalEvent; clash: boolean; compact?: boolean }) {
   const note = STATE_NOTE[e.state];
   return (
@@ -167,7 +182,7 @@ function EventChip({ e, clash, compact = false }: { e: CalEvent; clash: boolean;
           {note ? ` (${note})` : ""}
         </span>
       )}
-      {compact && e.kind === "install" && e.dayN ? <span className="block truncate">Day {e.dayN}{e.ofDays ? `/${e.ofDays}` : ""}{note ? `, ${note}` : ""}</span> : null}
+      {compact && <span className="block truncate">{shortTitle(e)}</span>}
       {clash && <span className="block font-semibold text-red-700">Crew clash</span>}
     </Link>
   );

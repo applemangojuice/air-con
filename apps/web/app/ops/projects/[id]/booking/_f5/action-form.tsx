@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { startTransition, useActionState, useEffect, useRef, useState, type ReactNode } from "react";
 import { BlockerList, Button, type ButtonSize, type ButtonVariant } from "@/components/kit";
 import type { ActionState } from "./action-state";
+import { flash } from "./flash";
 
 /**
  * One form, one server action, every state said out loud: busy while it
@@ -33,6 +34,7 @@ export function ActionForm({
   confirm,
   disabled = false,
   footer,
+  flash: announce = false,
 }: {
   action: (prev: ActionState, form: FormData) => Promise<ActionState>;
   submitLabel: ReactNode;
@@ -50,6 +52,8 @@ export function ActionForm({
   confirm?: string;
   disabled?: boolean;
   footer?: ReactNode;
+  /** Also announce a success in the page's FlashRegion (for forms that disappear once they've worked). */
+  flash?: boolean;
 }) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
@@ -68,8 +72,9 @@ export function ActionForm({
     if (!state.ok) return;
     setRequestId(newId());
     if (resetOnSuccess) formRef.current?.reset();
+    if (announce) flash({ ...(state.message ? { message: state.message } : {}), ...(state.warning ? { warning: state.warning } : {}) });
     if (refresh) router.refresh();
-  }, [state, refresh, resetOnSuccess, router]);
+  }, [state, refresh, resetOnSuccess, router, announce]);
 
   return (
     <form
@@ -102,10 +107,10 @@ export function ActionForm({
             <BlockerList blockers={state.blockers} />
           </div>
         )}
-        {!pending && state.ok && state.message && (
+        {!pending && !announce && state.ok && state.message && (
           <p className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">{state.message}</p>
         )}
-        {!pending && state.warning && (
+        {!pending && !announce && state.warning && (
           <p className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">{state.warning}</p>
         )}
       </div>

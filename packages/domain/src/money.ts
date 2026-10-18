@@ -67,6 +67,12 @@ export interface Invoice {
   requestId?: string;
   /** When the project's own totals (money.invoicedPence) took this invoice in. */
   recordedOnProjectAt?: string;
+  /**
+   * True from the moment it's numbered until its document, the project's
+   * totals and the email are all done; a retry finishes the rest. Absent on
+   * invoices made any other way, which are treated as complete.
+   */
+  issuing?: boolean;
 }
 
 export interface Payment {
@@ -92,6 +98,12 @@ export interface Payment {
   recordedAt?: string;
   /** When the payment was applied to its invoice and the project (a retry finishes what a failure left). */
   appliedAt?: string;
+  /**
+   * True while it still has to be applied (to its invoice, the project's
+   * totals, the receipt). Absent on payments recorded any other way, which
+   * are treated as applied.
+   */
+  pendingApply?: boolean;
 }
 
 /** "DIH", 1 → "DIH-0001". Pads to four digits and never truncates past them. */

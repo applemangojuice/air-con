@@ -100,7 +100,7 @@ export default async function KitPage({ params }: { params: Promise<{ id: string
             }
             action={
               view.source.ok ? (
-                <ActionForm action={generateAction.bind(null, p.id)} submitLabel="Raise purchase orders" busyLabel="Raising orders…" />
+                <ActionForm flash action={generateAction.bind(null, p.id)} submitLabel="Raise purchase orders" busyLabel="Raising orders…" />
               ) : (
                 <Link className="font-semibold text-accent-700 underline" href={`/ops/projects/${p.id}/proposal`}>
                   Go to the proposal
@@ -264,7 +264,7 @@ function OrderCard({
       {/* The next step */}
       <div className="border-t border-line bg-surface/40 px-5 py-4 sm:px-6">
         {next && (
-          <ActionForm action={advanceAction.bind(null, projectId)} submitLabel={next.label} variant={receiving ? "secondary" : "primary"} busyLabel="Saving…">
+          <ActionForm flash action={advanceAction.bind(null, projectId)} submitLabel={next.label} variant={receiving ? "secondary" : "primary"} busyLabel="Saving…">
             <input type="hidden" name="poId" value={po.id} />
             <input type="hidden" name="to" value={next.to} />
             {next.to === "ordered" && (
@@ -304,7 +304,7 @@ function OrderCard({
         <div className="mt-4 space-y-2">
           {receiving && (
             <Panel title="Record a delivery" open={po.status === "dispatched"}>
-              <ActionForm action={deliveryAction.bind(null, projectId)} submitLabel="Save the delivery" busyLabel="Saving…" resetOnSuccess>
+              <ActionForm flash action={deliveryAction.bind(null, projectId)} submitLabel="Save the delivery" busyLabel="Saving…" resetOnSuccess>
                 <input type="hidden" name="poId" value={po.id} />
                 <fieldset>
                   <legend className={label}>What arrived in this delivery</legend>
@@ -346,7 +346,7 @@ function OrderCard({
 
           {checking && (
             <Panel title="Check the kit against the design" open={po.status === "delivered"}>
-              <ActionForm action={inspectionAction.bind(null, projectId)} submitLabel="Save the check" busyLabel="Saving…">
+              <ActionForm flash action={inspectionAction.bind(null, projectId)} submitLabel="Save the check" busyLabel="Saving…">
                 <input type="hidden" name="poId" value={po.id} />
                 <p className="mb-3 text-sm text-ink-500">For each line: how many units are good and how many are damaged, out of what arrived. Damage raises an issue that holds install day 1.</p>
                 <ul className="space-y-4">
@@ -393,7 +393,7 @@ function OrderCard({
               {damaged.map((l) => {
                 const open = l.damagedQty - (l.replacedQty ?? 0);
                 return (
-                  <ActionForm key={l.id} action={replacementAction.bind(null, projectId)} submitLabel={`Order ${open} replacement${open === 1 ? "" : "s"}`} variant="secondary" className="mb-3">
+                  <ActionForm flash key={l.id} action={replacementAction.bind(null, projectId)} submitLabel={`Order ${open} replacement${open === 1 ? "" : "s"}`} variant="secondary" className="mb-3">
                     <input type="hidden" name="poId" value={po.id} />
                     <input type="hidden" name="lineId" value={l.id} />
                     <input type="hidden" name="qty" value={open} />
@@ -408,7 +408,7 @@ function OrderCard({
 
           {po.status !== "inspected" && (
             <Panel title="Edit order details">
-              <ActionForm action={updateAction.bind(null, projectId)} submitLabel="Save details" variant="secondary">
+              <ActionForm flash action={updateAction.bind(null, projectId)} submitLabel="Save details" variant="secondary">
                 <input type="hidden" name="poId" value={po.id} />
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div>
@@ -461,7 +461,7 @@ function OrderCard({
 
           {canCancel && (
             <Panel title="Cancel this order">
-              <ActionForm action={cancelAction.bind(null, projectId)} submitLabel="Cancel the order" variant="danger" confirm="Cancel this purchase order? This can't be undone.">
+              <ActionForm flash action={cancelAction.bind(null, projectId)} submitLabel="Cancel the order" variant="danger" confirm="Cancel this purchase order? This can't be undone.">
                 <input type="hidden" name="poId" value={po.id} />
                 <label className={label} htmlFor={`why-${po.id}`}>Why</label>
                 <input id={`why-${po.id}`} name="reason" required maxLength={500} className={field} />

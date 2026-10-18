@@ -9,7 +9,7 @@ import { loadMoney, type InvoicePlan } from "@/lib/money-server";
 import { isUuid } from "@/lib/repo/base";
 import { ActionForm } from "../booking/_f5/action-form";
 import { JobHeader } from "../booking/_f5/job-header";
-import { creditAction, finishAction, issueAction, paymentAction, refundAction } from "./actions";
+import { creditAction, finishAction, finishPaymentAction, issueAction, paymentAction, refundAction } from "./actions";
 
 export const metadata: Metadata = { title: "Money · ops", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -50,7 +50,13 @@ export default async function MoneyPage({ params }: { params: Promise<{ id: stri
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Stat label="Contract" value={s.contractTotalPence !== null ? <Money pence={s.contractTotalPence} /> : "Not accepted"} hint={s.toInvoicePence ? <>Still to invoice: <Money pence={s.toInvoicePence} /></> : undefined} />
         <Stat label="Invoiced" value={<Money pence={s.invoicedPence} />} hint={`${live.length} invoice${live.length === 1 ? "" : "s"}`} />
-        <Stat label="Received" value={<Money pence={s.receivedPence - s.refundedPence} />} tone={s.receivedPence > 0 ? "success" : "neutral"} hint={s.refundedPence ? <>After <Money pence={s.refundedPence} /> refunded</> : "Verified payments only"} />
+        <Stat label="Received" value={<Money pence={s.receivedPence - s.refundedPence} />} tone={s.receivedPence > 0 ? "success" : "neutral"} hint={
+            payments.some((x) => x.provider === "demo")
+              ? "Includes DEMO payments: no money moved"
+              : s.refundedPence
+                ? <>After <Money pence={s.refundedPence} /> refunded</>
+                : "Verified payments only"
+          } />
         <Stat
           label={s.outstandingPence < 0 ? "In credit" : "Outstanding"}
           value={<Money pence={Math.abs(s.outstandingPence)} />}
@@ -120,7 +126,7 @@ export default async function MoneyPage({ params }: { params: Promise<{ id: stri
         <details className="mt-3 rounded-2xl border border-line bg-white px-4">
           <summary className="flex min-h-12 cursor-pointer items-center text-sm font-semibold text-ink-900">A credit note not tied to one invoice</summary>
           <div className="pb-4">
-            <ActionForm action={creditAction.bind(null, p.id)} submitLabel="Issue credit note" variant="secondary" confirm="Issue this credit note? It goes in the customer's documents.">
+            <ActionForm flash action={creditAction.bind(null, p.id)} submitLabel="Issue credit note" variant="secondary" confirm="Issue this credit note? It goes in the customer's documents.">
               <CreditFields />
             </ActionForm>
           </div>
@@ -155,7 +161,11 @@ export default async function MoneyPage({ params }: { params: Promise<{ id: stri
                       {pay.provider === "demo" && <Badge tone="warn">DEMO: no money moved</Badge>}
                       {pay.provider === "stripe" && <Badge tone="info">Stripe</Badge>}
                       <StatusChip status={pay.status} />
-                      {!pay.appliedAt && <Badge tone="warn">Not fully applied: reload in a minute</Badge>}
+                      {pay.pendingApply && (
+                        <ActionForm flash action={finishPaymentAction.bind(null, p.id)} submitLabel="Finish applying" variant="secondary" footer={<Badge tone="warn">Not yet on the invoice</Badge>}>
+                          <input type="hidden" name="paymentId" value={pay.id} />
+                        </ActionForm>
+                      )}
                       {receipt && (
                         <Link href={`/d/${receipt.id}`} className="text-sm font-semibold text-accent-700 underline">
                           Receipt
@@ -179,7 +189,7 @@ function PlanCard({ plan, projectId }: { plan: InvoicePlan; projectId: string })
       <Card>
         <h3 className="font-semibold text-ink-900">Variation</h3>
         <p className="mt-1 text-sm text-ink-500">Bill an accepted variation on its own (otherwise the balance invoice includes it).</p>
-        <ActionForm action={issueAction.bind(null, projectId)} submitLabel="Issue and email" confirm="Issue this variation invoice and email it to the customer?">
+        <ActionForm flash action={issueAction.bind(null, projectId)} submitLabel="Issue and email" confirm="Issue this variation invoice and email it to the customer?">
           <input type="hidden" name="kind" value="variation" />
           <fieldset className="mt-3">
             <legend className={label}>Which variation</legend>
@@ -213,7 +223,7 @@ function PlanCard({ plan, projectId }: { plan: InvoicePlan; projectId: string })
           </dd>
         </div>
       </dl>
-      <ActionForm action={issueAction.bind(null, projectId)} submitLabel="Issue and email" busyLabel="Issuing…" confirm={`Issue this ${INVOICE_KIND_LABEL[plan.kind].toLowerCase()} invoice and email it to the customer?`}>
+      <ActionForm flash action={issueAction.bind(null, projectId)} submitLabel="Issue and email" busyLabel="Issuing…" confirm={`Issue this ${INVOICE_KIND_LABEL[plan.kind].toLowerCase()} invoice and email it to the customer?`}>
         <input type="hidden" name="kind" value={plan.kind} />
         <input type="hidden" name="expectedTotal" value={(plan.totalPence / 100).toFixed(2)} />
       </ActionForm>
@@ -257,7 +267,7 @@ function InvoiceRow({
   const overdue = isInvoiceOverdue(inv, all, today);
   const credit = inv.kind === "credit-note";
   const credited = all.filter((c) => c.kind === "credit-note" && c.creditsInvoiceId === inv.id && c.status !== "void");
-  const unfinished = !inv.documentId || !inv.recordedOnProjectAt;
+  const unfinished = inv.issuing === true;
   const todayIso = today;
 
   return (
@@ -295,8 +305,8 @@ function InvoiceRow({
       )}
       {unfinished && (
         <div className="mx-5 mb-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 sm:mx-6">
-          Issuing didn&apos;t finish ({!inv.documentId ? "no printable document" : "the project's totals weren't updated"}).
-          <ActionForm action={finishAction.bind(null, projectId)} submitLabel="Finish issuing" variant="secondary">
+          Issuing didn&apos;t finish: {!inv.documentId ? "the printable invoice is missing" : !inv.recordedOnProjectAt ? "the project's totals weren't updated" : "the email may not have gone"}. Finishing never doubles anything.
+          <ActionForm flash action={finishAction.bind(null, projectId)} submitLabel="Finish issuing" variant="secondary">
             <input type="hidden" name="invoiceId" value={inv.id} />
           </ActionForm>
         </div>
@@ -307,7 +317,7 @@ function InvoiceRow({
             <details className="rounded-2xl border border-line bg-white px-4" open={false}>
               <summary className="flex min-h-12 cursor-pointer items-center text-sm font-semibold text-ink-900">Record a payment you&apos;ve seen</summary>
               <div className="pb-4">
-                <ActionForm action={paymentAction.bind(null, projectId)} submitLabel="Record the payment" busyLabel="Recording…" resetOnSuccess>
+                <ActionForm flash action={paymentAction.bind(null, projectId)} submitLabel="Record the payment" busyLabel="Recording…" resetOnSuccess>
                   <input type="hidden" name="invoiceId" value={inv.id} />
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div>
@@ -345,7 +355,7 @@ function InvoiceRow({
             <details className="rounded-2xl border border-line bg-white px-4">
               <summary className="flex min-h-12 cursor-pointer items-center text-sm font-semibold text-ink-900">Credit it (cancel what&apos;s unpaid)</summary>
               <div className="pb-4">
-                <ActionForm action={creditAction.bind(null, projectId)} submitLabel="Issue credit note" variant="secondary" confirm={`Issue a credit note against ${inv.number}?`}>
+                <ActionForm flash action={creditAction.bind(null, projectId)} submitLabel="Issue credit note" variant="secondary" confirm={`Issue a credit note against ${inv.number}?`}>
                   <input type="hidden" name="invoiceId" value={inv.id} />
                   <CreditFields max={owed} />
                 </ActionForm>
@@ -356,7 +366,7 @@ function InvoiceRow({
             <details className="rounded-2xl border border-line bg-white px-4">
               <summary className="flex min-h-12 cursor-pointer items-center text-sm font-semibold text-ink-900">Record a refund</summary>
               <div className="pb-4">
-                <ActionForm action={refundAction.bind(null, projectId)} submitLabel="Record the refund" variant="secondary" confirm="Record this refund? It's shown to the customer on their timeline." resetOnSuccess>
+                <ActionForm flash action={refundAction.bind(null, projectId)} submitLabel="Record the refund" variant="secondary" confirm="Record this refund? It's shown to the customer on their timeline." resetOnSuccess>
                   <input type="hidden" name="invoiceId" value={inv.id} />
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div>

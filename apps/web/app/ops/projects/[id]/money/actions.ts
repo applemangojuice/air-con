@@ -3,7 +3,7 @@
 import { z } from "zod";
 import { INVOICE_KINDS, type InvoiceKind, type StaffMember } from "@aircon/domain";
 import { requireProjectAccess, requireStaff } from "@/lib/auth/server";
-import { finishIssue, issueInvoice, recordManualPayment, recordRefund } from "@/lib/money-server";
+import { finishIssue, finishPayment, issueInvoice, recordManualPayment, recordRefund } from "@/lib/money-server";
 import { isUuid } from "@/lib/repo/base";
 import * as invoicesRepo from "@/lib/repo/invoices";
 import { invalid, poundsToPence, text, toState, type ActionState } from "../booking/_f5/action-state";
@@ -123,6 +123,14 @@ export async function refundAction(projectId: string, _prev: ActionState, form: 
   );
   if (result.ok && result.value.duplicate) return { ok: true, message: "That refund was already recorded." };
   return toState(result, "Refund recorded.");
+}
+
+export async function finishPaymentAction(projectId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
+  const staff = await guard(projectId);
+  if (!staff) return NOT_FOUND;
+  const paymentId = z.string().uuid().safeParse(form.get("paymentId"));
+  if (!paymentId.success) return invalid();
+  return toState(await finishPayment(projectId, paymentId.data, staff), "Done.");
 }
 
 export async function finishAction(projectId: string, _prev: ActionState, form: FormData): Promise<ActionState> {

@@ -93,7 +93,7 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
                 blockers={view.blockers}
                 empty={<p className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">Everything&apos;s in place: confirm and the customer is told.</p>}
               />
-              <ActionForm
+              <ActionForm flash
                 action={confirmBookingAction.bind(null, p.id)}
                 submitLabel="Confirm booking and tell the customer"
                 busyLabel="Confirming…"
@@ -148,7 +148,7 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
                 <summary className="min-h-10 cursor-pointer text-sm font-semibold text-ink-900">Record the customer&apos;s written early-start request</summary>
                 <p className="mt-2 text-xs text-ink-500">The customer&apos;s own email, or a signed form, with these words:</p>
                 <blockquote className="mt-1 rounded-xl border-l-4 border-accent-500 bg-white px-3 py-2 text-sm text-ink-700">{view.earlyStart.wording}</blockquote>
-                <ActionForm action={earlyStartEvidenceAction.bind(null, p.id)} submitLabel="Record the request" variant="secondary" className="mt-3" resetOnSuccess>
+                <ActionForm flash action={earlyStartEvidenceAction.bind(null, p.id)} submitLabel="Record the request" variant="secondary" className="mt-3" resetOnSuccess>
                   <fieldset>
                     <legend className="mb-1.5 text-sm font-semibold text-ink-900">It came as</legend>
                     <div className="flex flex-wrap gap-4">
@@ -239,7 +239,7 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
                 </div>
               </div>
             ) : view.deposit.plan.available ? (
-              <ActionForm
+              <ActionForm flash
                 action={requestDepositAction.bind(null, p.id)}
                 submitLabel={`Send the deposit invoice (${money(view.deposit.plan.totalPence)})`}
                 busyLabel="Issuing…"

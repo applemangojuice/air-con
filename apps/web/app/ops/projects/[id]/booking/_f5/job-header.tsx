@@ -1,5 +1,6 @@
 import { STAGE_INFO, currentStage, type Project } from "@aircon/domain";
 import { Badge, PageHeader, Tabs } from "@/components/kit";
+import { FlashRegion } from "./flash";
 
 /**
  * The header on F5's project pages (booking, kit, compliance, money): who
@@ -56,6 +57,7 @@ export function JobHeader({
           { href: `${base}/money`, label: "Money" },
         ]}
       />
+      <FlashRegion />
     </>
   );
 }

@@ -32,7 +32,7 @@ export function DatesForm({
   const notWorking = Boolean(start) && preview[0] !== start;
   if (locked) return <p className="text-sm text-ink-500">{locked}</p>;
   return (
-    <ActionForm action={action} submitLabel={current ? "Move the install" : "Set install dates"} busyLabel="Checking the diary…" confirm={current ? "Move the install to these dates? The customer will be told once the booking is confirmed." : undefined}>
+    <ActionForm flash action={action} submitLabel={current ? "Move the install" : "Set install dates"} busyLabel="Checking the diary…" confirm={current ? "Move the install to these dates? The customer will be told once the booking is confirmed." : undefined}>
       <label htmlFor="startDate" className="mb-1.5 block text-sm font-semibold text-ink-900">
         First install day
       </label>
@@ -99,7 +99,7 @@ export function CrewForm({
     return <p className="text-sm text-ink-500">Nobody is on the staff list yet. Add people and their certificates on the Staff page.</p>;
   }
   return (
-    <ActionForm action={action} submitLabel="Save the crew" busyLabel="Checking qualifications…" disabled={Boolean(locked)}>
+    <ActionForm flash action={action} submitLabel="Save the crew" busyLabel="Checking qualifications…" disabled={Boolean(locked)}>
       {locked && <p className="mb-3 text-sm text-ink-500">{locked}</p>}
       <Fieldset legend="Who's on the job" hint={`Certificates are checked against ${fmtDate(checkOn)}, the last install day.`}>
         <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-white">

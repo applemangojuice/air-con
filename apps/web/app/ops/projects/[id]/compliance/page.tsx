@@ -80,7 +80,7 @@ export default async function CompliancePage({ params }: { params: Promise<{ id:
         <EmptyState
           title="No compliance checklist on this project"
           body="Install day 1 can't start without one. It's created from the standard template: planning, safety, electrical, F-gas, consumer rights and the rest."
-          action={contributor ? <ActionForm action={createChecklistAction.bind(null, p.id)} submitLabel="Create the checklist" /> : undefined}
+          action={contributor ? <ActionForm flash action={createChecklistAction.bind(null, p.id)} submitLabel="Create the checklist" /> : undefined}
         />
       ) : (
         <>
@@ -93,7 +93,7 @@ export default async function CompliancePage({ params }: { params: Promise<{ id:
           {items.length < 20 && contributor && (
             <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
               This checklist is missing some of the current template&apos;s items.
-              <ActionForm action={createChecklistAction.bind(null, p.id)} submitLabel="Add the missing items" variant="secondary" />
+              <ActionForm flash action={createChecklistAction.bind(null, p.id)} submitLabel="Add the missing items" variant="secondary" />
             </div>
           )}
 
@@ -187,6 +187,19 @@ function contextFor(
   }
 }
 
+function ContextList({ context }: { context: { label: string; value: string; tone?: "success" | "warn" | "danger" }[] }) {
+  return (
+    <dl className="mt-3 grid gap-x-4 gap-y-1.5 rounded-2xl bg-surface/60 px-4 py-3 text-sm sm:grid-cols-[minmax(0,1fr)_auto]">
+      {context.map((c) => (
+        <div key={c.label} className="contents">
+          <dt className="text-ink-700">{c.label}</dt>
+          <dd className={`font-medium sm:text-right ${c.tone === "success" ? "text-emerald-800" : c.tone === "danger" ? "text-red-700" : c.tone === "warn" ? "text-amber-800" : "text-ink-900"}`}>{c.value}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
 const REVIEW_CHOICES: { to: ComplianceStatus; label: string }[] = [
   { to: "approved", label: "Approve" },
   { to: "not-applicable", label: "Not applicable" },
@@ -251,16 +264,7 @@ function ItemCard({
           </div>
         )}
 
-        {context.length > 0 && (
-          <dl className="mt-3 grid gap-x-4 gap-y-1.5 rounded-2xl bg-surface/60 px-4 py-3 text-sm sm:grid-cols-[minmax(0,1fr)_auto]">
-            {context.map((c) => (
-              <div key={c.label} className="contents">
-                <dt className="text-ink-700">{c.label}</dt>
-                <dd className={`font-medium sm:text-right ${c.tone === "success" ? "text-emerald-800" : c.tone === "danger" ? "text-red-700" : c.tone === "warn" ? "text-amber-800" : "text-ink-900"}`}>{c.value}</dd>
-              </div>
-            ))}
-          </dl>
-        )}
+        {context.length > 0 && !settled && <ContextList context={context} />}
 
         {media.length > 0 && (
           <ul className="mt-3 flex flex-wrap gap-2">
@@ -284,13 +288,24 @@ function ItemCard({
         )}
       </div>
 
-      <div className="space-y-2 border-t border-line bg-surface/40 px-5 py-3 sm:px-6">
+      <div className="flex flex-wrap gap-2 border-t border-line bg-surface/40 px-5 py-3 sm:px-6">
+        {context.length > 0 && settled && (
+          <details className="group min-w-0 open:basis-full">
+            <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-full border border-line bg-white px-4 text-sm font-semibold text-ink-900 hover:bg-surface group-open:border-ink-300">
+              <span aria-hidden className="text-ink-500 transition group-open:rotate-90">▸</span> On record now
+              {context.some((c) => c.tone === "warn" || c.tone === "danger") && <><span aria-hidden className="h-2 w-2 rounded-full bg-amber-500" /><span className="sr-only">(something to look at)</span></>}
+            </summary>
+            <div className="pb-2">
+              <ContextList context={context} />
+            </div>
+          </details>
+        )}
         {t && (
-          <details className="group">
-            <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 text-sm font-semibold text-ink-900">
+          <details className="group min-w-0 open:basis-full">
+            <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-full border border-line bg-white px-4 text-sm font-semibold text-ink-900 hover:bg-surface group-open:border-ink-300">
               <span aria-hidden className="text-ink-500 transition group-open:rotate-90">▸</span> What to check
             </summary>
-            <div className="pb-2 pl-5 text-sm text-ink-700">
+            <div className="pb-2 pt-3 text-sm text-ink-700">
               <p>{t.guidance}</p>
               <p className="mt-2">
                 <span className="font-semibold text-ink-900">Evidence: </span>
@@ -302,12 +317,12 @@ function ItemCard({
         )}
 
         {contributor && !t?.auto && (
-          <details className="group">
-            <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 text-sm font-semibold text-ink-900">
+          <details className="group min-w-0 open:basis-full">
+            <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-full border border-line bg-white px-4 text-sm font-semibold text-ink-900 hover:bg-surface group-open:border-ink-300">
               <span aria-hidden className="text-ink-500 transition group-open:rotate-90">▸</span> Add evidence or a note
             </summary>
-            <div className="pb-2 pl-5">
-              <ActionForm action={evidenceAction.bind(null, projectId)} submitLabel="Save evidence" variant="secondary" resetOnSuccess>
+            <div className="pb-2 pt-3">
+              <ActionForm flash action={evidenceAction.bind(null, projectId)} submitLabel="Save evidence" variant="secondary" resetOnSuccess>
                 <input type="hidden" name="itemId" value={item.id} />
                 <PhotoUpload projectId={projectId} tag="document" caption={item.label} label="Photos or a PDF" />
                 <label htmlFor={`note-${item.id}`} className="mb-1.5 mt-3 block text-sm font-semibold text-ink-900">
@@ -320,12 +335,12 @@ function ItemCard({
         )}
 
         {reviewer && choices.length > 0 && (
-          <details className="group" open={item.status === "under-review"}>
-            <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 text-sm font-semibold text-ink-900">
+          <details className="group min-w-0 open:basis-full" open={item.status === "under-review"}>
+            <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-full border border-line bg-white px-4 text-sm font-semibold text-ink-900 hover:bg-surface group-open:border-ink-300">
               <span aria-hidden className="text-ink-500 transition group-open:rotate-90">▸</span> Review
             </summary>
-            <div className="pb-2 pl-5">
-              <ActionForm action={reviewAction.bind(null, projectId)} submitLabel="Save the review" busyLabel="Saving…">
+            <div className="pb-2 pt-3">
+              <ActionForm flash action={reviewAction.bind(null, projectId)} submitLabel="Save the review" busyLabel="Saving…">
                 <input type="hidden" name="itemId" value={item.id} />
                 <fieldset>
                   <legend className="mb-1.5 text-sm font-semibold text-ink-900">Decision</legend>
@@ -368,11 +383,11 @@ function ItemCard({
         )}
 
         {(item.history?.length ?? 0) > 0 && (
-          <details className="group">
-            <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 text-sm font-semibold text-ink-900">
+          <details className="group min-w-0 open:basis-full">
+            <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-full border border-line bg-white px-4 text-sm font-semibold text-ink-900 hover:bg-surface group-open:border-ink-300">
               <span aria-hidden className="text-ink-500 transition group-open:rotate-90">▸</span> History ({item.history!.length})
             </summary>
-            <ol className="space-y-2 pb-2 pl-5 text-sm">
+            <ol className="space-y-2 pb-2 pt-3 text-sm">
               {[...item.history!].reverse().map((h, i) => (
                 <li key={`${h.at}-${i}`}>
                   <span className="text-xs text-ink-500">{fmtLondon(h.at)} · {h.by}</span>
