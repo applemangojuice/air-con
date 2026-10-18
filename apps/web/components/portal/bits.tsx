@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useState, type ReactNode } from "react";
-import type { StageInfo, StageState } from "@aircon/domain";
+import type { Blocker, StageInfo, StageState } from "@aircon/domain";
 import { STAFF_READ_ONLY, canAct, useHub } from "./controller";
 import type { PersonCard, PortalRequest } from "./types";
 
@@ -16,9 +16,36 @@ import type { PersonCard, PortalRequest } from "./types";
 export function useAction() {
   const hub = useHub();
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [failure, setFailure] = useState<{ text: string; steps: string[] } | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const readOnly = !canAct(hub);
+  // The refusal, with any steps that are the customer's own to take (from the gate's blockers).
+  const setError = useCallback((text: string | null, blockers?: Blocker[]) => {
+    setFailure(
+      text
+        ? {
+            text,
+            steps: (blockers ?? [])
+              .filter((b) => b.severity === "block" && b.owner === "customer")
+              .map((b) => (b.action ? `${b.message} ${b.action}.` : b.message)),
+          }
+        : null,
+    );
+  }, []);
+  const error: ReactNode = failure ? (
+    failure.steps.length ? (
+      <>
+        {failure.text}
+        <ul className="mt-1.5 list-disc pl-5 font-normal">
+          {failure.steps.map((s) => (
+            <li key={s}>{s}</li>
+          ))}
+        </ul>
+      </>
+    ) : (
+      failure.text
+    )
+  ) : null;
 
   const run = useCallback(
     async (req: PortalRequest): Promise<boolean> => {
@@ -35,25 +62,25 @@ export function useAction() {
           setMessage(result.message ?? null);
           return true;
         }
-        setError(result.error);
+        setError(result.error, result.blockers);
         return false;
       } finally {
         setBusy(false);
       }
     },
-    [hub, readOnly],
+    [hub, readOnly, setError],
   );
 
   const clear = useCallback(() => {
     setError(null);
     setMessage(null);
-  }, []);
+  }, [setError]);
 
   return { run, busy, error, message, readOnly, clear };
 }
 
 /** The outcome of an action, announced. Errors interrupt; confirmations wait their turn. */
-export function ActionFeedback({ error, message, className = "" }: { error?: string | null; message?: string | null; className?: string }) {
+export function ActionFeedback({ error, message, className = "" }: { error?: ReactNode; message?: string | null; className?: string }) {
   return (
     <div aria-live="polite" className={className}>
       {error && (

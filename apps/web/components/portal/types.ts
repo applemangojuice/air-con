@@ -92,7 +92,7 @@ export interface HubCommissioning {
 /** Settings-derived facts the screens need, already turned into words. */
 export interface HubFacts {
   stages: Record<ProjectStageId, StageInfo>;
-  company: { tradingName: string; phone: string; email: string };
+  company: { tradingName: string; phone: string; email: string; reviewUrl?: string };
   scheduling: { surveyDurationMinutes: number; installBlockDays: number; cancellationDays: number };
   warranty: { workmanshipYears: number | null; manufacturerSummary: string | null };
   cancellation: {

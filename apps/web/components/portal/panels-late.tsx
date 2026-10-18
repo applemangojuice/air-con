@@ -665,6 +665,18 @@ export function AftercarePanel({ data, state }: PanelProps) {
         </div>
       )}
       {handed && <Feedback data={data} />}
+      {/* The same invitation for everyone, once we've asked by email: never based on the feedback score. */}
+      {handed && p.aftercare.reviewRequestedAt && data.company.reviewUrl && (
+        <div className="space-y-2 rounded-2xl border border-line bg-white p-4 sm:p-5">
+          <Sub>Would you leave us a review?</Sub>
+          <p className="text-[15px] leading-relaxed text-ink-700">
+            We ask everyone, good or bad, and we don&apos;t offer anything for it. It helps other families decide.
+          </p>
+          <a href={data.company.reviewUrl} target="_blank" rel="noreferrer" className={primaryCls()}>
+            Write a review
+          </a>
+        </div>
+      )}
       <ReportProblem data={data} />
       {handed && <FollowUps data={data} />}
     </StageShell>

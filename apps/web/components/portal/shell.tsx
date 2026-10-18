@@ -34,12 +34,12 @@ export function PortalShell({
 export function CustomerNav() {
   return (
     <>
-      <Link href="/portal" className="inline-flex min-h-11 items-center rounded-full px-3 font-semibold text-ink-700 hover:bg-surface hover:text-ink-900">
+      <Link href="/portal" className="inline-flex min-h-11 items-center whitespace-nowrap rounded-full px-2 font-semibold text-ink-700 hover:bg-surface hover:text-ink-900 sm:px-3">
         Your homes
       </Link>
       <form action="/auth/logout" method="post">
         <input type="hidden" name="next" value="/portal?signedOut=1" />
-        <button type="submit" className="inline-flex min-h-11 items-center rounded-full px-3 font-semibold text-ink-700 hover:bg-surface hover:text-ink-900">
+        <button type="submit" className="inline-flex min-h-11 items-center whitespace-nowrap rounded-full px-2 font-semibold text-ink-700 hover:bg-surface hover:text-ink-900 sm:px-3">
           Sign out
         </button>
       </form>

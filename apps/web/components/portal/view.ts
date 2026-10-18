@@ -54,7 +54,12 @@ export function hubFacts(project: Project, settings: PilotSettings, today: strin
   const cs = cancellationStatus(project, today, settings);
   return {
     stages,
-    company: { tradingName: settings.company.tradingName, phone: settings.company.phone, email: settings.company.email },
+    company: {
+      tradingName: settings.company.tradingName,
+      phone: settings.company.phone,
+      email: settings.company.email,
+      ...(settings.company.reviewUrl ? { reviewUrl: settings.company.reviewUrl } : {}),
+    },
     scheduling: {
       surveyDurationMinutes: settings.scheduling.surveyDurationMinutes,
       installBlockDays: settings.scheduling.installBlockDays,

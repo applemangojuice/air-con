@@ -295,6 +295,70 @@ export async function loadHub(projectId: string, access: ProjectAccess): Promise
 }
 
 /* ------------------------------------------------------------------ */
+/* Documents                                                           */
+/* ------------------------------------------------------------------ */
+
+/** Every photo a document's snapshot refers to (proposal rooms, survey rooms and outdoor spots). */
+export function documentMediaIds(doc: Pick<DocumentRecord, "kind" | "snapshot">): string[] {
+  const s = (doc.snapshot ?? {}) as Record<string, unknown>;
+  const ids: string[] = [];
+  if (doc.kind === "proposal") {
+    const options = ((s.proposal as { options?: unknown[] } | undefined)?.options ?? []) as {
+      roomCards?: { mediaIds?: string[] }[];
+      outdoorMediaIds?: string[];
+    }[];
+    for (const o of options) {
+      for (const r of o.roomCards ?? []) ids.push(...(r.mediaIds ?? []));
+      ids.push(...(o.outdoorMediaIds ?? []));
+    }
+  }
+  if (doc.kind === "survey-report") {
+    const data = ((s.survey as { data?: unknown } | undefined)?.data ?? {}) as {
+      rooms?: { mediaIds?: string[] }[];
+      outdoor?: { positions?: { mediaId?: string }[] };
+    };
+    for (const r of data.rooms ?? []) ids.push(...(r.mediaIds ?? []));
+    for (const p of data.outdoor?.positions ?? []) if (p.mediaId) ids.push(p.mediaId);
+  }
+  return [...new Set(ids.filter((id) => typeof id === "string"))];
+}
+
+export interface DocPhotoView {
+  url: string | null;
+  annotations: MediaItem["annotations"];
+  width?: number;
+  height?: number;
+  caption?: string;
+}
+
+/**
+ * Signed photos for a document: only this project's own files. For the
+ * handover pack, also the customer-visible "finished" photos (as-built).
+ */
+export async function documentPhotos(doc: DocumentRecord): Promise<{ photos: Map<string, DocPhotoView>; asBuilt: DocPhotoView[] }> {
+  const ids = documentMediaIds(doc);
+  const [referenced, finished] = await Promise.all([
+    safe("document media", () => mediaRepo.listByIds(ids), [] as MediaItem[]),
+    doc.kind === "handover-pack"
+      ? safe("as-built media", () => mediaRepo.listForProject(doc.projectId, { tag: "completed", customerVisibleOnly: true }), [] as MediaItem[])
+      : Promise.resolve([] as MediaItem[]),
+  ]);
+  const own = [...referenced, ...finished].filter((m) => m.projectId === doc.projectId);
+  const urls = await safe("document media urls", () => signedMediaUrls(own, 4 * 3600), new Map<string, string>());
+  const view = (m: MediaItem): DocPhotoView => ({
+    url: urls.get(m.id) ?? null,
+    annotations: m.annotations,
+    ...(m.width ? { width: m.width } : {}),
+    ...(m.height ? { height: m.height } : {}),
+    ...(m.caption ? { caption: m.caption } : {}),
+  });
+  return {
+    photos: new Map(own.filter((m) => ids.includes(m.id)).map((m) => [m.id, view(m)])),
+    asBuilt: finished.filter((m) => m.projectId === doc.projectId).slice(0, 8).map(view),
+  };
+}
+
+/* ------------------------------------------------------------------ */
 /* "Your homes" on /portal                                             */
 /* ------------------------------------------------------------------ */
 

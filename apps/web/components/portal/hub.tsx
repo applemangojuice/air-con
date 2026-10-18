@@ -150,20 +150,12 @@ function NextStep({ data, go }: { data: HubData; go: (stage: ProjectStageId, anc
 }
 
 function StaffStrip({ data }: { data: HubData }) {
-  const hub = useHub();
   if (data.viewer.kind !== "staff") return null;
   return (
-    <div role="note" className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-sage-200 bg-sage-50 px-4 py-3 text-sm text-sage-900">
-      <p>
-        <span className="font-semibold">Staff view{data.viewer.name ? ` (${data.viewer.name})` : ""}.</span> This is exactly what the customer sees. Their buttons
-        are switched off for you.
-      </p>
-      {hub.hrefs.ops && (
-        <Link href={hub.hrefs.ops} className="inline-flex min-h-10 items-center rounded-full bg-white px-4 font-semibold text-sage-800 ring-1 ring-sage-200 hover:bg-sage-100">
-          Ops view
-        </Link>
-      )}
-    </div>
+    <p role="note" className="mb-6 rounded-2xl border border-sage-200 bg-sage-50 px-4 py-3 text-sm text-sage-900">
+      <span className="font-semibold">Staff view{data.viewer.name ? `: ${data.viewer.name}` : ""}.</span> This is exactly what the customer sees; their buttons are
+      switched off for you. Use Ops view to make changes.
+    </p>
   );
 }
 
