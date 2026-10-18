@@ -89,6 +89,25 @@ export default async function KitPage({ params }: { params: Promise<{ id: string
         {p.booking.status !== "booked" && " (kit updates reach the customer once the booking is confirmed)"}
       </p>
 
+      {view.kitIssues.length > 0 && (
+        <div role="alert" className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
+          <p className="font-semibold">
+            {view.kitIssues.length} open kit issue{view.kitIssues.length === 1 ? "" : "s"}: install day 1 waits until {view.kitIssues.length === 1 ? "it's" : "they're"} resolved
+          </p>
+          <ul className="mt-1 space-y-0.5">
+            {view.kitIssues.map((i) => (
+              <li key={i.id}>
+                #{i.number} {i.title}
+                {i.nextAction ? `. Next: ${i.nextAction}.` : ""}
+              </li>
+            ))}
+          </ul>
+          <Link href={`/ops/projects/${p.id}`} className="mt-1 inline-flex min-h-10 items-center font-semibold underline">
+            Resolve on the project page
+          </Link>
+        </div>
+      )}
+
       {live.length === 0 && (
         <div className="mt-8">
           <EmptyState

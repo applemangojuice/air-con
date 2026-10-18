@@ -133,12 +133,19 @@ export interface KitView {
   summary: ReturnType<typeof kitSummary>;
   source: { ok: true; optionLabel: string; designVersion: number } | { ok: false; reason: string };
   today: string;
+  /** Open damage and missing-kit issues on this job. */
+  kitIssues: Issue[];
 }
 
 export async function loadKit(projectId: string): Promise<KitView | null> {
   const project = await loadProject(projectId);
   if (!project) return null;
-  const [pos, settings, src] = await Promise.all([purchaseOrdersRepo.listForProject(projectId), getSettings(), kitSource(projectId)]);
+  const [pos, settings, src, issues] = await Promise.all([
+    purchaseOrdersRepo.listForProject(projectId),
+    getSettings(),
+    kitSource(projectId),
+    issuesRepo.listForProject(projectId, { openOnly: true }),
+  ]);
   const today = londonToday();
   return {
     project,
@@ -146,6 +153,7 @@ export async function loadKit(projectId: string): Promise<KitView | null> {
     summary: kitSummary(pos),
     source: src.ok ? { ok: true, optionLabel: src.source.optionLabel, designVersion: src.source.design.version } : { ok: false, reason: src.reason },
     today,
+    kitIssues: issues.filter((i) => i.kind === "damage" || i.kind === "shortage"),
   };
 }
 
@@ -329,22 +337,25 @@ export async function syncKitStatus(projectId: string, staff: StaffMember | null
     if (project.booking.status !== "booked") return { changed: false };
     const s = kitSummary(pos);
     const k = project.kit;
-    const summary = kitCustomerSummary(s);
+    let status = s.status;
+    let summary = kitCustomerSummary(s);
+    // Once the goods were delivered, the customer was told so, and it was true. A replacement
+    // ordered after that (damage found at the check) is said as "delivered, N still to come",
+    // never as the kit going back to "ordered".
+    const order = ["not-ordered", "ordered", "confirmed", "dispatched", "delivered", "inspected"];
+    if (order.indexOf(status) < order.indexOf("delivered") && (k.status === "delivered" || k.status === "inspected")) {
+      status = "delivered";
+      summary = s.shortages ? `${s.shortages} item${s.shortages === 1 ? "" : "s"} still to come` : "";
+    }
     const same =
-      k.status === s.status &&
+      k.status === status &&
       k.shortages === s.shortages &&
       (s.expectedDate === undefined || k.expectedDate === s.expectedDate) &&
       (k.summary ?? "") === summary;
     if (same) return { changed: false };
-    // Never take a project's kit backwards on a technicality (e.g. a fresh replacement order
-    // after the goods were delivered): the customer was told it arrived, and it did.
-    const order = ["not-ordered", "ordered", "confirmed", "dispatched", "delivered", "inspected"];
-    if (order.indexOf(s.status) < order.indexOf(k.status) && (k.status === "delivered" || k.status === "inspected")) {
-      return { changed: false };
-    }
     const result = await dispatch(
       projectId,
-      { type: "kit-updated", status: s.status, ...(s.expectedDate ? { expectedDate: s.expectedDate } : {}), summary, shortages: s.shortages },
+      { type: "kit-updated", status, ...(s.expectedDate ? { expectedDate: s.expectedDate } : {}), summary, shortages: s.shortages },
       staff ?? { kind: "system", name: "purchasing" },
     );
     if ("error" in result) {

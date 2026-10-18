@@ -232,7 +232,10 @@ export function posFromDesign(
     lineKey.set(key, line);
   }
 
-  return [...orders.values()].map((po) => ({ ...po, expectedTotalPence: poTotals(po).expectedPence }));
+  // Van stock rides along on a supplier's order for the real kit, never as an order of its own.
+  return [...orders.values()]
+    .filter((po) => po.lines.some((l) => l.required))
+    .map((po) => ({ ...po, expectedTotalPence: poTotals(po).expectedPence }));
 }
 
 /* ------------------------------------------------------------------ */
@@ -761,6 +764,8 @@ export function poSchedule(
 ): { needOnSiteBy?: string; orderBy?: string; flags: PoFlag[] } {
   const today = dateOf(todayIso);
   const flags: PoFlag[] = [];
+  // Nothing on it holds the install (van stock only): no deadlines to chase.
+  if (!po.lines.some((l) => l.required && poLineEffectiveQty(l) > 0)) return { flags };
   const done = po.status === "delivered" || po.status === "inspected" || po.status === "cancelled";
   const placed = statusIndex(po.status) >= statusIndex("ordered") && !done;
   const eta = po.eta && isDate(po.eta) ? dateOf(po.eta) : undefined;

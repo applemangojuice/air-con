@@ -39,6 +39,7 @@ const CATALOGUE: CatalogueItem[] = [
   cat({ id: "pipe", kind: "material", label: "Line set (DEMO)", unit: "m", costPence: 900, supplier: "DEMO Trade Counter" }),
   cat({ id: "tape", kind: "material", label: "Tape (DEMO)", costPence: null, costSource: { supplier: "DEMO Trade Counter" } }),
   cat({ id: "mystery", kind: "material", label: "Bracket (DEMO)", costPence: 5_500 }),
+  cat({ id: "gloves", kind: "material", label: "Gloves (DEMO)", costPence: 300, supplier: "DEMO Van Supplies" }),
 ];
 
 const DESIGN: DesignRecord = {
@@ -67,6 +68,7 @@ const DESIGN: DesignRecord = {
         { catalogueItemId: "tape", sku: "tape", label: "tape", qty: 2, category: "consumables" },
         { catalogueItemId: "mystery", sku: "mystery", label: "bracket", qty: 1, category: "materials" },
         { sku: "free-text", label: "Cable ties", qty: 0, category: "consumables" },
+        { catalogueItemId: "gloves", sku: "gloves", label: "gloves", qty: 2, category: "consumables" },
       ],
     },
   ],
@@ -79,7 +81,7 @@ const bySupplier = (list: PurchaseOrder[], s: string) => list.find((p) => p.supp
 
 test("purchase orders: one per supplier, equipment first, same item merged, expected costs from the catalogue", () => {
   const list = pos();
-  assert.deepEqual(list.map((p) => p.supplier), ["DEMO Aircon Supplies", "DEMO Trade Counter", UNKNOWN_SUPPLIER]);
+  assert.deepEqual(list.map((p) => p.supplier), ["DEMO Aircon Supplies", "DEMO Trade Counter", UNKNOWN_SUPPLIER], "van stock alone never makes an order");
   const equipment = bySupplier(list, "DEMO Aircon Supplies");
   assert.deepEqual(equipment.lines.map((l) => [l.label, l.qty]), [
     ["Indoor 25 (DEMO)", 2],
