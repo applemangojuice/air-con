@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, type ReactNode } from "react";
+import { primaryBtn, secondaryBtn } from "@/components/site/styles";
 import { LegalLinks } from "./legal-links";
 
 /**
@@ -19,11 +20,7 @@ import { LegalLinks } from "./legal-links";
 export const inputCls =
   "w-full min-h-12 rounded-full border border-line bg-white px-5 py-3 text-base text-ink-900 outline-none transition placeholder:text-ink-500 focus:border-accent-500 focus:ring-2 focus:ring-accent-100 aria-invalid:border-red-600";
 
-/** The primary action colour: accent-700 keeps white text at AA (accent-600 is 4.0:1). */
-export const primaryBtn =
-  "inline-flex min-h-12 items-center justify-center rounded-full bg-accent-700 px-6 py-3 font-semibold text-white shadow-sm transition hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-50";
-export const secondaryBtn =
-  "inline-flex min-h-12 items-center justify-center rounded-full border border-line bg-white px-5 py-3 font-semibold text-ink-900 transition hover:border-ink-500 hover:bg-surface disabled:opacity-50";
+export { primaryBtn, secondaryBtn };
 
 /** A labelled text control. The render prop receives the id and description wiring. */
 export function TextField({

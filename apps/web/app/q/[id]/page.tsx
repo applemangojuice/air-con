@@ -102,38 +102,43 @@ export default async function SavedQuotePage({
           {survey.addressLine}, {survey.postcode} · given {fmtDate(createdAt)}
         </p>
 
-        <QuoteView quote={quote} roomCount={survey.rooms.length} settings={settings} createdAt={createdAt} />
+        <QuoteView
+          quote={quote}
+          roomCount={survey.rooms.length}
+          settings={settings}
+          createdAt={createdAt}
+          afterHero={
+            <>
+              {expired && (
+                <p className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                  This price was valid until {fmtDate(until)}. Book a survey and we&apos;ll confirm today&apos;s price
+                  for your home in your proposal.
+                </p>
+              )}
+              {coverage.covered || projectRow ? (
+                <BookSurveyButton
+                  quoteId={data.id}
+                  existingProjectId={(projectRow?.id as string | undefined) ?? null}
+                  surveyPrice={surveyPriceCopy(settings)}
+                  surveyDuration={surveyDurationCopy(settings)}
+                />
+              ) : (
+                <section className="rounded-3xl border border-line bg-white p-6">
+                  <h2 className="text-lg font-bold">We&apos;re not installing in {coverage.outcode} at the moment</h2>
+                  <p className="mt-2 text-sm text-ink-700">
+                    So we can&apos;t book a survey there yet. Email{" "}
+                    <a href={`mailto:${settings.company.email}`} className="font-semibold text-accent-700 underline">
+                      {settings.company.email}
+                    </a>{" "}
+                    and we&apos;ll tell you when that changes.
+                  </p>
+                </section>
+              )}
+            </>
+          }
+        />
 
-        {expired && (
-          <p className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-            This price was valid until {fmtDate(until)}. Book a survey and we&apos;ll confirm today&apos;s price for your
-            home in your proposal.
-          </p>
-        )}
-
-        <div className="mt-8">
-          {coverage.covered || projectRow ? (
-            <BookSurveyButton
-              quoteId={data.id}
-              existingProjectId={(projectRow?.id as string | undefined) ?? null}
-              surveyPrice={surveyPriceCopy(settings)}
-              surveyDuration={surveyDurationCopy(settings)}
-            />
-          ) : (
-            <section className="rounded-3xl border border-line bg-white p-6">
-              <h2 className="text-lg font-bold">We&apos;re not installing in {coverage.outcode} at the moment</h2>
-              <p className="mt-2 text-sm text-ink-700">
-                So we can&apos;t book a survey there yet. Email{" "}
-                <a href={`mailto:${settings.company.email}`} className="font-semibold text-accent-700 underline">
-                  {settings.company.email}
-                </a>{" "}
-                and we&apos;ll tell you when that changes.
-              </p>
-            </section>
-          )}
-        </div>
-
-        <div className="no-print mt-3 grid gap-3 sm:grid-cols-2">
+        <div className="no-print mt-8 grid gap-3 sm:grid-cols-2">
           <ShareQuoteButton quoteId={data.id} />
           <PrintButton />
         </div>

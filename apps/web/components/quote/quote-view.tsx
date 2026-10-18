@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useId, useState, type ReactNode } from "react";
 import type { QuoteResult as Quote } from "@aircon/domain";
 import { fmtDate, gbp } from "@/lib/format";
 import {
@@ -25,12 +25,15 @@ export function QuoteView({
   roomCount,
   settings,
   createdAt,
+  afterHero,
 }: {
   quote: Quote;
   roomCount: number;
   settings: PublicSettings;
   /** When the price was given; sets the "valid until" date. */
   createdAt?: string;
+  /** The next action, placed straight after the price so it's never below the fold. */
+  afterHero?: ReactNode;
 }) {
   const [showBreakdown, setShowBreakdown] = useState(false);
   const breakdownId = useId();
@@ -58,19 +61,14 @@ export function QuoteView({
         <p className="mt-4 rounded-2xl bg-white/10 px-4 py-3 text-sm leading-relaxed text-white/90">{PRICE_PROMISE}</p>
       </div>
 
-      <dl className="mt-4 grid gap-x-4 gap-y-1 text-sm sm:grid-cols-2">
-        <div className="flex gap-1.5">
-          <dt className="text-ink-500">Valid:</dt>
-          <dd className="font-medium text-ink-900">
-            {until ? `until ${fmtDate(until)}` : `for ${settings.quoteValidityDays} days`}
-          </dd>
-        </div>
-        <div className="flex gap-1.5">
-          <dt className="text-ink-500">Confidence:</dt>
-          <dd className="font-medium text-ink-900">{band.label.toLowerCase()}</dd>
-        </div>
-      </dl>
-      <p className="mt-2 text-sm text-ink-500">{band.body}</p>
+      <p className="mt-4 text-sm text-ink-700">
+        <span className="font-semibold text-ink-900">
+          {until ? `Valid until ${fmtDate(until)}.` : `Valid for ${settings.quoteValidityDays} days.`}
+        </span>{" "}
+        {band.body}
+      </p>
+
+      {afterHero && <div className="mt-6">{afterHero}</div>}
 
       {/* Systems */}
       <section className="mt-8" aria-labelledby={`${breakdownId}-system`}>
@@ -148,7 +146,8 @@ export function QuoteView({
           <h2 className="text-sm font-bold">Your surveyor will check</h2>
           <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-ink-700">
             {quote.reviewFlags.map((flag) => (
-              <li key={flag}>{flag}</li>
+              // The engine's older wording says "lock this line in"; nothing is locked before the survey.
+              <li key={flag}>{flag.replace(/lets us lock this line in/i, "helps us firm up this line")}</li>
             ))}
           </ul>
         </section>

@@ -120,22 +120,24 @@ export function RoomsStep({
       </div>
 
       {/* What we've already filled in, one compact line, changeable */}
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-2xl border border-line bg-white px-4 py-2.5 text-xs text-ink-700">
-        <span className="font-semibold text-ink-500">Priced for:</span>
-        <span className="font-medium">
-          {TYPE_LABEL[draft.survey.property.type] ?? draft.survey.property.type}
-          {" · "}
-          {ERA_LABEL[draft.survey.property.era] ?? draft.survey.property.era}
-          {" · "}
-          {draft.survey.property.bedrooms} bed{draft.survey.property.bedrooms === 1 ? "" : "s"}
-          {draft.survey.property.floorAreaM2 ? ` · ~${draft.survey.property.floorAreaM2} m²` : ""}
-        </span>
-        {draft.prefilledFromIntel && <span className="text-ink-500">(from public records)</span>}
+      <div className="flex items-center gap-3 rounded-2xl border border-line bg-white px-4 py-2.5 text-xs text-ink-700">
+        <p className="min-w-0 flex-1">
+          <span className="font-semibold text-ink-500">Priced for: </span>
+          <span className="font-medium">
+            {TYPE_LABEL[draft.survey.property.type] ?? draft.survey.property.type}
+            {" · "}
+            {ERA_LABEL[draft.survey.property.era] ?? draft.survey.property.era}
+            {" · "}
+            {draft.survey.property.bedrooms} bed{draft.survey.property.bedrooms === 1 ? "" : "s"}
+            {draft.survey.property.floorAreaM2 ? ` · ~${draft.survey.property.floorAreaM2} m²` : ""}
+          </span>
+          {draft.prefilledFromIntel && <span className="text-ink-500"> (from public records)</span>}
+        </p>
         {onBack && (
           <button
             type="button"
             onClick={onBack}
-            className="ml-auto min-h-9 shrink-0 rounded-full border border-line px-3 font-semibold text-accent-700 transition hover:bg-accent-50"
+            className="min-h-9 shrink-0 rounded-full border border-line px-3 font-semibold text-accent-700 transition hover:bg-accent-50"
           >
             Change
           </button>

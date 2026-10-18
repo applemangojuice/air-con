@@ -67,7 +67,7 @@ export function OutOfArea({
     <div className="rounded-2xl border border-line bg-white p-5">
       <p className="font-semibold text-ink-900">Sorry, we&apos;re not in {place} yet.</p>
       <p className="mt-1.5 text-sm leading-relaxed text-ink-700">
-        We&apos;re starting small, in a few South London postcodes, so every home gets our full attention. Right now
+        We&apos;re starting small, in a handful of London postcodes, so every home gets our full attention. Right now
         we install in {listOutcodes(serviceArea)}.
       </p>
 
@@ -81,7 +81,6 @@ export function OutOfArea({
             label="Want a heads-up when we get there?"
             hint={areaLaunchConsentText(outcode)}
             error={error}
-            optional
           >
             {(c) => (
               <input

@@ -316,7 +316,7 @@ export const OPERATIONAL_CONSENT = {
 
 export const MARKETING_CONSENT = {
   label: "Send me occasional news and offers by email",
-  hint: "Seasonal tips, new areas and offers from us. Optional, and you can unsubscribe from any email.",
+  hint: "Seasonal tips, new areas and offers from us. Unsubscribe from any email, any time.",
 } as const;
 
 export const AREA_LAUNCH_VERSION = "area-launch-v1";

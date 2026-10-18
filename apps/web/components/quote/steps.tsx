@@ -197,7 +197,7 @@ export function AddressStep({
       totalSteps={totalSteps}
       title="Let's price your home"
       subtitle="Start with your postcode. Quicker than finding where you put the fan last September."
-      onNext={onNext}
+      onNext={outOfArea ? undefined : onNext}
       nextDisabled={!ready}
       busy={busy}
       nextLabel="Continue"
@@ -208,7 +208,7 @@ export function AddressStep({
         </p>
       )}
 
-      <TextField label="Postcode" hint="We install in a few South London postcodes for now.">
+      <TextField label="Postcode" hint="We install in a handful of London postcodes for now.">
         {(c) => (
           <input
             {...c}

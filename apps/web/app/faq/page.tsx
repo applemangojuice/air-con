@@ -2,87 +2,129 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { SiteFooter } from "@/components/site/footer";
 import { SiteHeader } from "@/components/site/header";
-import { BRAND } from "@/lib/brand";
+import {
+  cancellationSummary,
+  fgasClaim,
+  installDaysPhrase,
+  listOutcodes,
+  paymentCopy,
+  surveyDurationCopy,
+  surveyPriceCopy,
+  vatCopy,
+  warrantyCopy,
+  type PublicSettings,
+} from "@/components/site/claims";
+import { primaryBtn, textLink } from "@/components/site/styles";
+import { examplePrices, fromPrice } from "@/lib/example-prices";
+import { gbp } from "@/lib/format";
+import { getPublicSettings } from "@/lib/public-settings";
+
+export const revalidate = 60;
 
 export const metadata: Metadata = {
   title: "FAQ",
   description:
-    "Planning permission, noise, running costs, install day, warranty: every question about home air conditioning, answered straight.",
+    "Heating and cooling with an air-to-air heat pump: planning, noise, running costs, install time, guarantees and your right to cancel, answered straight.",
 };
 
 /**
- * The questions people actually ask before buying home air conditioning in
- * the UK, answered honestly. Rendered with FAQPage structured data so search
- * engines can show the answers directly.
+ * The questions people ask before putting a heat pump (the thing most people
+ * call air conditioning) in their home, answered honestly. Anything that
+ * depends on a business decision (warranty, VAT, payment, coverage, who does
+ * the work) is read from settings, so the answers never get ahead of the
+ * facts. Rendered with FAQPage structured data from the same text.
  */
-const faqs: { q: string; a: string }[] = [
-  {
-    q: "Do I need planning permission for air conditioning?",
-    a: "Usually not. Most houses can install an outdoor unit under permitted development, as long as it meets size and placement rules (which our designs follow by default). Flats, listed buildings and conservation areas are different — if public records suggest your address needs a check, your quote says so upfront rather than on install day.",
-  },
-  {
-    q: "How much does home air conditioning cost to install?",
-    a: "A single room typically starts around £2,000 installed; a whole-house multi-split system for a three-bedroom home is usually £6,000–£10,000 depending on rooms and routing. Ours is a fixed price, not an estimate: complete the two-minute survey and the price you see is the price you pay.",
-  },
-  {
-    q: "What does it cost to run?",
-    a: "Modern inverter systems are extremely efficient. Cooling a bedroom overnight typically costs 20–40p at current electricity prices; a living room on a hot afternoon under £1. In winter the same unit heats at roughly a third of the cost of a plug-in electric heater, because heat pumps move heat rather than generate it.",
-  },
-  {
-    q: "Is it noisy?",
-    a: "Indoor units run at a whisper — around 19–26 dB on night mode, quieter than a library. The outdoor unit is about as loud as a fridge and we position it away from bedrooms (yours and your neighbours') as part of the design.",
-  },
-  {
-    q: "Does it heat as well as cool?",
-    a: "Yes. Every system we install is a heat pump: cooling in summer, efficient heating in winter, and air filtration all year. Many customers end up using it as their main heating in the rooms it serves.",
-  },
-  {
-    q: "How long does installation take?",
-    a: "Most single-unit installs are done in a day; whole-house systems typically take two. Your quote includes the expected duration, and everything is documented: pressure tests, vacuum readings and commissioning data, with certificates handed over at the end.",
-  },
-  {
-    q: "How accurate is the online price, really?",
-    a: "Every quote carries an Installation Confidence Score. Complete the survey with photos and the score is high — that price is guaranteed as-is. If something on the day materially differs from your survey, we explain and agree any change before starting work, and you can cancel at no cost if you don't accept it.",
-  },
-  {
-    q: "What warranty do I get?",
-    a: "Five years, parts and labour, on every installation as standard — on top of your statutory consumer rights, not instead of them.",
-  },
-  {
-    q: "Do I need my landlord's or freeholder's permission?",
-    a: "If you rent, yes — you'll need your landlord's written consent. If you own a leasehold flat, your lease usually requires freeholder consent for the outdoor unit. We flag this in your quote and can provide the technical details consent requests usually ask for.",
-  },
-  {
-    q: "Which areas do you cover?",
-    a: "We're rolling out street by street across South London, starting with SW16 and SW17. Enter your postcode and we'll tell you straight away whether we cover you — and if we don't yet, your quote is still real and we'll tell you when we arrive in your area.",
-  },
-];
+function faqsFor(s: PublicSettings): { q: string; a: string }[] {
+  const p = examplePrices();
+  const from = fromPrice();
+  const warranty = warrantyCopy(s);
+  const fgas = fgasClaim(s);
+  const pay = paymentCopy(s);
+  const survey = [surveyPriceCopy(s), surveyDurationCopy(s)].filter(Boolean).join(", ").toLowerCase();
+  const outcodes = s.serviceArea;
 
-const faqJsonLd = {
-  "@context": "https://schema.org",
-  "@type": "FAQPage",
-  mainEntity: faqs.map((f) => ({
-    "@type": "Question",
-    name: f.q,
-    acceptedAnswer: { "@type": "Answer", text: f.a },
-  })),
-};
+  return [
+    {
+      q: "Is this air conditioning or a heat pump?",
+      a: "Both. What most people call air conditioning is an air-to-air heat pump: the same unit cools a room in summer and heats it in winter, by moving heat rather than making it. Every system we fit is set up for both, and we show you heating mode at handover.",
+    },
+    {
+      q: "Do I need planning permission?",
+      a: "Often not for a house, but it depends, so we never assume. In England, heat pumps can usually go in under permitted development when the outdoor unit meets size and siting rules and a noise limit for your neighbours, and the system isn't used only for cooling. Flats, listed buildings, conservation areas and Article 4 areas need extra checks. We check your home at the survey and tell you in your proposal.",
+    },
+    {
+      q: "How much does it cost?",
+      a: `One room starts from about ${gbp(from)} installed, and a whole three-bed home from about ${gbp(Math.min(p.threeBedTerrace, p.threeBedSemi))}, depending on rooms and pipe routes. ${vatCopy(s).long} Your online price is for your home, and it's confirmed at your survey.`,
+    },
+    {
+      q: "How accurate is the online price?",
+      a: "It's calculated from your answers, and every quote shows how confident we are in it. Photos make it more accurate. It's confirmed at your home survey: if the survey finds something your answers didn't show (an extra room, a fuse board that needs work), your proposal says exactly what changed and why, before you agree to anything.",
+    },
+    {
+      q: "What happens at the survey?",
+      a: `A surveyor visits (${survey}) to measure each room, check where the indoor and outdoor units could go and how the pipes would run, and look at your fuse board. Then we design your system and send a proposal with the price in writing. There's no obligation.`,
+    },
+    {
+      q: "What does it cost to run?",
+      a: "That depends on your tariff, your home and how you use it, so we won't promise a number. As a rule of thumb, a heat pump gives out three or more units of heat for each unit of electricity it uses, which is why it heats far more cheaply than a plug-in electric heater. Manufacturers publish this as SCOP (heating) and SEER (cooling), and your proposal names the exact units so you can check their figures.",
+    },
+    {
+      q: "Is it noisy?",
+      a: "Indoor units are very quiet on their lowest setting: the models we're looking at are rated from about 19 dB(A), roughly a whisper, though it varies by model and size. The outdoor unit is louder, so its position matters. We check it against the noise limit for your neighbours at the survey.",
+    },
+    {
+      q: "How long does installation take?",
+      a: `${installDaysPhrase(s).charAt(0).toUpperCase()}${installDaysPhrase(s).slice(1)} for most homes, and your proposal gives the plan for yours. Expect the power to be off for up to 30 minutes while the new circuit is connected. Before we leave, the system is tested and commissioned in heating and cooling, and you get your paperwork.`,
+    },
+    {
+      q: "Who does the work?",
+      a: `Refrigerant work legally needs F-gas certified engineers, and the new electrical circuit needs a registered electrician. ${fgas ?? ""} Before your install you'll see who's coming and the qualifications they actually hold.`.replace(/\s+/g, " "),
+    },
+    {
+      q: "What guarantees do I get?",
+      a: `${warranty ? `${warranty.headline}. ${warranty.body}` : "Your proposal sets out the manufacturer's warranty and our workmanship guarantee in writing, before you agree to anything."} All of this is on top of your statutory rights, not instead of them.`,
+    },
+    {
+      q: "How do I pay?",
+      a: `Getting a price costs nothing${surveyPriceCopy(s) === "Free" ? ", and so does the survey" : ""}. ${pay.deposit} ${pay.balance} ${pay.methods}${s.finance.lenderConfigured ? "" : " We don't offer finance at the moment."}`,
+    },
+    {
+      q: "Can I change my mind?",
+      a: `Yes. ${cancellationSummary(s).replace(/^If you accept, you/, "Once you accept, you")} If you'd like us to start sooner, you can ask us to, in writing. Our terms explain it in full.`,
+    },
+    {
+      q: "Do I need my landlord's or freeholder's permission?",
+      a: "If you rent, yes: you'll need your landlord's written consent. If you own a leasehold flat, your lease usually needs the freeholder's consent for the outdoor unit. We flag this in your quote and can give you the technical details consent requests usually ask for.",
+    },
+    {
+      q: "Which areas do you cover?",
+      a: outcodes.length
+        ? `We're starting with ${listOutcodes(outcodes)}. Put your postcode in and we'll tell you straight away. If we're not there yet, you can ask us to email you once when we are.`
+        : "We're finalising our first areas. Put your postcode in and we'll tell you straight away.",
+    },
+  ];
+}
 
-export default function FaqPage() {
+export default async function FaqPage() {
+  const settings = await getPublicSettings();
+  const faqs = faqsFor(settings);
+  const faqJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: faqs.map((f) => ({ "@type": "Question", name: f.q, acceptedAnswer: { "@type": "Answer", text: f.a } })),
+  };
+
   return (
     <>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
-      />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }} />
       <SiteHeader />
       <main>
         <section className="warm-gradient">
           <div className="mx-auto max-w-3xl px-4 py-14 sm:px-6">
             <h1 className="text-4xl font-display sm:text-5xl">Fair questions</h1>
-            <p className="mt-4 text-lg text-ink-500">
-              Everything people ask before putting air conditioning in their
-              home, answered without the salesperson gloss.
+            <p className="mt-4 text-lg text-ink-700">
+              Everything people ask before putting a heat pump in their home for heating and cooling, answered
+              without the sales gloss.
             </p>
           </div>
         </section>
@@ -90,44 +132,32 @@ export default function FaqPage() {
         <section className="mx-auto max-w-3xl px-4 py-12 sm:px-6">
           <div className="space-y-3">
             {faqs.map((f) => (
-              <details
-                key={f.q}
-                className="group rounded-2xl border border-line bg-white p-5 open:shadow-sm"
-              >
-                <summary className="cursor-pointer list-none font-semibold text-ink-900 marker:content-none">
+              <details key={f.q} className="group rounded-2xl border border-line bg-white p-5 open:shadow-sm">
+                <summary className="cursor-pointer list-none font-semibold text-ink-900 marker:content-none [&::-webkit-details-marker]:hidden">
                   <span className="flex items-center justify-between gap-3">
                     {f.q}
-                    <span
-                      aria-hidden
-                      className="shrink-0 text-accent-600 transition group-open:rotate-45"
-                    >
+                    <span aria-hidden className="shrink-0 text-xl leading-none text-accent-700 transition group-open:rotate-45">
                       +
                     </span>
                   </span>
                 </summary>
-                <p className="mt-3 leading-relaxed text-ink-500">{f.a}</p>
+                <p className="mt-3 leading-relaxed text-ink-700">{f.a}</p>
               </details>
             ))}
           </div>
 
           <div className="mt-10 rounded-2xl border border-accent-100 bg-accent-50 p-6">
             <p className="font-semibold">Something we haven&apos;t answered?</p>
-            <p className="mt-1 text-sm text-ink-500">
+            <p className="mt-1 text-sm text-ink-700">
               Email{" "}
-              <a
-                href={`mailto:${BRAND.supportEmail}`}
-                className="font-semibold text-accent-700 hover:underline"
-              >
-                {BRAND.supportEmail}
+              <a href={`mailto:${settings.company.email}`} className={textLink}>
+                {settings.company.email}
               </a>{" "}
-              and a human replies. Or just get your price — it&apos;s free and
-              answers most questions by itself.
+              {settings.company.phone ? `or call ${settings.company.phone} ` : ""}and a person replies. Or get your
+              price: it&apos;s free and answers most questions by itself.
             </p>
-            <Link
-              href="/quote"
-              className="mt-4 inline-block rounded-full bg-accent-600 px-5 py-2.5 font-semibold text-white transition hover:bg-accent-700"
-            >
-              Get my fixed price
+            <Link href="/quote" className={`mt-4 ${primaryBtn}`}>
+              Get my price
             </Link>
           </div>
         </section>
