@@ -4,9 +4,12 @@ import * as nodeModule from "node:module";
 import {
   COMMS_EVENTS,
   DEFAULT_SETTINGS,
+  EARLY_START_WORDING_VERSION,
+  FOLLOW_UP_EVENTS,
   LINK_PLACEHOLDER,
   applyProjectAction,
   createProject,
+  earlyStartWording,
   generateQuote,
   idempotencyKey,
   mergeSettings,
@@ -50,11 +53,11 @@ function resolveExtensionlessTs(): void {
 }
 resolveExtensionlessTs();
 
-const { renderMessage, templateContext, firstNameOf, linkPathFor } = await import("../lib/comms/templates.ts");
+const { renderMessage, smsCandidates, templateContext, firstNameOf, linkPathFor } = await import("../lib/comms/templates.ts");
 type CommsData = import("../lib/comms/templates.ts").CommsData;
 const { cancellationForm, cancellationInstructions, CANCELLATION_NOTICE_VERSION } = await import("../lib/comms/legal-text.ts");
-const { commsForAction, textHash } = await import("../lib/comms/action-map.ts");
-const { createOutbox, consentAllows, addressFor, headline } = await import("../lib/comms/outbox-core.ts");
+const { commsForAction, followUpForDelivered, textHash } = await import("../lib/comms/action-map.ts");
+const { createOutbox, consentAllows, addressFor, headline, optedOut } = await import("../lib/comms/outbox-core.ts");
 type OutboxDeps = import("../lib/comms/outbox-core.ts").OutboxDeps;
 const { messageStore } = await import("../lib/repo/messages.ts");
 const { createLocalClient } = await import("../lib/db/local-client.ts");
@@ -65,7 +68,18 @@ const { smsLength } = await import("../lib/providers/sms.ts");
 /* ------------------------------------------------------------------ */
 
 const ALL_EVENTS = Object.keys(COMMS_EVENTS) as CommsEventId[];
-const SETTINGS: PilotSettings = mergeSettings(DEFAULT_SETTINGS);
+const REVIEW_URL = "https://reviews.example/dang-its-hot";
+/** A business with its pre-contract details and review link filled in (DEMO values). */
+const SETTINGS: PilotSettings = mergeSettings({
+  company: {
+    geographicAddress: "DEMO, 1 Example Street, London SW16 2BE",
+    complaintsProcess: "DEMO: tell us by phone or email and we reply within two working days.",
+    adr: "DEMO dispute scheme: disputes.example",
+    workmanshipGuarantee: "DEMO: call us and we come back to put it right.",
+    reviewUrl: REVIEW_URL,
+  },
+  warranty: { workmanshipYears: 2, manufacturerSummary: "DEMO: five years on parts when registered." },
+});
 const PHONE = SETTINGS.company.phone;
 const PORTAL = "https://dang.example/auth/verify?t=demo-token";
 const PROJECT_ID = "00000000-0000-4000-8000-0000000000aa";
@@ -96,7 +110,23 @@ const FULL: { [E in CommsEventId]: CommsData[E] } = {
   "survey-reminder": { scheduledFor: "2026-11-03T10:00:00.000Z", durationMinutes: 90, mode: "in-person", surveyorName: "Alex Demo" },
   "surveyor-on-my-way": { etaMinutes: 20, at: "2026-11-03T09:40:00.000Z", name: "Alex Demo" },
   "survey-complete": { proposalBy: "2026-11-10" },
-  "proposal-issued": { version: 2, validUntil: "2026-12-03", optionCount: 2, engineerApproved: true },
+  "proposal-issued": {
+    version: 2,
+    validUntil: "2026-12-03",
+    optionCount: 2,
+    engineerApproved: true,
+    contractType: "supply-and-install",
+    options: [
+      { label: "Standard", summary: "Three wall units on one outdoor unit.", rooms: ["Main bedroom: 2.5 kW wall unit"], highlights: ["Quiet night mode"], totalPence: 645_000, installDays: 3 },
+      { label: "Quiet", rooms: ["Main bedroom: 2.5 kW premium wall unit"], totalPence: 712_000, installDays: 3 },
+    ],
+    rooms: ["Main bedroom: 2.5 kW wall unit"],
+    installDays: 3,
+    inclusions: ["Condensate pump where needed"],
+    exclusions: ["Redecorating after the install"],
+    assumptions: ["The fuse board has a spare way, as seen at the survey"],
+    warranty: "DEMO: seven years on parts and labour from the manufacturer, registered by us.",
+  },
   "proposal-reminder": { version: 1, validUntil: "2026-12-03" },
   "proposal-accepted": {
     version: 2,
@@ -111,6 +141,13 @@ const FULL: { [E in CommsEventId]: CommsData[E] } = {
     acknowledgedLossOfRight: true,
     installDays: 3,
     proposalRef: "DIH-PR-00AA-v2",
+    contractType: "supply-and-install",
+    option: { label: "Quiet", rooms: ["Main bedroom: 2.5 kW premium wall unit"], totalPence: 612_350, installDays: 3 },
+    inclusions: ["Condensate pump where needed"],
+    exclusions: ["Redecorating after the install"],
+    assumptions: ["The fuse board has a spare way, as seen at the survey"],
+    warranty: null,
+    earlyStartWordingVersion: EARLY_START_WORDING_VERSION,
   },
   "proposal-changes-requested": { text: "Could the landing unit go on the other wall?", version: 2 },
   "invoice-issued": { invoiceNumber: "DIH-0003", kind: "balance", totalPence: 612_350, outstandingPence: 562_350, dueOn: "2026-12-10" },
@@ -132,8 +169,11 @@ const FULL: { [E in CommsEventId]: CommsData[E] } = {
   "variation-approval": { title: "Condensate pump in the loft room", description: "No fall to an outside wall.", totalDeltaPence: 18_000, issueNumber: 4 },
   "issue-update": { title: "Drip from the bedroom unit", update: "We've found a kinked drain hose.", nextStep: "Jo will replace it.", dueOn: "2026-12-08", issueNumber: 5 },
   "handover-ready": { electricalCertPending: true },
+  "certificate-issued": { kind: "electrical-certificate" },
   "check-in-7d": {},
   "feedback-30d": {},
+  "review-request": {},
+  "seasonal-check": { mode: "heating" },
   "service-reminder": { dueOn: "2027-12-03" },
   "team-alert": { title: "Proposal accepted: DEMO Sam Taylor", detail: "Quiet option.", lines: ["Early start requested"], urgent: true, legalCheck: true },
 };
@@ -160,8 +200,11 @@ const MIN: { [E in CommsEventId]: CommsData[E] } = {
   "variation-approval": { title: "Extra trunking", totalDeltaPence: 0 },
   "issue-update": { title: "Remote not pairing", update: "" },
   "handover-ready": {},
+  "certificate-issued": { kind: "warranty-confirmation" },
   "check-in-7d": {},
   "feedback-30d": {},
+  "review-request": {},
+  "seasonal-check": { mode: "cooling" },
   "service-reminder": { dueOn: "2027-12-03" },
   "team-alert": { title: "Something to know" },
 };
@@ -174,9 +217,10 @@ const JUNK = /undefined|\bnull\b|NaN|\[object Object\]|Invalid Date/;
 /* ------------------------------------------------------------------ */
 
 test("every event renders a subject, text and HTML, with full and with minimal data", () => {
+  const bare = ctxFor({}, mergeSettings(DEFAULT_SETTINGS)); // nothing optional in settings either
   for (const event of ALL_EVENTS) {
-    for (const [label, data] of [["full", FULL[event]], ["minimal", MIN[event]]] as const) {
-      const m = render(event, data as never);
+    for (const [label, data, ctx] of [["full", FULL[event], ctxFor()], ["minimal", MIN[event], ctxFor()], ["defaults", MIN[event], bare]] as const) {
+      const m = render(event, data as never, ctx);
       const where = `${event} (${label})`;
       assert.ok(m.subject.length > 5, `${where}: subject`);
       assert.ok(m.text.length > 40, `${where}: text`);
@@ -197,8 +241,20 @@ test("customer messages greet by first name, name the property, link once and gi
     assert.ok(m.text.includes(SETTINGS.company.tradingName), `${event}: names us`);
     if (event !== "magic-link") assert.ok(m.text.includes("12 Demo Road"), `${event}: the property`);
     if (!COMMS_EVENTS[event].channels.includes("email")) continue; // SMS-only: no email link to count
-    assert.equal(m.text.split(PORTAL).length - 1, 1, `${event}: exactly one link in the text`);
-    assert.equal(m.html.split(`href="${PORTAL}"`).length - 1, 1, `${event}: exactly one link in the HTML`);
+    // The review request's one link is the review site, not the portal.
+    const link = event === "review-request" ? REVIEW_URL : PORTAL;
+    assert.equal(m.text.split(link).length - 1, 1, `${event}: exactly one link in the text`);
+    assert.equal(m.html.split(`href="${link}"`).length - 1, 1, `${event}: exactly one link in the HTML`);
+    if (event === "review-request") assert.ok(!m.text.includes(PORTAL), "no second link");
+  }
+});
+
+test("follow-ups carry an opt-out line; nothing else does", () => {
+  for (const event of ALL_EVENTS) {
+    if (COMMS_EVENTS[event].audience !== "customer") continue;
+    const m = render(event, FULL[event] as never);
+    const has = /Don't want follow-up emails like this one\? Email hello@dang\.ac or call 0800 000 0000 and we'll stop them\./.test(m.text);
+    assert.equal(has, FOLLOW_UP_EVENTS.has(event), `${event}: opt-out line`);
   }
 });
 
@@ -241,6 +297,39 @@ test("SMS events have texts within two GSM-7 segments that give our number", () 
   }
 });
 
+test("every SMS template is GSM-7 as written, and every text stays GSM-7 within 306 characters", () => {
+  const smsEvents = ALL_EVENTS.filter((e) => COMMS_EVENTS[e].channels.includes("sms"));
+  // As written: no curly quotes, dashes or emoji in our own words (plain fixtures, so only the template is tested).
+  for (const event of smsEvents) {
+    for (const ctx of [ctxFor(), ctxFor({ name: "" })]) {
+      for (const data of [FULL[event], MIN[event]]) {
+        const candidates = smsCandidates(event, ctx, data as never);
+        assert.ok(candidates.length >= 2, `${event}: a shorter fallback`);
+        for (const c of candidates) assert.equal(smsLength(c).encoding, "gsm7", `${event} as written: ${c}`);
+      }
+    }
+  }
+  // Whatever the customer's name or address holds, what goes out is GSM-7 and two segments at most.
+  const awkward = [
+    ctxFor({ name: "Sam 🙂 Taylor", addressLine: "12 “Demo” Road — Flat 2" }),
+    ctxFor({ name: "李 小龙", addressLine: "Ünïcödé House" }),
+    ctxFor({ name: "A".repeat(400), addressLine: "B".repeat(400) }),
+  ];
+  for (const event of smsEvents) {
+    for (const ctx of awkward) {
+      for (const data of [FULL[event], MIN[event]]) {
+        const sms = renderMessage(event, ctx, data as never).sms!;
+        const len = smsLength(sms);
+        assert.equal(len.encoding, "gsm7", `${event}: ${sms}`);
+        assert.ok(len.units <= 306, `${event}: ${len.units} characters: ${sms}`);
+        assert.ok(sms.includes(PHONE), `${event}: our phone number survives`);
+        assert.doesNotMatch(sms, / ,| \.|  /, `${event}: tidy after stripping: ${sms}`);
+      }
+    }
+  }
+  assert.equal(smsCandidates("proposal-issued", ctxFor(), FULL["proposal-issued"]).length, 0, "email-only events have none");
+});
+
 test("on-my-way texts give the arrival time in London time and the ETA", () => {
   // 09:40 UTC on 3 Nov is 09:40 in London (GMT); 20 minutes on is 10:00.
   assert.match(render("surveyor-on-my-way", FULL["surveyor-on-my-way"]).sms!, /Alex Demo is on the way .* around 10:00 \(about 20 min\)/);
@@ -258,24 +347,147 @@ test("user-supplied text is escaped in HTML", () => {
   assert.ok(m.text.includes("<script>alert(1)</script> & more"), "text stays literal");
 });
 
-test("the acceptance email is the durable copy: contract, record, early start and the statutory text", () => {
+const escapeRe = (x: string) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+test("the acceptance email is the durable copy: contract, record, cancellation position, early start and the statutory text", () => {
   const m = render("proposal-accepted", FULL["proposal-accepted"]);
   for (const s of ["Quiet", "£6,123.50", "Version 2 (DIH-PR-00AA-v2)", "pilot-draft-1", "Sam Taylor", "12 Nov 2026 at 15:04 (UK time)"]) {
     assert.ok(m.text.includes(s), `contract summary / record: ${s}`);
   }
   assert.ok(m.text.includes(CANCELLATION_NOTICE_VERSION));
-  assert.match(m.text, /You asked us to start work during your cancellation period/);
-  assert.match(m.text, /once the work is fully completed, you lose the right to cancel/);
+  assert.match(m.text, /Contract: Supply and installation/);
+  assert.match(m.text, /Documents by email: Agreed/);
+  // The cancellation position for this contract: the date when known, else what it runs from.
+  assert.match(m.text, /YOUR CANCELLATION PERIOD\n\nYou can cancel without giving a reason until the end of Thursday 26 November 2026\./);
+  assert.match(
+    render("proposal-accepted", MIN["proposal-accepted"]).text,
+    /Because we're supplying your equipment, you can cancel without giving a reason until 14 days after the day it's delivered to you\. We'll tell you the exact date when it arrives\./,
+  );
+  // Early start: the customer's reply is the durable-medium evidence, with the exact words.
+  assert.match(m.text, /YOU ASKED US TO START SOONER/);
+  assert.match(m.text, /please reply to this email \(or email hello@dang\.ac\) with these exact words:/);
+  assert.ok(m.text.includes(`> ${earlyStartWording("supply-and-install")}`), "the wording, quoted exactly");
+  assert.match(m.text, new RegExp(`Wording reference: ${EARLY_START_WORDING_VERSION}\\.`));
+  // A sales contract keeps the right to cancel after installation: no loss-of-right line, even if acknowledged.
+  assert.doesNotMatch(m.text, /lose the right to cancel/);
+  // The statutory text, filled for a sales contract (note 1(c), note 5).
   assert.match(m.text, /You have the right to cancel this contract within 14 days without giving any reason\./);
+  assert.match(m.text, /acquires physical possession of the last good/);
+  assert.match(m.text, /We will collect the goods\. We will bear the cost of returning the goods\./);
   assert.match(m.text, /proportion to what has been provided/);
   assert.match(m.text, /I\/We \[\*\] hereby give notice that I\/We \[\*\] cancel/);
-  assert.match(m.text, new RegExp(`To: ${SETTINGS.company.legalName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
+  assert.match(m.text, new RegExp(`To: ${escapeRe(SETTINGS.company.legalName)}`));
   assert.match(m.text, /None charged: we're not VAT registered/);
+  // The contract information again, with the chosen option.
+  assert.match(m.text, /YOUR CONTRACT INFORMATION/);
+  assert.match(m.text, /Quiet: £6,123\.50 in total, no VAT: we're not VAT registered/);
+  assert.match(m.text, /Main bedroom: 2\.5 kW premium wall unit/);
 
-  const plain = render("proposal-accepted", { ...MIN["proposal-accepted"], cancellationEndsOn: "2026-11-26" });
-  assert.match(plain.text, /Your cancellation period ends at the end of 26 Nov 2026\. We won't start work until it has ended/);
-  assert.doesNotMatch(plain.text, /You asked us to start/);
-  assert.match(plain.text, /Accepted by: DEMO Sam Taylor/, "falls back to the customer's name");
+  // Install-only, no early start, a known end date: the loss-of-right line where it belongs, the invitation to start sooner.
+  const service = render("proposal-accepted", {
+    ...MIN["proposal-accepted"],
+    contractType: "install-only",
+    cancellationEndsOn: "2026-11-26",
+    acknowledgedLossOfRight: true,
+  });
+  assert.match(service.text, /You can cancel without giving a reason until the end of Thursday 26 November 2026\./);
+  assert.match(service.text, /We won't start work until your cancellation period has ended, unless you ask us to start sooner\./);
+  assert.match(service.text, /If you'd like us to start sooner, reply to this email/);
+  assert.ok(service.text.includes(earlyStartWording("install-only")));
+  assert.match(service.text, /from the day of the conclusion of the contract/);
+  assert.doesNotMatch(service.text, /We will collect the goods/);
+  assert.doesNotMatch(service.text, /You asked us to start sooner/i);
+  assert.match(service.text, /you lose the right to cancel once we've fully completed the work/, "Sch 2(o) for a service contract");
+  const serviceEarly = render("proposal-accepted", { ...MIN["proposal-accepted"], contractType: "install-only", earlyStartRequested: true, acknowledgedLossOfRight: true });
+  assert.match(serviceEarly.text, /You also confirmed you understand that once the work is fully completed, you lose the right to cancel\./);
+  assert.match(service.text, /Accepted by: DEMO Sam Taylor/, "falls back to the customer's name");
+});
+
+test("the proposal email carries the Schedule 2 information, the instructions and the form: it's the durable medium", () => {
+  const m = render("proposal-issued", FULL["proposal-issued"]);
+  const t = m.text;
+  assert.match(t, /BEFORE YOU DECIDE: YOUR PRE-CONTRACT INFORMATION/);
+  assert.match(t, /this email is also your copy of the information you need before you decide/);
+  // (b) (c): who we are, where, how to reach us.
+  assert.match(t, /Business: Dang It's Hot Ltd, trading as Dang, It's Hot/);
+  assert.match(t, /Address: DEMO, 1 Example Street, London SW16 2BE/);
+  assert.match(t, /Phone: 0800 000 0000/);
+  assert.match(t, /Email: hello@dang\.ac/);
+  // (a): main characteristics.
+  assert.match(t, /We supply the equipment below, install it, then connect, test and commission it\./);
+  assert.match(t, /Three wall units on one outdoor unit\./);
+  assert.match(t, /- Main bedroom: 2\.5 kW wall unit/);
+  assert.match(t, /- Installation: 3 working days\./);
+  assert.match(t, /- Condensate pump where needed/);
+  assert.match(t, /- Redecorating after the install/);
+  // (f) (g): total price inc. taxes, how anything else is worked out, other costs.
+  assert.match(t, /Standard: £6,450 in total, no VAT: we're not VAT registered/);
+  assert.match(t, /Quiet: £7,120 in total/);
+  assert.match(t, /Nothing extra is charged unless you agree to it\./);
+  assert.match(t, /The price assumes:\n\n- The fuse board has a spare way/);
+  assert.match(t, /less than 7 days' notice, there's a £150 date-change fee/);
+  // (j) (u): payment, deposit, performance.
+  assert.match(t, /There's no deposit\./);
+  assert.match(t, /due within 7 days of the invoice/);
+  assert.match(t, /You can pay by bank transfer or card\./);
+  assert.match(t, /at least 5 days ahead/);
+  assert.match(t, /This proposal is valid until 3 Dec 2026\./);
+  // (l) (m) (n): cancellation, return costs, reasonable costs on early start.
+  assert.match(t, /If you accept, you can cancel without giving a reason until 14 days after the day your equipment is delivered to you\./);
+  assert.match(t, /we collect it and we pay the cost of returning it/);
+  assert.match(t, /you'll pay a proportionate amount for the work done up to when you tell us/);
+  assert.match(t, /CANCELLATION INSTRUCTIONS/);
+  assert.match(t, /acquires physical possession of the last good/);
+  assert.match(t, /MODEL CANCELLATION FORM/);
+  assert.match(t, /I\/We \[\*\] hereby give notice/);
+  assert.match(t, /To: Dang It's Hot Ltd \(trading as Dang, It's Hot\), DEMO, 1 Example Street, London SW16 2BE, email hello@dang\.ac/);
+  // (p) (q): conformity, guarantees, after-sales.
+  assert.match(t, /We're under a legal duty to supply goods that conform with this contract\./);
+  assert.match(t, /Manufacturer's warranty: DEMO: seven years on parts and labour/, "the proposal's own wording wins");
+  assert.match(t, /Our workmanship guarantee: 2 years\. DEMO: call us and we come back/);
+  assert.match(t, /None of this affects your legal rights\./);
+  // (k) (x): complaints and ADR.
+  assert.match(t, /DEMO: tell us by phone or email and we reply within two working days\./);
+  assert.match(t, /If you're not happy with how we've handled a complaint: DEMO dispute scheme/);
+
+  // VAT registered: the tax is named; install-only: no conformity reminder, the loss-of-right line instead.
+  const vat = mergeSettings({ ...SETTINGS, tax: { vatRegistered: true, defaultTaxCode: "zero-esm", accountantConfirmed: true } });
+  const taxed = render("proposal-issued", { ...FULL["proposal-issued"], options: [{ label: "Standard", totalPence: 645_000, taxLabel: "Zero-rated energy-saving materials (0%)" }] }, ctxFor({}, vat));
+  assert.match(taxed.text, /Standard: £6,450 in total, including VAT \(Zero-rated energy-saving materials \(0%\)\)/);
+  const service = render("proposal-issued", { ...MIN["proposal-issued"], contractType: "install-only" });
+  assert.match(service.text, /You supply the equipment; we install it/);
+  assert.match(service.text, /within 14 days of the day you accept/);
+  assert.doesNotMatch(service.text, /legal duty to supply goods/);
+  assert.match(service.text, /you lose the right to cancel once we've fully completed the work/);
+  // Without the record's prices, the email says where they are rather than inventing one.
+  assert.match(service.text, /The total price of each option, including any VAT, is on your proposal page\./);
+  // An explicit "no workmanship guarantee" is said plainly.
+  const none = mergeSettings({ ...SETTINGS, warranty: { workmanshipYears: 0, manufacturerSummary: "DEMO: the manufacturer's own." } });
+  assert.match(render("proposal-issued", MIN["proposal-issued"], ctxFor({}, none)).text, /We don't offer a separate guarantee on our workmanship\./);
+});
+
+test("review request: the same words for everyone, no incentive, the review site as its one link", () => {
+  const m = render("review-request", {});
+  assert.match(m.text, /we're asking what we ask every customer at this point/);
+  assert.match(m.text, /There's no reward, discount or prize for a review/);
+  assert.match(m.text, new RegExp(`Write a review: ${escapeRe(REVIEW_URL)}`));
+  assert.ok(m.html.includes(`href="${REVIEW_URL}"`));
+  assert.doesNotMatch(m.text, /score|happy|if you enjoyed/i, "never depends on, or asks about, how they rated us");
+  // No link in settings: nothing about a review site to click (the outbox won't send it anyway).
+  const bare = render("review-request", {}, ctxFor({}, mergeSettings(DEFAULT_SETTINGS)));
+  assert.doesNotMatch(bare.text, /Write a review/);
+  // The 30-day feedback stays internal and says so.
+  const feedback = render("feedback-30d", {});
+  assert.match(feedback.text, /We ask everyone this at the same point\. It's just for us: it isn't a public review/);
+  assert.doesNotMatch(feedback.text, /review site|Write a review/);
+});
+
+test("seasonal check and certificate messages say what changed and what to do", () => {
+  assert.match(render("seasonal-check", { mode: "heating" }).text, /Switch the mode to Heat/);
+  assert.match(render("seasonal-check", { mode: "heating" }).text, /A puff of steam/);
+  assert.match(render("seasonal-check", { mode: "cooling" }).subject, /cool/);
+  assert.match(render("certificate-issued", { kind: "electrical-certificate" }).text, /electrical installation certificate .* has arrived/);
+  assert.match(render("certificate-issued", { kind: "warranty-confirmation" }).subject, /warranty is registered/);
 });
 
 test("legal text fills in our details and keeps the statutory wording", () => {
@@ -286,7 +498,26 @@ test("legal text fills in our details and keeps the statutory wording", () => {
   const b = cancellationForm(trader);
   assert.equal(b[1], "To: Demo Trading Ltd (trading as Demo), 1 Demo Street, London, email hello@example.test");
   assert.ok(b.includes("[*] Delete as appropriate."));
-  assert.ok(!a.some((p) => p.text.includes("{TRADER}")) && !b.some((l) => l.includes("{TRADER}")));
+  const placeholders = /\{(TRADER|PERIOD|GOODS|DAYS)\}/;
+  assert.ok(!a.some((p) => placeholders.test(p.text)) && !b.some((l) => placeholders.test(l)));
+  // The geographic address (where we're established) wins over the registered office.
+  const both = cancellationForm({ ...trader, geographicAddress: "2 Trading Yard, London" });
+  assert.equal(both[1], "To: Demo Trading Ltd (trading as Demo), 2 Trading Yard, London, email hello@example.test");
+
+  // Per contract type: note 1(c) and note 5 for a sales contract, note 1(a) and no note 5 for a service.
+  const sale = cancellationInstructions(trader, { contractType: "supply-and-install" }).map((p) => p.text).join(" ");
+  assert.equal(sale, a.map((p) => p.text).join(" "), "supply-and-install is the default");
+  assert.match(sale, /acquires physical possession of the last good\./);
+  assert.match(sale, /We will collect the goods\. We will bear the cost of returning the goods\. You are only liable for any diminished value/);
+  const service = cancellationInstructions(trader, { contractType: "install-only" });
+  const serviceText = service.map((p) => p.text).join(" ");
+  assert.match(serviceText, /expire after 14 days from the day of the conclusion of the contract\./);
+  assert.doesNotMatch(serviceText, /We will collect the goods/);
+  assert.ok(service.every((p) => p.text.trim().length > 0), "no empty paragraph where note 5 is left out");
+  // A longer period from settings; never shorter than the statutory 14.
+  assert.match(cancellationInstructions(trader, { days: 21 })[0].text, /within 21 days/);
+  assert.match(cancellationInstructions(trader, { days: 7 })[0].text, /within 14 days/);
+  assert.equal(CANCELLATION_NOTICE_VERSION, "ccr-2013-sch3-v2");
 });
 
 test("invoices show bank details only when settings have them, and never claim payment early", () => {
@@ -405,6 +636,8 @@ test("proposals: one message per version; acceptance tells the customer and the 
   assert.equal((commsForAction(p, v1)[0].data as CommsData["proposal-issued"]).engineerApproved, true);
 
   p.proposal.status = "accepted";
+  p.proposal.contractType = "install-only";
+  p.proposal.preContractInfoSentAt = "2026-11-05T10:00:00.000Z";
   p.proposal.acceptedAt = "2026-11-12T15:04:00.000Z";
   p.proposal.cancellationEndsOn = "2026-11-26";
   const accept: ProjectAction = {
@@ -420,6 +653,18 @@ test("proposals: one message per version; acceptance tells the customer and the 
   const keys = keysOf(p, accept);
   assert.equal(new Set(keys).size, keys.length, "distinct keys for customer copy and team alert");
   assert.equal((notices[0].data as CommsData["proposal-accepted"]).cancellationEndsOn, "2026-11-26");
+  assert.equal((notices[0].data as CommsData["proposal-accepted"]).contractType, "install-only");
+  // Supply-and-install: no end date until the goods arrive, and the team hears what that means.
+  const goods = structuredClone(p);
+  goods.proposal.contractType = "supply-and-install";
+  const [customer, team] = commsForAction(goods, accept);
+  assert.equal((customer.data as CommsData["proposal-accepted"]).cancellationEndsOn, undefined);
+  const lines = (team.data as CommsData["team-alert"]).lines!.join("\n");
+  assert.match(lines, /supply and install/);
+  assert.match(lines, /14 days after the kit is delivered/);
+  assert.match(lines, /Legal review required/);
+  const early = commsForAction(goods, { ...accept, earlyStartRequested: true } as ProjectAction);
+  assert.match((early[1].data as CommsData["team-alert"]).lines!.join(" "), /only counts once the customer's reply to the confirmation email/);
 
   p.proposal.proposalId = "prop-v2";
   const ask = (text: string): ProjectAction => ({ type: "proposal-changes-requested", text });
@@ -470,6 +715,54 @@ test("bookings, kit, install days and handover map per the contract", () => {
   const [handover] = commsForAction(p, { type: "handover-pack-published", documentId: "doc-1" });
   assert.equal(handover.event, "handover-ready");
   assert.deepEqual(commsForAction(p, { type: "note", text: "internal" }), []);
+
+  // Documents after the pack: one message each; before the pack, handover-ready covers them.
+  assert.deepEqual(commsForAction(p, { type: "electrical-cert-updated", status: "received" }), [], "no pack yet");
+  p.handover.packDocumentId = "doc-1";
+  const [cert] = commsForAction(p, { type: "electrical-cert-updated", status: "received" });
+  assert.deepEqual([cert.event, cert.data, cert.discriminator], ["certificate-issued", { kind: "electrical-certificate" }, "electrical-certificate"]);
+  assert.deepEqual(commsForAction(p, { type: "electrical-cert-updated", status: "not-required" }), []);
+  const [warranty] = commsForAction(p, { type: "warranty-registered" });
+  assert.deepEqual([warranty.event, warranty.discriminator], ["certificate-issued", "warranty-confirmation"]);
+});
+
+test("the issue email is the pre-contract one; the confirmation record never sends anything (no loops)", () => {
+  const p = baseProject();
+  p.design.status = "approved";
+  p.proposal.contractType = "install-only";
+  const [issued] = commsForAction(p, { type: "proposal-issued", proposalId: "prop-1", version: 1, validUntil: "2026-12-03", optionCount: 1 });
+  const data = issued.data as CommsData["proposal-issued"];
+  assert.equal(data.contractType, "install-only");
+  assert.ok(data.rooms!.length > 0 && data.rooms!.every((r) => r.includes(": ")), "rooms stand in for the record's options");
+  assert.ok(renderMessage("proposal-issued", ctxFor(), data).text.includes("BEFORE YOU DECIDE"));
+
+  for (const action of [
+    { type: "contract-confirmation-sent" },
+    { type: "contract-confirmation-sent", messageId: "m1", demo: true },
+    { type: "documents-consent-recorded", channel: "portal" },
+    { type: "early-start-requested", channel: "email" },
+    { type: "early-start-evidenced", channel: "email", evidenceRef: "x", by: "y" },
+    { type: "aftercare-opt-out", optedOut: true },
+    { type: "review-requested" },
+    { type: "seasonal-check-sent" },
+  ] as ProjectAction[]) {
+    assert.deepEqual(commsForAction(p, action), [], action.type);
+  }
+  // Only the acceptance email, delivered by email to a project, records the confirmation.
+  const m = { id: "m-1", event: "proposal-accepted" as const, channel: "email" as const, projectId: PROJECT_ID };
+  assert.deepEqual(followUpForDelivered(m, "sent"), { projectId: PROJECT_ID, action: { type: "contract-confirmation-sent", messageId: "m-1" } });
+  assert.deepEqual(followUpForDelivered(m, "demo"), { projectId: PROJECT_ID, action: { type: "contract-confirmation-sent", messageId: "m-1", demo: true } });
+  assert.equal(followUpForDelivered({ ...m, event: "team-alert" }, "sent"), null);
+  assert.equal(followUpForDelivered({ ...m, event: "proposal-issued" }, "sent"), null);
+  assert.equal(followUpForDelivered({ ...m, channel: "sms" }, "sent"), null);
+  assert.equal(followUpForDelivered({ ...m, projectId: undefined }, "sent"), null);
+  // And recording it twice changes nothing: the reducer keeps the first.
+  const accepted = baseProject();
+  accepted.proposal.status = "accepted";
+  const once = applyProjectAction(accepted, { type: "contract-confirmation-sent" }, "2026-11-12T15:05:00.000Z");
+  assert.ok(once.ok);
+  const twice = applyProjectAction(once.project, { type: "contract-confirmation-sent" }, "2026-11-13T09:00:00.000Z");
+  assert.ok(twice.ok && twice.project.proposal.confirmationSentAt === "2026-11-12T15:05:00.000Z");
 });
 
 /* ------------------------------------------------------------------ */
@@ -487,6 +780,7 @@ function harness(
     customerEmail?: string;
   } = {},
 ) {
+  const delivered: { id: string; event: string; status: string }[] = [];
   const db = createLocalClient({ backend: "memory" });
   const store = messageStore(db);
   const sent: { channel: string; to: string; body: string; subject?: string }[] = [];
@@ -525,9 +819,12 @@ function harness(
         return { ok: true, providerRef: "SM-demo" };
       },
     },
+    onDelivered: async (m, status) => {
+      delivered.push({ id: m.id, event: m.event, status });
+    },
     log: () => {},
   };
-  return { db, store, sent, minted, outbox: createOutbox(deps) };
+  return { db, store, sent, minted, delivered, outbox: createOutbox(deps) };
 }
 
 const surveyBooked = { scheduledFor: "2026-11-03T10:00:00.000Z" } as const;
@@ -812,6 +1109,100 @@ test("the engine never throws: a broken dependency becomes an error result", asy
   const sentPlain = await plainFallback.notify("survey-complete", { projectId: PROJECT_ID, data: {}, discriminator: "s2" });
   assert.equal(sentPlain.status, "sent");
   assert.match(attempted[0]!, new RegExp(`href="https://dang\\.example/p/${PROJECT_ID}#survey"`), "a plain link when the magic link fails");
+});
+
+test("delivery is reported however it happens: demo, first send, cron retry, resend; never on failure", async () => {
+  const accepted = { version: 1, optionLabel: "Standard", contractTotalPence: 450_000, acceptedAt: "2026-11-12T15:04:00.000Z", earlyStartRequested: false };
+  const demo = harness();
+  const d = await demo.outbox.notify("proposal-accepted", { projectId: PROJECT_ID, data: accepted, discriminator: "prop-1" });
+  assert.equal(d.status, "demo");
+  assert.deepEqual(demo.delivered, [{ id: d.results[0]!.messageId!, event: "proposal-accepted", status: "demo" }]);
+
+  const flaky = harness({ email: true, emailOk: [false, true] });
+  const f = await flaky.outbox.notify("proposal-accepted", { projectId: PROJECT_ID, data: accepted, discriminator: "prop-2" });
+  assert.equal(f.status, "failed");
+  assert.equal(flaky.delivered.length, 0, "a failed send isn't a delivery");
+  await flaky.outbox.dispatchDue(new Date(Date.now() + 10 * 60_000).toISOString());
+  assert.deepEqual(flaky.delivered.map((x) => x.status), ["sent"], "the cron retry counts");
+  await flaky.outbox.resend(f.results[0]!.messageId!);
+  assert.equal(flaky.delivered.length, 2, "so does a resend (the reducer keeps the first)");
+
+  // A hook that throws never fails the send.
+  const h = harness({ email: true });
+  const engine = createOutbox({
+    store: h.store,
+    now: () => new Date().toISOString(),
+    newId: () => crypto.randomUUID(),
+    getSettings: async () => SETTINGS,
+    loadProject: async () => baseProject(),
+    customerLink: async (_id, path) => `https://dang.example${path}`,
+    appUrl: () => "https://dang.example",
+    teamInbox: () => null,
+    email: { provider: "resend", configured: () => true, send: async () => ({ ok: true }) },
+    sms: { provider: "twilio", configured: () => false, send: async () => ({ ok: true }) },
+    onDelivered: async () => {
+      throw new Error("dispatch down");
+    },
+    log: () => {},
+  });
+  assert.equal((await engine.notify("proposal-accepted", { projectId: PROJECT_ID, data: accepted, discriminator: "prop-3" })).status, "sent");
+});
+
+test("follow-ups respect an opt-out, at notify and when a queued one is due; review requests need a review link", async () => {
+  const optedOutProject = applyProjectAction(baseProject(), { type: "aftercare-opt-out", optedOut: true }, new Date().toISOString());
+  assert.ok(optedOutProject.ok);
+  const h = harness({ email: true, project: optedOutProject.project });
+  for (const event of FOLLOW_UP_EVENTS) {
+    const data = (event === "service-reminder" ? { dueOn: "2027-12-03" } : event === "seasonal-check" ? { mode: "heating" } : {}) as never;
+    const r = await h.outbox.notify(event, { projectId: PROJECT_ID, data, discriminator: "x" });
+    assert.equal(r.status, "not-allowed", event);
+    assert.match(r.results[0]!.error ?? "", /opted out/);
+  }
+  // Operational messages still go.
+  assert.equal((await h.outbox.notify("issue-update", { projectId: PROJECT_ID, data: { title: "Drip", update: "Fixed" }, discriminator: "i1" })).status, "sent");
+  assert.equal(optedOut("issue-update", optedOutProject.project), false);
+  assert.equal(optedOut("check-in-7d", optedOutProject.project), true);
+  assert.equal(optedOut("check-in-7d", baseProject()), false);
+
+  // Queued before the opt-out, due after it: skipped, and so is a resend.
+  let project = baseProject();
+  const later = harness({ email: true, project });
+  const tomorrow = new Date(Date.now() + 86_400_000).toISOString();
+  const q = await later.outbox.notify("check-in-7d", { projectId: PROJECT_ID, data: {}, discriminator: "7d", scheduledFor: tomorrow });
+  assert.equal(q.status, "queued");
+  const off = applyProjectAction(project, { type: "aftercare-opt-out", optedOut: true }, new Date().toISOString());
+  assert.ok(off.ok);
+  project = off.project;
+  const engine = createOutbox({
+    store: later.store,
+    now: () => new Date().toISOString(),
+    newId: () => crypto.randomUUID(),
+    getSettings: async () => SETTINGS,
+    loadProject: async () => project,
+    customerLink: async () => "",
+    appUrl: () => "https://dang.example",
+    teamInbox: () => null,
+    email: { provider: "resend", configured: () => true, send: async () => ({ ok: true }) },
+    sms: { provider: "twilio", configured: () => false, send: async () => ({ ok: true }) },
+    log: () => {},
+  });
+  assert.equal((await engine.dispatchDue(new Date(Date.now() + 2 * 86_400_000).toISOString())).skipped, 1);
+  const stored = (await later.store.get(q.results[0]!.messageId!))!;
+  assert.equal(stored.status, "skipped");
+  assert.match(stored.error ?? "", /opted out/);
+  assert.equal((await engine.resend(stored.id)).status, "skipped");
+  assert.equal(later.sent.length, 0);
+
+  // No review link in settings: no review request, and nothing stored.
+  const noLink = harness({ email: true, settings: mergeSettings(DEFAULT_SETTINGS) });
+  const r = await noLink.outbox.notify("review-request", { projectId: PROJECT_ID, data: {}, discriminator: "review" });
+  assert.equal(r.status, "disabled");
+  assert.match(r.results[0]!.error ?? "", /No review link/);
+  assert.equal((await noLink.db.from("messages").select("id")).data!.length, 0);
+  const withLink = harness({ email: true });
+  assert.equal((await withLink.outbox.notify("review-request", { projectId: PROJECT_ID, data: {}, discriminator: "review" })).status, "sent");
+  assert.ok(withLink.sent[0]!.body.includes(`href="${REVIEW_URL}"`));
+  assert.equal(withLink.minted.length, 0, "no sign-in token in a review request");
 });
 
 test("pure helpers: consent, addresses, headline", () => {

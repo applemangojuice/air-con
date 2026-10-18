@@ -2,11 +2,12 @@ import type { CommsEventId } from "@aircon/domain";
 import { customerLink } from "@/lib/auth/magic";
 import { appUrl } from "@/lib/brand";
 import { emailConfigured, sendEmail, teamInbox } from "@/lib/email";
-import { loadProject } from "@/lib/project-service";
+import { dispatch, loadProject } from "@/lib/project-service";
 import { sendSms, smsConfigured } from "@/lib/providers/sms";
 import { messageStore } from "@/lib/repo/messages";
 import { getSettings } from "@/lib/settings-server";
 import { getServiceClient } from "@/lib/supabase-server";
+import { followUpForDelivered } from "./action-map";
 import {
   createOutbox,
   type ChannelResult,
@@ -52,6 +53,14 @@ function realOutbox(): Outbox | null {
       },
     },
     sms: { provider: "twilio", configured: smsConfigured, send: sendSms },
+    // The acceptance email reaching the customer is a contract fact
+    // (confirmationSentAt): record it however the send happened.
+    onDelivered: async (message, status) => {
+      const next = followUpForDelivered(message, status);
+      if (!next) return;
+      const result = await dispatch(next.projectId, next.action, { kind: "system", name: "outbox" });
+      if ("error" in result) console.error(`[outbox] couldn't record ${next.action.type} on ${next.projectId}:`, result.error);
+    },
   });
 }
 

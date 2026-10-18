@@ -1,8 +1,9 @@
 import type { ContractType } from "@aircon/domain";
 
 /**
- * Statutory cancellation wording for the acceptance confirmation email (the
- * durable copy) and the contract document.
+ * Statutory cancellation wording for the proposal issue email (the
+ * pre-contract information), the acceptance confirmation email (the
+ * contract copy) and the contract document: all durable media.
  *
  * NEEDS SOLICITOR REVIEW. This is the model wording from Schedule 3 of the
  * Consumer Contracts (Information, Cancellation and Additional Charges)

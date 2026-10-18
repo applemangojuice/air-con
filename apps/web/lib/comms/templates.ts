@@ -606,7 +606,7 @@ function preContractInfo(ctx: TemplateContext, x: ProposalDetails & { cancellati
       : "There's no deposit.",
     `We invoice the balance when the installation is finished. It's due within ${plural(payments.balanceDueDays, "day")} of the invoice.`,
   ];
-  if (methods.length) pay.push(`You can pay by ${listJoin(methods)}.`);
+  if (methods.length) pay.push(`You can pay by ${listJoin(methods).replace(/ and ([^,]+)$/, " or $1")}.`);
   pay.push(`You choose your install dates after accepting, from the dates we can offer, at least ${INSTALL_LEAD_DAYS} days ahead.`);
   if (x.validUntil) pay.push(`This proposal is valid until ${dateLong(x.validUntil)}.`);
   out.push({ list: pay });

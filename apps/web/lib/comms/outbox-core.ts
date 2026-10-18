@@ -1,5 +1,6 @@
 import {
   COMMS_EVENTS,
+  FOLLOW_UP_EVENTS,
   LINK_PLACEHOLDER,
   idempotencyKey,
   type CommsEventId,
@@ -30,6 +31,12 @@ import { linkPathFor, renderMessage, templateContext, type CommsData, type Rende
  * a spent token. A demo message is never sent, so it never gets a token. A
  * magic-link message's link exists only in memory for its first send; if
  * that fails, it's not retried (the person asks for a new link).
+ *
+ * Follow-ups (FOLLOW_UP_EVENTS) never go to a customer who opted out, checked
+ * at notify and again when a queued one is sent. A review request needs a
+ * review link in settings. `onDelivered` hears about every message that was
+ * sent or stored in demo mode, however it got there (first send, cron
+ * retry, resend), so a delivery can be recorded on the project.
  */
 
 export type Channel = MessageRecord["channel"];
@@ -62,9 +69,9 @@ export type ChannelStatus =
   | "failed" //      provider refused or unreachable; the cron retries
   | "skipped" //     stored but deliberately not sent (event turned off before a queued send)
   | "duplicate" //   this occurrence already has a message
-  | "disabled" //    event turned off in settings
+  | "disabled" //    event turned off in settings (or, for a review request, no review link)
   | "no-recipient" // no usable address for this channel
-  | "not-allowed" // consent doesn't allow it
+  | "not-allowed" // consent doesn't allow it, or the customer opted out of follow-ups
   | "error"; //      something broke; logged, never thrown
 
 export interface ChannelResult {
@@ -127,7 +134,20 @@ export interface OutboxDeps {
   marketingConsent?(project: Project | null): Promise<boolean>;
   email: { configured(): boolean; provider: string; send(to: string, subject: string, html: string): Promise<SendResult> };
   sms: { configured(): boolean; provider: string; send(to: string, body: string): Promise<SendResult> };
+  /**
+   * A message was sent (provider acknowledged) or stored as demo. Awaited,
+   * never allowed to fail the send: errors are logged.
+   */
+  onDelivered?(message: MessageRecord, status: "sent" | "demo"): Promise<void>;
   log?(message: string, err?: unknown): void;
+}
+
+const OPTED_OUT = "The customer opted out of follow-up messages";
+const NO_REVIEW_LINK = "No review link in settings (company.reviewUrl)";
+
+/** Pure: has this customer refused this kind of message? Only follow-ups can be refused. */
+export function optedOut(event: CommsEventId, project: Pick<Project, "aftercare"> | null | undefined): boolean {
+  return FOLLOW_UP_EVENTS.has(event) && Boolean(project?.aftercare?.followUpsOptedOutAt);
 }
 
 /**
@@ -227,6 +247,15 @@ export function createOutbox(deps: OutboxDeps) {
     };
   }
 
+  async function delivered(m: MessageRecord, status: "sent" | "demo"): Promise<void> {
+    if (!deps.onDelivered) return;
+    try {
+      await deps.onDelivered(m, status);
+    } catch (err) {
+      log(`onDelivered for ${m.id} failed`, err);
+    }
+  }
+
   /** Send one stored message now and record what happened. `liveLink`: a magic link, on its first send only. */
   async function dispatchMessage(m: MessageRecord, settings?: PilotSettings, liveLink?: string): Promise<ChannelResult> {
     const base = { channel: m.channel, key: m.idempotencyKey, messageId: m.id, to: m.to };
@@ -235,9 +264,15 @@ export function createOutbox(deps: OutboxDeps) {
         await deps.store.update(m.id, { status: "skipped", error: "Event turned off in settings before it was sent" });
         return { ...base, status: "skipped" };
       }
+      // A queued follow-up (or a resend) to someone who has opted out since.
+      if (FOLLOW_UP_EVENTS.has(m.event) && m.projectId && optedOut(m.event, await deps.loadProject(m.projectId))) {
+        await deps.store.update(m.id, { status: "skipped", error: OPTED_OUT });
+        return { ...base, status: "skipped", error: OPTED_OUT };
+      }
       const provider = m.channel === "email" ? deps.email : deps.sms;
       if (!provider.configured()) {
         await deps.store.update(m.id, { status: "demo", provider: "demo", error: undefined });
+        await delivered(m, "demo");
         return { ...base, status: "demo" };
       }
       const content = await contentForSend(m, liveLink);
@@ -265,6 +300,7 @@ export function createOutbox(deps: OutboxDeps) {
           attempts,
           error: undefined,
         });
+        await delivered(m, "sent");
         return { ...base, status: "sent" };
       }
       const error = res.error || "The provider didn't accept the message";
@@ -289,7 +325,13 @@ export function createOutbox(deps: OutboxDeps) {
       if (settings.comms.disabledEvents.includes(event)) {
         return done(event, channels.map((channel) => ({ channel, status: "disabled" })));
       }
+      if (event === "review-request" && !settings.company.reviewUrl) {
+        return done(event, channels.map((channel) => ({ channel, status: "disabled", error: NO_REVIEW_LINK })));
+      }
       const project = opts.projectId ? await deps.loadProject(opts.projectId) : null;
+      if (optedOut(event, project)) {
+        return done(event, channels.map((channel) => ({ channel, status: "not-allowed", error: OPTED_OUT })));
+      }
       const projectId = project?.id ?? opts.projectId;
       const recipient = await recipientFor(event, opts, project, settings);
       const marketingOk = MARKETING_EVENTS.has(event) ? Boolean(await deps.marketingConsent?.(project)) : true;
