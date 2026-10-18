@@ -96,7 +96,7 @@ export default async function DocumentsPage({ params }: { params: Promise<{ id: 
               <h2 id={`g-${g.kinds[0]}`} className="mb-3 text-sm font-semibold uppercase tracking-wide text-ink-500">
                 {g.title}
               </h2>
-              <ul className="divide-y divide-line rounded-3xl border border-line bg-white">
+              <ul className="divide-y divide-line overflow-hidden rounded-3xl border border-line bg-white">
                 {g.docs.map((d: DocumentRecord) => (
                   <li key={d.id}>
                     <Link href={`/d/${d.id}`} className="flex min-h-16 items-center justify-between gap-4 px-5 py-3 hover:bg-surface/50">

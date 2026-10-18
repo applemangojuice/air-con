@@ -50,8 +50,18 @@ type Step = { label: string; run: () => string | null };
 export function DemoHub({ initialProject }: { initialProject: Project }) {
   const initial = useMemo<DemoState>(
     () => ({
-      // A fictional household with an (unreachable) address, so the email-only gates behave as they would for real.
-      project: { ...initialProject, customer: { ...initialProject.customer, name: "Alex Morgan (DEMO)", email: "alex.morgan@example.com" } },
+      // A fictional household with an (unreachable) email, so the email-only gates behave as they would for real,
+      // and an obviously made-up address so no screenshot ever looks like someone's real home.
+      project: {
+        ...initialProject,
+        customer: {
+          ...initialProject.customer,
+          name: "Alex Morgan (DEMO)",
+          email: "alex.morgan@example.com",
+          addressLine: "12 Demo Rise",
+          postcode: "SW4 9ZZ",
+        },
+      },
       now: Date.parse(initialProject.createdAt),
       issues: [],
       invoices: [],
