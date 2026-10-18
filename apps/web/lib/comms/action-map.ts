@@ -1,4 +1,11 @@
-import type { CommsEventId, Project, ProjectAction } from "@aircon/domain";
+import {
+  CANCELLATION_RULE_STATUS,
+  cancellationStatus,
+  type CommsEventId,
+  type MessageRecord,
+  type Project,
+  type ProjectAction,
+} from "@aircon/domain";
 import { fmtDate, fmtDayTime, money } from "../format.ts";
 import type { CommsData } from "./templates.ts";
 
@@ -120,6 +127,10 @@ export function commsForAction(project: Project, action: ProjectAction, actor?: 
       ];
     }
 
+    // The issue email is the durable copy of the pre-contract information
+    // (the reducer records preContractInfoSentAt at issue). for-action adds
+    // the proposal record's options and prices; the project's rooms stand in
+    // if it can't be read.
     case "proposal-issued":
       return [
         notice(
@@ -129,13 +140,19 @@ export function commsForAction(project: Project, action: ProjectAction, actor?: 
             validUntil: action.validUntil,
             optionCount: action.optionCount,
             engineerApproved: p.design.status === "approved",
+            contractType: p.proposal.contractType,
+            rooms: p.quoteSummary.roomDesigns.map((r) => `${r.name}: ${r.unitLabel}`),
+            ...(p.booking.installDays ? { installDays: p.booking.installDays } : {}),
           },
           action.proposalId,
         ),
       ];
 
     case "proposal-accepted": {
-      const ends = p.proposal.cancellationEndsOn;
+      // The end date as the law counts it (install-only: from today;
+      // supply-and-install: unknown until the goods arrive).
+      const ends = cancellationStatus(p, "").endsOn;
+      const supply = p.proposal.contractType !== "install-only";
       return [
         notice(
           "proposal-accepted",
@@ -148,6 +165,8 @@ export function commsForAction(project: Project, action: ProjectAction, actor?: 
             cancellationEndsOn: ends,
             earlyStartRequested: action.earlyStartRequested,
             installDays: p.booking.installDays || undefined,
+            contractType: p.proposal.contractType,
+            ...(p.proposal.earlyStart?.wordingVersion ? { earlyStartWordingVersion: p.proposal.earlyStart.wordingVersion } : {}),
           },
           action.proposalId,
         ),
@@ -156,13 +175,14 @@ export function commsForAction(project: Project, action: ProjectAction, actor?: 
           {
             title: `Proposal accepted: ${who}, ${money(action.contractTotalPence)}`,
             lines: [
-              `${action.optionLabel} (proposal version ${action.version})`,
+              `${action.optionLabel} (proposal version ${action.version}), ${supply ? "supply and install" : "install only"}`,
               action.earlyStartRequested
-                ? "Early start requested: the install may start inside the cancellation period."
+                ? "Early start ticked on the portal. It only counts once the customer's reply to the confirmation email (or a signed form) is recorded as evidence."
                 : ends
                   ? `No early start: the install can't start until the cancellation period ends (${fmtDate(ends)}).`
-                  : "No early start requested.",
+                  : "No early start: the install can only start once the cancellation period ends, 14 days after the kit is delivered.",
               "Next: agree install dates and assign a qualified crew.",
+              CANCELLATION_RULE_STATUS,
             ],
             legalCheck: true,
           },
@@ -250,7 +270,43 @@ export function commsForAction(project: Project, action: ProjectAction, actor?: 
         notice("handover-ready", { electricalCertPending: p.handover.electricalCert === "pending" }, action.documentId),
       ];
 
+    // Documents that arrive after the pack: the pack email promised to say
+    // when they're there. Before the pack is out, handover-ready covers them.
+    case "electrical-cert-updated":
+      if (action.status !== "received" || !p.handover.packDocumentId) return [];
+      return [notice("certificate-issued", { kind: "electrical-certificate" }, "electrical-certificate")];
+
+    case "warranty-registered":
+      if (!p.handover.packDocumentId) return [];
+      return [notice("certificate-issued", { kind: "warranty-confirmation" }, "warranty-confirmation")];
+
+    // Recorded by the outbox once the acceptance email has gone (see
+    // followUpForDelivered): it must never send anything itself, or the
+    // two could feed each other.
+    case "contract-confirmation-sent":
+      return [];
+
     default:
       return [];
   }
+}
+
+/**
+ * What a delivered message records on its project, if anything. Called by
+ * the outbox whenever a message is sent (or stored in demo mode): on the
+ * first send, a cron retry or a resend alike. Today one rule: the
+ * acceptance email (the customer's contract copy) sets confirmationSentAt,
+ * which ready-to-install needs (CCR reg 12(4)). The action it returns sends
+ * nothing (commsForAction maps it to []) and is idempotent, so this can't
+ * loop.
+ */
+export function followUpForDelivered(
+  message: Pick<MessageRecord, "id" | "event" | "channel" | "projectId">,
+  status: "sent" | "demo",
+): { projectId: string; action: ProjectAction } | null {
+  if (message.event !== "proposal-accepted" || message.channel !== "email" || !message.projectId) return null;
+  return {
+    projectId: message.projectId,
+    action: { type: "contract-confirmation-sent", messageId: message.id, ...(status === "demo" ? { demo: true } : {}) },
+  };
 }

@@ -1,9 +1,17 @@
 import {
   COMMS_EVENTS,
+  EARLY_START_WORDING_VERSION,
+  FOLLOW_UP_EVENTS,
+  INSTALL_LEAD_DAYS,
+  RESCHEDULE_FEES,
   ROLE_LABEL,
   TAX_CODES,
+  cancellationSentence,
+  earlyStartWording,
   effectiveTaxCode,
+  schedule2Missing,
   type CommsEventId,
+  type ContractType,
   type InvoiceKind,
   type Payment,
   type PilotSettings,
@@ -11,8 +19,8 @@ import {
 } from "@aircon/domain";
 import { brandedEmail, escapeHtml } from "../email.ts";
 import { fmtDate, fmtDay, fmtDayTime, money } from "../format.ts";
-import { fitSms } from "../providers/sms.ts";
-import { CANCELLATION_NOTICE_VERSION, cancellationForm, cancellationInstructions } from "./legal-text.ts";
+import { fitSms, gsmSafe, smsLength } from "../providers/sms.ts";
+import { CANCELLATION_NOTICE_VERSION, cancellationForm, cancellationInstructions, type TraderDetails } from "./legal-text.ts";
 
 /**
  * One renderer per comms event (contract §F): typed data in, `{ subject,
@@ -25,8 +33,14 @@ import { CANCELLATION_NOTICE_VERSION, cancellationForm, cancellationInstructions
  * messages. Money, contract and safety copy is calm and plain.
  *
  * SMS: our sender is one-way (alphanumeric), so every text carries our
- * phone number and says replies aren't read. Two segments at most; each
- * template offers shorter fallbacks for long names and addresses.
+ * phone number and says replies aren't read. GSM-7 only (no curly quotes or
+ * emoji: one would cut each segment to 70 characters), two segments (306
+ * characters) at most; each template offers shorter fallbacks for long
+ * names and addresses.
+ *
+ * Follow-ups (FOLLOW_UP_EVENTS) end with an opt-out line. The proposal and
+ * acceptance emails carry the pre-contract information in full: they are
+ * the durable medium (CCR 2013 regs 10 and 12).
  *
  * Pure (no I/O, no clock): `node --test` renders every event directly.
  */
@@ -36,6 +50,36 @@ import { CANCELLATION_NOTICE_VERSION, cancellationForm, cancellationInstructions
 /* ------------------------------------------------------------------ */
 
 type EmptyData = Record<string, never>;
+
+/** One option as the pre-contract information describes it: what it is and what it costs. */
+export interface OptionSummary {
+  label: string;
+  summary?: string;
+  /** "Main bedroom: 2.5 kW wall unit". */
+  rooms?: string[];
+  highlights?: string[];
+  /** The total the customer pays, including any VAT. */
+  totalPence: number;
+  /** The VAT treatment's label, when VAT is charged. */
+  taxLabel?: string;
+  installDays?: number;
+}
+
+/** What the proposal record adds to the pre-contract information (the issue and acceptance emails). */
+interface ProposalDetails {
+  contractType?: ContractType;
+  /** From the proposal record; without it, `rooms` describes the job. */
+  options?: OptionSummary[];
+  /** The project's rooms and units, when the record couldn't be read. */
+  rooms?: string[];
+  installDays?: number;
+  inclusions?: string[];
+  exclusions?: string[];
+  /** What the price assumes (how anything not priced in advance is worked out). */
+  assumptions?: string[];
+  /** The proposal's own warranty wording, which wins over settings. */
+  warranty?: string | null;
+}
 
 /** What each event needs beyond the shared context. Optional fields are left out of the copy when absent. */
 export interface CommsData {
@@ -51,7 +95,7 @@ export interface CommsData {
   "survey-reminder": { scheduledFor: string; durationMinutes?: number; mode?: "in-person" | "video"; surveyorName?: string };
   "surveyor-on-my-way": { etaMinutes: number; at: string; name?: string };
   "survey-complete": { proposalBy?: string };
-  "proposal-issued": { version: number; validUntil: string; optionCount?: number; engineerApproved?: boolean };
+  "proposal-issued": ProposalDetails & { version: number; validUntil: string; optionCount?: number; engineerApproved?: boolean };
   "proposal-reminder": { version?: number; validUntil: string };
   "proposal-accepted": {
     version: number;
@@ -66,6 +110,15 @@ export interface CommsData {
     acknowledgedLossOfRight?: boolean;
     installDays?: number;
     proposalRef?: string;
+    contractType?: ContractType;
+    /** The chosen option in full, from the proposal record. */
+    option?: OptionSummary;
+    inclusions?: string[];
+    exclusions?: string[];
+    assumptions?: string[];
+    warranty?: string | null;
+    /** The early-start wording version the reply asks for. */
+    earlyStartWordingVersion?: string;
   };
   "proposal-changes-requested": { text: string; version?: number };
   "invoice-issued": {
@@ -91,8 +144,12 @@ export interface CommsData {
   "variation-approval": { title: string; description?: string; totalDeltaPence: number; issueNumber?: number };
   "issue-update": { title: string; update: string; nextStep?: string; dueOn?: string; issueNumber?: number };
   "handover-ready": { electricalCertPending?: boolean };
+  "certificate-issued": { kind: "electrical-certificate" | "warranty-confirmation" };
   "check-in-7d": EmptyData;
   "feedback-30d": EmptyData;
+  /** The review link comes from settings (company.reviewUrl); the outbox won't send without one. */
+  "review-request": EmptyData;
+  "seasonal-check": { mode: "heating" | "cooling" };
   "service-reminder": { dueOn: string };
   "team-alert": {
     title: string;
@@ -186,8 +243,11 @@ const PORTAL_PATH: Record<CommsEventId, string | null> = {
   "variation-approval": "#install",
   "issue-update": "",
   "handover-ready": "#handover",
+  "certificate-issued": "#handover",
   "check-in-7d": "#aftercare",
   "feedback-30d": "#aftercare",
+  "review-request": "#aftercare", // only if there's no review link to send them to
+  "seasonal-check": "#aftercare",
   "service-reminder": "#aftercare",
   "team-alert": null,
 };
@@ -364,6 +424,8 @@ interface Draft {
   subject: string;
   body: Block[];
   cta?: string;
+  /** The button goes here instead of the portal (an external page, like the review site). */
+  ctaHref?: string;
   /** After the button (legal text, small print). */
   after?: Block[];
   /** SMS candidates, longest first; the first that fits two segments wins. */
@@ -387,9 +449,10 @@ function wrap(event: CommsEventId, ctx: TemplateContext, d: Draft): RenderedMess
 
   const html: string[] = blocks.map(blockHtml);
   const text: string[] = blocks.map(blockText);
-  if (d.cta && ctx.portalUrl) {
-    html.push(buttonHtml(d.cta, ctx.portalUrl));
-    text.push(`${d.cta}: ${ctx.portalUrl}`);
+  const href = d.ctaHref ?? ctx.portalUrl;
+  if (d.cta && href) {
+    html.push(buttonHtml(d.cta, href));
+    text.push(`${d.cta}: ${href}`);
   }
 
   const tail: Block[] = [...(d.after ?? [])];
@@ -398,6 +461,7 @@ function wrap(event: CommsEventId, ctx: TemplateContext, d: Draft): RenderedMess
   } else {
     tail.push({ p: `Thanks,\nThe ${company.tradingName} team` });
     tail.push({ small: `Questions? Call us on ${company.phone} or email ${company.email}.` });
+    if (FOLLOW_UP_EVENTS.has(event)) tail.push({ small: optOutLine(ctx) });
     if (event !== "magic-link" && (ctx.addressLine || ctx.postcode)) {
       tail.push({ small: `This message is about your project at ${place(ctx)}.` });
     }
@@ -412,8 +476,196 @@ function wrap(event: CommsEventId, ctx: TemplateContext, d: Draft): RenderedMess
     html: brandedEmail(html.join("\n")),
     text: text.join("\n\n").replace(/\n{3,}/g, "\n\n").trim(),
   };
-  if (d.sms && COMMS_EVENTS[event].channels.includes("sms")) out.sms = fitSms(d.sms);
+  if (d.sms && COMMS_EVENTS[event].channels.includes("sms")) out.sms = fitSms(d.sms.map(gsm7Only));
   return out;
+}
+
+/**
+ * GSM-7 only: typographic punctuation and accents made plain (gsmSafe), then
+ * anything still outside the GSM set (emoji, other scripts in a name or an
+ * address) dropped, so a text never falls back to 70-character segments.
+ */
+function gsm7Only(text: string): string {
+  return [...gsmSafe(text)]
+    .filter((ch) => smsLength(ch).encoding === "gsm7")
+    .join("")
+    .replace(/ +([,.])/g, "$1")
+    .replace(/ {2,}/g, " ");
+}
+
+/** Every follow-up ends with this (FOLLOW_UP_EVENTS). The outbox honours it: see aftercare-opt-out. */
+function optOutLine(ctx: TemplateContext): string {
+  const { email, phone } = ctx.settings.company;
+  return `Don't want follow-up emails like this one? Email ${email} or call ${phone} and we'll stop them. We'll still contact you about any open work, problem or payment.`;
+}
+
+/* ------------------------------------------------------------------ */
+/* Pre-contract information (CCR 2013 Schedule 2)                      */
+/* ------------------------------------------------------------------ */
+
+const traderOf = (settings: PilotSettings): TraderDetails => {
+  const c = settings.company;
+  return {
+    legalName: c.legalName,
+    tradingName: c.tradingName,
+    geographicAddress: c.geographicAddress,
+    registeredAddress: c.registeredAddress,
+    phone: c.phone,
+    email: c.email,
+  };
+};
+
+const PAYMENT_METHOD: Record<PilotSettings["payments"]["methods"][number], string> = {
+  card: "card",
+  "bank-transfer": "bank transfer",
+};
+
+/** "with less than 7 days' notice, £150" from the installation fee bands. */
+function dateChangeFee(): { freeFromDays: number; feePence: number } | null {
+  const bands = RESCHEDULE_FEES.installation;
+  const charged = bands.filter((b) => b.feeGbp > 0).sort((a, b) => b.feeGbp - a.feeGbp)[0];
+  const free = bands.filter((b) => b.feeGbp === 0).sort((a, b) => a.minDaysNotice - b.minDaysNotice)[0];
+  return charged && free ? { freeFromDays: free.minDaysNotice, feePence: charged.feeGbp * 100 } : null;
+}
+
+const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+
+/**
+ * Everything Schedule 2 asks for, from settings and the proposal, as one
+ * section of the issue and acceptance emails (the durable medium). Each
+ * part names its paragraph for the solicitor's review. NEEDS SOLICITOR
+ * REVIEW, with the cancellation wording (settings.legal.cancellationReviewed).
+ */
+function preContractInfo(ctx: TemplateContext, x: ProposalDetails & { cancellation: string; validUntil?: string }): Block[] {
+  const { company, payments, warranty, tax } = ctx.settings;
+  const supply = x.contractType !== "install-only";
+  const out: Block[] = [];
+
+  // (b), (c), (e): who we are and how to reach us.
+  const identity =
+    company.tradingName.trim() && company.tradingName.trim() !== company.legalName.trim()
+      ? `${company.legalName}, trading as ${company.tradingName}`
+      : company.legalName;
+  const who: [string, string][] = [["Business", `${identity}${company.companyNumber ? ` (company number ${company.companyNumber})` : ""}`]];
+  if (company.geographicAddress.trim()) who.push(["Address", company.geographicAddress.trim()]);
+  const office = company.registeredAddress?.trim();
+  if (office && office !== company.geographicAddress.trim()) who.push(["Registered office", office]);
+  who.push(["Phone", company.phone], ["Email", company.email]);
+  out.push({ h: "Who we are" }, { facts: who });
+
+  // (a): the main characteristics.
+  out.push({ h: "What you're getting" });
+  out.push({
+    p: supply
+      ? "We supply the equipment below, install it, then connect, test and commission it."
+      : "You supply the equipment; we install it, then connect, test and commission it.",
+  });
+  const options = x.options ?? [];
+  for (const o of options) {
+    if (options.length > 1) out.push({ p: { strong: o.label } });
+    if (o.summary?.trim()) out.push({ p: o.summary.trim() });
+    const items = [...(o.rooms ?? []), ...(o.highlights ?? [])].filter((i) => i.trim());
+    const days = o.installDays ?? x.installDays;
+    if (days) items.push(`Installation: ${plural(days, "working day")}.`);
+    if (items.length) out.push({ list: items });
+  }
+  if (!options.length) {
+    const items = [...(x.rooms ?? [])];
+    if (x.installDays) items.push(`Installation: ${plural(x.installDays, "working day")}.`);
+    if (items.length) out.push({ list: items });
+  }
+  if (x.inclusions?.length) out.push({ p: "Also included:" }, { list: x.inclusions });
+  if (x.exclusions?.length) out.push({ p: "Not included:" }, { list: x.exclusions });
+
+  // (f), (g): the total price, how anything unpriced is worked out, other costs.
+  out.push({ h: "Price" });
+  const vat = (o: OptionSummary) =>
+    tax.vatRegistered ? `including VAT (${o.taxLabel ?? TAX_CODES[effectiveTaxCode(ctx.settings)].label})` : "no VAT: we're not VAT registered";
+  if (options.length) {
+    out.push({ facts: options.map((o): [string, string] => [o.label, `${money(o.totalPence)} in total, ${vat(o)}`]) });
+  } else {
+    out.push({ p: "The total price of each option, including any VAT, is on your proposal page." });
+  }
+  out.push({
+    p: "The price is fixed for the work described. If we find something we couldn't have seen at the survey that changes the job, we'll explain it and give you the price in writing first. Nothing extra is charged unless you agree to it.",
+  });
+  if (x.assumptions?.length) out.push({ p: "The price assumes:" }, { list: x.assumptions });
+  const fee = dateChangeFee();
+  out.push({
+    p: fee
+      ? `There are no delivery charges. The only other cost you could face: if you move your install dates with less than ${fee.freeFromDays} days' notice, there's a ${money(fee.feePence)} date-change fee.`
+      : "There are no delivery charges or other extra costs.",
+  });
+
+  // (j), (u): paying, deposits and timing.
+  out.push({ h: "Paying and timing" });
+  const methods = payments.methods.map((m) => PAYMENT_METHOD[m]);
+  const pay: Para[] = [
+    payments.depositPct > 0
+      ? `A deposit of ${payments.depositPct}% of the price is due ${payments.depositTiming === "on-acceptance" ? "when you accept" : "before we order your equipment"}.`
+      : "There's no deposit.",
+    `We invoice the balance when the installation is finished. It's due within ${plural(payments.balanceDueDays, "day")} of the invoice.`,
+  ];
+  if (methods.length) pay.push(`You can pay by ${listJoin(methods)}.`);
+  pay.push(`You choose your install dates after accepting, from the dates we can offer, at least ${INSTALL_LEAD_DAYS} days ahead.`);
+  if (x.validUntil) pay.push(`This proposal is valid until ${dateLong(x.validUntil)}.`);
+  out.push({ list: pay });
+
+  // (l), (m), (n), (o): cancellation.
+  out.push({ h: "Your right to cancel" });
+  out.push({ p: x.cancellation });
+  out.push({
+    p: "To cancel, tell us with any clear statement: an email, a letter or a phone call. You can use the model form at the end of this email, but you don't have to. It's enough to send it before the period ends.",
+  });
+  out.push({
+    p: "If you ask us to start work during the cancellation period and then cancel, you'll pay a proportionate amount for the work done up to when you tell us.",
+  });
+  out.push({
+    p: supply
+      ? "If you cancel after your equipment has been delivered, we collect it and we pay the cost of returning it."
+      : "If you ask us to start during the cancellation period, you lose the right to cancel once we've fully completed the work.",
+  });
+  out.push({ p: "The full cancellation instructions and the model cancellation form are at the end of this email." });
+
+  // (p), (q): conformity, guarantees and after-sales service.
+  out.push({ h: "Guarantees and after-sales" });
+  const g: Para[] = [];
+  if (supply) g.push("We're under a legal duty to supply goods that conform with this contract.");
+  const manufacturer = x.warranty?.trim() || warranty.manufacturerSummary?.trim();
+  if (manufacturer) g.push(`Manufacturer's warranty: ${manufacturer}`);
+  const years = warranty.workmanshipYears;
+  if (years === 0) g.push("We don't offer a separate guarantee on our workmanship.");
+  else if (years !== null && years > 0) {
+    const terms = company.workmanshipGuarantee?.trim();
+    g.push(`Our workmanship guarantee: ${plural(years, "year")}.${terms ? ` ${terms}` : ""}`);
+  } else if (company.workmanshipGuarantee?.trim()) g.push(`Our workmanship guarantee: ${company.workmanshipGuarantee.trim()}`);
+  g.push("After handover we check in, and you can report a problem any time from your project page or by phone.");
+  g.push("None of this affects your legal rights.");
+  out.push({ list: g });
+
+  // (k), (x): complaints and dispute resolution.
+  const complaints = company.complaintsProcess.trim();
+  const adr = company.adr?.trim();
+  if (complaints || adr) {
+    out.push({ h: "Complaints" });
+    if (complaints) out.push({ p: complaints });
+    if (adr) out.push({ p: `If you're not happy with how we've handled a complaint: ${adr}` });
+  }
+  return out;
+}
+
+/** Part A and Part B, as the closing section of a contract email. */
+function cancellationAppendix(ctx: TemplateContext, contractType: ContractType | undefined): Block[] {
+  const trader = traderOf(ctx.settings);
+  const opts = { contractType: contractType ?? "supply-and-install", days: ctx.settings.scheduling.cancellationDays } as const;
+  return [
+    { h: "Cancellation instructions" },
+    ...cancellationInstructions(trader, opts).flatMap((para): Block[] =>
+      para.heading ? [{ p: { strong: para.heading } }, { p: para.text }] : [{ p: para.text }],
+    ),
+    { h: "Model cancellation form" },
+    { box: cancellationForm(trader) },
+  ];
 }
 
 /* ------------------------------------------------------------------ */
@@ -547,8 +799,20 @@ const TEMPLATES: { [E in CommsEventId]: Renderer<E> } = {
         },
         { p: ["The price is valid until ", { strong: dateLong(d.validUntil) }, "."] },
         { p: "When you're ready, you can accept it, ask for changes or decline it, all from the same page. There's no obligation." },
+        {
+          p: "You agreed to get your documents by email, so this email is also your copy of the information you need before you decide, including your right to cancel. Please keep it.",
+        },
       ],
       cta: "Review your proposal",
+      after: [
+        { h: "Before you decide: your pre-contract information" },
+        ...preContractInfo(ctx, {
+          ...d,
+          validUntil: d.validUntil,
+          cancellation: cancellationSentence({ accepted: false, contractType: d.contractType }, ctx.settings.scheduling.cancellationDays),
+        }),
+        ...cancellationAppendix(ctx, d.contractType),
+      ],
     };
   },
 
@@ -564,20 +828,16 @@ const TEMPLATES: { [E in CommsEventId]: Renderer<E> } = {
   }),
 
   "proposal-accepted": (ctx, d) => {
-    const { company, legal } = ctx.settings;
-    const trader = {
-      legalName: company.legalName,
-      tradingName: company.tradingName,
-      registeredAddress: company.registeredAddress,
-      phone: company.phone,
-      email: company.email,
-    };
+    const { company, legal, scheduling } = ctx.settings;
+    const contractType = d.contractType ?? "supply-and-install";
+    const supply = contractType !== "install-only";
     const accepted = london(d.acceptedAt);
     const summary: [string, string][] = [
       ["Property", place(ctx)],
       ["What you chose", d.optionLabel],
       ["Price", money(d.contractTotalPence)],
       ["VAT", vatLine(ctx.settings)],
+      ["Contract", supply ? "Supply and installation" : "Installation only (you supply the equipment)"],
       ["Proposal", `Version ${d.version}${d.proposalRef ? ` (${d.proposalRef})` : ""}`],
     ];
     if (d.installDays) summary.push(["Installation", `${d.installDays} days, on dates you choose`]);
@@ -588,49 +848,77 @@ const TEMPLATES: { [E in CommsEventId]: Renderer<E> } = {
       ["When", `${dateLong(accepted.date)} at ${accepted.time} (UK time)`],
       ["Terms version", d.termsVersion ?? legal.termsVersion],
       ["Cancellation notice", d.cancellationNoticeVersion ?? CANCELLATION_NOTICE_VERSION],
+      ["Documents by email", "Agreed"],
       ["Early start requested", d.earlyStartRequested ? "Yes" : "No"],
     ];
 
-    const ends = d.cancellationEndsOn ? dateLong(d.cancellationEndsOn) : null;
+    const cancellation = cancellationSentence(
+      { accepted: true, contractType, ...(d.cancellationEndsOn ? { endsOn: d.cancellationEndsOn } : {}) },
+      scheduling.cancellationDays,
+    );
+    const wording = earlyStartWording(contractType);
+    const wordingRef: Block = { small: `Wording reference: ${d.earlyStartWordingVersion ?? EARLY_START_WORDING_VERSION}.` };
+    const reply = `reply to this email (or email ${company.email}) with these exact words:`;
     const startBlocks: Block[] = d.earlyStartRequested
       ? [
-          { h: "You asked us to start within 14 days" },
+          { h: "You asked us to start sooner" },
           {
-            p: "You asked us to start work during your cancellation period, and we've recorded that request. You can still cancel during the period. If you cancel after work has started, you'll pay a proportionate amount for the work done up to when you tell us.",
+            p: `You ticked "start early" when you accepted. For that request to count, the law needs it from you in a form you can keep, such as an email. To confirm it, please ${reply}`,
           },
-          ...(d.acknowledgedLossOfRight
+          { quote: wording },
+          {
+            p: "Until we have your reply, we can't start work before your cancellation period ends. You can still cancel during the period. If you cancel after work has started, you'll pay a proportionate amount for the work done up to when you tell us.",
+          },
+          ...(!supply && d.acknowledgedLossOfRight
             ? [{ p: "You also confirmed you understand that once the work is fully completed, you lose the right to cancel." } as Block]
             : []),
+          wordingRef,
         ]
       : [
           { h: "When we can start" },
           {
-            p: ends
-              ? `Your cancellation period ends at the end of ${ends}. We won't start work until it has ended, unless you ask us to start sooner.`
-              : "We won't start work until your 14-day cancellation period has ended, unless you ask us to start sooner.",
+            p: supply
+              ? "We won't start the installation until your cancellation period has ended, unless you ask us to start sooner."
+              : "We won't start work until your cancellation period has ended, unless you ask us to start sooner.",
           },
+          { p: `If you'd like us to start sooner, ${reply}` },
+          { quote: wording },
+          wordingRef,
         ];
 
+    const option: OptionSummary = d.option ?? {
+      label: d.optionLabel,
+      totalPence: d.contractTotalPence,
+      ...(d.installDays ? { installDays: d.installDays } : {}),
+    };
     return {
       subject: `Your contract with ${company.tradingName}: confirmation and cancellation rights`,
       body: [
-        { p: `Thank you for accepting your proposal for ${place(ctx)}. This email confirms your contract with ${company.legalName}. Please keep it.` },
+        { p: `Thank you for accepting your proposal for ${place(ctx)}. This email confirms your contract with ${company.legalName} and is your copy of it. Please keep it.` },
         { h: "What you've agreed" },
         { facts: summary },
         { h: "Your acceptance record" },
         { facts: record },
+        { h: "Your cancellation period" },
+        { p: cancellation },
         ...startBlocks,
         { h: "What happens next" },
         { p: "Choose your install dates from your project page. We'll then confirm the dates and your team by email. Your proposal and terms are on the same page." },
       ],
       cta: "Choose your install dates",
       after: [
-        { h: "Your right to cancel" },
-        ...cancellationInstructions(trader).flatMap((para): Block[] =>
-          para.heading ? [{ p: { strong: para.heading } }, { p: para.text }] : [{ p: para.text }],
-        ),
-        { h: "Model cancellation form" },
-        { box: cancellationForm(trader) },
+        { h: "Your contract information" },
+        ...preContractInfo(ctx, {
+          contractType,
+          options: [{ ...option, label: option.label || d.optionLabel, totalPence: d.contractTotalPence }],
+          installDays: d.installDays,
+          inclusions: d.inclusions,
+          exclusions: d.exclusions,
+          assumptions: d.assumptions,
+          warranty: d.warranty,
+          cancellation,
+        }),
+        ...cancellationAppendix(ctx, contractType),
       ],
     };
   },
@@ -880,6 +1168,27 @@ const TEMPLATES: { [E in CommsEventId]: Renderer<E> } = {
     };
   },
 
+  "certificate-issued": (ctx, d) => {
+    const electrical = d.kind === "electrical-certificate";
+    return {
+      subject: electrical ? "Your electrical certificate is in your handover pack" : "Your manufacturer warranty is registered",
+      body: [
+        {
+          p: electrical
+            ? `The electrical installation certificate for the work at ${place(ctx)} has arrived. It's now in your handover pack.`
+            : `We've registered the manufacturer's warranty for your system at ${place(ctx)}. The confirmation is in your handover pack.`,
+        },
+        {
+          p: electrical
+            ? "Keep it with your home's paperwork: you may be asked for it if you sell the house."
+            : "Keep it with your home's paperwork: you'll need it for any warranty claim.",
+        },
+        { p: "Nothing for you to do." },
+      ],
+      cta: "Open your handover pack",
+    };
+  },
+
   "check-in-7d": (ctx) => ({
     subject: "How's your system running?",
     body: [
@@ -896,9 +1205,61 @@ const TEMPLATES: { [E in CommsEventId]: Renderer<E> } = {
     body: [
       { p: `It's been a month since your installation at ${place(ctx)}.` },
       { p: "Would you give us a score from 0 to 10, and tell us what we could do better? It takes about a minute, and we read every answer." },
+      { p: "We ask everyone this at the same point. It's just for us: it isn't a public review, and your answer doesn't change anything else we send you." },
     ],
     cta: "Give your score",
   }),
+
+  // The same words for everyone, at the same point, whatever their score:
+  // no gating, no incentive (DMCC Act 2024 Sch 20 para 13).
+  "review-request": (ctx) => {
+    const url = ctx.settings.company.reviewUrl;
+    return {
+      subject: `Would you review ${ctx.settings.company.tradingName}?`,
+      body: [
+        {
+          p: `It's been a while since we finished at ${place(ctx)}, so we're asking what we ask every customer at this point: would you write an honest review of us?`,
+        },
+        {
+          p: "Good, bad or in between, we'd like it said. There's no reward, discount or prize for a review, and the review site publishes it, not us.",
+        },
+        { p: "Separately, if anything isn't working as it should, tell us on your project page or call us, review or no review." },
+      ],
+      ...(url ? { cta: "Write a review", ctaHref: url } : { cta: "Open your project" }),
+    };
+  },
+
+  "seasonal-check": (ctx, d) => {
+    const heating = d.mode === "heating";
+    return {
+      subject: heating ? "Colder days ahead: using your system to heat" : "Warmer days ahead: using your system to cool",
+      body: [
+        {
+          p: heating
+            ? `As the weather turns colder, you'll probably use the system at ${place(ctx)} to heat your home for the first time.`
+            : `As the weather warms up, you'll probably use the system at ${place(ctx)} to cool your home for the first time.`,
+        },
+        { p: "A few things that help:" },
+        {
+          list: heating
+            ? [
+                "Switch the mode to Heat on the remote or the app.",
+                "Pick a steady temperature and leave it there: that's more efficient than turning it up and down.",
+                "In cold, damp weather the outdoor unit defrosts now and then. A puff of steam and a short pause in the warm air are normal.",
+                "Clean the filters as the manual says, so it keeps running well.",
+              ]
+            : [
+                "Switch the mode to Cool on the remote or the app.",
+                "Set it a few degrees below the room, not as low as it goes, and close curtains on the sunny side on hot days.",
+                "A little water from the condensate pipe outside is normal.",
+                "Clean the filters as the manual says, so it keeps running well.",
+              ],
+        },
+        { p: "If anything doesn't seem right, tell us on your project page and we'll sort it." },
+      ],
+      cta: "Report a problem or ask a question",
+    };
+  },
 
   "service-reminder": (ctx, d) => ({
     subject: `Your system's yearly service is due ${shortDay(d.dueOn)}`,
@@ -915,8 +1276,9 @@ const TEMPLATES: { [E in CommsEventId]: Renderer<E> } = {
     const { legal } = ctx.settings;
     if (d.legalCheck && !legal.cancellationReviewed) lines.push("Cancellation wording is not yet marked reviewed in settings (legal).");
     if (d.legalCheck && !legal.termsReviewed) lines.push(`Terms ${legal.termsVersion} are not yet marked reviewed in settings (legal).`);
-    if (d.legalCheck && !ctx.settings.company.registeredAddress?.trim()) {
-      lines.push("No company address in settings: the cancellation information and form need our geographical address.");
+    const missing = d.legalCheck ? schedule2Missing(ctx.settings) : [];
+    if (missing.length) {
+      lines.push(`Pre-contract information incomplete in settings: ${missing.join(", ")}. The cancellation information and form need our geographical address.`);
     }
     return {
       subject: `${d.urgent ? "[Urgent] " : ""}${d.title}`,
@@ -958,4 +1320,10 @@ function onMyWay(ctx: TemplateContext, d: { etaMinutes: number; at: string; name
 export function renderMessage<E extends CommsEventId>(event: E, ctx: TemplateContext, data: CommsData[E]): RenderedMessage {
   const renderer = TEMPLATES[event] as Renderer<E>;
   return wrap(event, ctx, renderer(ctx, data));
+}
+
+/** The SMS texts a template offers, longest first, exactly as written (before fitting), for tests. */
+export function smsCandidates<E extends CommsEventId>(event: E, ctx: TemplateContext, data: CommsData[E]): string[] {
+  if (!COMMS_EVENTS[event].channels.includes("sms")) return [];
+  return (TEMPLATES[event] as Renderer<E>)(ctx, data).sms ?? [];
 }

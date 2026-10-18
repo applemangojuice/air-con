@@ -1,3 +1,5 @@
+import type { ContractType } from "@aircon/domain";
+
 /**
  * Statutory cancellation wording for the acceptance confirmation email (the
  * durable copy) and the contract document.
@@ -8,21 +10,24 @@
  * cancellation, and Part B, the model cancellation form. The regulations
  * let a trader give the cancellation information by using the model
  * instructions, correctly completed. The completion choices below are ours
- * and are the part to review:
+ * and are the part to review (docs/research/uk-consumer-legal.md §1.10):
  *
- *   1. Period start. We use the service-contract text ("the day of the
- *      conclusion of the contract"), matching the 14 days from acceptance
- *      that the platform enforces. A supply-and-install contract may count
- *      as a sales contract, where the period instead runs from the day the
- *      customer takes physical possession of the goods. Confirm.
+ *   1. Period start, by contract type (project.ts cancellationStatus).
+ *      supply-and-install is a sales contract: note 1(c), the day the
+ *      customer takes physical possession of the last of the goods (indoor
+ *      and outdoor units can arrive on different days). install-only is a
+ *      service contract: note 1(a), the day of the conclusion of the contract.
  *   2. Note 6 (services started early on request, proportionate payment)
  *      is included, because installs can start inside the period on an
  *      express request (reg 36). Losing the right once the service is fully
- *      performed is acknowledged at acceptance, not here.
- *   3. Note 5 (collection and cost of returning goods) is left out: whether
- *      we collect installed equipment, and at whose cost, is a business and
- *      legal decision not yet made. Add the chosen sentences here.
+ *      performed applies to install-only only, and is said in the
+ *      pre-contract information, not here.
+ *   3. Note 5, supply-and-install only: we collect the goods and bear the
+ *      cost of returning them (units fixed to a wall can't go back by post),
+ *      plus the diminished-value sentence. The research's recommended
+ *      default; a business decision for the solicitor to confirm.
  *   4. Note 3 (online cancellation) is left out until a cancel flow exists.
+ *   5. The period length follows settings (14 days unless we give longer).
  *
  * Settings carry `legal.cancellationReviewed`; until it's true, team alerts
  * say the wording is unreviewed. Bump CANCELLATION_NOTICE_VERSION whenever
@@ -32,7 +37,7 @@
  * renders in email, documents and tests.
  */
 
-export const CANCELLATION_NOTICE_VERSION = "ccr-2013-sch3-v1";
+export const CANCELLATION_NOTICE_VERSION = "ccr-2013-sch3-v2";
 
 export const LEGAL_REVIEW_NOTE = "Needs solicitor review";
 
@@ -40,19 +45,43 @@ export const LEGAL_REVIEW_NOTE = "Needs solicitor review";
 export interface TraderDetails {
   legalName: string;
   tradingName?: string;
+  /** Where we're established (settings.company.geographicAddress): the address note 2 asks for. */
+  geographicAddress?: string;
+  /** Used only when there's no geographic address. */
   registeredAddress?: string;
   phone?: string;
   email?: string;
 }
 
+export interface CancellationOptions {
+  /** Picks note 1(c) or 1(a), and whether note 5 applies. supply-and-install when left out. */
+  contractType?: ContractType;
+  /** The period length (settings.scheduling.cancellationDays); 14 when left out. Never shorter than 14. */
+  days?: number;
+}
+
+const periodDays = (o: CancellationOptions) => Math.max(14, Math.round(o.days ?? 14));
+
+/** Note 1: (c) for a sales contract whose goods may arrive on different days, (a) for a service contract. */
+const PERIOD_END: Record<ContractType, string> = {
+  "supply-and-install":
+    "The cancellation period will expire after {DAYS} days from the day on which you acquire, or a third party, other than the carrier and indicated by you, acquires physical possession of the last good.",
+  "install-only": "The cancellation period will expire after {DAYS} days from the day of the conclusion of the contract.",
+};
+
+/** Note 5 (a), (b) and (c): we collect, we pay, and the customer's diminished-value liability. Goods only. */
+const RETURN_OF_GOODS =
+  "We will collect the goods. We will bear the cost of returning the goods. You are only liable for any diminished value of the goods resulting from the handling other than what is necessary to establish the nature, characteristics and functioning of the goods.";
+
 /**
- * Schedule 3 Part A, model instructions for cancellation, with note 1(a)
- * chosen and note 6 inserted. `{TRADER}` is replaced by the trader's name,
- * geographical address, telephone number and email (note 2).
+ * Schedule 3 Part A, model instructions for cancellation, with note 6
+ * inserted. `{PERIOD}` is note 1's sentence and `{GOODS}` note 5's, chosen
+ * per contract type; `{TRADER}` is the trader's name, geographical address,
+ * telephone number and email (note 2).
  */
 export const CANCELLATION_INSTRUCTIONS: readonly { heading?: string; text: string }[] = [
-  { heading: "Right to cancel", text: "You have the right to cancel this contract within 14 days without giving any reason." },
-  { text: "The cancellation period will expire after 14 days from the day of the conclusion of the contract." },
+  { heading: "Right to cancel", text: "You have the right to cancel this contract within {DAYS} days without giving any reason." },
+  { text: "{PERIOD}" },
   {
     text: "To exercise the right to cancel, you must inform us ({TRADER}) of your decision to cancel this contract by a clear statement (e.g. a letter sent by post, fax or e-mail). You may use the attached model cancellation form, but it is not obligatory.",
   },
@@ -70,6 +99,7 @@ export const CANCELLATION_INSTRUCTIONS: readonly { heading?: string; text: strin
   {
     text: "We will make the reimbursement using the same means of payment as you used for the initial transaction, unless you have expressly agreed otherwise; in any event, you will not incur any fees as a result of the reimbursement.",
   },
+  { text: "{GOODS}" },
   {
     text: "If you requested to begin the performance of services during the cancellation period, you shall pay us an amount which is in proportion to what has been provided until you have communicated us your cancellation from this contract, in comparison with the full coverage of the contract.",
   },
@@ -99,16 +129,23 @@ export function traderBlock(t: TraderDetails, opts: { phone?: boolean } = {}): s
       ? `${t.legalName.trim()} (trading as ${t.tradingName.trim()})`
       : t.legalName.trim();
   const parts = [name];
-  if (t.registeredAddress?.trim()) parts.push(t.registeredAddress.trim());
+  const address = t.geographicAddress?.trim() || t.registeredAddress?.trim();
+  if (address) parts.push(address);
   if (opts.phone !== false && t.phone?.trim()) parts.push(`phone ${t.phone.trim()}`);
   if (t.email?.trim()) parts.push(`email ${t.email.trim()}`);
   return parts.join(", ");
 }
 
-/** Part A with our details filled in, one entry per paragraph. */
-export function cancellationInstructions(t: TraderDetails): { heading?: string; text: string }[] {
+/** Part A with our details and the contract type's choices filled in, one entry per paragraph. */
+export function cancellationInstructions(t: TraderDetails, opts: CancellationOptions = {}): { heading?: string; text: string }[] {
   const trader = traderBlock(t);
-  return CANCELLATION_INSTRUCTIONS.map((p) => ({ ...p, text: p.text.replace("{TRADER}", trader) }));
+  const type = opts.contractType ?? "supply-and-install";
+  const days = String(periodDays(opts));
+  const goods = type === "supply-and-install" ? RETURN_OF_GOODS : "";
+  return CANCELLATION_INSTRUCTIONS.map((p) => ({
+    ...p,
+    text: p.text.replace("{PERIOD}", PERIOD_END[type]).replace("{GOODS}", goods).replace("{TRADER}", trader).split("{DAYS}").join(days),
+  })).filter((p) => p.text.trim().length > 0);
 }
 
 /** Part B with our details filled in (the form names no phone number: note to Part B). */
