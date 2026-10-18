@@ -15,7 +15,7 @@ import {
 import { NOISE_LIMIT_DB, designVerdict, estimateHeightDiffM, estimatePipeRunM, type DesignVerdict, type RuleResult, type RuleStatus } from "./design.ts";
 import { estimateRoomLoadWatts, selectCapacityKw } from "./heatload.ts";
 import type { PropertyIntel } from "./intelligence.ts";
-import type { MeasuredRoom, MeasuredSurvey, OutdoorPosition, PdCheckId } from "./survey-visit.ts";
+import { PD_CHECKS, type MeasuredRoom, type MeasuredSurvey, type OutdoorPosition, type PdCheckId } from "./survey-visit.ts";
 import type { FloorLevel, PropertyType, RoomSize, RoomType, Survey, SurveyRoom } from "./types.ts";
 
 /**
@@ -353,6 +353,69 @@ export function roomInputsFromSurvey(measured: MeasuredSurvey, baseSurvey?: Surv
         ...(estimated.length ? { estimated } : {}),
       };
     });
+}
+
+/**
+ * Fill in what an older record (or one written by another tool, like the
+ * demo seed) doesn't carry yet: the site facts, the room facts and the
+ * survey baseline, from the survey it was drawn from; each system's
+ * position and outdoor photo; each option's brand. Nothing already there is
+ * changed, and no choice is made for anyone.
+ */
+export function hydrateDesign(design: DesignRecord, measured?: MeasuredSurvey, opts: { intel?: PropertyIntel; catalogue?: CatalogueItem[] } = {}): DesignRecord {
+  const site = design.site ?? (measured ? siteFromSurvey(measured, opts.intel) : undefined);
+  const rooms = design.rooms.map((r) => {
+    const m = measured?.rooms.find((x) => x.id === r.roomId);
+    const next: RoomDesignInput = { ...r };
+    if (m) {
+      if (next.type === undefined) next.type = m.type;
+      if (next.hasExternalWall === undefined) next.hasExternalWall = m.hasExternalWall;
+      if (next.route === undefined && m.route) next.route = m.route;
+      if (next.areaM2 === undefined) {
+        const area = positive(m.areaM2) ? m.areaM2 : positive(m.lengthM) && positive(m.widthM) ? m.lengthM * m.widthM : undefined;
+        if (area) next.areaM2 = round1(area);
+      }
+    }
+    if (!next.survey) {
+      // An override already on the record names its own baseline: keep it, so its reason still applies.
+      const from = (field: string) => design.overrides.find((o) => o.field === `rooms.${r.roomId}.${field}`)?.from;
+      const num = (v: string | undefined) => (v !== undefined && Number.isFinite(Number(v)) ? Number(v) : undefined);
+      const fromCondensate = from("condensate");
+      next.survey = {
+        pipeRunM: num(from("pipeRunM")) ?? (m && positive(m.pipeRunM) ? round1(m.pipeRunM) : r.pipeRunM),
+        heightDiffM: num(from("heightDiffM")) ?? (m && nonNegative(m.heightDropM) ? round1(m.heightDropM) : r.heightDiffM),
+        condensate:
+          fromCondensate === "gravity" || fromCondensate === "pump"
+            ? fromCondensate
+            : m && (m.condensate === "gravity" || m.condensate === "pump")
+              ? m.condensate
+              : r.condensate,
+      };
+    }
+    return next;
+  });
+  const byId = opts.catalogue ? byIdMap(opts.catalogue) : null;
+  const variants = design.variants.map((v) => {
+    let manufacturer = v.manufacturer;
+    if (!manufacturer && byId) {
+      const counts = new Map<string, number>();
+      for (const u of v.roomUnits) {
+        const m = byId.get(u.indoorItemId)?.manufacturer;
+        if (m) counts.set(m, (counts.get(m) ?? 0) + 1);
+      }
+      manufacturer = [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0];
+    }
+    const systems = v.systems.map((s, i) => {
+      const position = s.outdoorPositionId ? site?.outdoorPositions.find((p) => p.id === s.outdoorPositionId) : defaultPosition(site, i);
+      return {
+        ...s,
+        ...(position && !s.outdoorPositionId ? { outdoorPositionId: position.id } : {}),
+        layoutMediaIds: s.layoutMediaIds ?? (position?.mediaId ? [position.mediaId] : []),
+      };
+    });
+    return { ...v, ...(manufacturer ? { manufacturer } : {}), systems };
+  });
+  return { ...design, rooms, variants, ...(site ? { site } : {}) };
 }
 
 /* ------------------------------------------------------------------ */
@@ -1217,15 +1280,16 @@ function designRules(x: RuleInput): RuleResult[] {
         notes.push("No property record held, so listing, conservation area and Article 4 haven't been checked against the council's maps.");
       }
       const answers = Object.values(p.pd);
-      const no = Object.entries(p.pd).filter(([, v]) => v === "no").map(([k]) => k);
-      const unsure = Object.entries(p.pd).filter(([, v]) => v === "unsure").map(([k]) => k);
+      const pdLabel = (k: string) => `“${PD_CHECKS.find((c) => c.id === k)?.label ?? k}”`;
+      const no = Object.entries(p.pd).filter(([, v]) => v === "no").map(([k]) => pdLabel(k));
+      const unsure = Object.entries(p.pd).filter(([, v]) => v === "unsure").map(([k]) => pdLabel(k));
       if (no.length) {
         statuses.push("review");
-        notes.push(`Permitted development check answered no (${no.join(", ")}): this goes down the planning application route.`);
+        notes.push(`Permitted development answered no: ${no.join("; ")}. This goes down the planning application route.`);
       }
       if (unsure.length || answers.length < 8) {
         statuses.push("review");
-        notes.push(`${unsure.length ? `Unsure: ${unsure.join(", ")}. ` : ""}${answers.length < 8 ? `${8 - answers.length} permitted-development checks unanswered.` : ""}`.trim());
+        notes.push(`${unsure.length ? `Unsure: ${unsure.join("; ")}. ` : ""}${answers.length < 8 ? `${8 - answers.length} permitted-development checks unanswered.` : ""}`.trim());
       }
       if (site?.heatingUse === "cooling-only-intent") {
         statuses.push("review");

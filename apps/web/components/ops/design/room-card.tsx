@@ -90,11 +90,11 @@ export function RoomCard(p: RoomCardProps) {
             {room.route ? ` · ${ROUTE[room.route] ?? room.route}` : ""}
           </p>
         </div>
-        <div className="text-right">
+        <div className="sm:text-right">
           <p className="text-sm font-semibold text-ink-900">
             {fmtW(room.preliminaryLoadW)} <span className="font-normal text-ink-500">→ {kw(room.suggestedKw)} suggested</span>
           </p>
-          <p className="mt-0.5 max-w-[16rem] text-xs text-ink-500">{PRELIMINARY_LOAD_LABEL}</p>
+          <p className="mt-0.5 text-xs text-ink-500 sm:max-w-[16rem]">{PRELIMINARY_LOAD_LABEL}</p>
         </div>
       </header>
 
@@ -126,11 +126,12 @@ export function RoomCard(p: RoomCardProps) {
                     {CAPACITY_OPTIONS_KW.map((k) => (
                       <option key={k} value={String(k)}>
                         {kw(k)}
-                        {k === room.suggestedKw ? " (suggested)" : ""}
                       </option>
                     ))}
                   </select>
-                  {p.multipleVariants && <p className="mt-1.5 text-xs text-ink-500">Size, runs, drain and photos apply to every option.</p>}
+                  <p className="mt-1.5 text-xs text-ink-500">
+                    Suggested {kw(room.suggestedKw)}.{p.multipleVariants ? " Size, runs, drain and photos apply to every option." : ""}
+                  </p>
                 </div>
                 <div>
                   <label htmlFor={`cond-${room.roomId}`} className="mb-1.5 flex items-center gap-2 text-sm font-semibold text-ink-900">

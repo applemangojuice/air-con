@@ -8,6 +8,7 @@ import {
   designInputsKey,
   draftDesign,
   hasCurrentQualification,
+  hydrateDesign,
   layoutMediaIdsOf,
   meetsRequirement,
   recomputeVariant,
@@ -185,6 +186,20 @@ async function submittedSurvey(projectId: string): Promise<{ survey: SurveyRecor
   return { survey, inProgress: Boolean(all[0] && all[0].status !== "submitted" && survey && all[0].version > survey.version) };
 }
 
+/**
+ * A record as the studio needs it: older ones (and the demo seed's) don't
+ * carry the site facts or the survey baseline, so they're filled in from
+ * the survey the design was drawn from. Never written back by itself: the
+ * next save stores it, with checks recomputed.
+ */
+async function hydrated(design: DesignRecord, catalogue: CatalogueItem[], project?: Project | null): Promise<DesignRecord> {
+  const complete = design.site && design.rooms.every((r) => r.survey) && design.variants.every((v) => v.manufacturer && v.systems.every((s) => s.layoutMediaIds));
+  if (complete) return design;
+  const survey = (design.surveyRecordId ? await surveysRepo.get(design.surveyRecordId) : null) ?? (await submittedSurvey(design.projectId)).survey;
+  const intel = project && !design.site ? await intelFor(project) : null;
+  return hydrateDesign(design, survey?.data, { catalogue, ...(intel ? { intel } : {}) });
+}
+
 /** The catalogue the browser gets: what designs pick from, plus anything the design already uses. Costs only for those who may see them. */
 function catalogueForViewer(all: CatalogueItem[], design: DesignRecord | null, viewer: DesignViewer): CatalogueItem[] {
   const used = new Set(design ? design.variants.flatMap((v) => [...v.roomUnits.map((u) => u.indoorItemId), ...v.systems.map((s) => s.outdoorItemId), ...v.bom.map((b) => b.catalogueItemId ?? "")]) : []);
@@ -207,7 +222,8 @@ export async function loadDesignPage(projectId: string, viewer: DesignViewer): P
     catalogueRepo.list(),
     compatibilityRepo.list(),
   ]);
-  const design = history[0] ?? null;
+  const stored = history[0] ?? null;
+  const design = stored ? await hydrated(stored, catalogue, project) : null;
   const active = design ? catalogue.filter((i) => i.active || designUses(design, i.id)) : catalogue.filter((i) => i.active);
 
   const mediaIds = new Set<string>();
@@ -231,7 +247,7 @@ export async function loadDesignPage(projectId: string, viewer: DesignViewer): P
   let catalogueChanged = false;
   if (design && design.status !== "approved" && design.status !== "superseded" && design.variants.length) {
     try {
-      catalogueChanged = designContentKey(recomputed(design, active, compatibility)) !== designContentKey(design);
+      catalogueChanged = designContentKey(recomputed(design, active, compatibility)) !== designContentKey(stored!);
     } catch (err) {
       console.error(`[design] recompute check for ${projectId} failed:`, err);
     }
@@ -448,13 +464,14 @@ export async function saveDesign(projectId: string, staff: StaffMember, input: u
   if (!project) return fail("Project not found", 404);
   if (project.proposal.status === "accepted") return fail("The proposal is accepted. Changes now go through a variation.");
 
-  const [base, latest, catalogue, compatibility] = await Promise.all([
+  const [stored, latest, catalogue, compatibility] = await Promise.all([
     designsRepo.get(baseId),
     designsRepo.latestForProject(projectId),
     catalogueRepo.list(),
     compatibilityRepo.list(),
   ]);
-  if (!base || base.projectId !== projectId || base.version !== baseVersion) return fail("That design version isn't on this project.", 404);
+  if (!stored || stored.projectId !== projectId || stored.version !== baseVersion) return fail("That design version isn't on this project.", 404);
+  const base = await hydrated(stored, catalogue, project);
   const active = catalogue.filter((i) => i.active || designUses(base, i.id));
   const now = new Date().toISOString();
   const next = applyDesignEdits(base, edits as DesignEdits, { catalogue: active, compatibility, by: staff.name, at: now, id: crypto.randomUUID(), version: base.version + 1 });
@@ -467,8 +484,8 @@ export async function saveDesign(projectId: string, staff: StaffMember, input: u
     return fail(`Someone saved a newer version (v${latest.version}) while you were working. Reload to see it; your changes are kept on this device until you do.`, 409, { conflict: true });
   }
 
-  const changed = designContentKey(next) !== designContentKey(base);
-  if (!changed) return finishSave(projectId, staff, base, Boolean(submit), true);
+  const changed = designContentKey(next) !== designContentKey(stored);
+  if (!changed) return finishSave(projectId, staff, stored, Boolean(submit), true);
 
   // A design already in review stays in review when it's corrected; a draft stays a draft until submitted.
   const toInsert: DesignRecord = { ...next, status: submit || base.status === "in-review" ? "in-review" : "draft" };
@@ -536,8 +553,8 @@ export async function approveDesignRecord(projectId: string, staff: StaffMember,
   if (latest.status === "superseded") return fail("A newer version of this design exists.", 409, { conflict: true });
 
   const active = catalogue.filter((i) => i.active || designUses(latest, i.id));
-  if (designContentKey(recomputed(latest, active, compatibility)) !== designContentKey(latest)) {
-    return fail(`The catalogue has changed since v${latest.version} was saved. Save the design again to bring its checks up to date, then approve.`);
+  if (designContentKey(recomputed(await hydrated(latest, catalogue, project), active, compatibility)) !== designContentKey(latest)) {
+    return fail(`The checks have moved on since v${latest.version} was saved (the catalogue or the survey data changed). Save the design again to bring them up to date, then approve.`);
   }
   const now = new Date().toISOString();
   const signed = approveDesign(latest, { staffId: staff.id, name: staff.name, qualificationRef: viewer.qualificationRef }, now, {

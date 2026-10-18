@@ -46,7 +46,11 @@ export default async function DesignPage({ params }: { params: Promise<{ id: str
             <LinkButton href={`/field/survey/${id}`} variant="secondary">
               Survey
             </LinkButton>
-            {design?.status === "approved" && <LinkButton href={proposalHref}>Proposal</LinkButton>}
+            {design?.status === "approved" && (
+              <LinkButton href={proposalHref} variant="secondary">
+                Proposal
+              </LinkButton>
+            )}
           </>
         }
       />
@@ -140,6 +144,21 @@ export default async function DesignPage({ params }: { params: Promise<{ id: str
             today={today}
             proposalHref={proposalHref}
           />
+          {editable && !surveyChanged && (
+            <details className="mt-10 rounded-2xl border border-line bg-white px-5 py-4">
+              <summary className="cursor-pointer text-sm font-semibold text-ink-900">Start again from the survey</summary>
+              <p className="mb-4 mt-2 text-sm text-ink-500">
+                A fresh draft from the measured survey and today's catalogue, optionally on one brand. The current version stays in the history.
+              </p>
+              <DraftDesignButton
+                projectId={id}
+                brands={brands}
+                label="Draft again"
+                variant="secondary"
+                confirm="This replaces the current choices and reasons with a fresh draft."
+              />
+            </details>
+          )}
         </>
       )}
     </main>

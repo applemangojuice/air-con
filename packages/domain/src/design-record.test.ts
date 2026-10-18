@@ -14,6 +14,7 @@ import {
   designInputsKey,
   draftDesign,
   editsFromDesign,
+  hydrateDesign,
   layoutMediaIdsOf,
   needsCombinationAck,
   recomputeVariant,
@@ -469,6 +470,31 @@ test("designInputsKey: a no-op edit is no change; a real one is", () => {
   const edits: DesignEdits = editsFromDesign(d);
   edits.notes = "Customer prefers the unit left of the window.";
   assert.notEqual(designInputsKey(applyDesignEdits(d, edits, ctx(d))), designInputsKey(d));
+});
+
+test("hydrateDesign fills an older record from its survey, keeping existing override baselines", () => {
+  const d = draft(ROOMS.slice(0, 2));
+  const old: DesignRecord = {
+    ...d,
+    site: undefined,
+    rooms: d.rooms.map(({ survey: _s, areaM2: _a, type: _t, route: _r, ...r }) => ({ ...r, ...(r.roomId === "r1" ? { pipeRunM: 15 } : {}) })),
+    variants: d.variants.map(({ manufacturer: _m, suggested: _g, ...v }) => ({ ...v, systems: v.systems.map(({ layoutMediaIds: _l, ...s }) => s) })),
+    overrides: [{ field: "rooms.r1.pipeRunM", from: "6", to: "15", reason: "Loft route (DEMO)", by: "DEMO Sam", at: NOW }],
+  };
+  delete old.site;
+  const h = hydrateDesign(old, survey(ROOMS.slice(0, 2)), { catalogue: DEMO_CATALOGUE, intel: INTEL });
+  assert.deepEqual(h.site, d.site);
+  assert.equal(h.rooms[0]!.areaM2, 14);
+  assert.equal(h.rooms[0]!.type, "bedroom");
+  assert.deepEqual(h.rooms[0]!.survey, { pipeRunM: 6, heightDiffM: 3, condensate: "gravity" }); // from the override
+  assert.deepEqual(h.rooms[1]!.survey, { pipeRunM: 3, heightDiffM: 0.5, condensate: "gravity" }); // from the survey
+  assert.equal(h.variants[0]!.manufacturer, "DEMO Aircon Co");
+  assert.deepEqual(h.variants[0]!.systems[0]!.layoutMediaIds, ["photo-out"]);
+  // The kept override still explains the deviation, so nothing new is asked for.
+  assert.deepEqual(designDeviations(h).map((x) => x.field), ["rooms.r1.pipeRunM"]);
+  assert.ok(!designApprovalErrors(h).some((e) => e.includes("pipe run")));
+  // A complete record comes back unchanged.
+  assert.deepEqual(hydrateDesign(d, survey(ROOMS.slice(0, 2)), { catalogue: DEMO_CATALOGUE }), d);
 });
 
 test("dropping the Quiet option keeps Standard; dropping everything keeps what was there", () => {

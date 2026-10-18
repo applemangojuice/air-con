@@ -57,7 +57,7 @@ export function BomTable({ bom, catalogue, canSeeCosts }: { bom: DesignBomLine[]
                         </div>
                       )}
                     </td>
-                    <td className="w-28 px-4 py-3 text-right tabular-nums text-ink-900 sm:w-40">
+                    <td className="w-24 px-4 py-3 text-right tabular-nums text-ink-900 sm:w-40">
                       {qty(line.qty)} <span className="text-ink-500">{line.unit ?? "each"}</span>
                     </td>
                   </tr>

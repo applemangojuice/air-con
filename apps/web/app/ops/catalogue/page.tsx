@@ -46,6 +46,14 @@ export default async function CataloguePage({ searchParams }: { searchParams: Pr
     q: one(sp.q).toLowerCase(),
   };
   const manufacturers = [...new Set(items.map((i) => i.manufacturer).filter((m): m is string => !!m))].sort();
+  const kindOrder = (k: CatalogueItem["kind"]) => ["indoor", "outdoor", "material", "tool", "labour", "service"].indexOf(k);
+  items.sort(
+    (a, b) =>
+      kindOrder(a.kind) - kindOrder(b.kind) ||
+      (a.manufacturer ?? "").localeCompare(b.manufacturer ?? "") ||
+      (a.specs?.coolingKw ?? 0) - (b.specs?.coolingKw ?? 0) ||
+      a.label.localeCompare(b.label),
+  );
   const shown = items.filter(
     (i) =>
       (!f.kind || i.kind === f.kind) &&
@@ -72,7 +80,7 @@ export default async function CataloguePage({ searchParams }: { searchParams: Pr
       <PageHeader
         eyebrow="Catalogue and rates"
         title="Catalogue"
-        subtitle="Equipment, materials and the multi-split rules every design is checked against."
+        subtitle="What every design is built from and checked against."
         actions={
           <>
             <LinkButton href="/ops/catalogue/compatibility" variant="secondary">
@@ -85,7 +93,7 @@ export default async function CataloguePage({ searchParams }: { searchParams: Pr
             )}
             {canEdit && (
               <>
-                <LinkButton href="/ops/catalogue/import" variant="secondary">
+                <LinkButton href="/ops/catalogue/import" variant="ghost">
                   Import CSV
                 </LinkButton>
                 <LinkButton href="/ops/catalogue/new">Add item</LinkButton>
@@ -122,7 +130,7 @@ export default async function CataloguePage({ searchParams }: { searchParams: Pr
           </div>
 
           <form method="get" className="mb-4 rounded-2xl border border-line bg-white p-4" aria-label="Filter the catalogue">
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-7">
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-8">
               <label className="col-span-2 block text-xs font-semibold text-ink-700 md:col-span-4 lg:col-span-2">
                 Search
                 <input name="q" defaultValue={one(sp.q)} placeholder="Model, label or series" className={`${SELECT} mt-1`} />

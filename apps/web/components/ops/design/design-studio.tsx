@@ -391,7 +391,7 @@ export function DesignStudio(props: DesignStudioProps) {
         )}
       </div>
 
-      <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_21rem] lg:items-start lg:gap-6">
+      <div className="flex flex-col gap-8 lg:grid lg:grid-cols-[minmax(0,1fr)_21rem] lg:items-start lg:gap-6">
         <div id={`panel-${variant.id}`} role="tabpanel" aria-labelledby={`tab-${variant.id}`} className="min-w-0 space-y-8">
           <section aria-labelledby="checks-h">
             <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
@@ -506,7 +506,7 @@ export function DesignStudio(props: DesignStudioProps) {
         </div>
 
         {/* The summary and the one next action. */}
-        <aside className="mt-8 space-y-4 lg:sticky lg:top-4 lg:mt-0" aria-label="Design summary and actions">
+        <aside className="order-first space-y-4 lg:sticky lg:top-4 lg:order-none" aria-label="Design summary and actions">
           <Card>
             <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">{variant.label} option</p>
             <div className="mt-2">
@@ -596,7 +596,9 @@ export function DesignStudio(props: DesignStudioProps) {
                   Unsaved changes, kept on this device.{missingReasons ? ` ${missingReasons} change${missingReasons === 1 ? " needs" : "s need"} a reason.` : ""}
                 </p>
               )}
-              {!message && !dirty && editing && props.catalogueChanged && <p className="text-sm text-amber-800">The catalogue has changed: save to bring the checks up to date.</p>}
+              {!message && !dirty && editing && props.catalogueChanged && (
+                <p className="text-sm text-amber-800">The checks have moved on since this version was saved (catalogue or survey data). Saving records them as a new version.</p>
+              )}
             </div>
           </Card>
 
