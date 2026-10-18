@@ -131,6 +131,16 @@ export interface HubData extends HubFacts {
   /** Media id → photo, for the end-of-day updates. */
   photos: Record<string, HubPhoto>;
   commissioning: HubCommissioning | null;
+  /** The published handover pack's paperwork position, from its snapshot. */
+  pack: HubPack | null;
+}
+
+export interface HubPack {
+  documentId: string;
+  completedOn: string;
+  electricalCert: { status: "pending" | "received" | "not-required"; dueBy: string };
+  maintenanceInfo: { dueBy: string; provided: boolean };
+  warranty: { text: string | null; registered: boolean; dueOn?: string };
 }
 
 /** What the hub asks of its controller (the API for real projects, the reducer for the demo). */

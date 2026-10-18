@@ -1,64 +1,142 @@
-import Link from "next/link";
 import type { Metadata } from "next";
-import { SiteFooter } from "@/components/site/footer";
-import { SiteHeader } from "@/components/site/header";
+import Link from "next/link";
+import { STAGE_INFO } from "@aircon/domain";
+import { primaryCls } from "@/components/portal/bits";
+import { CustomerNav, PortalShell } from "@/components/portal/shell";
+import { EmailSignIn } from "@/components/portal/sign-in";
+import { getSession } from "@/lib/auth/server";
+import { customerHomes } from "@/lib/portal-server";
+import { getSettings } from "@/lib/settings-server";
 
 export const metadata: Metadata = {
-  title: "Customer portal",
+  title: "Your homes",
+  robots: { index: false, follow: false },
 };
 
-const upcoming = [
-  { title: "Quote history & revisions", body: "Every version of your quote and design, side by side." },
-  { title: "Contracts & deposit", body: "Sign, pay and track your balance online." },
-  { title: "Installation progress", body: "Live tracker from booking through commissioning sign-off." },
-  { title: "Documents & certificates", body: "Warranty, commissioning data and electrical certificates in one place." },
-  { title: "Energy & running costs", body: "See what your system uses and what it costs to run." },
-  { title: "Service & health", body: "We monitor your system and tell you when it actually needs attention." },
-];
+export const dynamic = "force-dynamic";
 
-export default function PortalPage() {
-  return (
-    <>
-      <SiteHeader />
-      <main className="mx-auto max-w-4xl px-4 py-16 sm:px-6">
-        <span className="rounded-full bg-surface px-3 py-1 text-xs font-semibold text-ink-500">
-          Coming soon
-        </span>
-        <h1 className="mt-4 text-4xl font-display">Your account</h1>
-        <p className="mt-3 max-w-xl text-ink-500">
-          The portal opens once you&apos;ve booked an installation. Everything
-          about your system (quotes, contracts, progress, documents and
-          monitoring) will live here. Meanwhile your installation already runs
-          on a live timeline, which frankly does most of the showing off:{" "}
-          <Link href="/p/demo" className="font-semibold text-accent-700 underline">
-            see a playable example
-          </Link>
+type SearchParams = Promise<Record<string, string | string[] | undefined>>;
+
+/**
+ * The customer portal's front door (contract §G F1). Signed in: "Your
+ * homes", each with its stage and the one next step. Signed out: an email
+ * box for a sign-in link, answered the same way whoever asks.
+ */
+export default async function PortalPage({ searchParams }: { searchParams: SearchParams }) {
+  const sp = await searchParams;
+  const signedOut = sp.signedOut === "1";
+  const [session, settings] = await Promise.all([getSession(), getSettings()]);
+  const homes = session?.kind === "customer" ? await customerHomes() : null;
+  const phone = settings.company.phone;
+
+  if (homes) {
+    const first = homes.name.replace(/\s*\(DEMO\)\s*/, "").split(" ")[0];
+    return (
+      <PortalShell right={<CustomerNav />} width="narrow">
+        <p className="text-sm font-semibold text-accent-700">{first ? `Hello, ${first}` : "Hello"}</p>
+        <h1 className="mt-1 font-display text-3xl leading-tight text-ink-900 sm:text-4xl">Your homes</h1>
+        {homes.homes.length === 0 ? (
+          <div className="mt-8 rounded-3xl border border-dashed border-line bg-white/60 px-6 py-10 text-center">
+            <p className="font-semibold text-ink-900">No projects on this account yet</p>
+            <p className="mx-auto mt-1.5 max-w-md text-sm text-ink-500">
+              If you&apos;ve started one under a different email address, sign out and sign in with that one, or call us on {phone}.
+            </p>
+            <Link href="/quote" className={`${primaryCls(false)} mt-5`}>
+              Get a price for a home
+            </Link>
+          </div>
+        ) : (
+          <ul className="mt-6 space-y-3">
+            {homes.homes.map((h) => (
+              <li key={h.id}>
+                <Link
+                  href={`/p/${h.id}`}
+                  className="block rounded-3xl border border-line bg-white p-5 shadow-sm transition hover:border-ink-300 sm:p-6"
+                >
+                  <span className="flex flex-wrap items-start justify-between gap-3">
+                    <span className="min-w-0">
+                      <span className="block font-display text-xl leading-tight text-ink-900">{h.addressLine || "Your home"}</span>
+                      <span className="mt-0.5 block text-sm text-ink-500">{h.postcode}</span>
+                    </span>
+                    <span
+                      className={`inline-flex shrink-0 items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${
+                        h.closed ? "border-line bg-surface text-ink-700" : "border-accent-100 bg-accent-50 text-accent-700"
+                      }`}
+                    >
+                      {h.closed ? "Complete" : STAGE_INFO[h.stage].label}
+                    </span>
+                  </span>
+                  <span className="mt-4 flex items-center justify-between gap-3 border-t border-line pt-4">
+                    <span className="text-[15px] text-ink-700">
+                      {h.next ? (
+                        <>
+                          <span className="font-semibold text-ink-900">Next: </span>
+                          {h.next.label}
+                        </>
+                      ) : (
+                        "Nothing for you to do right now"
+                      )}
+                    </span>
+                    <span aria-hidden className="text-ink-500">
+                      →
+                    </span>
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+        <p className="mt-8 text-sm text-ink-500">
+          Questions? Call us on{" "}
+          <a href={`tel:${phone.replace(/\s+/g, "")}`} className="font-semibold text-accent-700 underline underline-offset-2">
+            {phone}
+          </a>{" "}
+          or email{" "}
+          <a href={`mailto:${settings.company.email}`} className="font-semibold text-accent-700 underline underline-offset-2">
+            {settings.company.email}
+          </a>
           .
         </p>
+      </PortalShell>
+    );
+  }
 
-        <div className="mt-10 grid gap-4 sm:grid-cols-2">
-          {upcoming.map((f) => (
-            <div key={f.title} className="rounded-2xl border border-line p-5">
-              <h2 className="font-semibold">{f.title}</h2>
-              <p className="mt-1.5 text-sm text-ink-500">{f.body}</p>
-            </div>
-          ))}
-        </div>
-
-        <div className="mt-10 rounded-2xl border border-accent-100 bg-accent-50 p-6">
-          <p className="font-semibold">Haven&apos;t got a quote yet?</p>
-          <p className="mt-1 text-sm text-ink-500">
-            That&apos;s the first step, and it takes about two minutes.
-          </p>
-          <Link
-            href="/quote"
-            className="mt-4 inline-block rounded-full bg-accent-600 px-5 py-2.5 font-semibold text-white transition hover:bg-accent-700"
-          >
-            Get my fixed price
+  return (
+    <PortalShell width="narrow">
+      {signedOut && (
+        <p role="status" className="mb-6 rounded-2xl border border-line bg-surface px-4 py-3 text-sm text-ink-700">
+          You&apos;re signed out.
+        </p>
+      )}
+      {session?.kind === "staff" && (
+        <p role="note" className="mb-6 rounded-2xl border border-sage-200 bg-sage-50 px-4 py-3 text-sm text-sage-900">
+          You&apos;re signed in as a team member.{" "}
+          <Link href="/ops" className="font-semibold underline underline-offset-2">
+            Go to ops
           </Link>
+          . Customers sign in below with their own email.
+        </p>
+      )}
+      <div className="rounded-3xl border border-line bg-white p-6 shadow-sm sm:p-8">
+        <p className="text-sm font-semibold text-accent-700">Your project</p>
+        <h1 className="mt-1 font-display text-3xl leading-tight text-ink-900 sm:text-4xl">Sign in to your project</h1>
+        <p className="mt-3 text-[15px] leading-relaxed text-ink-700">
+          Your dates, your documents and the next thing to do, all in one place. We&apos;ll email you a link: one tap and you&apos;re in, no password to remember.
+        </p>
+        <div className="mt-6">
+          <EmailSignIn phone={phone} />
         </div>
-      </main>
-      <SiteFooter />
-    </>
+      </div>
+      <div className="mt-6 grid gap-3 sm:grid-cols-2">
+        <Link href="/quote" className="rounded-3xl border border-line bg-white p-5 transition hover:border-ink-300">
+          <span className="block font-semibold text-ink-900">No price yet?</span>
+          <span className="mt-1 block text-sm text-ink-500">Get yours in about two minutes.</span>
+        </Link>
+        <Link href="/p/demo" className="rounded-3xl border border-line bg-white p-5 transition hover:border-ink-300">
+          <span className="block font-semibold text-ink-900">Just looking?</span>
+          <span className="mt-1 block text-sm text-ink-500">Play through a DEMO project, start to finish.</span>
+        </Link>
+      </div>
+    </PortalShell>
   );
 }

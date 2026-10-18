@@ -7,6 +7,7 @@ import {
   STAGE_INFO,
   type Blocker,
   type DocumentRecord,
+  type HandoverPackSnapshot,
   type Issue,
   type MediaItem,
   type Project,
@@ -45,7 +46,7 @@ import {
   londonWallClock,
   surveySlotDays,
 } from "@/components/portal/schedule";
-import type { HubData, HubDocument, HubInvoice, HubIssue, HubPhoto, PersonCard, PortalRequest } from "@/components/portal/types";
+import type { HubData, HubDocument, HubInvoice, HubIssue, HubPack, HubPhoto, PersonCard, PortalRequest } from "@/components/portal/types";
 import { customerSafeProject, hubFacts, outstandingOf, personCard } from "@/components/portal/view";
 
 /**
@@ -251,6 +252,24 @@ export async function loadHub(projectId: string, access: ProjectAccess): Promise
       }
     : null;
 
+  const packDoc = documents.find((d) => d.kind === "handover-pack" && d.id === project.handover.packDocumentId) ??
+    documents.find((d) => d.kind === "handover-pack");
+  const packSnap = packDoc?.snapshot as Partial<HandoverPackSnapshot> | undefined;
+  const pack: HubPack | null =
+    packDoc && packSnap?.electricalCert && packSnap.maintenanceInfo && packSnap.warranty
+      ? {
+          documentId: packDoc.id,
+          completedOn: String(packSnap.completedOn ?? ""),
+          electricalCert: { ...packSnap.electricalCert, status: project.handover.electricalCert },
+          maintenanceInfo: { ...packSnap.maintenanceInfo },
+          warranty: {
+            ...packSnap.warranty,
+            registered: project.handover.warrantyRegistered,
+            ...(project.handover.warrantyDueOn ? { dueOn: project.handover.warrantyDueOn } : {}),
+          },
+        }
+      : null;
+
   const viewer: HubData["viewer"] =
     access.kind === "staff" ? { kind: "staff", name: access.staff.name } : { kind: "customer" };
 
@@ -271,6 +290,7 @@ export async function loadHub(projectId: string, access: ProjectAccess): Promise
     money: moneyView,
     photos: Object.fromEntries([...projectPhotoIds].map((id) => [id, photoById.get(id) ?? { id, url: null }])),
     commissioning,
+    pack,
   };
 }
 

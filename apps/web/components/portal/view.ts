@@ -132,7 +132,7 @@ export function waitingCopy(project: Project): { title: string; body: string } {
   if (p.closure.closed) {
     return p.closure.reason === "cancelled"
       ? { title: "This project is closed", body: "Nothing more to do here. Get in touch any time if you'd like to pick it up again." }
-      : { title: "All wrapped up", body: "Nothing to do. If anything isn't right with your system, report it below and we'll call you back." };
+      : { title: "All wrapped up", body: "If anything isn't right with your system, report it below and we'll call you back." };
   }
   switch (currentStage(p)) {
     case "price":

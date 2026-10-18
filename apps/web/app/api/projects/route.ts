@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { requireProjectAccess } from "@/lib/auth/server";
 import { sendSignInLink } from "@/lib/portal-server";
 import { createProjectForQuote } from "@/lib/project-service";
 import { enforceRateLimit } from "@/lib/rate-limit";
@@ -9,7 +10,7 @@ import { enforceRateLimit } from "@/lib/rate-limit";
  * installation plan" (components/project/start-project.tsx). Idempotent:
  * one project per quote.
  *
- *   POST /api/projects { quoteId } → { ok: true, demo: false, id, linkSent }   (unchanged shape, plus linkSent)
+ *   POST /api/projects { quoteId } → { ok: true, demo: false, id, canOpen, linkSent, devLink? }   (unchanged shape, plus these)
  *                                  → { ok: true, demo: true }                   (no database: the demo hub)
  *
  * The project page is private, so a fresh project also emails its customer
@@ -37,12 +38,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: result.error }, { status: result.status });
   }
 
+  // Already signed in as this project's customer (or staff who can see it): straight in.
+  const canOpen = Boolean(await requireProjectAccess(result.id, { allowCustomer: true }));
   let linkSent = false;
   let devLink: string | undefined;
-  if (result.created) {
+  if (result.created && !canOpen) {
     const link = await sendSignInLink({ kind: "project", projectId: result.id });
     linkSent = true;
     devLink = link.devLink;
   }
-  return NextResponse.json({ ok: true, demo: false, id: result.id, linkSent, ...(devLink ? { devLink } : {}) });
+  return NextResponse.json({ ok: true, demo: false, id: result.id, canOpen, linkSent, ...(devLink ? { devLink } : {}) });
 }
