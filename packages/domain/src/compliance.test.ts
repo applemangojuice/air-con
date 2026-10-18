@@ -202,6 +202,19 @@ test("evidence moves a waiting item to review and keeps a history", () => {
   assert.equal(addComplianceEvidence(item("rams"), {}, { name: "x" }, NOW).ok, false);
 });
 
+test("a written note of what was checked counts as evidence; a rejection reason doesn't", () => {
+  const noted = addComplianceEvidence(item("asbestos"), { note: "DEMO: no textured ceilings; nothing suspected." }, { name: TECH.name }, NOW);
+  assert.ok(noted.ok);
+  if (!noted.ok) return;
+  assert.equal(noted.item.evidenceNote, "DEMO: no textured ceilings; nothing suspected.");
+  // The reviewer can approve it as it stands.
+  assert.equal(reviewCompliance(noted.item, "approved", TECH, undefined, undefined, NOW).ok, true);
+  // A rejection's reason isn't evidence: approving after it still needs some.
+  const rejected = reviewCompliance(item("asbestos"), "rejected", TECH, "DEMO: survey photos missing", undefined, NOW);
+  assert.ok(rejected.ok);
+  if (rejected.ok) assert.equal(reviewCompliance(rejected.item, "approved", TECH, undefined, undefined, NOW).ok, false);
+});
+
 /* ---------------- sync with the project ---------------- */
 
 const SURVEY: Survey = {

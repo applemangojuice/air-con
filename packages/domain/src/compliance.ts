@@ -430,6 +430,8 @@ export interface ComplianceItem {
   history?: ComplianceHistoryEntry[];
   /** The blocking issue raised when this item was rejected, until it's approved again. */
   blockerIssueId?: string;
+  /** The latest written evidence (what someone checked), which counts as evidence like a file. */
+  evidenceNote?: string;
 }
 
 export function instantiateCompliance(projectId: string, makeId: () => string): ComplianceItem[] {
@@ -506,7 +508,7 @@ export function reviewCompliance(
   const text = note?.trim() || undefined;
   const override = overrideReason?.trim() || undefined;
   const reviews = can(reviewer, "compliance.review");
-  const hasEvidence = item.mediaIds.length > 0;
+  const hasEvidence = item.mediaIds.length > 0 || Boolean(item.evidenceNote?.trim());
   const statutory = item.statutory || Boolean(t?.statutory);
   let usedOverride: string | undefined;
 
@@ -607,7 +609,7 @@ export function addComplianceEvidence(
     ...item,
     status: to,
     mediaIds: [...item.mediaIds, ...added],
-    ...(text ? { note: text } : {}),
+    ...(text ? { note: text, evidenceNote: text } : {}),
     history: withHistory(item, {
       at: now,
       by: by.name,
