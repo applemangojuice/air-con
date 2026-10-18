@@ -80,18 +80,32 @@ function useClock(data: FieldJob): { running: boolean; entryId?: string; since?:
   }, [state.acked, state.items, data.clock, data.header.projectId]);
 }
 
-/** True while someone's typing in the page (not in a sheet): the floating button steps aside for the keyboard. */
+/**
+ * True while someone's typing in the page (not in a sheet): the floating
+ * button steps aside for the keyboard. It comes back a moment after the
+ * field loses focus, so the tap that left the field (often on its Save
+ * button, right where the floating button sits) lands on what was under
+ * the finger, not on the button reappearing.
+ */
 function useTyping(): boolean {
   const [typing, setTyping] = useState(false);
   useEffect(() => {
+    let timer: number | undefined;
+    const off = () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => setTyping(false), 400);
+    };
     const on = (e: FocusEvent) => {
       const t = e.target as HTMLElement | null;
-      setTyping(Boolean(t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA") && !t.closest("[role=dialog]")));
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA") && !t.closest("[role=dialog]")) {
+        window.clearTimeout(timer);
+        setTyping(true);
+      } else off();
     };
-    const off = () => setTyping(false);
     document.addEventListener("focusin", on);
     document.addEventListener("focusout", off);
     return () => {
+      window.clearTimeout(timer);
       document.removeEventListener("focusin", on);
       document.removeEventListener("focusout", off);
     };

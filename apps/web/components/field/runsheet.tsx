@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { INSTALL_PHASES, isStepFinished, runsheetDays, runsheetProgress, stepView, stepsForDay, type StepView } from "@aircon/domain";
 import { QuickActions } from "./quick-actions";
 import { StepCard } from "./step-card";
@@ -14,15 +15,29 @@ import { fmtDay, londonTime } from "./format";
  * The day runsheet: the day's steps, phase by phase, each with its
  * evidence and outcome. All three days load together, so switching days
  * works without signal. The step to do next is open; finishing it opens
- * the one after.
+ * the one after. It renders from the day layout, so a refresh after a sync
+ * updates it in place; the day comes from the URL.
  */
 
-export function Runsheet({ data, initialDay }: { data: FieldJob; initialDay: number }) {
+function dayFromPath(pathname: string | null): number {
+  const n = Number.parseInt(/\/day\/(\d+)/.exec(pathname ?? "")?.[1] ?? "1", 10);
+  return Number.isInteger(n) && n > 0 ? n : 1;
+}
+
+export function Runsheet({ data }: { data: FieldJob }) {
   useRefreshOnSync();
   const { header, me } = data;
   const merged = useMergedJob(data.job, me);
   const days = merged ? runsheetDays(merged.job.runsheet) : [1, 2, 3];
-  const [day, setDay] = useState(Math.min(Math.max(1, initialDay), days.length));
+  const pathname = usePathname();
+  const [day, setDay] = useState(() => Math.min(dayFromPath(pathname), days.length));
+
+  // A link to another day (the job pack, Today) moves the tabs too.
+  useEffect(() => {
+    const d = Math.min(dayFromPath(pathname), days.length);
+    if (d !== day) switchDay(d, false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
 
   const views: StepView[] = useMemo(() => (merged ? stepsForDay(merged.job.runsheet, day).map((s) => stepView(merged.job, s)) : []), [merged, day]);
   const progress = useMemo(() => (merged ? runsheetProgress(merged.job) : null), [merged]);
@@ -44,11 +59,11 @@ export function Runsheet({ data, initialDay }: { data: FieldJob; initialDay: num
     });
   }, [views]);
 
-  function switchDay(d: number) {
+  function switchDay(d: number, updateUrl = true) {
     setDay(d);
     const first = merged ? stepsForDay(merged.job.runsheet, d).map((s) => stepView(merged.job, s)).find((v) => !isStepFinished(v))?.step.id : undefined;
     setExpanded(new Set(first ? [first] : []));
-    window.history.replaceState(null, "", `/field/jobs/${header.projectId}/day/${d}`);
+    if (updateUrl) window.history.replaceState(null, "", `/field/jobs/${header.projectId}/day/${d}`);
     window.scrollTo({ top: 0 });
   }
 
