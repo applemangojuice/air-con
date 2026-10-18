@@ -1,5 +1,5 @@
 import { can, type Permission, type StaffMember } from "@aircon/domain";
-import type { CustomerSession, Session } from "./session.ts";
+import { MIN_SESSION_SECRET_LENGTH, sessionSecretUsable, type CustomerSession, type Session } from "./session.ts";
 
 /**
  * Access decisions, as pure functions (contract §C). lib/auth/server.ts
@@ -112,20 +112,28 @@ export function staffLanding(
 /**
  * A same-origin path to redirect to, or the fallback. Rejects absolute and
  * protocol-relative URLs, backslash tricks and control characters, so a
- * sign-in link can't bounce anyone off-site.
+ * sign-in link can't bounce anyone off-site. The checks run again on the
+ * normalised result: dot segments can turn a harmless-looking path into a
+ * protocol-relative one (`/.//evil.com` → `//evil.com`), which a browser,
+ * or `new URL(target, request.url)`, would send off-site.
  */
 export function safeNextPath(next: string | null | undefined, fallback: string): string {
   if (typeof next !== "string" || next.length === 0 || next.length > 2048) return fallback;
-  if (!next.startsWith("/") || next.startsWith("//") || next.startsWith("/\\")) return fallback;
-  if (/[\u0000-\u001f\u007f\\]/.test(next)) return fallback;
+  if (!isSafeRelative(next)) return fallback;
   try {
     // Resolving against a dummy origin catches anything that would leave it.
     const url = new URL(next, "https://origin.invalid");
     if (url.origin !== "https://origin.invalid") return fallback;
-    return `${url.pathname}${url.search}${url.hash}`;
+    const out = `${url.pathname}${url.search}${url.hash}`;
+    return isSafeRelative(out) ? out : fallback;
   } catch {
     return fallback;
   }
+}
+
+function isSafeRelative(path: string): boolean {
+  if (!path.startsWith("/") || path.startsWith("//") || path.startsWith("/\\")) return false;
+  return !/[\u0000-\u001f\u007f\\]/.test(path);
 }
 
 /** ADMIN_EMAILS as a normalised list (comma or whitespace separated). */
@@ -150,7 +158,100 @@ export function isPlausibleEmail(email: string): boolean {
   return email.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
-/** "Try as…" demo sign-in: never in production unless ALLOW_DEMO_LOGIN=1 says so. */
+/**
+ * "Try as…" demo sign-in: never in production unless ALLOW_DEMO_LOGIN=1 says
+ * so, and never against a production Supabase database unless
+ * DEMO_DEPLOYMENT=1 says that database is a demo one too. A demo admin holds
+ * every permission, so on a real database it would hand anyone on the
+ * internet the customers' records.
+ */
 export function demoLoginAllowed(env: Record<string, string | undefined>): boolean {
-  return env.NODE_ENV !== "production" || env.ALLOW_DEMO_LOGIN === "1";
+  if (env.NODE_ENV !== "production") return true;
+  if (env.ALLOW_DEMO_LOGIN !== "1") return false;
+  const supabase = Boolean(env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY);
+  return !supabase || env.DEMO_DEPLOYMENT === "1";
+}
+
+/** ALLOW_DEMO_LOGIN=1 set in production, but refused because the database is real (for the boot warning). */
+export function demoLoginRefusedOnRealData(env: Record<string, string | undefined>): boolean {
+  return env.NODE_ENV === "production" && env.ALLOW_DEMO_LOGIN === "1" && !demoLoginAllowed(env);
+}
+
+/**
+ * A staff record written by a demo session is itself demo: it dies with demo
+ * mode (staffForSession refuses demo rows once demo sign-in is off), so
+ * nothing a "Try as… Admin" visitor creates outlives the demo.
+ */
+export function taintedByDemo<T extends { demo?: boolean }>(record: T, by: { demo?: boolean } | null | undefined): T {
+  return by?.demo ? { ...record, demo: true } : record;
+}
+
+/** Break-glass passwords shorter than this are refused outright: it's one shared secret guarding admin. */
+export const MIN_BREAK_GLASS_PASSWORD = 20;
+
+/** Is break-glass sign-in on? Only with an OPS_PASSWORD long enough to resist guessing. */
+export function breakGlassEnabled(env: Record<string, string | undefined>): boolean {
+  return (env.OPS_PASSWORD ?? "").length >= MIN_BREAK_GLASS_PASSWORD;
+}
+
+/**
+ * Sign-in configuration that's unsafe or silently off, said loudly at boot
+ * (instrumentation.ts) so it's in the deployment logs, not discovered later.
+ */
+export function securityWarnings(env: Record<string, string | undefined>): string[] {
+  if (env.NODE_ENV !== "production") return [];
+  const out: string[] = [];
+  if (demoLoginRefusedOnRealData(env)) {
+    out.push(
+      "ALLOW_DEMO_LOGIN=1 is set on a Supabase database, so demo sign-in is REFUSED. Set DEMO_DEPLOYMENT=1 only if that database holds nothing real.",
+    );
+  } else if (demoLoginAllowed(env)) {
+    out.push("DEMO sign-in is ON in production: anyone can sign in as a demo admin. Only for a deployment with nothing real in it.");
+  }
+  if (!sessionSecretUsable(env)) {
+    out.push(
+      env.SESSION_SECRET
+        ? `SESSION_SECRET is shorter than ${MIN_SESSION_SECRET_LENGTH} characters, so it's ignored and nobody can sign in. Use: openssl rand -hex 32`
+        : "SESSION_SECRET is not set, so nobody can sign in. Use: openssl rand -hex 32",
+    );
+  }
+  if (env.OPS_PASSWORD && !breakGlassEnabled(env)) {
+    out.push(`OPS_PASSWORD is shorter than ${MIN_BREAK_GLASS_PASSWORD} characters, so break-glass sign-in is off.`);
+  }
+  return out;
+}
+
+/** The same mailbox, however it was typed. */
+export function sameEmail(a: string | null | undefined, b: string | null | undefined): boolean {
+  const x = normaliseEmail(a ?? "");
+  return x.length > 0 && x === normaliseEmail(b ?? "");
+}
+
+/**
+ * May a sign-in link for this customer go to this address? Only to the
+ * customer's own email: a token signs in as the customer record, so a link
+ * sent anywhere else would hand that address the customer's whole account.
+ */
+export function linkMayCarryToken(customerEmail: string | null | undefined, recipient: string | null | undefined): boolean {
+  return sameEmail(customerEmail, recipient) && isPlausibleEmail(normaliseEmail(recipient ?? ""));
+}
+
+/**
+ * When a project's email changes, the address the project should now belong
+ * to (normalised), else null. The email is the customer's identity, so a new
+ * address means a different customer record; clearing the email leaves the
+ * project where it is (nothing is sent to anyone until a new address is set).
+ */
+export function relinkEmail(before: string | null | undefined, after: string | null | undefined): string | null {
+  const next = normaliseEmail(after ?? "");
+  if (!next || !isPlausibleEmail(next) || sameEmail(before, next)) return null;
+  return next;
+}
+
+/** "jo.bloggs@example.com" → "j***@example.com", for confirming who a link is for without revealing it. */
+export function maskEmail(email: string): string {
+  const clean = normaliseEmail(email);
+  const at = clean.lastIndexOf("@");
+  if (at < 1) return "***";
+  return `${clean[0]}***${clean.slice(at)}`;
 }

@@ -1,5 +1,5 @@
 import type { MeasuredSurvey, SurveyRecord } from "@aircon/domain";
-import { compact, db, isUuid, jsonObject, must, nowIso, optNum, optStr, type Row } from "./base";
+import { compact, db, isUniqueViolation, isUuid, jsonObject, must, nowIso, optNum, optStr, type Row } from "./base";
 
 /**
  * `surveys`: the measured survey from the home visit, one row per version.
@@ -74,9 +74,27 @@ export async function currentForProject(projectId: string): Promise<SurveyRecord
   return data ? fromRow(data) : null;
 }
 
+/** Insert a new version. Throws on a clash: (project_id, version) is unique. */
 export async function insert(record: SurveyRecord): Promise<SurveyRecord> {
   const data = must(await db().from(TABLE).insert(toRow(record)).select("*").single(), "surveys insert");
   return fromRow(data!);
+}
+
+/**
+ * Insert a new version, or hand back the row that already holds that
+ * (project, version): a double-tapped "Start survey" or an offline retry
+ * reuses the draft that's there instead of failing. `created` says which.
+ */
+export async function insertOrReuse(record: SurveyRecord): Promise<{ record: SurveyRecord; created: boolean }> {
+  const res = await db().from(TABLE).insert(toRow(record)).select("*").single();
+  if (isUniqueViolation(res.error)) {
+    const existing = must(
+      await db().from(TABLE).select("*").eq("project_id", record.projectId).eq("version", record.version).maybeSingle(),
+      "surveys reuse",
+    );
+    if (existing) return { record: fromRow(existing), created: false };
+  }
+  return { record: fromRow(must(res, "surveys insert")!), created: true };
 }
 
 export async function update(record: SurveyRecord): Promise<SurveyRecord> {

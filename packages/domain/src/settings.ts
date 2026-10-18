@@ -214,9 +214,61 @@ function clone<T>(v: T): T {
   return v === undefined ? v : (JSON.parse(JSON.stringify(v)) as T);
 }
 
+const DEPOSIT_TIMINGS: readonly PilotSettings["payments"]["depositTiming"][] = ["on-acceptance", "before-kit-order"];
+const PAYMENT_METHODS: readonly PilotSettings["payments"]["methods"][number][] = ["card", "bank-transfer"];
+
+const isTaxCode = (v: unknown): v is TaxCodeId =>
+  typeof v === "string" && Object.prototype.hasOwnProperty.call(TAX_CODES, v);
+
+/**
+ * Keep the members of a list that pass `ok`, once each. A list that had
+ * entries but none valid was junk, so it takes the default; an empty list
+ * stays empty (that was a choice).
+ */
+function validList<T>(stored: unknown[], ok: (v: unknown) => v is T, fallback: readonly T[]): T[] {
+  const kept = [...new Set(stored.filter(ok))];
+  return kept.length > 0 || stored.length === 0 ? kept : [...fallback];
+}
+
+/**
+ * The type check in mergeValue only knows primitives. Values that must be one
+ * of a fixed set (union members, list items code reads without checking) are
+ * checked here, so junk can't reach `TAX_CODES[code].ratePct` and the like.
+ */
+function sanitise(s: PilotSettings): PilotSettings {
+  const d = DEFAULT_SETTINGS;
+  const isStr = (v: unknown): v is string => typeof v === "string";
+  if (!isTaxCode(s.tax.defaultTaxCode)) s.tax.defaultTaxCode = d.tax.defaultTaxCode;
+  if (!DEPOSIT_TIMINGS.includes(s.payments.depositTiming)) s.payments.depositTiming = d.payments.depositTiming;
+  s.payments.methods = validList(
+    s.payments.methods,
+    (v): v is PilotSettings["payments"]["methods"][number] => PAYMENT_METHODS.includes(v as never),
+    d.payments.methods,
+  );
+  s.scheduling.workingDays = validList(
+    s.scheduling.workingDays,
+    (v): v is number => Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 7,
+    d.scheduling.workingDays,
+  );
+  s.scheduling.surveySlotTimes = validList(s.scheduling.surveySlotTimes, isStr, d.scheduling.surveySlotTimes);
+  s.serviceArea.outcodes = validList(s.serviceArea.outcodes, isStr, d.serviceArea.outcodes);
+  s.comms.disabledEvents = validList(s.comms.disabledEvents, isStr, d.comms.disabledEvents);
+  s.discounts = validList(
+    s.discounts,
+    (v): v is DiscountCode => isPlainObject(v) && typeof v.code === "string" && v.code.length > 0,
+    d.discounts,
+  );
+  // A null default accepts a number or a string in mergeValue; each of these takes one.
+  if (s.warranty.workmanshipYears !== null && typeof s.warranty.workmanshipYears !== "number") s.warranty.workmanshipYears = null;
+  if (s.warranty.manufacturerSummary !== null && typeof s.warranty.manufacturerSummary !== "string") {
+    s.warranty.manufacturerSummary = null;
+  }
+  return s;
+}
+
 /** Deep-merge stored JSON over the defaults, tolerant of missing or junk keys. */
 export function mergeSettings(stored: unknown): PilotSettings {
-  return mergeValue(DEFAULT_SETTINGS, isPlainObject(stored) ? stored : {}) as PilotSettings;
+  return sanitise(mergeValue(DEFAULT_SETTINGS, isPlainObject(stored) ? stored : {}) as PilotSettings);
 }
 
 /* ------------------------------------------------------------------ */

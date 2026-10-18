@@ -1,11 +1,20 @@
 import { STAFF_ROLES, type Qualification, type StaffMember, type StaffRole } from "@aircon/domain";
+import { taintedByDemo } from "../auth/access";
 import { compact, db, isUuid, jsonArray, must, nowIso, optStr, uuidOrNull, type Row } from "./base";
 
 /**
  * `staff`: our team and subcontractors. Typed columns, no JSONB snapshot
  * (qualifications are the one JSON column). Emails are stored lower-case,
  * so sign-in matches however someone types theirs.
+ *
+ * Writes name who made them (`by`: the signed-in staff member, or null for
+ * the system). A row written by a DEMO account is saved as demo itself, so
+ * it dies with demo mode: a "Try as… Admin" visitor can't leave a real admin
+ * account behind as a backdoor.
  */
+
+/** Who's writing: a staff member (only `demo` matters here), or null for the system. */
+export type StaffWriter = Pick<StaffMember, "demo"> | null;
 
 const TABLE = "staff";
 
@@ -74,17 +83,17 @@ export async function listByIds(ids: string[]): Promise<StaffMember[]> {
 }
 
 /** Insert a new person. Throws on a duplicate email (callers look up first). */
-export async function insert(member: Omit<StaffMember, "id"> & { id?: string }): Promise<StaffMember> {
-  const row = toRow({ ...member, id: member.id ?? crypto.randomUUID() });
+export async function insert(member: Omit<StaffMember, "id"> & { id?: string }, by: StaffWriter): Promise<StaffMember> {
+  const row = toRow(taintedByDemo({ ...member, id: member.id ?? crypto.randomUUID() }, by));
   const data = must(await db().from(TABLE).insert(row).select("*").single(), "staff insert");
   return fromRow(data!);
 }
 
-export async function update(member: StaffMember): Promise<StaffMember> {
+export async function update(member: StaffMember, by: StaffWriter): Promise<StaffMember> {
   const data = must(
     await db()
       .from(TABLE)
-      .update({ ...toRow(member), updated_at: nowIso() })
+      .update({ ...toRow(taintedByDemo(member, by)), updated_at: nowIso() })
       .eq("id", member.id)
       .select("*")
       .maybeSingle(),

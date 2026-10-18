@@ -52,6 +52,25 @@ export function rateLimit(key: string, limit: number, windowMs: number): RateLim
 }
 
 /**
+ * The unit a rate limit counts: an IPv4 address as-is, an IPv6 address by
+ * its /64 (one household or one server usually holds a whole /64, so keying
+ * per address would let anyone rotate through billions of fresh limits).
+ */
+export function rateLimitIdentity(ip: string): string {
+  const v = ip.trim().toLowerCase().replace(/^\[|\]$/g, "").replace(/%.*$/, "");
+  if (!v.includes(":")) return v;
+  const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(v);
+  if (mapped) return mapped[1]!;
+  const halves = v.split("::");
+  if (halves.length > 2) return v;
+  const head = halves[0] ? halves[0].split(":") : [];
+  const tail = halves.length === 2 && halves[1] ? halves[1].split(":") : [];
+  const groups = halves.length === 2 ? [...head, ...Array<string>(Math.max(0, 8 - head.length - tail.length)).fill("0"), ...tail] : head;
+  if (groups.length !== 8 || !groups.every((g) => /^[0-9a-f]{1,4}$/.test(g))) return v;
+  return `${groups.slice(0, 4).map((g) => g.replace(/^0+(?=.)/, "")).join(":")}::/64`;
+}
+
+/**
  * Best client identity we can get behind Vercel's proxy. SAFE ON VERCEL
  * ONLY: Vercel overwrites x-forwarded-for with the true client IP. Behind an
  * append-style proxy (default nginx, generic LBs) the first hop is

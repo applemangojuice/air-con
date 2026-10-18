@@ -146,7 +146,9 @@ create index if not exists media_project_idx on public.media (project_id, create
 create index if not exists media_project_tag_idx on public.media (project_id, tag);
 
 -- The measured survey from the home visit, versioned (a re-survey is a new
--- version; the self-survey on quote_requests is never overwritten).
+-- version; the self-survey on quote_requests is never overwritten). One row
+-- per version, like designs and proposals: a double-tapped "Start survey" or
+-- an offline retry gets 23505 and reuses the draft that's already there.
 create table if not exists public.surveys (
   id uuid primary key default gen_random_uuid(),
   created_at timestamptz not null default now(),
@@ -160,7 +162,9 @@ create table if not exists public.surveys (
   surveyor jsonb,                   -- { staffId, name }
   started_at timestamptz,
   submitted_at timestamptz,
-  minutes int check (minutes >= 0)
+  minutes int check (minutes >= 0),
+
+  unique (project_id, version)
 );
 
 create index if not exists surveys_project_idx on public.surveys (project_id, version desc);

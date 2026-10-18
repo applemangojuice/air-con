@@ -1,4 +1,13 @@
-import { COMMS_EVENTS, idempotencyKey, type CommsEventId, type MessageRecord, type PilotSettings, type Project } from "@aircon/domain";
+import {
+  COMMS_EVENTS,
+  LINK_PLACEHOLDER,
+  idempotencyKey,
+  type CommsEventId,
+  type MessageRecord,
+  type PilotSettings,
+  type Project,
+} from "@aircon/domain";
+import { escapeHtml } from "../email.ts";
 import type { MessageStore, StoredMessage } from "../repo/messages.ts";
 import { isTextable, normaliseUkPhone } from "../providers/sms.ts";
 import { linkPathFor, renderMessage, templateContext, type CommsData, type RenderedMessage } from "./templates.ts";
@@ -13,6 +22,14 @@ import { linkPathFor, renderMessage, templateContext, type CommsData, type Rende
  * then send now unless it's scheduled. "sent" only ever means the provider
  * acknowledged it; with no provider configured the rendered message is kept
  * as `demo`. Nothing here throws: a message must never take a request down.
+ *
+ * Sign-in links are never stored. A customer message is stored with
+ * LINK_PLACEHOLDER where its link goes (plus `linkPath`), and the link, with
+ * a fresh single-use token, is minted at the moment a provider takes the
+ * message: first send, cron retry or resend alike, so a resend never replays
+ * a spent token. A demo message is never sent, so it never gets a token. A
+ * magic-link message's link exists only in memory for its first send; if
+ * that fails, it's not retried (the person asks for a new link).
  */
 
 export type Channel = MessageRecord["channel"];
@@ -96,11 +113,14 @@ export interface OutboxDeps {
   now(): string;
   newId(): string;
   getSettings(): Promise<PilotSettings>;
+  /** The v2 project. A v1 project comes with its quote's email and phone filled in (v1 kept them there). */
   loadProject(id: string): Promise<Project | null>;
-  /** Legacy projects keep contact details on the quote; fills gaps in `project.customer`. */
-  quoteContact?(quoteId: string): Promise<{ email?: string | null; phone?: string | null } | null>;
-  /** Absolute URL with a fresh single-use sign-in token for the project's customer. */
-  customerLink(projectId: string, path: string): Promise<string>;
+  /**
+   * Absolute URL into the project for an email to `recipient`: with a fresh
+   * single-use sign-in token for the project's customer only when
+   * `recipient` is that customer's own address, else the plain page URL.
+   */
+  customerLink(projectId: string, path: string, recipient: string): Promise<string>;
   appUrl(): string;
   teamInbox(): string | null;
   /** Marketing events only (none exist today): has this customer opted in? */
@@ -147,32 +167,68 @@ export function createOutbox(deps: OutboxDeps) {
     const audience = COMMS_EVENTS[event].audience;
     if (audience === "team") return { email: deps.teamInbox() ?? settings.company.email };
     if (audience === "staff" || !project) return {};
-    const r: Recipient = { email: project.customer.email, phone: project.customer.phone, name: project.customer.name };
-    if ((!r.email || !r.phone) && deps.quoteContact && project.quoteId) {
-      const q = await deps.quoteContact(project.quoteId).catch(() => null);
-      r.email ||= q?.email ?? undefined;
-      r.phone ||= q?.phone ?? undefined;
-    }
-    return r;
+    // The project's own details, exactly: an empty field means "no address"
+    // (staff may have removed a wrong one on purpose), never "ask the quote".
+    return { email: project.customer.email, phone: project.customer.phone, name: project.customer.name };
   }
 
-  async function linkFor<E extends CommsEventId>(event: E, opts: NotifyOptions<E>, projectId: string | undefined): Promise<string> {
-    if (event === "magic-link") return (opts.data as CommsData["magic-link"]).link;
+  /**
+   * The one link a message carries, as stored. Customer project links and
+   * magic links are the placeholder (minted at send); everything else (team
+   * and staff mail, a customer message with no project) is a plain URL.
+   */
+  function storedLinkFor<E extends CommsEventId>(
+    event: E,
+    opts: NotifyOptions<E>,
+    projectId: string | undefined,
+  ): { portalUrl: string; linkPath?: string } {
+    if (event === "magic-link") return { portalUrl: LINK_PLACEHOLDER };
     const path = opts.path ?? linkPathFor(event, projectId);
-    if (!path) return deps.appUrl();
-    if (COMMS_EVENTS[event].audience === "customer" && projectId) {
-      try {
-        return await deps.customerLink(projectId, path);
-      } catch (err) {
-        // A link that asks them to sign in beats no message at all.
-        log(`magic link for ${event} failed; sending a plain link`, err);
-      }
-    }
-    return `${deps.appUrl()}${path}`;
+    if (!path) return { portalUrl: deps.appUrl() };
+    if (COMMS_EVENTS[event].audience === "customer" && projectId) return { portalUrl: LINK_PLACEHOLDER, linkPath: path };
+    return { portalUrl: `${deps.appUrl()}${path}` };
   }
 
-  /** Send one stored message now and record what happened. */
-  async function dispatchMessage(m: MessageRecord, settings?: PilotSettings): Promise<ChannelResult> {
+  /** The link for one send of a stored message: a fresh token for the customer's own inbox, else plain. */
+  async function linkForSend(m: MessageRecord & { linkPath: string }): Promise<string> {
+    const plain = `${deps.appUrl()}${m.linkPath}`;
+    // Texts never carry a sign-in token (the contract's links are for email).
+    if (m.channel !== "email" || !m.projectId) return plain;
+    try {
+      return await deps.customerLink(m.projectId, m.linkPath, m.to);
+    } catch (err) {
+      // A link that asks them to sign in beats no message at all.
+      log(`magic link for ${m.event} failed; sending a plain link`, err);
+      return plain;
+    }
+  }
+
+  /**
+   * The message as it goes to the provider: the placeholder replaced by a
+   * link minted now (or the in-memory magic link). Null when the link can't
+   * be made again (a stored magic-link message).
+   */
+  async function contentForSend(
+    m: MessageRecord,
+    liveLink?: string,
+  ): Promise<{ subject: string; text: string; html?: string } | null> {
+    const content = { subject: m.subject ?? "", text: m.bodyText, html: m.bodyHtml };
+    if (![content.subject, content.text, content.html ?? ""].some((x) => x.includes(LINK_PLACEHOLDER))) return content;
+    let link = liveLink;
+    if (!link) {
+      if (m.event === "magic-link") return null;
+      link = m.linkPath ? await linkForSend({ ...m, linkPath: m.linkPath }) : deps.appUrl();
+    }
+    const fill = (x: string, value: string) => x.split(LINK_PLACEHOLDER).join(value);
+    return {
+      subject: fill(content.subject, link),
+      text: fill(content.text, link),
+      ...(content.html === undefined ? {} : { html: fill(content.html, escapeHtml(link)) }),
+    };
+  }
+
+  /** Send one stored message now and record what happened. `liveLink`: a magic link, on its first send only. */
+  async function dispatchMessage(m: MessageRecord, settings?: PilotSettings, liveLink?: string): Promise<ChannelResult> {
     const base = { channel: m.channel, key: m.idempotencyKey, messageId: m.id, to: m.to };
     try {
       if (settings?.comms.disabledEvents.includes(m.event)) {
@@ -184,12 +240,18 @@ export function createOutbox(deps: OutboxDeps) {
         await deps.store.update(m.id, { status: "demo", provider: "demo", error: undefined });
         return { ...base, status: "demo" };
       }
+      const content = await contentForSend(m, liveLink);
+      if (!content) {
+        const error = "Sign-in links aren't kept, so this one can't be sent again. Ask for a new link.";
+        await deps.store.update(m.id, { status: "skipped", error });
+        return { ...base, status: "skipped", error };
+      }
       let res: SendResult;
       try {
         res =
           m.channel === "email"
-            ? await deps.email.send(m.to, m.subject ?? "", m.bodyHtml ?? m.bodyText)
-            : await deps.sms.send(m.to, m.bodyText);
+            ? await deps.email.send(m.to, content.subject, content.html ?? content.text)
+            : await deps.sms.send(m.to, content.text);
       } catch (err) {
         res = { ok: false, error: err instanceof Error ? err.message : String(err) };
       }
@@ -254,10 +316,12 @@ export function createOutbox(deps: OutboxDeps) {
       }
       if (pending.length === 0) return done(event, results);
 
+      const link = storedLinkFor(event, opts, projectId);
+      const liveLink = event === "magic-link" ? (opts.data as CommsData["magic-link"]).link : undefined;
       const ctx = templateContext({
         settings,
         project,
-        portalUrl: await linkFor(event, opts, projectId),
+        portalUrl: link.portalUrl,
         recipientName: recipient.name ?? (event === "magic-link" ? (opts.data as CommsData["magic-link"]).name : undefined),
       });
       const rendered: RenderedMessage = renderMessage(event, ctx, opts.data);
@@ -287,6 +351,7 @@ export function createOutbox(deps: OutboxDeps) {
           record.subject = rendered.subject;
           record.bodyHtml = rendered.html;
         }
+        if (link.linkPath) record.linkPath = link.linkPath;
         if (opts.scheduledFor) record.scheduledFor = opts.scheduledFor;
 
         const inserted = await deps.store.insert(record);
@@ -295,7 +360,9 @@ export function createOutbox(deps: OutboxDeps) {
           results.push({ channel, key, to, status: inserted.duplicate ? "duplicate" : "error", error: inserted.duplicate ? undefined : inserted.error });
           continue;
         }
-        results.push(later ? { channel, key, to, messageId: record.id, status: "queued" } : await dispatchMessage(record));
+        results.push(
+          later ? { channel, key, to, messageId: record.id, status: "queued" } : await dispatchMessage(record, undefined, liveLink),
+        );
       }
       return done(event, results);
     } catch (err) {
@@ -334,7 +401,7 @@ export function createOutbox(deps: OutboxDeps) {
     return summary;
   }
 
-  /** A person pressed resend: one more attempt of the same message, same key, same body. */
+  /** A person pressed resend: one more attempt of the same message, same key, same body (with a freshly minted link). */
   async function resend(messageId: string): Promise<ChannelResult | { status: "error"; error: string }> {
     try {
       const m = await deps.store.get(messageId);

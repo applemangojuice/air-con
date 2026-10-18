@@ -1,8 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { audit } from "@/lib/audit";
-import { safeNextPath, staffLanding } from "@/lib/auth/access";
-import { consumeToken } from "@/lib/auth/magic";
+import { maskEmail, safeNextPath, sameEmail, staffLanding } from "@/lib/auth/access";
+import { consumeToken, peekToken, type TokenSubject } from "@/lib/auth/magic";
 import { customerSession, sessionCookie, staffForToken, staffSession } from "@/lib/auth/server";
+import { SESSION_COOKIE, verifySession, type Session } from "@/lib/auth/session";
 import { BRAND } from "@/lib/brand";
 import { escapeHtml } from "@/lib/email";
 import * as customersRepo from "@/lib/repo/customers";
@@ -11,11 +12,16 @@ import { getServiceClient } from "@/lib/supabase-server";
 /**
  * Magic-link exchange (contract §C).
  *
- * GET /auth/verify?t=… answers with a tiny page that POSTs the token back
- * (automatically, or with one tap without JavaScript). The token is only
- * spent on that POST: mail scanners that pre-open every link in an email
- * fetch the GET and would otherwise burn a single-use link before the
- * customer ever taps it.
+ * GET /auth/verify?t=… answers with a confirm page: "Continue as
+ * j***@example.com", one tap, no script. Nothing is spent or signed in on the
+ * GET, for two reasons:
+ *  * mail scanners pre-open every link in an email, and would otherwise burn
+ *    a single-use link before the customer ever taps it;
+ *  * anyone holding a valid token (their own customer link, say) could send
+ *    someone else to it and silently sign them in as the attacker, replacing
+ *    their session (staff included), so whatever they then upload or sign
+ *    lands in the attacker's account. The page says whose account it is, and
+ *    warns first when it would replace a different signed-in account.
  *
  * POST exchanges the token for a session cookie and redirects to the
  * token's `next` path (same-origin only), or the person's home.
@@ -27,42 +33,73 @@ export const dynamic = "force-dynamic";
 // token (in the query string) from leaking off-site.
 const NO_STORE = { "cache-control": "no-store" };
 
-function confirmPage(token: string): string {
+/** Is the signed-in session someone other than the token's subject? */
+function isSomeoneElse(current: Session, subject: TokenSubject): boolean {
+  if (current.kind !== subject.kind) return true;
+  const currentId = current.kind === "staff" ? current.staffId : current.customerId;
+  if (subject.subjectId) return subject.subjectId !== currentId;
+  return !sameEmail(current.email, subject.email);
+}
+
+function confirmPage(token: string, subject: TokenSubject, current: Session | null): string {
   const t = escapeHtml(token);
+  const who = escapeHtml(maskEmail(subject.email));
+  const replacing = current && isSomeoneElse(current, subject) ? escapeHtml(maskEmail(current.email)) : null;
   return `<!doctype html>
 <html lang="en-GB">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
-<title>Signing you in · ${escapeHtml(BRAND.name)}</title>
+<title>Sign in · ${escapeHtml(BRAND.name)}</title>
 <style>
   body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f8f5ef;color:#1d212b;font-family:-apple-system,"Segoe UI",Roboto,Arial,sans-serif;padding:16px}
   main{max-width:380px;text-align:center}
   h1{font-size:22px;margin:0 0 8px}
-  p{color:#6e7482;margin:0 0 24px;line-height:1.5}
+  p{color:#5b6170;margin:0 0 24px;line-height:1.5}
+  .warn{background:#fff4e8;border:1px solid #f2c79b;border-radius:16px;padding:12px 14px;color:#1d212b;text-align:left}
   button{min-height:48px;padding:12px 32px;border:0;border-radius:999px;background:#d55a0a;color:#fff;font-size:16px;font-weight:600;cursor:pointer}
   button:hover{background:#a84508}
+  a{display:inline-block;margin-top:20px;color:#5b6170}
 </style>
 </head>
 <body>
 <main>
-  <h1>Signing you in…</h1>
-  <p>One moment. If nothing happens, tap the button.</p>
+  <h1>Sign in to ${escapeHtml(BRAND.name)}</h1>
+  <p>This link signs you in as <strong>${who}</strong>.</p>
+  ${
+    replacing
+      ? `<p class="warn" role="alert">You're signed in as <strong>${replacing}</strong> on this device. Continuing signs you out of that account. If you didn't expect this link, don't continue.</p>`
+      : ""
+  }
   <form method="post" action="/auth/verify">
     <input type="hidden" name="t" value="${t}">
-    <button type="submit">Continue</button>
+    <button type="submit">Continue as ${who}</button>
   </form>
+  <a href="/">Not you? Go back</a>
 </main>
-<script>document.forms[0].submit();</script>
 </body>
 </html>`;
 }
 
+function redirectTo(request: NextRequest, path: string) {
+  return NextResponse.redirect(new URL(path, request.url), { status: 303, headers: NO_STORE });
+}
+
 export async function GET(request: NextRequest) {
   const token = request.nextUrl.searchParams.get("t");
-  if (!token) return NextResponse.redirect(new URL("/login?error=missing", request.url), 303);
-  return new NextResponse(confirmPage(token), {
+  if (!token) return redirectTo(request, "/login?error=missing");
+  if (!getServiceClient()) return redirectTo(request, "/login?error=unavailable");
+  let subject: TokenSubject | null;
+  try {
+    subject = await peekToken(token);
+  } catch (err) {
+    console.error("[auth] token lookup failed:", err);
+    return redirectTo(request, "/login?error=unavailable");
+  }
+  if (!subject) return redirectTo(request, "/login?error=expired");
+  const current = await verifySession(request.cookies.get(SESSION_COOKIE)?.value);
+  return new NextResponse(confirmPage(token, subject, current), {
     status: 200,
     headers: { "content-type": "text/html; charset=utf-8", ...NO_STORE },
   });
@@ -88,10 +125,6 @@ async function signedCookie(session: Parameters<typeof sessionCookie>[0]) {
     console.error("[auth] could not sign a session:", err);
     return null;
   }
-}
-
-function redirectTo(request: NextRequest, path: string) {
-  return NextResponse.redirect(new URL(path, request.url), { status: 303, headers: NO_STORE });
 }
 
 export async function POST(request: NextRequest) {

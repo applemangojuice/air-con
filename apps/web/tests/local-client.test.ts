@@ -340,6 +340,59 @@ test("accepted proposals are immutable except for superseding", async () => {
   assert.equal(supersede.error, null);
 });
 
+test("the accepted-proposal guard matches the SQL trigger, field for field", async () => {
+  const db = memory();
+  const acceptance = { optionId: "standard", totalPence: 450_000, name: "DEMO Sam", at: "2026-10-27T18:00:00.000Z" };
+  const record = { options: [{ id: "standard", totalPence: 450_000 }], acceptance };
+  const acceptedAt = "2026-10-27T18:00:00.000Z";
+  const fresh = async (id: string) => {
+    await db.from("proposals").insert({ id, project_id: "p1", version: Number(id.slice(2)), status: "accepted", record, accepted_at: acceptedAt });
+  };
+  const refused = async (id: string, patch: Record<string, unknown>, why: string) => {
+    const res = await db.from("proposals").update(patch).eq("id", id);
+    assert.equal(res.error?.code, "P0001", why);
+  };
+
+  // Superseding may not touch what was agreed, or where and when it was agreed.
+  await fresh("pr1");
+  await refused("pr1", { status: "superseded", record: { ...record, acceptance: { ...acceptance, totalPence: 1 } } }, "acceptance");
+  await refused("pr1", { status: "superseded", record: { options: record.options } }, "acceptance dropped");
+  await refused("pr1", { status: "superseded", record, project_id: "p2" }, "project_id");
+  await refused("pr1", { status: "superseded", record, version: 9 }, "version");
+  await refused("pr1", { status: "superseded", record, accepted_at: "2026-10-28T09:00:00.000Z" }, "accepted_at");
+  await refused("pr1", { status: "declined", record }, "any status but superseded");
+  // Bookkeeping in the record is fine, and the same instant written another way is the same instant.
+  const ok = await db
+    .from("proposals")
+    .update({ status: "superseded", record: { ...record, supersededBy: "pr2" }, accepted_at: "2026-10-27T18:00:00+00:00" })
+    .eq("id", "pr1");
+  assert.equal(ok.error, null);
+
+  // Accepted, then superseded: still frozen.
+  await refused("pr1", { record: { ...record, options: [] } }, "options of a superseded acceptance");
+  await refused("pr1", { status: "draft" }, "un-superseding");
+  await refused("pr1", { record: { options: record.options } }, "dropping the acceptance after superseding");
+  const restated = await db.from("proposals").update({ status: "superseded", record: { ...record, supersededBy: "pr3" } }).eq("id", "pr1");
+  assert.equal(restated.error, null, "re-stating it superseded, agreement untouched");
+
+  // A superseded draft that was never accepted is ordinary data.
+  await db.from("proposals").insert({ id: "pd1", project_id: "p1", version: 7, status: "superseded", record: { options: [] } });
+  const free = await db.from("proposals").update({ status: "draft", record: { options: [{ id: "x" }] } }).eq("id", "pd1");
+  assert.equal(free.error, null);
+});
+
+test("surveys: one row per (project, version), so a double-tapped start can't make two drafts", async () => {
+  const db = memory();
+  const first = await db.from("surveys").insert({ project_id: "p1", version: 1, status: "draft", data: {} });
+  assert.equal(first.error, null);
+  const twin = await db.from("surveys").insert({ project_id: "p1", version: 1, status: "draft", data: {} });
+  assert.equal(twin.error?.code, "23505");
+  const next = await db.from("surveys").insert({ project_id: "p1", version: 2, status: "draft", data: {} });
+  assert.equal(next.error, null);
+  const other = await db.from("surveys").insert({ project_id: "p2", version: 1, status: "draft", data: {} });
+  assert.equal(other.error, null);
+});
+
 test("throwOnError throws the PostgREST error", async () => {
   const db = memory();
   await assert.rejects(

@@ -8,6 +8,8 @@ import {
   currentStage,
   customerNextAction,
   daysBetween,
+  earliestInstallStart,
+  isLegacySnapshot,
   isGatePassed,
   isStageComplete,
   migrateProject,
@@ -16,6 +18,7 @@ import {
   projectTimeline,
   readiness,
   rescheduleFeeGbp,
+  stageInfo,
   stageState,
   PROJECT_STAGES,
   STAGE_INFO,
@@ -381,6 +384,10 @@ test("design-approved needs a qualified, permitted tech lead", () => {
   refuses(p, approve, T.design, { actor: TECH_LEAD, design: { status: "in-review", compatibilityErrors: ["Too many indoor units"] } }, /compatibility/);
   const admin = step(p, approve, T.design, { actor: { ...ADMIN, qualifications: [fgas("FG-0009")] } });
   assert.equal(admin.design.status, "approved");
+  // The verified approver is recorded, never the name the caller typed.
+  assert.equal(admin.design.approvedBy, "Ada Admin");
+  assert.equal(admin.events.at(-1)!.actorName, "Ada Admin");
+  assert.match(admin.events.at(-1)!.label, /signed off by Ada Admin/);
 });
 
 /* ------------------------------------------------------------------ */
@@ -499,6 +506,19 @@ test("install-dates-set: accepted, working days, right length, lead time, after 
   const early = step(walk("proposal-viewed"), { ...JOURNEY[9]![1], earlyStartRequested: true } as ProjectAction, T.accept);
   const soon = step(early, set(["2026-11-03", "2026-11-04", "2026-11-05"]), T.dates);
   assert.deepEqual(soon.booking.dates, ["2026-11-03", "2026-11-04", "2026-11-05"]);
+
+  // What a date picker should offer first: exactly what the guard accepts.
+  assert.equal(earliestInstallStart(p, T.dates), "2026-11-11"); // the day after the period ends
+  assert.equal(earliestInstallStart(early, T.dates), "2026-11-02"); // lead time only (Mon)
+  assert.equal(earliestInstallStart(p, "2026-11-13T10:00:00.000Z"), "2026-11-18"); // lead time wins
+  assert.equal(earliestInstallStart(p, "2026-11-12T10:00:00.000Z"), "2026-11-17"); // Tue 17: +5 is a working day
+  assert.equal(earliestInstallStart(early, "2026-10-29T10:00:00.000Z"), "2026-11-03"); // Tue 3: +5 is a Tue
+  assert.equal(earliestInstallStart(early, "2026-10-30T10:00:00.000Z"), "2026-11-04");
+  assert.equal(earliestInstallStart(early, "2026-10-31T10:00:00.000Z"), "2026-11-05");
+  assert.equal(earliestInstallStart(early, "2026-11-01T10:00:00.000Z"), "2026-11-06");
+  assert.equal(earliestInstallStart(early, "2026-11-02T10:00:00.000Z"), "2026-11-09"); // Sat 7 → Mon 9
+  assert.ok(apply(early, set(["2026-11-02", "2026-11-03", "2026-11-04"]), T.dates).ok);
+  refuses(early, set(["2026-10-30", "2026-11-02", "2026-11-03"]), T.dates, {}, /5 days' notice/);
 
   const chosen = walk("install-dates-set");
   assert.equal(chosen.booking.status, "not-booked"); // chosen, not yet confirmed
@@ -714,9 +734,17 @@ test("commissioning-signed: install complete, a qualified tech lead", () => {
   refuses(p, sign, T.done, { actor: INSTALLER }, /can't do this/);
   refuses(p, sign, T.done, { actor: { ...TECH_LEAD, external: true, qualifications: [] } }, /current F-gas/);
   refuses(p, sign, T.done, {}, /signed-in technical lead/);
+  // No commissioning record in install_jobs: the commissioned gate's rule.
+  const unsigned = refuses(p, sign, T.done, { actor: TECH_LEAD, commissioning: { signed: false } }, /commissioning results/);
+  assert.ok(!unsigned.ok && unsigned.blockers?.map((b) => b.code).join() === "commissioning-unsigned");
+  refuses(p, sign, T.done, { actor: TECH_LEAD, commissioning: undefined }, /commissioning results/);
   const signed = walk("commissioning-signed");
   assert.equal(signed.handover.status, "commissioned");
   refuses(signed, sign, T.done, { actor: TECH_LEAD }, /already signed off/);
+  // The verified signer, not the typed name.
+  const typed = step(p, { type: "commissioning-signed", by: "Someone Else" }, T.done, { actor: TECH_LEAD });
+  assert.equal(typed.handover.commissionedBy, "Tess Lead");
+  assert.match(typed.events.at(-1)!.label, /signed off by Tess Lead\.$/);
 });
 
 test("handover: pack after commissioning, signature after the pack and the walkthrough", () => {
@@ -791,9 +819,38 @@ test("warranty, certificates, invoices and payments", () => {
   assert.match(credit.events.at(-1)!.label, /Credit note for £50/);
 });
 
+test("survey-fee-paid: status only, once, and only when there's a fee", () => {
+  const due = fresh({}, { surveyFeeGbp: 150 });
+  const paid = step(due, { type: "survey-fee-paid", amountPence: 15_000 }, T.book);
+  assert.equal(paid.survey.paymentStatus, "paid");
+  assert.equal(projectFees(paid).surveyPaidGbp, 150);
+  assert.equal(paid.money.paidPence, 0, "money moves through payment-recorded only");
+  assert.match(paid.events.at(-1)!.label, /Survey fee of £150 received/);
+  refuses(paid, { type: "survey-fee-paid", amountPence: 15_000 }, T.book, {}, /already paid/);
+  refuses(due, { type: "survey-fee-paid", amountPence: 0 }, T.book, {}, /positive/);
+  refuses(due, { type: "survey-fee-paid", amountPence: 150.5 }, T.book, {}, /positive/);
+  refuses(fresh(), { type: "survey-fee-paid", amountPence: 15_000 }, T.book, {}, /no survey fee/);
+  // A late payment still lands after the project closes.
+  const closed = { ...walk(), survey: { ...walk().survey, feeGbp: 150, paymentStatus: "unpaid" as const } };
+  assert.ok(apply(closed, { type: "survey-fee-paid", amountPence: 15_000 }, T.close).ok);
+});
+
 /* ------------------------------------------------------------------ */
 /* Small actions                                                       */
 /* ------------------------------------------------------------------ */
+
+test("set-owner sets and clears the board owner, internally, even after close", () => {
+  let p = step(fresh(), { type: "set-owner", staffId: "s-sv", name: "Sam Survey" }, T.book, { actor: ADMIN });
+  assert.deepEqual(p.owner, { staffId: "s-sv", name: "Sam Survey" });
+  assert.equal(p.events.at(-1)!.type, "owner-set");
+  assert.equal(p.events.at(-1)!.internal, true);
+  refuses(p, { type: "set-owner", staffId: "s-sv", name: "Sam Survey" }, T.book, {}, /already owns/);
+  refuses(p, { type: "set-owner", staffId: "s-tl", name: " " }, T.book, {}, /Pick who/);
+  p = step(p, { type: "set-owner", staffId: "", name: "" }, T.book, { actor: ADMIN });
+  assert.equal(p.owner, undefined);
+  refuses(p, { type: "set-owner", staffId: "", name: "" }, T.book, {}, /no owner/);
+  assert.equal(step(walk(), { type: "set-owner", staffId: "s-tl", name: "Tess Lead" }, T.close, { actor: ADMIN }).owner?.name, "Tess Lead");
+});
 
 test("prep checklist ticks, informational items don't", () => {
   const p = step(fresh(), { type: "prep-toggled", itemId: "parking", done: true }, T.book);
@@ -999,6 +1056,29 @@ test("stage copy covers every stage and never states warranty years", () => {
   assert.deepEqual(PROJECT_STAGES.map((s) => STAGE_INFO[s].label), ["Price", "Survey", "Proposal", "Booking", "Kit", "Install", "Handover", "Aftercare"]);
 });
 
+test("stage copy never hard-codes what settings control; stageInfo fills it in", () => {
+  const generic = PROJECT_STAGES.map((s) => [STAGE_INFO[s].strap, ...STAGE_INFO[s].explainer].join(" ")).join(" ");
+  assert.doesNotMatch(generic, /14 days|three-day|Three days|day three|90 minutes/);
+
+  const defaults = (stage: (typeof PROJECT_STAGES)[number]) => stageInfo(stage, DEFAULT_SETTINGS);
+  assert.match(defaults("booking").explainer[0]!, /three-day block/);
+  assert.match(defaults("booking").explainer[2]!, /within 14 days of accepting/);
+  assert.match(defaults("install").strap, /^Three days,/);
+  assert.match(defaults("install").explainer[0]!, /day three is pipes/);
+  assert.match(defaults("survey").strap, /about 90 minutes/);
+
+  const other = mergeSettings({ scheduling: { installBlockDays: 2, cancellationDays: 21, surveyDurationMinutes: 60 } });
+  assert.match(stageInfo("booking", other).explainer[0]!, /two-day block/);
+  assert.match(stageInfo("booking", other).explainer[2]!, /within 21 days/);
+  assert.match(stageInfo("install", other).strap, /^Two days,/);
+  assert.equal(stageInfo("install", other).explainer[0], STAGE_INFO.install.explainer[0]); // no day-by-day for two days
+  assert.match(stageInfo("survey", other).strap, /about 60 minutes/);
+  assert.match(stageInfo("install", mergeSettings({ scheduling: { installBlockDays: 1 } })).strap, /^One day,/);
+  assert.equal(stageInfo("price", other).strap, STAGE_INFO.price.strap);
+  assert.notEqual(stageInfo("booking", other).explainer, STAGE_INFO.booking.explainer, "a copy, never the shared array");
+  assert.match(STAGE_INFO.booking.explainer[0]!, /^Choose install dates/);
+});
+
 test("daysBetween is shared with v1", () => {
   assert.equal(daysBetween("2026-07-01T23:00:00.000Z", "2026-07-08"), 7);
 });
@@ -1051,8 +1131,9 @@ test("migrateProject: a fresh v1 project", () => {
   assert.equal(p.roughPlan.archetypeName, old.floorPlan.archetypeName);
   assert.equal(p.survey.status, "not-booked");
   assert.equal(p.survey.mode, "in-person"); // nothing agreed yet, so the v2 default
-  assert.equal(p.survey.feeGbp, 150); // fee as-is
-  assert.equal(p.survey.paymentStatus, "unpaid");
+  assert.equal(old.siteVisit.feeGbp, 150);
+  assert.equal(p.survey.feeGbp, 0); // never booked, so never agreed: the v2 (free) terms
+  assert.equal(p.survey.paymentStatus, "not-required");
   // v1 auto-issued the final quote on a high-confidence survey.
   assert.equal(p.proposal.status, "issued");
   assert.equal(p.proposal.proposalId, undefined);
@@ -1075,10 +1156,32 @@ test("migrateProject: accepted, and site visit completed", () => {
   assert.equal(visited.survey.mode, "video");
   assert.equal(visited.survey.scheduledFor, "2026-07-08T14:00:00.000Z");
   assert.equal(visited.survey.paymentStatus, "paid"); // paid stays paid
+  assert.equal(visited.survey.feeGbp, 150);
+  assert.equal(projectFees(visited).surveyPaidGbp, 150); // what the balance invoice credits
   assert.equal(visited.survey.submittedAt, V1_NOW); // from the site-visit-completed event
   assert.equal(visited.electrics.status, "validated");
   assert.equal(currentStage(visited), "booking");
   assert.equal(visited.money.paidPence, 0); // a v1 button press isn't a verified payment
+  const flag = visited.events.at(-1)!;
+  assert.equal(flag.type, "migrated-survey-fee");
+  assert.equal(flag.internal, true); // ops only: check it, then credit it
+  assert.match(flag.label, /£150 site visit fee was marked paid/);
+  assert.equal(visited.events.filter((e) => e.type === "migrated-survey-fee").length, 1);
+
+  // Booked but unpaid: the fee was agreed at booking, so it stays.
+  const booked = migrateProject(v1([...V1_ACCEPTED, { type: "book-site-visit", scheduledFor: "2026-07-08T14:00:00.000Z", mode: "video" }]));
+  assert.deepEqual([booked.survey.feeGbp, booked.survey.paymentStatus], [150, "unpaid"]);
+  assert.ok(!booked.events.some((e) => e.type === "migrated-survey-fee"));
+});
+
+test("isLegacySnapshot matches migrateProject's own v1 test", () => {
+  assert.equal(isLegacySnapshot(v1([])), true);
+  assert.equal(isLegacySnapshot({ id: "x", siteVisit: { status: "booked" } }), true);
+  assert.equal(isLegacySnapshot(walk("book-survey")), false);
+  assert.equal(isLegacySnapshot(migrateProject(v1(V1_VISITED))), false);
+  assert.equal(isLegacySnapshot({ id: "y", survey: {} }), false); // a v2 snapshot missing its version
+  assert.equal(isLegacySnapshot(null), false);
+  assert.equal(isLegacySnapshot([]), false);
 });
 
 test("migrateProject: installed", () => {

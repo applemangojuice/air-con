@@ -32,19 +32,41 @@ export interface TableSchema {
 const BOTH_STAMPS = ["created_at", "updated_at"];
 const CREATED_ONLY = ["created_at"];
 
+const recordOf = (row: Row): Row => {
+  const r = row.record;
+  return typeof r === "object" && r !== null && !Array.isArray(r) ? (r as Row) : {};
+};
+
+/** `timestamptz is distinct from`: the same instant however it's written, else the same value. */
+function sameInstant(a: unknown, b: unknown): boolean {
+  if (a === null || a === undefined || b === null || b === undefined) return (a ?? null) === (b ?? null);
+  const ta = Date.parse(String(a));
+  const tb = Date.parse(String(b));
+  return Number.isFinite(ta) && Number.isFinite(tb) ? ta === tb : String(a) === String(b);
+}
+
 /**
- * Proposals are immutable once accepted (migration 0010 enforces this with
- * a trigger). The one permitted change is superseding the row without
- * touching the options the customer agreed to.
+ * Proposals are immutable once accepted: the same rule as migration 0010's
+ * `proposals_guard_accepted` trigger, kept in step by hand. A row is frozen
+ * when it's accepted, or superseded with an acceptance record (accepted, then
+ * replaced: otherwise accepted → superseded → edit would get round the rule).
+ * The one permitted change to a frozen row is (re)stating it superseded,
+ * leaving the options, the acceptance record, the project, the version and
+ * `accepted_at` exactly as they were.
  */
 function acceptedProposalGuard(before: Row, after: Row): string | null {
-  if (before.status !== "accepted") return null;
-  const optionsBefore = (before.record as Row | null | undefined)?.options;
-  const optionsAfter = (after.record as Row | null | undefined)?.options;
-  if (after.status === "superseded" && canonicalJson(optionsBefore) === canonicalJson(optionsAfter)) {
-    return null;
-  }
-  return `proposal ${String(before.id)} is accepted and can't be changed (only superseded)`;
+  const acceptance = recordOf(before).acceptance;
+  const wasAccepted = typeof acceptance === "object" && acceptance !== null && !Array.isArray(acceptance);
+  const frozen = before.status === "accepted" || (before.status === "superseded" && wasAccepted);
+  if (!frozen) return null;
+  const unchanged =
+    after.status === "superseded" &&
+    canonicalJson(recordOf(before).options) === canonicalJson(recordOf(after).options) &&
+    canonicalJson(recordOf(before).acceptance) === canonicalJson(recordOf(after).acceptance) &&
+    (before.project_id ?? null) === (after.project_id ?? null) &&
+    canonicalJson(before.version) === canonicalJson(after.version) &&
+    sameInstant(before.accepted_at, after.accepted_at);
+  return unchanged ? null : `proposal ${String(before.id)} is accepted and can't be changed (only superseded)`;
 }
 
 type SchemaPatch = Partial<TableSchema>;
@@ -77,6 +99,7 @@ const TABLES: Record<string, SchemaPatch> = {
   customers: { unique: [["email"]] },
   login_tokens: { unique: [["token_hash"]], stamps: CREATED_ONLY },
   media: { defaults: { annotations: [] } },
+  surveys: { unique: [["project_id", "version"]] },
   designs: { unique: [["project_id", "version"]] },
   proposals: { unique: [["project_id", "version"]], beforeUpdate: acceptedProposalGuard },
   compliance_items: { unique: [["project_id", "key"]] },

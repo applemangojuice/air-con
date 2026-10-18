@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { sessionSecretUsable } from "./auth/session.ts";
 import { createLocalClient, defaultDataDir, type LocalBackendKind } from "./db/local-client.ts";
 
 export const PHOTO_BUCKET = "survey-photos";
@@ -34,17 +35,19 @@ function localClient(kind: LocalBackendKind): SupabaseClient {
   const key = `${kind}:${dataDir ?? ""}`;
   let client = cache.get(key);
   if (!client) {
-    if (!process.env.SESSION_SECRET) {
+    // The same rule as sessions: in production a short secret counts as unset.
+    const usable = sessionSecretUsable(process.env);
+    if (!usable) {
       console.warn(
         process.env.NODE_ENV === "production"
-          ? "[local-db] SESSION_SECRET not set: local file uploads and signed URLs are disabled."
+          ? "[local-db] SESSION_SECRET not set (or under 32 characters): local file uploads and signed URLs are disabled."
           : "[local-db] SESSION_SECRET not set: signing local file URLs with the dev fallback secret.",
       );
     }
     client = createLocalClient({
       backend: kind,
       dataDir,
-      secret: process.env.SESSION_SECRET,
+      secret: usable ? process.env.SESSION_SECRET : undefined,
       buckets: [PHOTO_BUCKET, VIDEO_BUCKET, MEDIA_BUCKET],
     });
     cache.set(key, client);

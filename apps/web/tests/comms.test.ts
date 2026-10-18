@@ -4,6 +4,8 @@ import * as nodeModule from "node:module";
 import {
   COMMS_EVENTS,
   DEFAULT_SETTINGS,
+  LINK_PLACEHOLDER,
+  applyProjectAction,
   createProject,
   generateQuote,
   idempotencyKey,
@@ -474,27 +476,44 @@ test("bookings, kit, install days and handover map per the contract", () => {
 /* Outbox engine against the in-memory backend                         */
 /* ------------------------------------------------------------------ */
 
-function harness(opts: { email?: boolean; sms?: boolean; emailOk?: boolean[]; project?: Project | null; settings?: PilotSettings } = {}) {
+function harness(
+  opts: {
+    email?: boolean;
+    sms?: boolean;
+    emailOk?: boolean[];
+    project?: Project | null;
+    settings?: PilotSettings;
+    /** The address on the project's customer record (what a token signs in as). */
+    customerEmail?: string;
+  } = {},
+) {
   const db = createLocalClient({ backend: "memory" });
   const store = messageStore(db);
-  const sent: { channel: string; to: string; body: string }[] = [];
+  const sent: { channel: string; to: string; body: string; subject?: string }[] = [];
+  const minted: { projectId: string; path: string; recipient: string }[] = [];
   const emailResults = [...(opts.emailOk ?? [])];
   const project = opts.project === undefined ? baseProject() : opts.project;
+  const recordEmail = opts.customerEmail ?? CUSTOMER.email;
   const deps: OutboxDeps = {
     store,
     now: () => new Date().toISOString(),
     newId: () => crypto.randomUUID(),
     getSettings: async () => opts.settings ?? SETTINGS,
     loadProject: async (id) => (project && project.id === id ? project : null),
-    customerLink: async (_id, path) => `https://dang.example/auth/verify?t=fresh&next=${encodeURIComponent(path)}`,
+    // Like lib/auth/magic: a token only for the customer's own address, a fresh one per call.
+    customerLink: async (projectId, path, recipient) => {
+      if (recipient.trim().toLowerCase() !== recordEmail) return `https://dang.example${path}`;
+      minted.push({ projectId, path, recipient });
+      return `https://dang.example/auth/verify?t=fresh${minted.length}&next=${encodeURIComponent(path)}`;
+    },
     appUrl: () => "https://dang.example",
     teamInbox: () => "team@example.test",
     email: {
       provider: "resend",
       configured: () => opts.email ?? false,
-      send: async (to, _subject, html) => {
+      send: async (to, subject, html) => {
         const ok = emailResults.length ? emailResults.shift()! : true;
-        if (ok) sent.push({ channel: "email", to, body: html });
+        if (ok) sent.push({ channel: "email", to, body: html, subject });
         return ok ? { ok } : { ok, error: "Resend said no" };
       },
     },
@@ -508,7 +527,7 @@ function harness(opts: { email?: boolean; sms?: boolean; emailOk?: boolean[]; pr
     },
     log: () => {},
   };
-  return { db, store, sent, outbox: createOutbox(deps) };
+  return { db, store, sent, minted, outbox: createOutbox(deps) };
 }
 
 const surveyBooked = { scheduledFor: "2026-11-03T10:00:00.000Z" } as const;
@@ -529,8 +548,79 @@ test("demo mode stores the rendered message as demo and never as sent; the same 
   assert.equal(stored!.sentAt, undefined, "demo is not sent");
   assert.equal(stored!.idempotencyKey, idempotencyKey("survey-booked", PROJECT_ID, surveyBooked.scheduledFor, "email"));
   assert.match(stored!.bodyText, /^Hi Sam,/);
-  assert.match(stored!.bodyText, /auth\/verify\?t=fresh&next=%2Fp%2F[^#]+%23survey/, "a fresh magic link to the survey screen");
+  // No sign-in token is ever stored: the link is minted only when a provider takes it.
+  assert.ok(stored!.bodyText.includes(LINK_PLACEHOLDER));
+  assert.ok(stored!.bodyHtml!.includes(LINK_PLACEHOLDER));
+  assert.doesNotMatch(`${stored!.bodyText}${stored!.bodyHtml}`, /verify\?t=/);
+  assert.equal(stored!.linkPath, `/p/${PROJECT_ID}#survey`);
+  assert.equal(h.minted.length, 0, "a demo message never gets a token");
   assert.equal(h.sent.length, 0);
+});
+
+test("live email: the link is minted at send, for the recipient, and never stored", async () => {
+  const h = harness({ email: true });
+  const r = await h.outbox.notify("survey-booked", { projectId: PROJECT_ID, data: surveyBooked, discriminator: "live-1" });
+  assert.equal(r.status, "sent");
+  assert.deepEqual(h.minted, [{ projectId: PROJECT_ID, path: `/p/${PROJECT_ID}#survey`, recipient: CUSTOMER.email }]);
+  assert.match(h.sent[0]!.body, /href="https:\/\/dang\.example\/auth\/verify\?t=fresh1&amp;next=%2Fp%2F[^"]+%23survey"/);
+  assert.ok(!h.sent[0]!.body.includes(LINK_PLACEHOLDER));
+  const stored = (await h.store.get(r.results[0]!.messageId!))!;
+  assert.equal(stored.status, "sent");
+  assert.doesNotMatch(`${stored.bodyText}${stored.bodyHtml}`, /fresh|verify\?t=/);
+
+  // A resend mints a new token rather than replaying the spent one.
+  await h.outbox.resend(stored.id);
+  assert.equal(h.minted.length, 2);
+  assert.match(h.sent[1]!.body, /t=fresh2/);
+});
+
+test("a sign-in link only goes to the customer's own address", async () => {
+  // The project's email was changed to an address that isn't the customer record's.
+  const changed = applyProjectAction(baseProject(), { type: "set-customer-contact", email: "someone.else@example.test" }, new Date().toISOString());
+  assert.ok(changed.ok);
+  const h = harness({ email: true, project: changed.project });
+  const r = await h.outbox.notify("proposal-issued", { projectId: PROJECT_ID, data: { version: 1, validUntil: "2026-12-03" }, discriminator: "p1" });
+  assert.equal(r.results[0]!.to, "someone.else@example.test");
+  assert.equal(h.minted.length, 0, "no token for someone who isn't the customer");
+  assert.match(h.sent[0]!.body, new RegExp(`href="https://dang\\.example/p/${PROJECT_ID}/proposal"`));
+  // Once the project belongs to that address's customer (dispatch relinks it), it gets a token.
+  const relinked = harness({ email: true, project: changed.project, customerEmail: "someone.else@example.test" });
+  await relinked.outbox.notify("proposal-issued", { projectId: PROJECT_ID, data: { version: 1, validUntil: "2026-12-03" }, discriminator: "p1" });
+  assert.equal(relinked.minted[0]!.recipient, "someone.else@example.test");
+});
+
+test("a removed email stays removed: no recipient, never the quote's old address", async () => {
+  const cleared = applyProjectAction(baseProject(), { type: "set-customer-contact", email: "" }, new Date().toISOString());
+  assert.ok(cleared.ok && cleared.project.customer.email === undefined);
+  const h = harness({ email: true, project: cleared.project });
+  const r = await h.outbox.notify("proposal-issued", { projectId: PROJECT_ID, data: { version: 1, validUntil: "2026-12-03" }, discriminator: "p2" });
+  assert.equal(r.results[0]!.status, "no-recipient");
+  assert.equal(h.sent.length, 0);
+  assert.equal(h.minted.length, 0);
+});
+
+test("magic links: sent once from memory, never stored, never retried", async () => {
+  const h = harness({ email: true, emailOk: [true] });
+  const link = "https://dang.example/auth/verify?t=staff-token";
+  const r = await h.outbox.notify("magic-link", { to: "staff@example.test", data: { link, name: "Alex Demo", audience: "staff" }, discriminator: "tok-a" });
+  assert.equal(r.status, "sent");
+  assert.ok(h.sent[0]!.body.includes(link), "the first send carries the real link");
+  const stored = (await h.store.get(r.results[0]!.messageId!))!;
+  assert.ok(!`${stored.bodyText}${stored.bodyHtml}`.includes("staff-token"), "the token isn't in the database");
+  assert.ok(stored.bodyText.includes(LINK_PLACEHOLDER));
+  assert.equal(stored.linkPath, undefined);
+
+  // A failed one isn't sent again with a dead link: it's skipped, and says why.
+  const f = harness({ email: true, emailOk: [false] });
+  const failed = await f.outbox.notify("magic-link", { to: "staff@example.test", data: { link, audience: "staff" }, discriminator: "tok-b" });
+  assert.equal(failed.status, "failed");
+  const later = new Date(Date.now() + 10 * 60_000).toISOString();
+  assert.deepEqual(await f.outbox.dispatchDue(later), { due: 1, sent: 0, demo: 0, failed: 0, skipped: 1, errors: 0 });
+  const after = (await f.store.get(failed.results[0]!.messageId!))!;
+  assert.equal(after.status, "skipped");
+  assert.match(after.error ?? "", /Ask for a new link/);
+  assert.equal((await f.outbox.resend(after.id)).status, "skipped");
+  assert.equal(f.sent.length, 0);
 });
 
 test("concurrent notifies for one occurrence store exactly one message", async () => {
@@ -692,8 +782,36 @@ test("the engine never throws: a broken dependency becomes an error result", asy
   const res = await engine.notify("survey-complete", { projectId: PROJECT_ID, data: {}, discriminator: "s1" });
   assert.equal(res.status, "failed");
   const stored = await throwingSend.store.get(res.results[0].messageId!);
-  assert.match(stored!.bodyText, /https:\/\/dang\.example\/p\/[^ ]+#survey/, "falls back to a plain link when the magic link fails");
+  assert.ok(stored!.bodyText.includes(LINK_PLACEHOLDER), "the stored body never holds a link with a token");
   assert.equal(stored!.error, "socket hang up");
+
+  // When minting fails, the send goes out with a plain link instead.
+  const attempted: string[] = [];
+  const plainFallback = createOutbox({
+    store: throwingSend.store,
+    now: () => new Date().toISOString(),
+    newId: () => crypto.randomUUID(),
+    getSettings: async () => SETTINGS,
+    loadProject: async () => baseProject(),
+    customerLink: async () => {
+      throw new Error("token table down");
+    },
+    appUrl: () => "https://dang.example",
+    teamInbox: () => null,
+    email: {
+      provider: "resend",
+      configured: () => true,
+      send: async (_to, _subject, html) => {
+        attempted.push(html);
+        return { ok: true };
+      },
+    },
+    sms: { provider: "twilio", configured: () => false, send: async () => ({ ok: true }) },
+    log: () => {},
+  });
+  const sentPlain = await plainFallback.notify("survey-complete", { projectId: PROJECT_ID, data: {}, discriminator: "s2" });
+  assert.equal(sentPlain.status, "sent");
+  assert.match(attempted[0]!, new RegExp(`href="https://dang\\.example/p/${PROJECT_ID}#survey"`), "a plain link when the magic link fails");
 });
 
 test("pure helpers: consent, addresses, headline", () => {

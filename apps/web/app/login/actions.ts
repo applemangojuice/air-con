@@ -9,13 +9,22 @@ import { issueMagicLink } from "@/lib/auth/magic";
 import { breakGlassSession, ensureDemoStaff, setSession, staffSession } from "@/lib/auth/server";
 import { emailConfigured } from "@/lib/email";
 import { isDemoLoginAllowed } from "@/lib/env-mode";
-import { rateLimit } from "@/lib/rate-limit";
+import { rateLimit, rateLimitIdentity } from "@/lib/rate-limit";
 import { getServiceClient } from "@/lib/supabase-server";
 
 /**
  * Staff sign-in actions. Server actions carry Next's own same-origin check;
- * the rate limits below are a brake on guessing and inbox flooding.
+ * the rate limits below are a brake on guessing and inbox flooding. They're
+ * in-memory per instance (lib/rate-limit), so for break-glass the real
+ * protection is the password itself: at least 20 characters or it's off.
  */
+
+/** Break-glass: per address (IPv6 by /64), per email, and across everyone. */
+const BREAK_GLASS_LIMITS = {
+  perIp: { limit: 5, windowMs: 15 * 60_000 },
+  perEmail: { limit: 5, windowMs: 60 * 60_000 },
+  global: { limit: 20, windowMs: 60 * 60_000 },
+};
 
 export interface LinkState {
   status: "idle" | "sent" | "error";
@@ -33,7 +42,7 @@ export interface BreakGlassState {
 
 async function clientIp(): Promise<string> {
   const h = await headers();
-  return h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || "unknown";
+  return rateLimitIdentity(h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || "unknown");
 }
 
 const field = (form: FormData, key: string) => String(form.get(key) ?? "").trim();
@@ -75,14 +84,28 @@ export async function demoSignIn(form: FormData): Promise<void> {
 }
 
 export async function breakGlassSignIn(_prev: BreakGlassState, form: FormData): Promise<BreakGlassState> {
-  const email = normaliseEmail(field(form, "email"));
+  const email = normaliseEmail(field(form, "email")).slice(0, 254);
   const password = String(form.get("password") ?? "");
   const ip = await clientIp();
-  if (!rateLimit(`break-glass:${ip}`, 5, 15 * 60_000).ok) {
-    return { status: "error", message: "Too many attempts. Wait 15 minutes and try again." };
+  const { perIp, perEmail, global } = BREAK_GLASS_LIMITS;
+  const limited =
+    !rateLimit("break-glass:all", global.limit, global.windowMs).ok ||
+    !rateLimit(`break-glass:${ip}`, perIp.limit, perIp.windowMs).ok ||
+    !rateLimit(`break-glass-email:${email}`, perEmail.limit, perEmail.windowMs).ok;
+  // Refusals over the limit aren't audited (that would let a flood write rows);
+  // every attempt that's actually checked is.
+  if (limited) {
+    return { status: "error", message: "Too many attempts. Wait a while and try again, or ask for a sign-in link." };
   }
   const session = await breakGlassSession(email, password);
   if (!session) {
+    // Every failure is recorded: a run of these is someone guessing.
+    await audit({
+      actor: { kind: "system", name: "break-glass" },
+      action: "auth.break-glass-failed",
+      entity: "staff",
+      detail: { email, ip },
+    });
     return { status: "error", message: "That email and password don't open the admin console." };
   }
   await setSession(session);

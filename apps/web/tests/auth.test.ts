@@ -8,7 +8,9 @@ import {
   hmacSha256Hex,
   sessionCookieOptions,
   sessionExpiry,
+  MIN_SESSION_SECRET_LENGTH,
   sessionSecret,
+  sessionSecretUsable,
   signSession,
   verifySession,
   type CustomerSession,
@@ -126,10 +128,28 @@ test("constantTimeEqual compares exactly", () => {
 });
 
 test("secrets: SESSION_SECRET wins, dev falls back, production refuses to sign", async () => {
-  assert.equal(sessionSecret({ SESSION_SECRET: "configured", NODE_ENV: "production" }), "configured");
+  const strong = "0123456789abcdef".repeat(4); // openssl rand -hex 32 → 64 characters
+  assert.equal(sessionSecret({ SESSION_SECRET: strong, NODE_ENV: "production" }), strong);
   assert.equal(sessionSecret({ NODE_ENV: "production" }), null);
   assert.ok(sessionSecret({ NODE_ENV: "development" }), "dev fallback");
   await assert.rejects(signSession(staff, null), /SESSION_SECRET/);
+});
+
+test("secrets: production treats a short SESSION_SECRET as unset", async () => {
+  assert.equal(MIN_SESSION_SECRET_LENGTH, 32);
+  const prod = (secret: string) => ({ SESSION_SECRET: secret, NODE_ENV: "production" });
+  assert.equal(sessionSecret(prod("configured")), null);
+  assert.equal(sessionSecret(prod("x".repeat(31))), null);
+  assert.equal(sessionSecret(prod("x".repeat(32))), "x".repeat(32));
+  assert.equal(sessionSecretUsable(prod("short")), false);
+  assert.equal(sessionSecretUsable(prod("x".repeat(32))), true);
+  assert.equal(sessionSecretUsable({ NODE_ENV: "production" }), false);
+  // Outside production any secret works (tests and dev use short ones).
+  assert.equal(sessionSecret({ SESSION_SECRET: "configured", NODE_ENV: "development" }), "configured");
+  assert.equal(sessionSecretUsable({ SESSION_SECRET: "configured", NODE_ENV: "test" }), true);
+  // Nothing signed with a weak secret is trusted in production.
+  const token = await signSession(staff, "short");
+  assert.equal(await verifySession(token, { secret: sessionSecret(prod("short")), nowMs: NOW }), null);
 });
 
 test("expiry defaults to 30 days; cookie is httpOnly, Lax, Secure in production", () => {

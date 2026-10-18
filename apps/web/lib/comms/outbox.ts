@@ -18,8 +18,9 @@ import {
 
 /**
  * The outbox, wired to the real world (contract §F): Resend for email,
- * Twilio for SMS, the settings document, v2 projects and magic links. The
- * logic lives in outbox-core.ts; this file only chooses the dependencies.
+ * Twilio for SMS, the settings document, v2 projects (v1 ones with their
+ * quote's contact details, see project-service) and magic links. The logic
+ * lives in outbox-core.ts; this file only chooses the dependencies.
  *
  *   await notify("survey-booked", { projectId, data: { scheduledFor }, discriminator: scheduledFor });
  *
@@ -38,11 +39,7 @@ function realOutbox(): Outbox | null {
     newId: () => crypto.randomUUID(),
     getSettings,
     loadProject,
-    quoteContact: async (quoteId) => {
-      const { data } = await db.from("quote_requests").select("email, phone").eq("id", quoteId).maybeSingle();
-      return (data as { email?: string | null; phone?: string | null } | null) ?? null;
-    },
-    customerLink: async (projectId, path) => customerLink(projectId, path),
+    customerLink,
     appUrl,
     teamInbox,
     email: {

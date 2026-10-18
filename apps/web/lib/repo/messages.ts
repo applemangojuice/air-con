@@ -54,6 +54,7 @@ export function rowToMessage(row: Row): StoredMessage {
     subject: m.subject,
     bodyText: m.bodyText ?? "",
     bodyHtml: m.bodyHtml,
+    linkPath: m.linkPath,
     status: (str(row.status) ?? m.status ?? "queued") as MessageRecord["status"],
     provider: m.provider,
     providerRef: str(row.provider_ref) ?? m.providerRef,

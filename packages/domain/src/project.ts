@@ -65,7 +65,9 @@ export interface StageInfo {
   explainer: string[];
 }
 
-// Warranty terms come from settings at render time; nothing here states years.
+// Facts that settings control (warranty terms, survey length, install days,
+// the cancellation period) never appear here: STAGE_INFO is the generic copy,
+// and `stageInfo(stage, settings)` fills them in from the live settings.
 export const STAGE_INFO: Record<ProjectStageId, StageInfo> = {
   price: {
     id: "price",
@@ -82,7 +84,7 @@ export const STAGE_INFO: Record<ProjectStageId, StageInfo> = {
     id: "survey",
     label: "Survey",
     title: "Your home survey",
-    strap: "One visit, 60 to 90 minutes, to measure up and check the details.",
+    strap: "One visit to measure up and check the details.",
     explainer: [
       "A surveyor comes to your home and measures each room, checks your walls and windows, and looks at where the outdoor unit could go.",
       "We photograph the spots we'd use, check your fuse board and the cable route, and note anything that needs a closer look.",
@@ -106,9 +108,9 @@ export const STAGE_INFO: Record<ProjectStageId, StageInfo> = {
     title: "Booking your install",
     strap: "Pick your install dates and meet the people who'll be there.",
     explainer: [
-      "Choose a three-day block that suits you. We only offer dates we can actually do.",
+      "Choose install dates that suit you. We only offer dates we can actually do.",
       "You'll see who's coming: names, roles and the qualifications they actually hold.",
-      "You can cancel within 14 days of accepting. We start after that, or sooner if you ask us to in writing.",
+      "You can cancel within the cancellation period after accepting. We start after it ends, or sooner if you ask us to in writing.",
     ],
   },
   kit: {
@@ -126,9 +128,9 @@ export const STAGE_INFO: Record<ProjectStageId, StageInfo> = {
     id: "install",
     label: "Install",
     title: "Install days",
-    strap: "Three days, a tidy crew, and an update at the end of each one.",
+    strap: "A tidy crew, and an update at the end of every day.",
     explainer: [
-      "Roughly: day one is marking out and drilling, day two the units go up, day three is pipes, power and testing.",
+      "Roughly: first we mark out and drill, then the units go up, and last come the pipes, power and testing.",
       "The power goes off for up to 30 minutes while we connect the new circuit. We'll tell you before it happens.",
       "Every step is photographed and checked, and you get a short update with photos at the end of each day.",
     ],
@@ -156,6 +158,49 @@ export const STAGE_INFO: Record<ProjectStageId, StageInfo> = {
     ],
   },
 };
+
+const NUMBER_WORDS = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"];
+const numberWord = (n: number) => NUMBER_WORDS[n] ?? String(n);
+const capitalise = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+/**
+ * A stage's copy with the numbers settings control filled in: the survey
+ * length, the install block and the cancellation period. Customer screens
+ * use this; STAGE_INFO is the generic fallback.
+ */
+export function stageInfo(stage: ProjectStageId, settings: PilotSettings): StageInfo {
+  const base = STAGE_INFO[stage];
+  const info: StageInfo = { ...base, explainer: [...base.explainer] };
+  const { surveyDurationMinutes, installBlockDays, cancellationDays } = settings.scheduling;
+  const days = Math.max(1, Math.round(installBlockDays));
+  switch (stage) {
+    case "survey":
+      if (surveyDurationMinutes > 0) {
+        info.strap = `One visit, about ${Math.round(surveyDurationMinutes)} minutes, to measure up and check the details.`;
+      }
+      break;
+    case "booking":
+      info.explainer[0] =
+        days === 1
+          ? "Choose an install day that suits you. We only offer dates we can actually do."
+          : `Choose a ${numberWord(days)}-day block that suits you. We only offer dates we can actually do.`;
+      if (cancellationDays > 0) {
+        info.explainer[2] = `You can cancel within ${cancellationDays} days of accepting. We start after that, or sooner if you ask us to in writing.`;
+      }
+      break;
+    case "install":
+      info.strap =
+        days === 1
+          ? "One day, a tidy crew, and an update at the end of it."
+          : `${capitalise(numberWord(days))} days, a tidy crew, and an update at the end of each one.`;
+      if (days === 3) {
+        info.explainer[0] =
+          "Roughly: day one is marking out and drilling, day two the units go up, day three is pipes, power and testing.";
+      }
+      break;
+  }
+  return info;
+}
 
 /* ------------------------------------------------------------------ */
 /* State                                                              */
@@ -1229,15 +1274,19 @@ function fromV1(raw: Rec): Project {
 
   // Site visit → survey. An unbooked v1 visit defaulted to video; v2's default
   // is the in-person home survey, so only a booked visit keeps its mode.
+  // An unbooked visit was never agreed, so it takes the v2 terms (free) rather
+  // than v1's default fee; a booked one keeps its fee and payment as-is.
   const svStatus = oneOf(sv.status, ["not-booked", "booked", "completed"], "not-booked");
-  const feeGbp = num(sv.feeGbp, 0);
+  const agreed = svStatus !== "not-booked";
+  const feeGbp = agreed ? num(sv.feeGbp, 0) : 0;
   const scheduledFor = optStr(sv.scheduledFor);
+  const v1Paid = agreed && sv.paymentStatus === "paid";
   p.survey = {
     status: svStatus === "completed" ? "submitted" : svStatus === "booked" && scheduledFor ? "booked" : "not-booked",
-    mode: svStatus === "not-booked" ? "in-person" : oneOf(sv.mode, ["video", "in-person"], "video"),
-    durationMinutes: svStatus === "not-booked" ? p.survey.durationMinutes : 60,
+    mode: agreed ? oneOf(sv.mode, ["video", "in-person"], "video") : "in-person",
+    durationMinutes: agreed ? 60 : p.survey.durationMinutes,
     feeGbp,
-    paymentStatus: sv.paymentStatus === "paid" ? "paid" : feeGbp > 0 ? "unpaid" : "not-required",
+    paymentStatus: v1Paid ? "paid" : feeGbp > 0 ? "unpaid" : "not-required",
     rescheduleFeesGbp: num(sv.rescheduleFeesGbp, 0),
     ...(scheduledFor ? { scheduledFor } : {}),
   };
@@ -1310,7 +1359,33 @@ function fromV1(raw: Rec): Project {
 
   p.money.changeFeesPence = (p.survey.rescheduleFeesGbp + p.booking.rescheduleFeesGbp) * 100;
   p.events = events;
+  // v1's "paid" was the customer's own button press, not a verified payment,
+  // so no money moves here. v1 promised the fee comes off the install
+  // balance (SITE_VISIT.creditedAgainstInstall), so say so where ops will see
+  // it: the balance invoice credits projectFees().surveyPaidGbp (§K).
+  if (v1Paid && feeGbp > 0) {
+    p.events.push({
+      at: events[events.length - 1]?.at ?? str(raw.createdAt),
+      type: "migrated-survey-fee",
+      label: `Moved from the old system: the £${feeGbp} site visit fee was marked paid there (not a verified payment). Check it was received, then credit it on the balance invoice as promised.`,
+      actor: "system",
+      internal: true,
+    });
+  }
   return p;
+}
+
+/**
+ * Is this stored snapshot a v1 project (the same test migrateProject uses)?
+ * v1 kept the customer's email and phone on the quote, not the project, so
+ * only these may borrow contact details from the quote; on a v2 project an
+ * empty field means "no address".
+ */
+export function isLegacySnapshot(raw: unknown): boolean {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return false;
+  const r = raw as Rec;
+  const looksV1 = V1_KEYS.some((k) => k in r);
+  return !(r.schemaVersion === PROJECT_SCHEMA_VERSION || (!looksV1 && r.schemaVersion === undefined && "survey" in r));
 }
 
 /**
@@ -1323,11 +1398,7 @@ export function migrateProject(raw: unknown): Project {
     throw new Error("migrateProject: not a project snapshot");
   }
   const r = raw as Rec;
-  const looksV1 = V1_KEYS.some((k) => k in r);
-  const p =
-    r.schemaVersion === PROJECT_SCHEMA_VERSION || (!looksV1 && r.schemaVersion === undefined && "survey" in r)
-      ? normaliseV2(r)
-      : fromV1(r);
+  const p = isLegacySnapshot(r) ? fromV1(r) : normaliseV2(r);
   // JSON-clean (no undefined-valued keys), so migrating twice is a strict no-op.
   return clone(p);
 }
@@ -1392,6 +1463,7 @@ export type ProjectAction =
   // money
   | { type: "invoice-issued"; amountPence: number }
   | { type: "payment-recorded"; amountPence: number }
+  | { type: "survey-fee-paid"; amountPence: number }
   // customer + aftercare
   | { type: "prep-toggled"; itemId: string; done: boolean }
   | { type: "aftercare-checkin-sent" }
@@ -1400,6 +1472,8 @@ export type ProjectAction =
   // admin
   | { type: "set-next-action"; text: string; dueOn?: string; ownerRole?: StaffRole | "customer" }
   | { type: "set-pilot"; number: number; label: string }
+  /** The staff member who owns the project on the board; an empty staffId clears it. */
+  | { type: "set-owner"; staffId: string; name: string }
   | { type: "set-customer-contact"; email?: string; phone?: string; accessNotes?: string; parkingNotes?: string }
   | { type: "project-closed"; reason?: string }
   | { type: "note"; text: string };
@@ -1411,9 +1485,11 @@ const AFTER_CLOSE: ReadonlySet<ProjectAction["type"]> = new Set<ProjectAction["t
   "note",
   "set-next-action",
   "set-pilot",
+  "set-owner",
   "set-customer-contact",
   "invoice-issued",
   "payment-recorded",
+  "survey-fee-paid",
   "electrical-cert-updated",
   "warranty-registered",
   "aftercare-checkin-sent",
@@ -1610,18 +1686,21 @@ export function applyProjectAction(project: Project, action: ProjectAction, now:
       }
       const errors = ctx?.design?.compatibilityErrors ?? [];
       if (errors.length) return err(`The design has compatibility errors: ${errors[0]}`);
+      // The approver is the verified, qualified person signed in (§A5), never a
+      // name the caller typed: `action.by` is informational only.
+      const approver = staff!.name;
       p.design = {
         status: "approved",
         designId: action.designId,
         version: action.version,
         approvedAt: now,
-        approvedBy: action.by,
+        approvedBy: approver,
       };
       log(
         "design-approved",
-        `Your design has been checked and signed off by ${action.by}, our qualified engineer. Your proposal is next.`,
+        `Your design has been checked and signed off by ${approver}, our qualified engineer. Your proposal is next.`,
         "ops",
-        { actorName: action.by },
+        { actorName: approver },
       );
       return ok();
     }
@@ -1927,11 +2006,20 @@ export function applyProjectAction(project: Project, action: ProjectAction, now:
       if (p.handover.status !== "pending") return err("Commissioning is already signed off.");
       const refusal = qualified("commissioning.sign", "Commissioning sign-off");
       if (refusal) return refusal;
+      // The commissioning results must exist (install_jobs.commissioning). Only
+      // this rule of the commissioned gate: its auto compliance item
+      // (commissioning-approval) is approved by this very step.
+      if (!ctx?.commissioning?.signed) {
+        const blockers = blockersFor(project, ctx!, "commissioned").filter((b) => b.code === "commissioning-unsigned");
+        return err(`Not ready (${GATE_LABEL.commissioned}): record and sign the commissioning results first.`, blockers);
+      }
+      // As with design approval: the verified signer, not a typed name.
+      const signer = staff!.name;
       p.handover.status = "commissioned";
       p.handover.commissionedAt = now;
-      p.handover.commissionedBy = action.by;
-      log("commissioning-signed", `Your system is commissioned: tested, measured and signed off by ${action.by}.`, "field", {
-        actorName: action.by,
+      p.handover.commissionedBy = signer;
+      log("commissioning-signed", `Your system is commissioned: tested, measured and signed off by ${signer}.`, "field", {
+        actorName: signer,
       });
       return ok();
     }
@@ -2024,6 +2112,17 @@ export function applyProjectAction(project: Project, action: ProjectAction, now:
       return ok();
     }
 
+    // Status only, like deposit-paid: the money itself moves through
+    // payment-recorded, so a survey fee is never counted twice.
+    case "survey-fee-paid": {
+      if (!isWholePence(action.amountPence) || action.amountPence <= 0) return err("The survey fee must be a positive amount.");
+      if (p.survey.paymentStatus === "paid") return err("The survey fee is already paid.");
+      if (p.survey.paymentStatus === "not-required" || p.survey.feeGbp <= 0) return err("There's no survey fee on this project.");
+      p.survey.paymentStatus = "paid";
+      log("survey-fee-paid", `Survey fee of ${fmtPence(action.amountPence)} received. Thank you.`, "system");
+      return ok();
+    }
+
     /* ---------------- customer + aftercare ---------------- */
 
     case "prep-toggled": {
@@ -2078,6 +2177,22 @@ export function applyProjectAction(project: Project, action: ProjectAction, now:
       return ok();
     }
 
+    case "set-owner": {
+      const staffId = action.staffId.trim();
+      const name = action.name.trim();
+      if (!staffId) {
+        if (!p.owner) return err("The project has no owner to clear.");
+        delete p.owner;
+        log("owner-set", "Project owner cleared.", "ops", { internal: true });
+        return ok();
+      }
+      if (!name) return err("Pick who owns the project.");
+      if (p.owner?.staffId === staffId && p.owner.name === name) return err(`${name} already owns this project.`);
+      p.owner = { staffId, name };
+      log("owner-set", `Project owner: ${name}.`, "ops", { internal: true });
+      return ok();
+    }
+
     case "set-customer-contact": {
       const patch = { email: action.email, phone: action.phone, accessNotes: action.accessNotes, parkingNotes: action.parkingNotes };
       let changed = false;
@@ -2120,6 +2235,20 @@ export function applyProjectAction(project: Project, action: ProjectAction, now:
 /* ------------------------------------------------------------------ */
 /* Read helpers                                                       */
 /* ------------------------------------------------------------------ */
+
+/**
+ * The first install start date `install-dates-set` will accept, for date
+ * pickers (portal and calendar): at least INSTALL_LEAD_DAYS away, after the
+ * cancellation period unless the customer asked in writing to start early,
+ * and on a working day. The period includes its last day
+ * (`cancellationEndsOn`), so work can start the day after.
+ */
+export function earliestInstallStart(project: Project, todayIso: string, settings: PilotSettings = DEFAULT_SETTINGS): string {
+  let earliest = addDays(dateOf(todayIso), INSTALL_LEAD_DAYS);
+  const ends = project.proposal.cancellationEndsOn;
+  if (ends && !project.proposal.earlyStartRequested) earliest = laterOf(earliest, addDays(ends, 1));
+  return nextWorkingDay(earliest, settings.scheduling.workingDays);
+}
 
 /** Date-change fees accrued so far, plus the survey fee state, for the balance strip. */
 export function projectFees(project: Project): { changeFeesGbp: number; surveyPaidGbp: number } {

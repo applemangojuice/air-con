@@ -116,7 +116,10 @@ export interface TemplateContext {
   firstName: string;
   addressLine: string;
   postcode: string;
-  /** The one link: a fresh magic link for customers, the ops page for team mail. */
+  /**
+   * The one link: the ops page for team mail; for customers, LINK_PLACEHOLDER,
+   * which the outbox swaps for a fresh magic link only as it sends.
+   */
   portalUrl: string;
   projectId?: string;
   customerEmail?: string;

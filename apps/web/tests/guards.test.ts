@@ -2,15 +2,24 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { can, meetsRequirement, type StaffMember } from "@aircon/domain";
 import {
+  MIN_BREAK_GLASS_PASSWORD,
+  breakGlassEnabled,
   customerCanAccessProject,
   decideProjectAccess,
   decideStaffGate,
   demoLoginAllowed,
+  demoLoginRefusedOnRealData,
   isAdminEmail,
   isAssigned,
   isPlausibleEmail,
+  linkMayCarryToken,
+  maskEmail,
   parseAdminEmails,
+  relinkEmail,
   safeNextPath,
+  sameEmail,
+  securityWarnings,
+  taintedByDemo,
   staffCanAccessProject,
   staffHome,
   staffLanding,
@@ -183,9 +192,21 @@ test("safeNextPath: same-origin paths only", () => {
     "/ops\nSet-Cookie: x=1",
     "/ops\tx",
     `/${"a".repeat(3000)}`,
+    // Dot segments that normalise into a protocol-relative URL.
+    "/.//evil.com",
+    "/%2e//evil.com",
+    "/%2E%2E//evil.com",
+    "/a/..//evil.com",
+    "/ops/..//evil.com",
+    "/ops/../..//evil.com/x?y=1",
   ]) {
     assert.equal(safeNextPath(bad as string | null | undefined, F), F, JSON.stringify(bad));
   }
+  // What a redirect would actually resolve to stays on our origin.
+  for (const tricky of ["/.//evil.com", "/%2e//evil.com", "/a/..//evil.com", "/ops/..//evil.com"]) {
+    assert.equal(new URL(safeNextPath(tricky, "/login"), "https://dang.example/auth/logout").host, "dang.example", tricky);
+  }
+  assert.equal(safeNextPath("/./ops", F), "/ops", "harmless dot segments still normalise");
 });
 
 test("ADMIN_EMAILS: comma or space separated, case-insensitive", () => {
@@ -200,12 +221,64 @@ test("ADMIN_EMAILS: comma or space separated, case-insensitive", () => {
   assert.equal(isAdminEmail("owner@example.com", undefined), false);
 });
 
-test("demo sign-in: outside production, or production with ALLOW_DEMO_LOGIN=1", () => {
+test("demo sign-in: outside production, or production with ALLOW_DEMO_LOGIN=1 on demo data", () => {
   assert.equal(demoLoginAllowed({ NODE_ENV: "development" }), true);
   assert.equal(demoLoginAllowed({ NODE_ENV: "test" }), true);
   assert.equal(demoLoginAllowed({ NODE_ENV: "production" }), false);
   assert.equal(demoLoginAllowed({ NODE_ENV: "production", ALLOW_DEMO_LOGIN: "1" }), true);
   assert.equal(demoLoginAllowed({ NODE_ENV: "production", ALLOW_DEMO_LOGIN: "true" }), false, "exactly 1");
+  // A real Supabase database needs the second, explicit flag.
+  const real = { NODE_ENV: "production", ALLOW_DEMO_LOGIN: "1", SUPABASE_URL: "https://x.supabase.co", SUPABASE_SERVICE_ROLE_KEY: "k" };
+  assert.equal(demoLoginAllowed(real), false);
+  assert.equal(demoLoginRefusedOnRealData(real), true);
+  assert.equal(demoLoginAllowed({ ...real, DEMO_DEPLOYMENT: "1" }), true);
+  assert.equal(demoLoginRefusedOnRealData({ ...real, DEMO_DEPLOYMENT: "1" }), false);
+  assert.equal(demoLoginAllowed({ ...real, DEMO_DEPLOYMENT: "yes" }), false, "exactly 1");
+  assert.equal(demoLoginAllowed({ ...real, NODE_ENV: "development" }), true, "dev is always demo-able");
+  assert.equal(demoLoginRefusedOnRealData({ NODE_ENV: "production" }), false);
+});
+
+test("a staff record written by a demo session is demo too", () => {
+  const record = { email: "new.admin@example.test", roles: ["admin"], demo: false };
+  assert.equal(taintedByDemo(record, { demo: true }).demo, true);
+  assert.equal(taintedByDemo(record, { demo: false }).demo, false);
+  assert.equal(taintedByDemo(record, null).demo, false);
+  assert.equal(record.demo, false, "never mutates");
+});
+
+test("break-glass needs a long OPS_PASSWORD", () => {
+  assert.equal(MIN_BREAK_GLASS_PASSWORD, 20);
+  assert.equal(breakGlassEnabled({}), false);
+  assert.equal(breakGlassEnabled({ OPS_PASSWORD: "" }), false);
+  assert.equal(breakGlassEnabled({ OPS_PASSWORD: "hunter2" }), false);
+  assert.equal(breakGlassEnabled({ OPS_PASSWORD: "x".repeat(19) }), false);
+  assert.equal(breakGlassEnabled({ OPS_PASSWORD: "x".repeat(20) }), true);
+});
+
+test("customer sign-in links only go to the customer's own address", () => {
+  assert.equal(sameEmail(" Sam@Example.test", "sam@example.test "), true);
+  assert.equal(sameEmail("", ""), false, "two blanks aren't a match");
+  assert.equal(sameEmail(undefined, undefined), false);
+  assert.equal(linkMayCarryToken("sam@example.test", "SAM@example.test"), true);
+  assert.equal(linkMayCarryToken("sam@example.test", "attacker@example.test"), false);
+  assert.equal(linkMayCarryToken("sam@example.test", null), false);
+  assert.equal(linkMayCarryToken("not-an-email", "not-an-email"), false);
+
+  // The email changed: the project moves to the new address's customer.
+  assert.equal(relinkEmail("victim@example.test", "Attacker@Example.test"), "attacker@example.test");
+  assert.equal(relinkEmail(undefined, "new@example.test"), "new@example.test");
+  assert.equal(relinkEmail("sam@example.test", " SAM@example.test"), null, "same mailbox: no change");
+  assert.equal(relinkEmail("sam@example.test", ""), null, "cleared: stays put, nothing is sent");
+  assert.equal(relinkEmail("sam@example.test", "junk"), null);
+  // ...and a link for the old customer never reaches the new address.
+  assert.equal(linkMayCarryToken("victim@example.test", relinkEmail("victim@example.test", "attacker@example.test")), false);
+});
+
+test("maskEmail shows enough to recognise, not enough to learn", () => {
+  assert.equal(maskEmail("Jo.Bloggs@Example.com"), "j***@example.com");
+  assert.equal(maskEmail("a@b.co"), "a***@b.co");
+  assert.equal(maskEmail("nonsense"), "***");
+  assert.equal(maskEmail("@b.co"), "***");
 });
 
 test("emails: plausible shapes only", () => {
@@ -234,4 +307,23 @@ test("DEMO team: one per role, fictional, and the qualified ones pass their gate
   assert.equal(isDemoRoleKey("admin"), true);
   assert.equal(isDemoRoleKey("superuser"), false);
   assert.equal(isDemoStaffId("de300000-0000-4000-8000-000000000999"), false);
+});
+
+test("securityWarnings: what the boot log shouts about in production", () => {
+  const strong = "0123456789abcdef".repeat(4);
+  assert.deepEqual(securityWarnings({ NODE_ENV: "development" }), [], "dev is quiet");
+  assert.deepEqual(securityWarnings({ NODE_ENV: "production", SESSION_SECRET: strong }), [], "a clean production config");
+  const all = securityWarnings({
+    NODE_ENV: "production",
+    SESSION_SECRET: "short",
+    OPS_PASSWORD: "hunter2",
+    ALLOW_DEMO_LOGIN: "1",
+    SUPABASE_URL: "https://x.supabase.co",
+    SUPABASE_SERVICE_ROLE_KEY: "k",
+  }).join("\n");
+  assert.match(all, /demo sign-in is REFUSED/);
+  assert.match(all, /SESSION_SECRET is shorter than 32/);
+  assert.match(all, /break-glass sign-in is off/);
+  assert.match(securityWarnings({ NODE_ENV: "production", SESSION_SECRET: strong, ALLOW_DEMO_LOGIN: "1" }).join(), /DEMO sign-in is ON/);
+  assert.match(securityWarnings({ NODE_ENV: "production" }).join(), /SESSION_SECRET is not set/);
 });

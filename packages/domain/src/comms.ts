@@ -262,6 +262,14 @@ export function idempotencyKey(
   return [event, projectId ?? "-", discriminator.trim() || "-", channel].join(":");
 }
 
+/**
+ * Stands in for a sign-in link in every stored body. Sign-in tokens are
+ * minted when a message is actually handed to a provider and never stored
+ * (the database keeps only sha256(token)), so a stored message, a demo
+ * message or a database backup can't sign anyone in.
+ */
+export const LINK_PLACEHOLDER = "[[link added when sent]]";
+
 export interface MessageRecord {
   id: string;
   idempotencyKey: string;
@@ -271,8 +279,11 @@ export interface MessageRecord {
   templateVersion: number;
   to: string;
   subject?: string;
+  /** Stored with LINK_PLACEHOLDER where a sign-in link goes; see `linkPath`. */
   bodyText: string;
   bodyHtml?: string;
+  /** The portal path the placeholder's link opens, so a later send (cron, resend) can mint a fresh one. */
+  linkPath?: string;
   status: "queued" | "sent" | "failed" | "demo" | "skipped";
   provider?: string;
   providerRef?: string;

@@ -1,3 +1,5 @@
+import { MIN_BREAK_GLASS_PASSWORD, breakGlassEnabled } from "./auth/access";
+import { MIN_SESSION_SECRET_LENGTH, sessionSecretUsable } from "./auth/session";
 import { getServiceClient } from "./supabase-server";
 import { MEDIA_BUCKET, PHOTO_BUCKET, VIDEO_BUCKET } from "./supabase-server";
 
@@ -148,9 +150,11 @@ function envReport(): EnvCheck[] {
     {
       key: "SESSION_SECRET",
       label: "Session secret",
-      set: has("SESSION_SECRET"),
+      set: sessionSecretUsable(process.env),
       required: true,
-      note: "Signs staff and customer sessions. Without it production signs nobody in.",
+      note: has("SESSION_SECRET") && !sessionSecretUsable(process.env)
+        ? `Set but too short: production ignores a secret under ${MIN_SESSION_SECRET_LENGTH} characters, so nobody can sign in. Generate one with \`openssl rand -hex 32\`.`
+        : "Signs staff and customer sessions. Without it production signs nobody in. Generate with `openssl rand -hex 32`.",
     },
     {
       key: "ADMIN_EMAILS",
@@ -162,9 +166,11 @@ function envReport(): EnvCheck[] {
     {
       key: "OPS_PASSWORD",
       label: "Break-glass password",
-      set: has("OPS_PASSWORD"),
+      set: breakGlassEnabled(process.env),
       required: false,
-      note: "Optional: lets an admin email sign in with this password when email is down.",
+      note: has("OPS_PASSWORD") && !breakGlassEnabled(process.env)
+        ? `Set but too short: break-glass is off until it's at least ${MIN_BREAK_GLASS_PASSWORD} characters.`
+        : `Optional: lets an admin email sign in with this password when email is down. At least ${MIN_BREAK_GLASS_PASSWORD} characters.`,
     },
     {
       key: "RESEND_API_KEY",

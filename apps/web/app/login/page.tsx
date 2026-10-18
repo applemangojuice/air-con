@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { ROLE_LABEL } from "@aircon/domain";
 import { Logo } from "@/components/site/logo";
-import { safeNextPath, staffLanding } from "@/lib/auth/access";
+import { breakGlassEnabled, safeNextPath, staffLanding } from "@/lib/auth/access";
 import { DEMO_ROLE_KEYS, DEMO_ROLE_LABEL } from "@/lib/auth/demo-staff";
 import { currentStaff } from "@/lib/auth/server";
 import { appMode, isDemoLoginAllowed } from "@/lib/env-mode";
@@ -44,7 +44,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Search
 
   const staff = await currentStaff();
   const demoAllowed = isDemoLoginAllowed();
-  const breakGlass = Boolean(process.env.OPS_PASSWORD);
+  const breakGlass = breakGlassEnabled(process.env);
   const mode = appMode();
 
   return (

@@ -54,8 +54,27 @@ export interface DocumentRecord {
   createdBy?: string;
 }
 
-/** ("proposal", "7f3a", 2) → "DIH-PR-7F3A-v2". */
-export function documentRef(kind: DocumentKind, projectShortId: string, version: number): string {
-  const short = projectShortId.toUpperCase().replace(/[^A-Z0-9]/g, "") || "X";
-  return `DIH-${DOCUMENT_KIND_CODE[kind]}-${short}-v${Math.max(1, Math.floor(version))}`;
+const refPart = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]/g, "");
+
+/**
+ * The printed ref, unique across all documents (`documents.ref` is UNIQUE).
+ *
+ *   ("proposal", "7f3a91c2", 2)          → "DIH-PR-7F3A91C2-v2"
+ *   ("invoice", "7f3a91c2", 1, "0002")   → "DIH-IN-7F3A91C2-0002-v1"
+ *
+ * `version` counts revisions of ONE document (proposal v1 → v2), not
+ * documents of a kind. Kinds a project has several of (invoices, receipts,
+ * variations) pass `instance` to tell them apart: the invoice number's
+ * digits, the variation's issue number, the receipt's payment id. Use
+ * `projectShortId` for the middle part: 4 characters collide across projects.
+ */
+export function documentRef(kind: DocumentKind, projectShortId: string, version: number, instance?: string): string {
+  const short = refPart(projectShortId) || "X";
+  const inst = instance === undefined ? "" : refPart(instance);
+  return `DIH-${DOCUMENT_KIND_CODE[kind]}-${short}${inst ? `-${inst}` : ""}-v${Math.max(1, Math.floor(version))}`;
+}
+
+/** The first 8 letters and digits of a project id (a uuid's first block), upper-case, for refs. */
+export function projectShortId(projectId: string): string {
+  return refPart(projectId).slice(0, 8) || "X";
 }

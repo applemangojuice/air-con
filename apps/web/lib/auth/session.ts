@@ -44,17 +44,40 @@ export type Session = StaffSession | CustomerSession;
 /** Anyone can read this constant in the repo, so it only ever signs outside production. */
 const DEV_FALLBACK_SECRET = "dih-dev-session-secret-not-for-production";
 
+/**
+ * Production refuses a SESSION_SECRET shorter than this. Anyone can get a
+ * validly signed cookie (any customer link), and with a short secret an
+ * offline HMAC search recovers it, which forges an admin session. Generate
+ * one with `openssl rand -hex 32` (64 characters).
+ */
+export const MIN_SESSION_SECRET_LENGTH = 32;
+
 let warnedFallback = false;
+let warnedWeak = false;
+
+/** Is SESSION_SECRET set and strong enough for this environment? (The status page asks.) */
+export function sessionSecretUsable(env: Record<string, string | undefined> = process.env): boolean {
+  const configured = env.SESSION_SECRET ?? "";
+  return configured.length >= (env.NODE_ENV === "production" ? MIN_SESSION_SECRET_LENGTH : 1);
+}
 
 /**
  * SESSION_SECRET, else the dev fallback outside production (with a one-time
  * warning), else null: production never signs or trusts a cookie without a
- * real secret.
+ * real secret, and treats a short one as unset.
  */
 export function sessionSecret(env: Record<string, string | undefined> = process.env): string | null {
   const configured = env.SESSION_SECRET;
-  if (configured) return configured;
-  if (env.NODE_ENV === "production") return null;
+  if (configured && sessionSecretUsable(env)) return configured;
+  if (env.NODE_ENV === "production") {
+    if (configured && !warnedWeak) {
+      warnedWeak = true;
+      console.error(
+        `[auth] SESSION_SECRET is shorter than ${MIN_SESSION_SECRET_LENGTH} characters, so it's ignored and nobody can sign in. Generate one with: openssl rand -hex 32`,
+      );
+    }
+    return null;
+  }
   if (!warnedFallback) {
     warnedFallback = true;
     console.warn("[auth] SESSION_SECRET not set: signing sessions with the dev fallback secret.");

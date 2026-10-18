@@ -92,6 +92,38 @@ test("mergeSettings: arrays replace, wrong types fall back, nulls accept values"
   assert.deepEqual(s.scheduling, DEFAULT_SETTINGS.scheduling);
 });
 
+test("mergeSettings: union values and list items outside their set fall back", () => {
+  const junk = mergeSettings({
+    tax: { vatRegistered: true, defaultTaxCode: "foo" },
+    payments: { depositTiming: "x", methods: ["card", "cheque", 7, "card"] },
+    scheduling: { workingDays: [1, 2, 9, 2.5, "3"], surveySlotTimes: [10, "11:00"] },
+    serviceArea: { outcodes: ["SW4", null, 3] },
+    comms: { disabledEvents: ["survey-booked", { e: 1 }] },
+    discounts: [{ code: "PILOT15", label: "x", pct: 15, reason: "r", active: true }, "junk", { label: "no code" }],
+    warranty: { workmanshipYears: "two", manufacturerSummary: 5 },
+  });
+  assert.equal(junk.tax.defaultTaxCode, "outside-scope");
+  assert.equal(effectiveTaxCode(junk), "standard-20"); // and never throws on TAX_CODES lookups
+  assert.equal(TAX_CODES[effectiveTaxCode(junk)].ratePct, 20);
+  assert.equal(junk.payments.depositTiming, "on-acceptance");
+  assert.deepEqual(junk.payments.methods, ["card"]);
+  assert.deepEqual(junk.scheduling.workingDays, [1, 2]);
+  assert.deepEqual(junk.scheduling.surveySlotTimes, ["11:00"]);
+  assert.deepEqual(junk.serviceArea.outcodes, ["SW4"]);
+  assert.equal(isInServiceArea(junk, "SW4 7AA"), true);
+  assert.deepEqual(junk.comms.disabledEvents, ["survey-booked"]);
+  assert.deepEqual(junk.discounts.map((d) => d.code), ["PILOT15"]);
+  assert.deepEqual(junk.warranty, { workmanshipYears: null, manufacturerSummary: null });
+
+  // Nothing valid at all: the default list. An empty list is a choice and stays.
+  assert.deepEqual(mergeSettings({ payments: { methods: ["cheque"] } }).payments.methods, DEFAULT_SETTINGS.payments.methods);
+  assert.deepEqual(mergeSettings({ payments: { methods: [] } }).payments.methods, []);
+  assert.equal(mergeSettings({ tax: { defaultTaxCode: "toString" } }).tax.defaultTaxCode, "outside-scope");
+  assert.equal(mergeSettings({ tax: { defaultTaxCode: "reduced-5" } }).tax.defaultTaxCode, "reduced-5");
+  assert.equal(mergeSettings({ payments: { depositTiming: "before-kit-order" } }).payments.depositTiming, "before-kit-order");
+  assert.deepEqual(mergeSettings(DEFAULT_SETTINGS), DEFAULT_SETTINGS);
+});
+
 test("mergeSettings keeps optional company details and never aliases the defaults", () => {
   const s = mergeSettings({
     company: {

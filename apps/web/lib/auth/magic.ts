@@ -6,7 +6,8 @@ import * as customersRepo from "@/lib/repo/customers";
 import * as staffRepo from "@/lib/repo/staff";
 import * as tokensRepo from "@/lib/repo/tokens";
 import { requireDb } from "@/lib/supabase-server";
-import { isAdminEmail, isPlausibleEmail, normaliseEmail, safeNextPath } from "./access";
+import { withLegacyContact } from "@/lib/legacy-contact";
+import { isAdminEmail, isPlausibleEmail, linkMayCarryToken, normaliseEmail, safeNextPath } from "./access";
 import { base64urlEncode } from "./session";
 
 /**
@@ -16,7 +17,8 @@ import { base64urlEncode } from "./session";
  *  * Staff links last 20 minutes. Customer sign-in links last an hour.
  *  * Links inside customer operational emails (`customerLink`) last 30 days,
  *    one fresh token per send, single use: a lost link means asking for
- *    another, never a password.
+ *    another, never a password. They only ever go to the customer's own
+ *    address, and are minted when the email is sent, never stored.
  *  * Sending goes through the outbox (`magic-link` event). Where email
  *    isn't configured the link comes back for the screen instead, but only
  *    on a developer's machine, or for DEMO accounts on a demo deployment:
@@ -132,14 +134,22 @@ export async function issueMagicLink(input: {
 }
 
 /**
- * An absolute link into a customer's project for an operational email,
- * carrying a fresh 30-day single-use sign-in token. Creates and attaches the
- * project's customer record from the project's email on first use. Falls
- * back to the plain page URL (no sign-in) when the project has no email yet.
+ * An absolute link into a customer's project for an operational email to
+ * `recipient`, carrying a fresh 30-day single-use sign-in token, or the plain
+ * page URL (no sign-in) when a token can't safely go there.
+ *
+ * A token signs in as the project's customer record, which may own other
+ * projects too, so it only ever goes to that customer's own address. Any
+ * other recipient (a stale address, a correction staff made, a mismatch from
+ * a quote submitted under someone else's email) gets the plain URL and signs
+ * in the normal way. A project with no customer yet is attached to the one
+ * for its own email (a v1 project: its quote's email) on first use.
  */
-export async function customerLink(projectId: string, path: string): Promise<string> {
+export async function customerLink(projectId: string, path: string, recipient: string): Promise<string> {
   const target = safeNextPath(path, `/p/${projectId}`);
   const plain = `${appUrl()}${target}`;
+  const to = normaliseEmail(recipient ?? "");
+  if (!isPlausibleEmail(to)) return plain;
   const db = requireDb();
 
   const { data: row } = await db
@@ -154,32 +164,26 @@ export async function customerLink(projectId: string, path: string): Promise<str
 
   let customer = row.customer_id ? await customersRepo.get(String(row.customer_id)) : null;
   if (!customer) {
-    let email: string | undefined;
-    let name: string | undefined;
-    let phone: string | undefined;
+    let project;
     try {
-      const project = migrateProject(row.project);
-      email = project.customer.email;
-      name = project.customer.name || undefined;
-      phone = project.customer.phone;
+      project = await withLegacyContact(db, migrateProject(row.project), row.project, (row.quote_id as string | null) ?? null);
     } catch {
-      // Unreadable snapshot: fall through to the quote's contact details.
+      return plain; // unreadable snapshot: no identity to attach
     }
-    if (!email && row.quote_id) {
-      const { data: quote } = await db
-        .from("quote_requests")
-        .select("email, customer_name, phone")
-        .eq("id", row.quote_id)
-        .maybeSingle();
-      email = (quote?.email as string | null) ?? undefined;
-      name ??= (quote?.customer_name as string | null) ?? undefined;
-      phone ??= (quote?.phone as string | null) ?? undefined;
-    }
-    if (!email || !isPlausibleEmail(normaliseEmail(email))) return plain;
-    customer = await customersRepo.findOrCreate({ email, name, phone });
+    const email = project.customer.email;
+    if (!email || !linkMayCarryToken(email, to)) return plain;
+    customer = await customersRepo.findOrCreate({
+      email,
+      name: project.customer.name || undefined,
+      phone: project.customer.phone,
+    });
     await db.from("projects").update({ customer_id: customer.id }).eq("id", projectId).is("customer_id", null);
   }
 
+  if (!linkMayCarryToken(customer.email, to)) {
+    console.warn(`[auth] customerLink: ${projectId}'s customer isn't the recipient; sending a plain link`);
+    return plain;
+  }
   const token = await createToken({
     kind: "customer",
     subjectId: customer.id,
@@ -198,16 +202,31 @@ export interface TokenSubject {
   next?: string;
 }
 
+/** The live (unused, unexpired) token row for a raw token, or null. Never spends it. */
+async function liveToken(raw: string | null | undefined, now: Date) {
+  if (!raw || raw.length > 200 || !/^[A-Za-z0-9_-]+$/.test(raw)) return null;
+  const row = await tokensRepo.findByHash(await hashToken(raw));
+  if (!row || row.usedAt) return null;
+  return new Date(row.expiresAt).getTime() > now.getTime() ? row : null;
+}
+
+/**
+ * Who a token would sign in, without spending it: for the confirm page,
+ * which says "Continue as j***@example.com" before anything happens.
+ */
+export async function peekToken(raw: string | null | undefined): Promise<TokenSubject | null> {
+  const row = await liveToken(raw, new Date());
+  return row ? { kind: row.subjectKind, subjectId: row.subjectId, email: row.email } : null;
+}
+
 /**
  * Exchange a raw token for its subject, exactly once. Null when unknown,
  * expired or already used; on success the token is spent.
  */
 export async function consumeToken(raw: string | null | undefined): Promise<TokenSubject | null> {
-  if (!raw || raw.length > 200 || !/^[A-Za-z0-9_-]+$/.test(raw)) return null;
-  const row = await tokensRepo.findByHash(await hashToken(raw));
-  if (!row || row.usedAt) return null;
   const now = new Date();
-  if (!(new Date(row.expiresAt).getTime() > now.getTime())) return null;
+  const row = await liveToken(raw, now);
+  if (!row) return null;
   if (!(await tokensRepo.markUsed(row.id, now.toISOString()))) return null;
   return {
     kind: row.subjectKind,

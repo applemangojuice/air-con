@@ -23,7 +23,7 @@ import {
   type Survey,
 } from "@aircon/domain";
 import { audit, type AuditActor } from "./audit";
-import { isPlausibleEmail, normaliseEmail } from "./auth/access";
+import { isPlausibleEmail, normaliseEmail, relinkEmail } from "./auth/access";
 import { notifyForAction } from "./comms/for-action";
 import { isUuid, uuidOrNull } from "./repo/base";
 import * as complianceRepo from "./repo/compliance";
@@ -37,6 +37,7 @@ import * as proposalsRepo from "./repo/proposals";
 import * as purchaseOrdersRepo from "./repo/purchaseOrders";
 import * as staffRepo from "./repo/staff";
 import * as surveysRepo from "./repo/surveys";
+import { withLegacyContact } from "./legacy-contact";
 import { getSettings } from "./settings-server";
 import { getServiceClient } from "./supabase-server";
 
@@ -106,7 +107,7 @@ async function readRow(id: string): Promise<LoadedRow | null> {
   if (!db || !isUuid(id)) return null;
   const { data, error } = await db
     .from("projects")
-    .select("id, customer_id, schema_version, updated_at, project")
+    .select("id, quote_id, customer_id, schema_version, updated_at, project")
     .eq("id", id)
     .maybeSingle();
   if (error) throw new Error(`project load: ${error.message}`);
@@ -118,6 +119,8 @@ async function readRow(id: string): Promise<LoadedRow | null> {
     console.error(`[project] ${id} has an unreadable snapshot:`, err);
     return null;
   }
+  // v1 kept the contact details on the quote; v2 never borrows them (see legacy-contact).
+  project = await withLegacyContact(db, project, data.project, (data.quote_id as string | null) ?? null);
   // customerLink attaches the customer on the row; carry it into the snapshot.
   if (data.customer_id && !project.customer.customerId) project.customer.customerId = String(data.customer_id);
   return {
@@ -441,6 +444,31 @@ export async function loadReadinessContext(projectId: string, actor?: StaffMembe
   return project ? buildReadinessContext(project, actor) : null;
 }
 
+/**
+ * The email is the customer's identity (§C). When a project's email changes,
+ * the project moves to the customer record for the new address (found or
+ * created), so links sent there sign in as that customer, never as whoever
+ * owned the old address, and the old customer's sessions lose the project at
+ * once (the row's customer_id decides access). Clearing the email moves
+ * nothing; with no address, nothing is sent. Null when the customer record
+ * couldn't be read or written: then the change mustn't be saved.
+ */
+async function relinkCustomer(before: Project, after: Project): Promise<Project | null> {
+  const email = relinkEmail(before.customer.email, after.customer.email);
+  if (!email) return after;
+  try {
+    const customer = await customersRepo.findOrCreate({
+      email,
+      name: after.customer.name || undefined,
+      phone: after.customer.phone,
+    });
+    return { ...after, customer: { ...after.customer, customerId: customer.id } };
+  } catch (err) {
+    console.error(`[project] customer relink for ${after.id} failed:`, err);
+    return null;
+  }
+}
+
 /** Does the project's next gate have anything that actually blocks it? (The board's red flag.) */
 function isBlocked(project: Project, ctx: ReadinessContext): boolean {
   const gate = nextGate(project);
@@ -474,10 +502,13 @@ export async function dispatch(projectId: string, action: ProjectAction, actorIn
     if (!result.ok) {
       return { error: result.error, status: 409, ...(result.blockers ? { blockers: result.blockers } : {}) };
     }
+    const next = await relinkCustomer(row.project, result.project);
+    if (!next) return { error: "Couldn't link the new email address to a customer record. Please try again.", status: 502 };
+    const movedTo = next.customer.customerId !== row.project.customer.customerId ? next.customer.customerId : undefined;
 
-    const write = await writeProject(result.project, {
+    const write = await writeProject(next, {
       expectedUpdatedAt: row.updatedAt,
-      blocked: isBlocked(result.project, ctx),
+      blocked: isBlocked(next, ctx),
     });
     if (!write.ok && write.conflict) continue; // someone saved in between: re-read and re-apply
     if (!write.ok) {
@@ -490,14 +521,18 @@ export async function dispatch(projectId: string, action: ProjectAction, actorIn
       action: `project.${action.type}`,
       entity: "project",
       entityId: projectId,
-      detail: { action, ...(row.schemaVersion < PROJECT_SCHEMA_VERSION ? { migratedFrom: row.schemaVersion } : {}) },
+      detail: {
+        action,
+        ...(row.schemaVersion < PROJECT_SCHEMA_VERSION ? { migratedFrom: row.schemaVersion } : {}),
+        ...(movedTo ? { customerId: movedTo } : {}),
+      },
     });
     try {
-      await notifyForAction(result.project, action, commsActorOf(actor));
+      await notifyForAction(next, action, commsActorOf(actor));
     } catch (err) {
       console.error(`[project] notify for ${action.type} on ${projectId} failed:`, err);
     }
-    return { project: result.project };
+    return { project: next };
   }
   return { error: "The project changed while saving. Please try again.", status: 409 };
 }

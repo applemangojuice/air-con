@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { documentRef, DOCUMENT_KIND_CODE, DOCUMENT_KIND_LABEL, type DocumentKind } from "./documents.ts";
+import { documentRef, projectShortId, DOCUMENT_KIND_CODE, DOCUMENT_KIND_LABEL, type DocumentKind } from "./documents.ts";
 import { ISSUE_KIND_LABEL, isOpen, type Issue, type IssueStatus } from "./issues.ts";
 import { ANNOTATION_STYLE, PHOTO_TAG_LABEL, PHOTO_TAGS } from "./media.ts";
 import { invoiceNumber } from "./money.ts";
@@ -20,6 +20,21 @@ test("documentRef: kind code, short id, version", () => {
   const kinds = Object.keys(DOCUMENT_KIND_CODE) as DocumentKind[];
   assert.equal(new Set(kinds.map((k) => DOCUMENT_KIND_CODE[k])).size, kinds.length); // codes are unique
   for (const k of kinds) assert.ok(DOCUMENT_KIND_LABEL[k]);
+});
+
+test("documentRef: an instance key keeps several documents of one kind apart", () => {
+  const short = projectShortId("7f3a91c2-0b1d-4e5f-8a9b-0c1d2e3f4a5b");
+  assert.equal(short, "7F3A91C2");
+  // A deposit and a balance invoice on one project, both first versions: different refs.
+  const deposit = documentRef("invoice", short, 1, "0001");
+  const balance = documentRef("invoice", short, 1, "0002");
+  assert.equal(deposit, "DIH-IN-7F3A91C2-0001-v1");
+  assert.notEqual(deposit, balance);
+  assert.equal(documentRef("invoice", short, 2, "0001"), "DIH-IN-7F3A91C2-0001-v2"); // a revision of the same invoice
+  assert.equal(documentRef("receipt", short, 1, "pay_3Ab-x"), "DIH-RC-7F3A91C2-PAY3ABX-v1");
+  assert.equal(documentRef("proposal", short, 1, ""), "DIH-PR-7F3A91C2-v1"); // empty instance: none
+  assert.equal(projectShortId("--"), "X");
+  assert.equal(projectShortId("ab"), "AB");
 });
 
 test("invoiceNumber pads to four digits and keeps counting past them", () => {

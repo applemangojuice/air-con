@@ -7,6 +7,7 @@ import type { CustomerRecord } from "@/lib/repo/customers";
 import * as staffRepo from "@/lib/repo/staff";
 import { getServiceClient } from "@/lib/supabase-server";
 import {
+  breakGlassEnabled,
   decideProjectAccess,
   decideStaffGate,
   demoLoginAllowed,
@@ -125,7 +126,7 @@ function breakGlassAdmin(email: string): StaffMember {
 async function staffForSession(session: StaffSession): Promise<StaffMember | null> {
   const env = process.env;
   if (session.staffId === BREAK_GLASS_STAFF_ID) {
-    const ok = !getServiceClient() && Boolean(env.OPS_PASSWORD) && isAdminEmail(session.email);
+    const ok = !getServiceClient() && breakGlassEnabled(env) && isAdminEmail(session.email);
     return ok ? breakGlassAdmin(session.email) : null;
   }
   if (!getServiceClient()) {
@@ -252,14 +253,17 @@ async function bootstrapAdmin(email: string, via: string): Promise<StaffMember |
   if (existing) return existing.active ? existing : null;
   if (!isAdminEmail(email)) return null;
   try {
-    const created = await staffRepo.insert({
-      email: normaliseEmail(email),
-      name: nameFromEmail(email),
-      roles: ["admin"],
-      external: false,
-      active: true,
-      qualifications: [],
-    });
+    const created = await staffRepo.insert(
+      {
+        email: normaliseEmail(email),
+        name: nameFromEmail(email),
+        roles: ["admin"],
+        external: false,
+        active: true,
+        qualifications: [],
+      },
+      null, // the system, on the person's own first sign-in
+    );
     await audit({ actor: created, action: "staff.bootstrap-admin", entity: "staff", entityId: created.id, detail: { via } });
     return created;
   } catch {
@@ -285,24 +289,41 @@ async function passwordMatches(given: string, expected: string): Promise<boolean
 }
 
 /**
- * Break-glass sign-in: an admin email plus OPS_PASSWORD. Admin means an
- * active admin staff row, or an ADMIN_EMAILS address (bootstrapped on first
- * use). Without a database, ADMIN_EMAILS addresses get a synthetic admin so
- * the legacy demo console still opens. Returns the session to set, or null.
+ * Who a break-glass sign-in for this email would be: an active admin row,
+ * an ADMIN_EMAILS address with no row yet (bootstrapped once the password is
+ * right), the synthetic admin when there's no database, or nobody. Read-only.
+ */
+async function breakGlassCandidate(email: string): Promise<StaffMember | "bootstrap" | "synthetic" | null> {
+  if (!getServiceClient()) return isAdminEmail(email) ? "synthetic" : null;
+  const existing = await staffRepo.getByEmail(email);
+  if (existing) return existing.active && existing.roles.includes("admin") ? existing : null;
+  return isAdminEmail(email) ? "bootstrap" : null;
+}
+
+/**
+ * Break-glass sign-in: an admin email plus OPS_PASSWORD (only when it's long
+ * enough to resist guessing, see `breakGlassEnabled`). Admin means an active
+ * admin staff row, or an ADMIN_EMAILS address (bootstrapped on first use).
+ * Without a database, ADMIN_EMAILS addresses get a synthetic admin so the
+ * legacy demo console still opens. Returns the session to set, or null.
+ *
+ * The password check and the admin lookup both run on every attempt, and the
+ * answer is the same null whichever failed, so neither the time taken nor the
+ * reply confirms a right password or a right email on its own.
  */
 export async function breakGlassSession(email: string, password: string): Promise<StaffSession | null> {
-  const expected = process.env.OPS_PASSWORD;
-  if (!expected || !password || !(await passwordMatches(password, expected))) return null;
+  if (!breakGlassEnabled(process.env)) return null;
   const clean = normaliseEmail(email);
-  if (!getServiceClient()) {
-    return isAdminEmail(clean) ? staffSession(breakGlassAdmin(clean), BREAK_GLASS_TTL_SECONDS) : null;
-  }
-  const existing = await staffRepo.getByEmail(clean);
-  const staff = existing
-    ? existing.active && existing.roles.includes("admin")
-      ? existing
-      : null
-    : await bootstrapAdmin(clean, "break-glass");
+  const [passwordOk, candidate] = await Promise.all([
+    passwordMatches(password, process.env.OPS_PASSWORD ?? ""),
+    breakGlassCandidate(clean).catch((err) => {
+      console.error("[auth] break-glass lookup failed:", err);
+      return null;
+    }),
+  ]);
+  if (!passwordOk || !password || !candidate) return null;
+  if (candidate === "synthetic") return staffSession(breakGlassAdmin(clean), BREAK_GLASS_TTL_SECONDS);
+  const staff = candidate === "bootstrap" ? await bootstrapAdmin(clean, "break-glass") : candidate;
   if (!staff) return null;
   await audit({ actor: staff, action: "auth.break-glass", entity: "staff", entityId: staff.id });
   return staffSession(staff, BREAK_GLASS_TTL_SECONDS);
@@ -321,7 +342,7 @@ export async function ensureDemoStaff(): Promise<Record<DemoRoleKey, StaffMember
     let staff = await staffRepo.get(demo.id);
     if (!staff) {
       try {
-        staff = await staffRepo.insert(demo);
+        staff = await staffRepo.insert(demo, null);
       } catch {
         staff = (await staffRepo.get(demo.id)) ?? (await staffRepo.getByEmail(demo.email));
       }

@@ -250,6 +250,10 @@ select pg_temp.expect_error('login_tokens.token_hash unique', '23505', $sql$
   values ('sha256-demo-token-1', 'customer', 'x@example.com', now())
 $sql$);
 
+select pg_temp.expect_error('surveys (project_id, version) unique', '23505', $sql$
+  insert into public.surveys (project_id, version) values ('b0000000-0000-4000-8000-000000000001', 1)
+$sql$);
+
 select pg_temp.expect_error('designs (project_id, version) unique', '23505', $sql$
   insert into public.designs (project_id, version) values ('b0000000-0000-4000-8000-000000000001', 1)
 $sql$);

@@ -57,11 +57,11 @@ async function liveChecks(): Promise<{ checks: Check[]; score: number; total: nu
     label: "Staff sign-in",
     ok: env("SESSION_SECRET") && env("ADMIN_EMAILS"),
     detail: !env("SESSION_SECRET")
-      ? "SESSION_SECRET NOT SET: nobody can sign in to /ops or /field in production."
+      ? "SESSION_SECRET NOT SET (or under 32 characters): nobody can sign in to /ops or /field in production."
       : env("ADMIN_EMAILS")
         ? "Sessions are signed; the first sign-in from an ADMIN_EMAILS address becomes admin."
         : "Sessions are signed, but ADMIN_EMAILS is empty, so there's no way to create the first admin.",
-    fix: "Set SESSION_SECRET (a long random string) and ADMIN_EMAILS in Vercel env vars and redeploy.",
+    fix: "Set SESSION_SECRET (`openssl rand -hex 32`) and ADMIN_EMAILS in Vercel env vars and redeploy.",
   });
 
   checks.push({
