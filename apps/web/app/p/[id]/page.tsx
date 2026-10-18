@@ -8,6 +8,7 @@ import { requireProjectAccess } from "@/lib/auth/server";
 import { loadHub } from "@/lib/portal-server";
 import { buildDemoProject } from "@/lib/project-service";
 import { getSettings } from "@/lib/settings-server";
+import { reachUs, realPhone } from "@/components/site/claims";
 
 export const metadata: Metadata = {
   title: "Your project",
@@ -38,7 +39,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
   const id = rawId.toLowerCase();
 
   const [access, settings] = await Promise.all([requireProjectAccess(id, { allowCustomer: true }), getSettings()]);
-  const phone = settings.company.phone;
+  const phone = realPhone(settings.company.phone);
 
   if (!access) {
     return (
@@ -51,7 +52,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
             this project: one tap and you&apos;re in, no password.
           </p>
           <div className="mt-6">
-            <LinkRequest target={{ projectId: id }} phone={phone} />
+            <LinkRequest target={{ projectId: id }} phone={phone} email={settings.company.email} />
           </div>
         </div>
         <p className="mt-6 text-center text-sm text-ink-500">
@@ -77,7 +78,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
         <div role="alert" className="rounded-3xl border border-line bg-white p-6 sm:p-8">
           <h1 className="font-display text-2xl text-ink-900">We couldn&apos;t load your project just now</h1>
           <p className="mt-2 text-[15px] leading-relaxed text-ink-700">
-            That&apos;s on us, not you. Try again in a moment, or call us on {phone} and we&apos;ll help straight away.
+            That&apos;s on us, not you. Try again in a moment, or {reachUs(settings.company)} and we&apos;ll help straight away.
           </p>
           <a href={`/p/${id}`} className="mt-5 inline-flex min-h-12 items-center rounded-full bg-accent-600 px-6 font-semibold text-white hover:bg-accent-700">
             Try again

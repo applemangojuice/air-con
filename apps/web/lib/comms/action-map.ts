@@ -5,6 +5,7 @@ import {
   type MessageRecord,
   type Project,
   type ProjectAction,
+  PROPOSAL_TURNAROUND_WORKING_DAYS,
 } from "@aircon/domain";
 import { fmtDate, fmtDayTime, money } from "../format.ts";
 import type { CommsData } from "./templates.ts";
@@ -32,8 +33,8 @@ export interface ActorLike {
 
 const byStaff = (actor: ActorLike | null | undefined) => Boolean(actor?.staffId);
 
-/** How long we tell customers the proposal takes after the survey. */
-export const PROPOSAL_TURNAROUND_WORKING_DAYS = 5;
+/** How long we tell customers the proposal takes after the survey: the domain's one number. */
+export { PROPOSAL_TURNAROUND_WORKING_DAYS };
 
 const notice = <E extends CommsEventId>(event: E, data: CommsData[E], discriminator: string): AnyNotice =>
   ({ event, data, discriminator }) as AnyNotice;
@@ -61,8 +62,20 @@ function addWorkingDays(dateIso: string, n: number): string {
 
 const lastEventAt = (p: Project, type: string) => [...p.events].reverse().find((e) => e.type === type)?.at;
 
-/** The crew member customers hear from: the installer, else whoever's first. */
-const crewLead = (p: Project) => p.booking.crew.find((c) => c.role === "installer") ?? p.booking.crew[0];
+/**
+ * The crew member customers hear from: the technical lead, else the person
+ * who did it (when they're on the crew), else an employed installer. Never an
+ * arbitrary subcontractor: an update signed by someone the customer hasn't
+ * been introduced to as in charge reads as if nobody is.
+ */
+export function crewLead(p: Project, actor?: ActorLike | null): Project["booking"]["crew"][number] | undefined {
+  const crew = p.booking.crew;
+  return (
+    crew.find((c) => c.role === "tech-lead") ??
+    (actor?.staffId ? crew.find((c) => c.staffId === actor.staffId) : undefined) ??
+    crew.find((c) => c.role === "installer" && !c.external)
+  );
+}
 
 export function commsForAction(project: Project, action: ProjectAction, actor?: ActorLike | null): AnyNotice[] {
   const p = project;
@@ -240,7 +253,7 @@ export function commsForAction(project: Project, action: ProjectAction, actor?: 
       return [
         notice(
           "installer-on-my-way",
-          { etaMinutes: action.etaMinutes, at, name: action.by || crewLead(p)?.name },
+          { etaMinutes: action.etaMinutes, at, name: action.by || crewLead(p, actor)?.name },
           `${at.slice(0, 10) || "-"}:${action.etaMinutes}`,
         ),
       ];
@@ -258,7 +271,7 @@ export function commsForAction(project: Project, action: ProjectAction, actor?: 
             text: action.customerUpdate.text,
             photoCount: action.customerUpdate.mediaIds.length,
             nextDate: next?.date,
-            by: crewLead(p)?.name,
+            by: crewLead(p, actor)?.name,
           },
           `day-${action.n}`,
         ),

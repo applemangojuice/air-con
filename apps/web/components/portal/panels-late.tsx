@@ -17,6 +17,7 @@ import {
   Sub,
   primaryCls,
   useAction,
+  ReachUs,
 } from "./bits";
 import { useHub } from "./controller";
 import type { PanelProps } from "./panel-types";
@@ -235,11 +236,7 @@ export function InstallPanel({ data, state }: PanelProps) {
       )}
       {state === "upcoming" && <Explainer info={info} />}
       <p className="text-sm text-ink-500">
-        Questions on the day? Call us on{" "}
-        <a href={tel(data.company.phone)} className="font-semibold text-accent-700 underline underline-offset-2">
-          {data.company.phone}
-        </a>
-        .
+        Questions on the day? <ReachUs company={data.company} capital className="font-semibold text-accent-700 underline underline-offset-2" />.
       </p>
     </StageShell>
   );
@@ -528,7 +525,7 @@ function ReportProblem({ data }: { data: PanelProps["data"] }) {
       >
         <div>
           <Sub id={titleId}>Report a problem</Sub>
-          <p className="mt-0.5 text-sm text-ink-500">It goes straight to the team, and we&apos;ll call you back. For anything urgent or unsafe, call {data.company.phone}.</p>
+          <p className="mt-0.5 text-sm text-ink-500">It goes straight to the team, and we&apos;ll call you back. {data.company.phone ? `For anything urgent or unsafe, call ${data.company.phone}.` : "For anything urgent or unsafe, say so at the top and we'll call you first."}</p>
         </div>
         <label className="block">
           <span className="mb-1.5 block text-sm font-semibold text-ink-900">What&apos;s wrong?</span>

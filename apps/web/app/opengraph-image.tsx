@@ -10,7 +10,7 @@ import { BRAND } from "@/lib/brand";
  * so shares look designed rather than like a screenshot.
  */
 
-export const alt = `${BRAND.name} — fixed-price home air conditioning`;
+export const alt = `${BRAND.name}: home air conditioning, priced online and confirmed at a home survey`;
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -52,11 +52,11 @@ export default async function OgImage() {
           >
             <span>Air conditioning,</span>
             <span style={{ display: "flex" }}>
-              fixed price in&nbsp;<span style={{ color: "#d55a0a" }}>2 minutes</span>
+              priced in&nbsp;<span style={{ color: "#d55a0a" }}>2 minutes</span>
             </span>
           </div>
           <div style={{ fontSize: 32, color: "#6e7482", display: "flex" }}>
-            No salesperson, no surveyor, no sharp intake of breath.
+            Confirmed at a home survey. No sharp intake of breath.
           </div>
         </div>
 
@@ -77,7 +77,7 @@ export default async function OgImage() {
               padding: "18px 36px",
             }}
           >
-            Get my fixed price
+            Get my price
           </div>
           <div style={{ color: "#a3a8b4", display: "flex" }}>
             {BRAND.strap}, street by street

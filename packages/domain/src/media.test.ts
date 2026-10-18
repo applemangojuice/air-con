@@ -7,8 +7,11 @@ import {
   MAX_ANNOTATION_SHAPES,
   MAX_ROUTE_POINTS,
   PHOTO_TAGS,
+  MEDIA_MAX_BYTES,
   PHOTO_TAG_LABEL,
   estimateLabel,
+  mediaUploadProblem,
+  uploadContentType,
   validateAnnotations,
   type Annotation,
 } from "./media.ts";
@@ -163,4 +166,16 @@ test("estimateLabel marks measurements as the surveyor's estimate", () => {
   assert.equal(estimateLabel("approx 3 m"), "approx 3 m");
   assert.equal(estimateLabel("   "), "");
   assert.ok(estimateLabel("x".repeat(200)).length <= MAX_ANNOTATION_LABEL);
+});
+
+test("upload rules: iPhone .mov video is taken within the size limit; other formats and oversize files are refused", () => {
+  assert.equal(mediaUploadProblem({ type: "video/quicktime", name: "IMG_0001.MOV", size: 18 * 1024 * 1024 }), null);
+  assert.equal(mediaUploadProblem({ type: "", name: "IMG_0001.MOV", size: 1024 }), null, "a blank type falls back to the extension");
+  assert.equal(uploadContentType("", "clip.mov"), "video/quicktime");
+  assert.equal(uploadContentType("image/JPG", "x"), "image/jpeg");
+  assert.equal(mediaUploadProblem({ type: "video/mp4", name: "a.mp4", size: 1024 }), null);
+  assert.match(mediaUploadProblem({ type: "video/quicktime", name: "long.mov", size: MEDIA_MAX_BYTES + 1 }) ?? "", /too long/);
+  assert.match(mediaUploadProblem({ type: "video/webm", name: "a.webm", size: 10 }) ?? "", /MP4 or iPhone \.mov/);
+  assert.match(mediaUploadProblem({ type: "image/gif", name: "a.gif", size: 10 }) ?? "", /can't be uploaded/);
+  assert.equal(mediaUploadProblem({ type: "image/heic", name: "a.heic", size: 3_000_000 }), null);
 });

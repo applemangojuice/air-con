@@ -2,7 +2,7 @@
 
 import { useId, useRef, useState } from "react";
 import { EVIDENCE_KIND_LABEL, NUMERIC_KINDS, windowText, type InstallStep, type SlotView } from "@aircon/domain";
-import { canScanBarcodes, capturePhoto, captureValue, locate, parseReading, readBarcode, VIDEO_OK } from "./capture";
+import { canScanBarcodes, capturePhoto, captureValue, locate, parseReading, readBarcode, uploadProblem } from "./capture";
 import { SignaturePad, type SignaturePadHandle } from "./signature-pad";
 import { Sheet } from "./sheet";
 import { londonTime, personName } from "./format";
@@ -83,8 +83,9 @@ export function Slot({ projectId, step, slot, waiting, refused, imageUrl, disabl
 
   async function onFile(f: File | undefined) {
     if (!f) return;
-    if (spec.kind === "video" && f.type.startsWith("video/") && !VIDEO_OK(f)) {
-      setError("This phone saved the video in a format we can't store (only MP4). Take a photo instead, or switch the camera to \"Most compatible\".");
+    const problem = uploadProblem(f);
+    if (problem) {
+      setError(problem);
       return;
     }
     await run(async () => {
@@ -210,7 +211,7 @@ export function Slot({ projectId, step, slot, waiting, refused, imageUrl, disabl
               <input
                 ref={file}
                 type="file"
-                accept={spec.kind === "video" ? "video/mp4,video/*,image/*" : "image/*"}
+                accept={spec.kind === "video" ? "video/mp4,video/quicktime,video/*,image/*" : "image/*"}
                 capture="environment"
                 className="sr-only"
                 aria-labelledby={`${id}-label`}

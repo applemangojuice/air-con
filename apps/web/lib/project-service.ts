@@ -224,7 +224,7 @@ export async function createProjectForQuote(
 
   const { data: quoteRow } = await db
     .from("quote_requests")
-    .select("id, customer_name, email, phone, survey, quote")
+    .select("id, customer_name, email, phone, survey, quote, attribution")
     .eq("id", quoteId)
     .maybeSingle();
   if (!quoteRow) return { error: "Quote not found", status: 404 };
@@ -236,7 +236,15 @@ export async function createProjectForQuote(
   let customerId: string | undefined;
   if (isPlausibleEmail(email)) {
     try {
-      customerId = (await customersRepo.findOrCreate({ email, name: name || undefined, phone })).id;
+      const customer = await customersRepo.findOrCreate({ email, name: name || undefined, phone });
+      customerId = customer.id;
+      // The funnel's consents (operational, and marketing only if ticked) become the customer's.
+      const consents = customersRepo.consentsFromQuote(quoteRow.attribution);
+      if (consents) {
+        await customersRepo.recordQuoteConsents(customer, consents).catch((err) => {
+          console.error("[project] recording the quote's consents failed (continuing):", err);
+        });
+      }
     } catch (err) {
       console.error("[project] customer link failed (continuing without):", err);
     }
@@ -278,8 +286,8 @@ export async function createProjectForQuote(
   try {
     await complianceRepo.insertMany(instantiateCompliance(project.id, () => crypto.randomUUID()));
   } catch (err) {
-    // The template may not be built yet (F5); readiness then says the checklist is missing.
-    console.warn(`[project] compliance checklist not created for ${project.id}:`, (err as Error).message);
+    // Readiness then says the checklist is missing, and ops can add it from the compliance page.
+    console.error(`[project] compliance checklist not created for ${project.id}:`, (err as Error).message);
   }
 
   await audit({
@@ -311,15 +319,14 @@ export function londonToday(now: Date = new Date()): string {
 }
 
 /**
- * Run a domain helper that a feature may not have implemented yet. A stub's
- * "not implemented" is expected and quiet; anything else is logged.
+ * Run a derived check. A failure is logged and the fact left unknown, which
+ * the gates treat as not passed (fail closed), never as passed.
  */
 function attempt<T>(label: string, fn: () => T): T | undefined {
   try {
     return fn();
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    if (!message.startsWith("not implemented")) console.error(`[readiness] ${label} failed:`, err);
+    console.error(`[readiness] ${label} failed:`, err);
     return undefined;
   }
 }
@@ -372,7 +379,7 @@ export async function buildReadinessContext(project: Project, actor?: StaffMembe
     ctx.surveyCompleteness = attempt("surveyCompleteness", () => {
       const c = surveyCompleteness(survey.data);
       return { pct: c.pct, missing: c.missing.map((m) => `${m.section}: ${m.item}`) };
-    }) ?? { pct: 0, missing: ["the completeness check isn't available yet"] };
+    }) ?? { pct: 0, missing: ["the completeness check failed: see the server log"] };
   }
 
   if (design) {

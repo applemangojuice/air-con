@@ -1,9 +1,11 @@
+import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { generateQuote, type Survey } from "@aircon/domain";
 import { logServerEvent } from "@/lib/analytics-server";
 import { appUrl } from "@/lib/brand";
 import { escapeHtml, quoteEmail, sendEmail, sendTeamEmail } from "@/lib/email";
+import { QUOTE_OWNER_COOKIE, quoteOwnerCookieOptions, readQuoteOwner, signQuoteOwner } from "@/lib/auth/quote-owner";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { UUID_RE, surveySchema } from "@/lib/schemas";
 import { getServiceClient } from "@/lib/supabase-server";
@@ -146,9 +148,8 @@ export async function POST(request: Request) {
     source,
     // Consents ride in the attribution JSON (no migration needed): who agreed
     // to what, when, and in which words (UK GDPR Art 7(1)).
-    // INTEGRATION(F1/F7): when a project (and its customers row) is created
-    // from this quote, copy attribution.consents.operational/marketing into
-    // customers.ops_consent / marketing_consent so marketing sends can check it.
+    // createProjectForQuote copies them onto customers.ops_consent /
+    // marketing_consent (repo/customers consentsFromQuote) when the project starts.
     attribution: { ...(attribution ?? {}), consents: consentRecord },
     referrer: attribution?.referrer ?? null,
     utm_source: attribution?.utmSource ?? null,
@@ -214,7 +215,14 @@ export async function POST(request: Request) {
   const emailed = await sendEmail(contact.email, email.subject, email.html);
   // Ping the team so a real submission is never missed.
   await notifyNewLead(contact, quote.totalGbp, survey.postcode, id, attribution, consents.marketing);
-  return NextResponse.json({ ok: true, demo: false, id, emailed });
+  const res = NextResponse.json({ ok: true, demo: false, id, emailed });
+  // This browser saved this quote, so "Book my home survey" can open the
+  // project made from it without an email round trip (lib/auth/quote-owner.ts).
+  // Only on a fresh save: the idempotent replay above returns before this.
+  const held = await readQuoteOwner((await cookies()).get(QUOTE_OWNER_COOKIE)?.value);
+  const grant = await signQuoteOwner(id, held).catch(() => null);
+  if (grant) res.cookies.set(QUOTE_OWNER_COOKIE, grant, quoteOwnerCookieOptions());
+  return res;
 }
 
 type Contact = { name: string; email: string; phone: string; timeframe: string };

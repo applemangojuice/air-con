@@ -2,9 +2,11 @@ import {
   COMPLIANCE_TEMPLATE,
   addComplianceEvidence,
   complianceTemplateFor,
+  createIssue,
   instantiateCompliance,
   reviewCompliance,
   syncCompliance,
+  transitionIssue,
   type ComplianceItem,
   type ComplianceStatus,
   type Issue,
@@ -108,7 +110,7 @@ async function raiseBlocker(item: ComplianceItem, staff: StaffMember): Promise<C
   }
   const now = new Date().toISOString();
   const t = complianceTemplateFor(item.key);
-  const issue: Issue = {
+  const raised = createIssue({
     id: crypto.randomUUID(),
     projectId: item.projectId,
     number: await issuesRepo.nextNumber(item.projectId),
@@ -116,15 +118,16 @@ async function raiseBlocker(item: ComplianceItem, staff: StaffMember): Promise<C
     title: `Compliance rejected: ${item.label}`,
     ...(item.note ? { detail: item.note } : {}),
     severity: item.statutory ? "high" : "medium",
-    status: "open",
     blocking: true,
     gate: item.gate,
     ownerRole: t?.ownerRole ?? "ops",
     nextAction: "Fix what the reviewer found, add the evidence, and send it for review again",
     raisedBy: { kind: "staff", id: staff.id, name: staff.name },
     raisedAt: now,
-    mediaIds: [],
     customerVisible: false,
+  });
+  const issue: Issue = {
+    ...raised,
     history: [{ at: now, by: staff.name, note: `Raised when the compliance item was rejected${item.note ? `: ${item.note}` : "."}`, status: "open" }],
   };
   const saved = await issuesRepo.insert(issue);
@@ -136,16 +139,8 @@ async function raiseBlocker(item: ComplianceItem, staff: StaffMember): Promise<C
 async function resolveBlocker(item: ComplianceItem, staff: StaffMember, to: ComplianceStatus): Promise<ComplianceItem> {
   const issue = await issuesRepo.get(item.blockerIssueId!);
   if (issue && ["open", "in-progress", "awaiting-customer"].includes(issue.status)) {
-    const now = new Date().toISOString();
-    // INTEGRATION(F6): transitionIssue owns issue transitions; this is the same shape, recorded directly.
     const resolution = `The compliance item was ${to === "approved" ? "approved" : "marked not applicable"} by ${staff.name}.`;
-    await issuesRepo.update({
-      ...issue,
-      status: "resolved",
-      resolution,
-      resolvedAt: now,
-      history: [...issue.history, { at: now, by: staff.name, note: resolution, status: "resolved" }],
-    });
+    await issuesRepo.update(transitionIssue(issue, "resolved", staff.name, resolution, new Date().toISOString()));
     await audit({ actor: staff, action: "issue.resolve", entity: "issue", entityId: issue.id, detail: { projectId: item.projectId, complianceKey: item.key } });
   }
   const { blockerIssueId: _drop, ...rest } = item;

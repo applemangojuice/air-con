@@ -11,9 +11,10 @@ import { primaryBtn } from "./ui";
  * server-side) and lands on the project page, where the survey slot is
  * picked. On a revisit with a project already started it simply opens it.
  */
-// INTEGRATION(F1): /p/[id] is the portal hub with the survey booking panel.
-// If F1 needs a customer session there, /api/projects must set it in this
-// response (the funnel has no other sign-in step).
+// /p/[id] is the portal hub with the survey booking panel. The browser that
+// saved the quote holds its quote-owner cookie (lib/auth/quote-owner.ts), which
+// opens this one project without an email round trip; anyone else gets the
+// hub's "we've emailed you a sign-in link" page.
 export function BookSurveyButton({
   quoteId,
   existingProjectId,

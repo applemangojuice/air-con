@@ -491,6 +491,8 @@ test("exceptions: out-of-window readings wait for the tech lead; accept or ask f
   j = { ...j, evidence: [...j.evidence, { id: "ev-bad", specId: gas.id, value: 45, at: "2026-11-10T13:00:00.000Z", by: "DEMO" }] };
   let p = runsheetProgress(j);
   assert.equal(p.openExceptions, 1);
+  assert.equal(p.missing, 0, "one out-of-range reading is listed once: to review, not also as a step to finish");
+  assert.deepEqual(commissioningSignErrors(j, TECH, "2026-11-10").filter((e) => /outside the window|still to finish/.test(e)), ["1 reading outside the window still to review."]);
   assert.equal(p.complete, false);
   assert.equal(stepView(j, flare).state, "exception");
   assert.equal(openExceptions(j).length, 1);

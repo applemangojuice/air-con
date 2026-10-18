@@ -63,20 +63,30 @@ export function decideProjectAccess(input: {
   session: Session | null;
   staff: StaffMember | null;
   projectId: string;
-  project: (AssignmentView & { customerId?: string | null }) | null;
+  project: (AssignmentView & { customerId?: string | null; quoteId?: string | null }) | null;
   perm?: Permission;
   allowCustomer?: boolean;
+  /**
+   * Quotes saved from this browser (lib/auth/quote-owner.ts). Opens the
+   * project made from one of them, and nothing else: never the customer
+   * record's other projects, since the email behind it is unverified.
+   */
+  quoteGrant?: readonly string[];
 }): ProjectAccess | null {
   const { session, staff, project } = input;
-  if (!session || !project) return null;
-  if (session.kind === "staff") {
+  if (!project) return null;
+  if (session?.kind === "staff") {
     if (!staff || staff.id !== session.staffId) return null;
     return staffCanAccessProject(staff, project, input.perm) ? { kind: "staff", staff } : null;
   }
   if (!input.allowCustomer) return null;
-  return customerCanAccessProject(session, input.projectId, project.customerId)
-    ? { kind: "customer", customerId: session.customerId }
-    : null;
+  if (session && customerCanAccessProject(session, input.projectId, project.customerId)) {
+    return { kind: "customer", customerId: session.customerId };
+  }
+  if (project.quoteId && project.customerId && input.quoteGrant?.includes(project.quoteId.toLowerCase())) {
+    return { kind: "customer", customerId: project.customerId };
+  }
+  return null;
 }
 
 /** What a staff-only page or route should do. */

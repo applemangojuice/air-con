@@ -96,7 +96,7 @@ const DESIGN: DesignRecord = {
 };
 
 const READY: PilotSettings = mergeSettings({
-  company: { ...DEFAULT_SETTINGS.company, geographicAddress: "DEMO: 1 Demo Street", complaintsProcess: "DEMO: call us." },
+  company: { ...DEFAULT_SETTINGS.company, geographicAddress: "DEMO: 1 Demo Street", phone: "020 7946 0123", complaintsProcess: "DEMO: call us." },
   warranty: { workmanshipYears: 2, manufacturerSummary: "DEMO: five years' parts once registered." },
 });
 

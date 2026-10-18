@@ -73,6 +73,7 @@ const REVIEW_URL = "https://reviews.example/dang-its-hot";
 const SETTINGS: PilotSettings = mergeSettings({
   company: {
     geographicAddress: "DEMO, 1 Example Street, London SW16 2BE",
+    phone: "020 7946 0123",
     complaintsProcess: "DEMO: tell us by phone or email and we reply within two working days.",
     adr: "DEMO dispute scheme: disputes.example",
     workmanshipGuarantee: "DEMO: call us and we come back to put it right.",
@@ -253,7 +254,7 @@ test("follow-ups carry an opt-out line; nothing else does", () => {
   for (const event of ALL_EVENTS) {
     if (COMMS_EVENTS[event].audience !== "customer") continue;
     const m = render(event, FULL[event] as never);
-    const has = /Don't want follow-up emails like this one\? Email hello@dang\.ac or call 0800 000 0000 and we'll stop them\./.test(m.text);
+    const has = /Don't want follow-up emails like this one\? Email hello@dang\.ac or call 020 7946 0123 and we'll stop them\./.test(m.text);
     assert.equal(has, FOLLOW_UP_EVENTS.has(event), `${event}: opt-out line`);
   }
 });
@@ -411,7 +412,7 @@ test("the proposal email carries the Schedule 2 information, the instructions an
   // (b) (c): who we are, where, how to reach us.
   assert.match(t, /Business: Dang It's Hot Ltd, trading as Dang, It's Hot/);
   assert.match(t, /Address: DEMO, 1 Example Street, London SW16 2BE/);
-  assert.match(t, /Phone: 0800 000 0000/);
+  assert.match(t, /Phone: 020 7946 0123/);
   assert.match(t, /Email: hello@dang\.ac/);
   // (a): main characteristics.
   assert.match(t, /We supply the equipment below, install it, then connect, test and commission it\./);
@@ -1214,4 +1215,29 @@ test("pure helpers: consent, addresses, headline", () => {
   assert.equal(headline([{ channel: "email", status: "failed" }, { channel: "sms", status: "sent" }]), "sent");
   assert.equal(headline([{ channel: "email", status: "no-recipient" }]), "no-recipient");
   assert.equal(headline([]), "no-recipient");
+});
+
+test("the shipped stand-in phone number never reaches a customer: emails and texts say how to email us instead", () => {
+  const placeholder = mergeSettings({ ...SETTINGS, company: { ...SETTINGS.company, phone: "0800 000 0000" } });
+  for (const event of ALL_EVENTS) {
+    const m = render(event, FULL[event] as never, ctxFor({}, placeholder));
+    assert.ok(!/0800 000 0000/.test(m.text), `${event}: no placeholder number in the email`);
+    if (m.sms) assert.ok(!/0800 000 0000/.test(m.sms), `${event}: no placeholder number in the text`);
+  }
+});
+
+test("the end-of-day update is signed by the crew lead, never an arbitrary subcontractor", () => {
+  const p = baseProject();
+  type Crew = Project["booking"]["crew"][number];
+  const sub: Crew = { staffId: "sub-1", name: "DEMO Xan (subcontractor)", role: "installer", external: true };
+  const lead: Crew = { staffId: "lead-1", name: "DEMO Priya (tech lead)", role: "tech-lead", external: false };
+  const fitter: Crew = { staffId: "fit-1", name: "DEMO Joe", role: "installer", external: false };
+  const ended: ProjectAction = { type: "install-day-ended", n: 1, summary: "Day 1 done", customerUpdate: { text: "Indoor units are up.", mediaIds: [] } };
+  const signer = (crew: Crew[], actor?: { staffId?: string; name?: string }) =>
+    (commsForAction({ ...p, booking: { ...p.booking, crew } }, ended, actor)[0]?.data as CommsData["install-day-update"] | undefined)?.by;
+
+  assert.equal(signer([sub, lead]), lead.name, "the tech lead, even listed second");
+  assert.equal(signer([sub, fitter], { staffId: sub.staffId, name: sub.name }), sub.name, "no tech lead: whoever ended the day");
+  assert.equal(signer([sub, fitter]), fitter.name, "no tech lead, no actor: an employed installer");
+  assert.equal(signer([sub]), undefined, "never a subcontractor nobody chose");
 });

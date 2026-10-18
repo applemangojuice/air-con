@@ -95,8 +95,8 @@ export default async function OnePagerPage() {
             </h2>
             <ul className="mt-2 ml-4 list-disc space-y-1 text-ink-700">
               <li>
-                Two-minute self-survey → a <strong>guaranteed fixed price</strong>, priced by a
-                deterministic engine, not a salesperson.
+                Two-minute self-survey → an <strong>instant price</strong> from a deterministic
+                engine, not a salesperson, confirmed at one home survey.
               </li>
               <li>
                 A property-intelligence book (EPC + planning + audits) that designs the install

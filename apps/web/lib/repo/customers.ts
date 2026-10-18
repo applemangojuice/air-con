@@ -51,6 +51,48 @@ function toRow(c: CustomerRecord): Row {
   };
 }
 
+/**
+ * The consents the quote funnel recorded (`quote_requests.attribution.consents`,
+ * components/site/claims.ts quoteConsentRecord) as customer consent facts.
+ * Null when the quote carries none (older quotes, ops-created projects).
+ * Marketing is only ever a consent when it was actually ticked.
+ */
+export function consentsFromQuote(attribution: unknown): { ops: Consent | null; marketing: Consent | null; at: string } | null {
+  if (typeof attribution !== "object" || attribution === null) return null;
+  const raw = (attribution as { consents?: unknown }).consents;
+  if (typeof raw !== "object" || raw === null) return null;
+  type Entry = { given?: unknown; at?: unknown; text?: unknown; version?: unknown; channels?: unknown; source?: unknown };
+  const fact = (e: unknown): Consent | null => {
+    if (typeof e !== "object" || e === null) return null;
+    const x = e as Entry;
+    if (x.given !== true || typeof x.at !== "string" || typeof x.text !== "string") return null;
+    const channels = Array.isArray(x.channels) ? x.channels.filter((c): c is string => typeof c === "string") : [];
+    const version = typeof x.version === "string" ? x.version : "unversioned";
+    const source = typeof x.source === "string" ? x.source : "quote-funnel";
+    return { at: x.at, source: `${source} (${version}${channels.length ? `; ${channels.join(", ")}` : ""})`, text: x.text };
+  };
+  const { operational, marketing } = raw as { operational?: Entry; marketing?: Entry };
+  const at = typeof operational?.at === "string" ? operational.at : typeof marketing?.at === "string" ? marketing.at : "";
+  if (!at) return null;
+  return { ops: fact(operational), marketing: fact(marketing), at };
+}
+
+/**
+ * Record a quote's consents on the customer. The latest answer wins: a newer
+ * quote with marketing unticked clears an older marketing consent (never
+ * assume one), and an older quote never overwrites a newer record.
+ */
+export async function recordQuoteConsents(customer: CustomerRecord, consents: NonNullable<ReturnType<typeof consentsFromQuote>>): Promise<CustomerRecord> {
+  // The newest answer on record (a cleared marketing consent leaves the operational one's time behind).
+  const latest = [customer.opsConsent?.at, customer.marketingConsent?.at].filter((x): x is string => Boolean(x)).sort().at(-1);
+  if (latest && latest > consents.at) return customer;
+  return update({
+    ...customer,
+    opsConsent: consents.ops ?? customer.opsConsent,
+    marketingConsent: consents.marketing,
+  });
+}
+
 export async function get(id: string): Promise<CustomerRecord | null> {
   if (!isUuid(id)) return null;
   const data = must(await db().from(TABLE).select("*").eq("id", id).maybeSingle(), "customers get");

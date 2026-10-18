@@ -19,6 +19,7 @@ import { ActionForm } from "../../../ops/projects/[id]/booking/_f5/action-form";
 import { FlashRegion } from "../../../ops/projects/[id]/booking/_f5/flash";
 import { CopyButton } from "./copy-button";
 import { sentTransferAction, simulatePaymentAction } from "./actions";
+import { reachUs, realPhone } from "@/components/site/claims";
 
 export const metadata: Metadata = { title: "Your payments", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -157,7 +158,7 @@ export default async function PayPage({
                   testMode={card.mode === "test"}
                   simulate={card.simulate}
                   projectId={id}
-                  phone={settings.company.phone}
+                  reach={reachUs(settings.company)}
                 />
               ))}
             </ol>
@@ -203,11 +204,18 @@ export default async function PayPage({
 
         <footer className="mt-12 text-sm text-ink-500">
           <p>
-            Questions about a payment? Call {settings.company.tradingName} on{" "}
-            <a className="font-semibold text-ink-900 underline" href={`tel:${settings.company.phone.replace(/\s+/g, "")}`}>
-              {settings.company.phone}
-            </a>{" "}
-            or email{" "}
+            Questions about a payment?{" "}
+            {realPhone(settings.company.phone) ? (
+              <>
+                Call {settings.company.tradingName} on{" "}
+                <a className="font-semibold text-ink-900 underline" href={`tel:${settings.company.phone.replace(/\s+/g, "")}`}>
+                  {settings.company.phone}
+                </a>{" "}
+                or email{" "}
+              </>
+            ) : (
+              <>Email {settings.company.tradingName} at </>
+            )}
             <a className="font-semibold text-ink-900 underline" href={`mailto:${settings.company.email}`}>
               {settings.company.email}
             </a>
@@ -232,7 +240,7 @@ function InvoiceCard({
   testMode,
   simulate,
   projectId,
-  phone,
+  reach,
 }: {
   inv: Invoice & { owedPence: number };
   overdue: boolean;
@@ -242,7 +250,8 @@ function InvoiceCard({
   testMode: boolean;
   simulate: boolean;
   projectId: string;
-  phone: string;
+  /** "call us on …", or "email us at …" while only the placeholder number is set. */
+  reach: string;
 }) {
   const partPaid = inv.owedPence < inv.totalPence;
   return (
@@ -325,11 +334,7 @@ function InvoiceCard({
       {!bank && !cardOn && !simulate && (
         <section className="border-t border-line px-5 py-4">
           <p className="text-ink-900">
-            To pay, call us on{" "}
-            <a className="font-semibold underline" href={`tel:${phone.replace(/\s+/g, "")}`}>
-              {phone}
-            </a>{" "}
-            and we&apos;ll give you our bank details.
+            To pay, {reach} and we&apos;ll give you our bank details.
           </p>
         </section>
       )}

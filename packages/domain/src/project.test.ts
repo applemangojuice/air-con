@@ -110,6 +110,7 @@ const SPARKY = staff({
 /** A business that has filled in everything the pre-contract information needs (DEMO details). */
 const READY_COMPANY = {
   geographicAddress: "DEMO, 1 Example Street, London SW16 2BE",
+  phone: "020 7946 0123",
   complaintsProcess: "DEMO: tell us by phone or email; we reply within two working days.",
 };
 const READY_WARRANTY = { workmanshipYears: 0, manufacturerSummary: "DEMO: the manufacturer's warranty, registered by us." };
@@ -517,7 +518,7 @@ test("proposal-issue gate: email consent, an email address, and every Schedule 2
   const defaults = blockersFor(consented, c({ settings: DEFAULT_SETTINGS }), "proposal-issue").find((b) => b.code === "schedule2-incomplete");
   assert.equal(defaults?.severity, "block");
   assert.equal(defaults?.owner, "admin");
-  assert.match(defaults!.message, /geographic address, complaints process, guarantee statement \(or explicit 'none'\)/);
+  assert.match(defaults!.message, /geographic address, phone, complaints process, guarantee statement \(or explicit 'none'\)/);
   const noPhone = blockersFor(consented, c({ settings: ready({ company: { phone: " " } }) }), "proposal-issue");
   assert.match(noPhone.find((b) => b.code === "schedule2-incomplete")!.message, /: phone\.$/);
 

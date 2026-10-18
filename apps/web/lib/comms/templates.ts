@@ -9,6 +9,7 @@ import {
   cancellationSentence,
   earlyStartWording,
   effectiveTaxCode,
+  isPlaceholderPhone,
   schedule2Missing,
   type CommsEventId,
   type ContractType,
@@ -462,7 +463,7 @@ function wrap(event: CommsEventId, ctx: TemplateContext, d: Draft): RenderedMess
     tail.push({ small: `Team alert from the ${company.tradingName} platform.` });
   } else {
     tail.push({ p: `Thanks,\nThe ${company.tradingName} team` });
-    tail.push({ small: `Questions? Call us on ${company.phone} or email ${company.email}.` });
+    tail.push({ small: phoneOf(ctx.settings) ? `Questions? Call us on ${company.phone} or email ${company.email}.` : `Questions? Email us at ${company.email}.` });
     if (FOLLOW_UP_EVENTS.has(event)) tail.push({ small: optOutLine(ctx) });
     if (event !== "magic-link" && (ctx.addressLine || ctx.postcode)) {
       tail.push({ small: `This message is about your project at ${place(ctx)}.` });
@@ -495,10 +496,26 @@ function gsm7Only(text: string): string {
     .replace(/ {2,}/g, " ");
 }
 
+/**
+ * The phone number to print, or null while settings hold only the shipped
+ * stand-in ("0800 000 0000"): a customer is never sent a number nobody
+ * answers. `reach` is the mid-sentence "call 020 …" / "email hello@…".
+ */
+const phoneOf = (settings: PilotSettings): string | null =>
+  isPlaceholderPhone(settings.company.phone) ? null : settings.company.phone.trim();
+function reach(settings: PilotSettings, opts: { capital?: boolean; us?: boolean } = {}): string {
+  const phone = phoneOf(settings);
+  const verb = phone ? "call" : "email";
+  const head = opts.capital ? verb[0]!.toUpperCase() + verb.slice(1) : verb;
+  const target = phone ?? settings.company.email;
+  return opts.us ? `${head} us ${phone ? "on" : "at"} ${target}` : `${head} ${target}`;
+}
+
 /** Every follow-up ends with this (FOLLOW_UP_EVENTS). The outbox honours it: see aftercare-opt-out. */
 function optOutLine(ctx: TemplateContext): string {
-  const { email, phone } = ctx.settings.company;
-  return `Don't want follow-up emails like this one? Email ${email} or call ${phone} and we'll stop them. We'll still contact you about any open work, problem or payment.`;
+  const { email } = ctx.settings.company;
+  const phone = phoneOf(ctx.settings);
+  return `Don't want follow-up emails like this one? Email ${email}${phone ? ` or call ${phone}` : ""} and we'll stop them. We'll still contact you about any open work, problem or payment.`;
 }
 
 /* ------------------------------------------------------------------ */
@@ -512,7 +529,7 @@ const traderOf = (settings: PilotSettings): TraderDetails => {
     tradingName: c.tradingName,
     geographicAddress: c.geographicAddress,
     registeredAddress: c.registeredAddress,
-    phone: c.phone,
+    ...(isPlaceholderPhone(c.phone) ? {} : { phone: c.phone }),
     email: c.email,
   };
 };
@@ -552,7 +569,8 @@ function preContractInfo(ctx: TemplateContext, x: ProposalDetails & { cancellati
   if (company.geographicAddress.trim()) who.push(["Address", company.geographicAddress.trim()]);
   const office = company.registeredAddress?.trim();
   if (office && office !== company.geographicAddress.trim()) who.push(["Registered office", office]);
-  who.push(["Phone", company.phone], ["Email", company.email]);
+  if (!isPlaceholderPhone(company.phone)) who.push(["Phone", company.phone]);
+  who.push(["Email", company.email]);
   out.push({ h: "Who we are" }, { facts: who });
 
   // (a): the main characteristics.
@@ -677,7 +695,7 @@ function cancellationAppendix(ctx: TemplateContext, contractType: ContractType |
 type Renderer<E extends CommsEventId> = (ctx: TemplateContext, data: CommsData[E]) => Draft;
 
 /** Ends every text: our number, and the truth about replies. */
-const smsTail = (ctx: TemplateContext) => `Questions? Call ${ctx.settings.company.phone}. Texts to this number aren't read.`;
+const smsTail = (ctx: TemplateContext) => `Questions? ${reach(ctx.settings, { capital: true })}. Texts to this number aren't read.`;
 const smsHead = (ctx: TemplateContext) => `${ctx.settings.company.tradingName}:`;
 
 const TEMPLATES: { [E in CommsEventId]: Renderer<E> } = {
@@ -762,9 +780,9 @@ const TEMPLATES: { [E in CommsEventId]: Renderer<E> } = {
       ],
       cta: "See your survey details",
       sms: [
-        `${smsHead(ctx)} Hi ${ctx.firstName}, a reminder that your ${video ? "video" : "home"} survey is on ${shortDayTime(d.scheduledFor)}${d.surveyorName ? ` with ${d.surveyorName}` : ""}.${video ? "" : " Please make sure we can reach your fuse board and loft."} To change it, call ${ctx.settings.company.phone}. Texts to this number aren't read.`,
-        `${smsHead(ctx)} Hi ${ctx.firstName}, reminder: your survey is on ${shortDayTime(d.scheduledFor)}. To change it, call ${ctx.settings.company.phone}. Texts to this number aren't read.`,
-        `${smsHead(ctx)} Survey reminder: ${shortDayTime(d.scheduledFor)}. Call ${ctx.settings.company.phone} to change it. Texts aren't read.`,
+        `${smsHead(ctx)} Hi ${ctx.firstName}, a reminder that your ${video ? "video" : "home"} survey is on ${shortDayTime(d.scheduledFor)}${d.surveyorName ? ` with ${d.surveyorName}` : ""}.${video ? "" : " Please make sure we can reach your fuse board and loft."} To change it, ${reach(ctx.settings)}. Texts to this number aren't read.`,
+        `${smsHead(ctx)} Hi ${ctx.firstName}, reminder: your survey is on ${shortDayTime(d.scheduledFor)}. To change it, ${reach(ctx.settings)}. Texts to this number aren't read.`,
+        `${smsHead(ctx)} Survey reminder: ${shortDayTime(d.scheduledFor)}. ${reach(ctx.settings, { capital: true })} to change it. Texts aren't read.`,
       ],
     };
   },
@@ -962,7 +980,7 @@ const TEMPLATES: { [E in CommsEventId]: Renderer<E> } = {
           : "By bank transfer: call us for our bank details, and use the invoice number as the reference.",
       );
     }
-    how.push(ways.length ? { list: ways } : { p: `Call us on ${company.phone} to pay.` });
+    how.push(ways.length ? { list: ways } : { p: `${reach(ctx.settings, { capital: true, us: true })} to pay.` });
     if (payments.methods.includes("bank-transfer") && company.bank) {
       how.push({
         facts: [
@@ -1269,7 +1287,7 @@ const TEMPLATES: { [E in CommsEventId]: Renderer<E> } = {
     body: [
       { p: ["Your system at ", place(ctx), " is due its yearly service around ", { strong: dateLong(d.dueOn) }, "."] },
       { p: "A yearly service keeps it running efficiently, and manufacturer warranties often require one." },
-      { p: `To book it, call us on ${ctx.settings.company.phone}.` },
+      { p: `To book it, ${reach(ctx.settings, { us: true })}.` },
     ],
     cta: "Open your project",
   }),
@@ -1311,7 +1329,7 @@ function onMyWay(ctx: TemplateContext, d: { etaMinutes: number; at: string; name
     sms: [
       `${smsHead(ctx)} Hi ${ctx.firstName}, ${line} ${smsTail(ctx)}`,
       `${smsHead(ctx)} ${line} ${smsTail(ctx)}`,
-      `${smsHead(ctx)} We're on the way, arriving ${arriving}. Call ${ctx.settings.company.phone}. Texts aren't read.`,
+      `${smsHead(ctx)} We're on the way, arriving ${arriving}. ${reach(ctx.settings, { capital: true })}. Texts aren't read.`,
     ],
   };
 }

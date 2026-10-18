@@ -34,6 +34,7 @@ import { getDocument, isCustomerVisible } from "@/lib/documents-server";
 import { documentPhotos } from "@/lib/portal-server";
 import { loadProject } from "@/lib/project-service";
 import { getSettings } from "@/lib/settings-server";
+import { reachUs, realPhone } from "@/components/site/claims";
 
 export const metadata: Metadata = {
   title: "Your document",
@@ -66,7 +67,7 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
       <PortalShell width="narrow">
         <div role="alert" className="rounded-3xl border border-line bg-white p-6 sm:p-8">
           <h1 className="font-display text-2xl text-ink-900">We couldn&apos;t open this document just now</h1>
-          <p className="mt-2 text-[15px] text-ink-700">Please try again in a moment, or call us on {settings.company.phone}.</p>
+          <p className="mt-2 text-[15px] text-ink-700">Please try again in a moment, or {reachUs(settings.company)}.</p>
         </div>
       </PortalShell>
     );
@@ -85,7 +86,7 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
             first.
           </p>
           <div className="mt-6">
-            <LinkRequest target={{ documentId: id }} phone={settings.company.phone} />
+            <LinkRequest target={{ documentId: id }} phone={realPhone(settings.company.phone)} email={settings.company.email} />
           </div>
         </div>
       </PortalShell>
@@ -171,7 +172,7 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
           body
         ) : (
           <p role="alert" className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-            This document&apos;s contents can&apos;t be displayed. Please call us on {settings.company.phone} and we&apos;ll send you a copy.
+            This document&apos;s contents can&apos;t be displayed. Please {reachUs(settings.company)} and we&apos;ll send you a copy.
           </p>
         )}
       </DocSheet>

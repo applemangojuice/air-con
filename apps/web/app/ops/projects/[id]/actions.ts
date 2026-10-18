@@ -274,14 +274,9 @@ const issueSchema = z.object({
   customerVisible: z.boolean(),
 });
 
-/** Kind defaults from the domain where F6 has built them; the form's own values otherwise. */
+/** The domain's defaults for this kind of issue (null for a kind the form shouldn't have sent). */
 function kindDefaults(kind: IssueKind) {
-  try {
-    return defaultsForKind(kind);
-  } catch {
-    // INTEGRATION(f6): defaultsForKind prefills severity, blocking, owner and visibility once implemented.
-    return null;
-  }
+  return kind in ISSUE_KIND_LABEL ? defaultsForKind(kind) : null;
 }
 
 export async function raiseIssueAction(projectId: string, fd: FormData): Promise<ActionResult> {
@@ -353,10 +348,7 @@ export async function transitionIssueAction(projectId: string, fd: FormData): Pr
   try {
     next = transitionIssue(issue, to, staff.name, parsed.data.note, new Date().toISOString());
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    // INTEGRATION(f6): transitionIssue is the field module's; until it lands status changes can't be made here.
-    if (message.startsWith("not implemented")) return refused("Issue status changes arrive with the field app update. Raise and track issues here meanwhile.");
-    return refused(message);
+    return refused(err instanceof Error ? err.message : String(err));
   }
   try {
     await issuesRepo.update(next);

@@ -1,4 +1,6 @@
 import {
+  MEDIA_MAX_BYTES,
+  MEDIA_UPLOAD_CONTENT_TYPES,
   PHOTO_TAGS,
   can,
   validateAnnotations,
@@ -56,13 +58,13 @@ export class MediaError extends Error {
   }
 }
 
-/** What a phone or laptop may upload. */
-export const MEDIA_CONTENT_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic", "application/pdf", "video/mp4"] as const;
+/** What a phone or laptop may upload: the domain's shared rule (iPhone .mov included). */
+export const MEDIA_CONTENT_TYPES = MEDIA_UPLOAD_CONTENT_TYPES;
 /** Plus what only the system stores (generated drawings, demo photos). */
 export const SYSTEM_MEDIA_CONTENT_TYPES = [...MEDIA_CONTENT_TYPES, "image/svg+xml"] as const;
 
-/** The same ceiling as the local storage route. */
-export const MEDIA_MAX_BYTES = 25 * 1024 * 1024;
+/** The same ceiling as the local storage route (the domain's shared rule). */
+export { MEDIA_MAX_BYTES };
 
 /** The signed upload URL's lifetime on both backends; tickets last as long. */
 export const UPLOAD_TICKET_TTL_SECONDS = 2 * 60 * 60;
@@ -110,6 +112,7 @@ const EXTENSION: Record<string, string> = {
   "image/svg+xml": ".svg",
   "application/pdf": ".pdf",
   "video/mp4": ".mp4",
+  "video/quicktime": ".mov",
 };
 
 /**
@@ -178,9 +181,11 @@ function pointOf(v: unknown): Point | null {
 }
 
 /**
- * The minimal safe check used until F2's `validateAnnotations` lands, and
- * the same contract: normalised 0..1 coordinates (clamped), known shapes
- * only, junk dropped, short labels, unique ids. Never throws.
+ * A lenient cleaner with the validator's contract: normalised 0..1
+ * coordinates (clamped), known shapes only, junk dropped, short labels,
+ * unique ids. Never throws. Saves go through F2's strict
+ * `validateAnnotations` (validateAnnotationsSafe below); this is for reading
+ * drawings of unknown provenance without refusing them.
  */
 export function cleanAnnotations(input: unknown): Annotation[] {
   if (!Array.isArray(input)) return [];
@@ -251,15 +256,14 @@ export function cleanAnnotations(input: unknown): Annotation[] {
 }
 
 /**
- * F2's validator when it exists; this module's safe check while it's still
- * a stub. A real validation failure is an error for the caller to show.
+ * F2's validator (the domain's validateAnnotations), as a result: a
+ * validation failure is an error for the caller to show.
  */
 export function validateAnnotationsSafe(input: unknown): { ok: true; annotations: Annotation[] } | { ok: false; error: string } {
   try {
     return { ok: true, annotations: validateAnnotations(input) };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    if (message.startsWith("not implemented")) return { ok: true, annotations: cleanAnnotations(input) };
     return { ok: false, error: message || "Those drawings couldn't be read." };
   }
 }
@@ -361,7 +365,7 @@ export async function createMediaUpload(input: MediaUploadInput, opts: { now?: D
   if (!isUuid(input.projectId)) throw new MediaError("Unknown project.", 404);
   const contentType = normaliseContentType(input.contentType);
   if (!mediaContentTypeAllowed(contentType)) {
-    throw new MediaError("That kind of file can't be uploaded. Photos (JPEG, PNG, WebP, HEIC), PDFs and MP4 videos only.", 415);
+    throw new MediaError("That kind of file can't be uploaded. Photos (JPEG, PNG, WebP, HEIC), PDFs and videos (MP4, .mov) only.", 415);
   }
   if (!isTag(input.tag)) throw new MediaError("Unknown photo tag.");
   if (!isSource(input.source)) throw new MediaError("Unknown media source.");

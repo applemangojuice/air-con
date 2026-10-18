@@ -14,9 +14,11 @@ import {
   type ProjectStageId,
   type StaffMember,
   type StaffRole,
+  PROPOSAL_TURNAROUND_WORKING_DAYS,
 } from "@aircon/domain";
 import { addWorkingDays, blockLabel, shortDay } from "./schedule.ts";
 import type { HubFacts, PersonCard } from "./types.ts";
+import { realPhone } from "@/components/site/claims";
 
 /**
  * Pure pieces of the customer hub: what to strip before anything reaches a
@@ -56,7 +58,7 @@ export function hubFacts(project: Project, settings: PilotSettings, today: strin
     stages,
     company: {
       tradingName: settings.company.tradingName,
-      phone: settings.company.phone,
+      phone: realPhone(settings.company.phone),
       email: settings.company.email,
       ...(settings.company.reviewUrl ? { reviewUrl: settings.company.reviewUrl } : {}),
     },
@@ -119,8 +121,8 @@ export function defaultStage(project: Project): ProjectStageId {
 /* What happens next, when it's on us                                  */
 /* ------------------------------------------------------------------ */
 
-/** Working days we tell customers a proposal takes after the survey (matches the survey-complete email). */
-export const PROPOSAL_TURNAROUND_WORKING_DAYS = 5;
+/** Working days we tell customers a proposal takes after the survey: the domain's one number (the survey-complete email uses it too). */
+export { PROPOSAL_TURNAROUND_WORKING_DAYS };
 
 /** When we said the proposal would arrive, or null before the survey. */
 export function proposalReadyBy(project: Project): string | null {

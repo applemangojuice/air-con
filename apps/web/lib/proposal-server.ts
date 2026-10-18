@@ -147,19 +147,19 @@ async function quoteSurvey(quoteId: string): Promise<Survey | null> {
 }
 
 /**
- * The list price reference: the engine re-run on the measured survey when
- * that conversion exists, else on the customer's own survey (said plainly),
+ * The list price reference: the engine re-run on the measured survey (F2's
+ * measuredToEngineSurvey), else on the customer's own survey (said plainly),
  * else none.
  */
 export async function engineReference(project: Project, survey: SurveyRecord | null): Promise<EngineReference> {
   const base = await quoteSurvey(project.quoteId);
   if (survey && base) {
     try {
-      // INTEGRATION(F2): measuredToEngineSurvey turns the measured rooms into engine input (areas, runs).
+      // measuredToEngineSurvey turns the measured rooms into engine input (areas, runs).
       const measured = measuredToEngineSurvey(survey.data, base);
       return { netPence: engineListNetPence(measured), source: "measured", note: "The pricing engine re-run on the measured survey." };
     } catch (err) {
-      if (!(err instanceof Error && err.message.startsWith("not implemented"))) console.error("[proposal] measured engine price failed:", err);
+      console.error("[proposal] measured engine price failed:", err);
     }
   }
   if (base) {
@@ -167,7 +167,9 @@ export async function engineReference(project: Project, survey: SurveyRecord | n
       return {
         netPence: engineListNetPence(base),
         source: "self-survey",
-        note: "The pricing engine on the customer's own online survey (the measured-survey re-run isn't available yet).",
+        note: survey
+          ? "The pricing engine on the customer's own online survey (the measured survey couldn't be re-run: see the server log)."
+          : "The pricing engine on the customer's own online survey (no measured survey yet).",
       };
     } catch (err) {
       console.error("[proposal] engine price failed:", err);

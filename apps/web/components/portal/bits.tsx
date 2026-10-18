@@ -6,6 +6,38 @@ import { STAFF_READ_ONLY, canAct, useHub } from "./controller";
 import type { PersonCard, PortalRequest } from "./types";
 
 /* ------------------------------------------------------------------ */
+/* Reaching us                                                         */
+/* ------------------------------------------------------------------ */
+
+type Reach = { phone: string | null; email: string };
+
+/**
+ * How to reach us, mid-sentence: the real phone number as a tel: link, or
+ * our email when settings only hold the placeholder number (which is never
+ * printed; components/site/claims.ts realPhone).
+ */
+export function ReachUs({ company, capital = false, className = "font-semibold underline" }: { company: Reach; capital?: boolean; className?: string }) {
+  if (company.phone) {
+    return (
+      <>
+        {capital ? "Call" : "call"} us on{" "}
+        <a className={className} href={`tel:${company.phone.replace(/\s+/g, "")}`}>
+          {company.phone}
+        </a>
+      </>
+    );
+  }
+  return (
+    <>
+      {capital ? "Email" : "email"} us at{" "}
+      <a className={className} href={`mailto:${company.email}`}>
+        {company.email}
+      </a>
+    </>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /* Actions                                                             */
 /* ------------------------------------------------------------------ */
 

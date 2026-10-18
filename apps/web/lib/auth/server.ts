@@ -17,6 +17,7 @@ import {
   type AssignmentView,
   type ProjectAccess,
 } from "./access";
+import { QUOTE_OWNER_COOKIE, readQuoteOwner } from "./quote-owner";
 import { DEMO_STAFF, demoStaffById, isDemoStaffId, type DemoRoleKey } from "./demo-staff";
 import {
   SESSION_COOKIE,
@@ -59,6 +60,12 @@ const BREAK_GLASS_STAFF_ID = "break-glass";
 export const getSession = cache(async (): Promise<Session | null> => {
   const store = await cookies();
   return verifySession(store.get(SESSION_COOKIE)?.value);
+});
+
+/** Quotes saved from this browser (lib/auth/quote-owner.ts); [] when none. */
+export const quoteOwnerGrant = cache(async (): Promise<string[]> => {
+  const store = await cookies();
+  return readQuoteOwner(store.get(QUOTE_OWNER_COOKIE)?.value);
 });
 
 export function staffSession(staff: StaffMember, ttlSeconds?: number): StaffSession {
@@ -213,22 +220,29 @@ export async function requireStaffApi(req: Request, perm?: Permission): Promise<
  * May the signed-in person open this project? Staff: board-wide view, or
  * assigned as surveyor or crew (subcontractors only ever the latter), plus
  * `perm` when given. Customers: only with `allowCustomer`, and only their
- * own projects. Anything else is null, which callers turn into a 404.
+ * own projects, or the project made from a quote this browser saved (the
+ * funnel's quote-owner cookie). Anything else is null, which callers turn
+ * into a 404.
  */
 export async function requireProjectAccess(
   projectId: string,
   opts: { perm?: Permission; allowCustomer?: boolean } = {},
 ): Promise<ProjectAccess | null> {
   const session = await getSession();
-  if (!session) return null;
+  const quoteGrant = opts.allowCustomer && session?.kind !== "staff" ? await quoteOwnerGrant() : [];
+  if (!session && quoteGrant.length === 0) return null;
   const db = getServiceClient();
   if (!db) return null;
-  const { data: row } = await db.from("projects").select("id, customer_id, project").eq("id", projectId).maybeSingle();
+  const { data: row } = await db.from("projects").select("id, customer_id, quote_id, project").eq("id", projectId).maybeSingle();
   const project = row
-    ? { ...((row.project ?? {}) as AssignmentView), customerId: (row.customer_id as string | null) ?? null }
+    ? {
+        ...((row.project ?? {}) as AssignmentView),
+        customerId: (row.customer_id as string | null) ?? null,
+        quoteId: (row.quote_id as string | null) ?? null,
+      }
     : null;
-  const staff = session.kind === "staff" ? await currentStaff() : null;
-  return decideProjectAccess({ session, staff, projectId, project, ...opts });
+  const staff = session?.kind === "staff" ? await currentStaff() : null;
+  return decideProjectAccess({ session, staff, projectId, project, quoteGrant, ...opts });
 }
 
 /* ------------------------------------------------------------------ */

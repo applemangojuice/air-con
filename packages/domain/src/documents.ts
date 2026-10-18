@@ -222,6 +222,13 @@ export interface HandoverPackSnapshot extends DocumentHeader {
   fgas: FgasRecord[];
   care: string[];
   contacts: { label: string; name?: string; phone?: string; email?: string }[];
+  /**
+   * The as-built photos: the customer-visible "completed" and "progress"
+   * photos as they stood when the pack was published, newest first. Frozen
+   * like the rest of the pack, so a later edit doesn't change what was handed
+   * over. Absent on packs published before this was recorded.
+   */
+  asBuilt?: { mediaId: string; caption?: string }[];
 }
 
 export interface SurveyReportSnapshot extends DocumentHeader {

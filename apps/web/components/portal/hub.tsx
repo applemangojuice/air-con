@@ -85,7 +85,7 @@ function nextDetail(label: string, data: HubData): string | null {
     case "Tell us how it's going":
       return "Two minutes, and it genuinely helps us get better.";
     case "Ask us for an updated proposal":
-      return `Call ${data.company.phone} or email ${data.company.email} and we'll refresh it.`;
+      return data.company.phone ? `Call ${data.company.phone} or email ${data.company.email} and we'll refresh it.` : `Email ${data.company.email} and we'll refresh it.`;
     default:
       return null;
   }

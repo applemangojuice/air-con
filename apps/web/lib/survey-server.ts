@@ -8,6 +8,7 @@ import {
   electricsFinding,
   emptyMeasuredSurvey,
   idempotencyKey,
+  createIssue,
   isOpen,
   migrateProject,
   normaliseAddress,
@@ -584,26 +585,20 @@ export async function raiseSurveyIssue(projectId: string, topic: SurveyIssueTopi
   if (open) return { ok: true, issue: { id: open.id, number: open.number, title: open.title, status: open.status }, created: false };
   const now = nowIso();
   const detail = note.trim().slice(0, 2000);
-  // INTEGRATION(F6): take severity/blocking/owner from defaultsForKind("safety") once issues.ts lands.
-  const issue: Issue = {
+  // Severity, blocking and owner are the domain's safety defaults (critical, blocking, the tech lead).
+  const raised = createIssue({
     id: crypto.randomUUID(),
     projectId,
     number: await issuesRepo.nextNumber(projectId),
     kind: "safety",
     title: spec.title,
     ...(detail ? { detail } : {}),
-    severity: "critical",
-    status: "open",
-    blocking: true,
     gate: "ready-to-install",
-    ownerRole: "tech-lead",
     nextAction: spec.nextAction,
     raisedBy: { kind: "staff", id: staff.id, name: staff.name },
     raisedAt: now,
-    mediaIds: [],
-    customerVisible: false,
-    history: [{ at: now, by: staff.name, note: "Raised from the survey.", status: "open" }],
-  };
+  });
+  const issue: Issue = { ...raised, history: [{ at: now, by: staff.name, note: "Raised from the survey.", status: "open" }] };
   const saved = await issuesRepo.insert(issue);
   await audit({ actor: staff, action: "issue.raise", entity: "issue", entityId: saved.id, detail: { projectId, topic } });
   try {

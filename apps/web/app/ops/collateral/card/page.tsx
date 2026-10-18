@@ -2,6 +2,8 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { BRAND, appHost } from "@/lib/brand";
 import { requireStaff } from "@/lib/auth/server";
+import { fgasClaim, installDurationCopy, warrantyCopy } from "@/components/site/claims";
+import { getPublicSettings } from "@/lib/public-settings";
 
 export const metadata: Metadata = {
   title: "Door-drop card · collateral · ops",
@@ -15,6 +17,16 @@ export const metadata: Metadata = {
  */
 export default async function DoorDropCardPage() {
   await requireStaff("projects.view-all");
+  // Every claim on a printed card comes from settings: nothing goes out that the business hasn't decided.
+  const ps = await getPublicSettings();
+  const warranty = warrantyCopy(ps);
+  const reasons = [
+    "Your price online in about two minutes, confirmed at a home survey",
+    "Cooling in summer, efficient heating in winter, one neat unit",
+    `${installDurationCopy(ps)}, mess binned${fgasClaim(ps) ? ", by F-gas certified engineers" : ""}`,
+    ...(warranty ? [`${warranty.headline}, in writing`] : []),
+    "We install street by street, so your street's quirks are already designed for",
+  ];
   return (
     <>
       <div className="no-print border-b border-line bg-surface px-4 py-3 text-sm">
@@ -42,7 +54,7 @@ export default async function DoorDropCardPage() {
             <span className="text-accent-600">In July.</span>
           </p>
           <p className="mt-4 max-w-xs text-ink-500">
-            Proper air conditioning for homes on this street — heating in winter too. Fixed price
+            Proper air conditioning for homes on this street, heating in winter too. Your price
             online in two minutes.
           </p>
         </div>
@@ -56,13 +68,7 @@ export default async function DoorDropCardPage() {
       <main className="print-exact mx-auto mb-8 flex aspect-[210/148] max-w-xl flex-col bg-white p-10 shadow-lg print:mb-0 print:aspect-auto print:min-h-dvh print:max-w-none print:shadow-none">
         <p className="text-lg font-display">Why your neighbours are doing it</p>
         <ul className="mt-4 space-y-2.5 text-sm text-ink-700">
-          {[
-            "A guaranteed fixed price online — not an estimate, no surveyor visit",
-            "Cooling in summer, efficient heating in winter, one neat unit",
-            "Installed in a day by F-Gas certified engineers, mess binned",
-            "5-year parts & labour warranty in writing",
-            "We install street by street, so your street's quirks are already designed for",
-          ].map((line) => (
+          {reasons.map((line) => (
             <li key={line} className="flex gap-2">
               <span aria-hidden className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent-500" />
               {line}

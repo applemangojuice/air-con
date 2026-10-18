@@ -24,10 +24,15 @@ export const getSettings = cache(async (): Promise<PilotSettings> => {
   }
 });
 
+/** The cache tag on everything built from settings (lib/public-settings.ts caches the public subset under it). */
+export const SETTINGS_CACHE_TAG = "settings";
+
 /**
  * Save the whole settings document (merged first, so junk can't be stored)
  * and audit it with the top-level sections that changed. Callers check
- * `settings.edit` before calling.
+ * `settings.edit` before calling, and then call `revalidateSettingsCaches()`
+ * (lib/public-settings.ts; Next-only, so not from here) so the public site,
+ * the funnel and the portal change at once, not when their cache runs out.
  */
 export async function saveSettings(next: PilotSettings, actor: AuditActorInput): Promise<PilotSettings> {
   const merged = mergeSettings(next);

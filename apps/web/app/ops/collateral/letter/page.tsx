@@ -134,8 +134,8 @@ export default async function LetterPage({
           </ul>
           <p>
             That was enough to design the system and price it. For a home like yours, whole-home
-            comfort installed is typically <strong>{m.price}</strong>, VAT included — a fixed
-            price, not an estimate, and it comes down if you want fewer rooms.
+            comfort installed is typically <strong>{m.price}</strong>. It&apos;s an estimate from
+            public records: it comes down if you want fewer rooms, and a home survey confirms it.
           </p>
           <p>
             Your home&apos;s page — what we know, what we&apos;d fit, and your price — is saved
@@ -143,8 +143,9 @@ export default async function LetterPage({
           </p>
           <p className="rounded-xl bg-surface px-4 py-3 text-center font-semibold">{m.link}</p>
           <p>
-            Two minutes there confirms the details and locks your price. No salesperson visits, no
-            phone calls, nobody &ldquo;popping by while they&apos;re in the area&rdquo;.
+            Two minutes there checks the details and gives you your price. If you go ahead, a
+            surveyor visits once, at a time you pick, to confirm it. No salesperson, no pushy
+            phone calls.
           </p>
         </div>
 

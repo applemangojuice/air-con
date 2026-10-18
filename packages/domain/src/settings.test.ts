@@ -6,6 +6,7 @@ import {
   effectiveTaxCode,
   isInServiceArea,
   mergeSettings,
+  isPlaceholderPhone,
   schedule2Missing,
   type PilotSettings,
 } from "./settings.ts";
@@ -57,9 +58,14 @@ test("defaults are the conservative pilot set", () => {
 });
 
 test("schedule2Missing lists what the pre-contract information still needs, in plain words", () => {
-  assert.deepEqual(schedule2Missing(DEFAULT_SETTINGS), ["geographic address", "complaints process", "guarantee statement (or explicit 'none')"]);
+  // The shipped "0800 000 0000" is a stand-in, not a number anyone answers.
+  assert.deepEqual(schedule2Missing(DEFAULT_SETTINGS), ["geographic address", "phone", "complaints process", "guarantee statement (or explicit 'none')"]);
   const complete = mergeSettings({
-    company: { geographicAddress: "DEMO, 1 Example Street, London SW16 2BE", complaintsProcess: "DEMO: call or email us; we reply within two working days." },
+    company: {
+      geographicAddress: "DEMO, 1 Example Street, London SW16 2BE",
+      phone: "020 7946 0123",
+      complaintsProcess: "DEMO: call or email us; we reply within two working days.",
+    },
     warranty: { workmanshipYears: 2, manufacturerSummary: null },
   });
   assert.deepEqual(schedule2Missing(complete), []);
@@ -74,6 +80,16 @@ test("schedule2Missing lists what the pre-contract information still needs, in p
   assert.deepEqual(schedule2Missing(blanks), ["trading name", "geographic address", "phone", "email"]);
   // ADR is "where applicable": never required.
   assert.equal(complete.company.adr, undefined);
+});
+
+test("isPlaceholderPhone: the stand-in and implausible numbers are not contact numbers", () => {
+  assert.equal(isPlaceholderPhone("0800 000 0000"), true);
+  assert.equal(isPlaceholderPhone(""), true);
+  assert.equal(isPlaceholderPhone(null), true);
+  assert.equal(isPlaceholderPhone("12345"), true);
+  assert.equal(isPlaceholderPhone("020 7946 0123"), false);
+  assert.equal(isPlaceholderPhone("+44 20 7946 0123"), false);
+  assert.equal(isPlaceholderPhone("07700 900123"), false);
 });
 
 test("optional company text: kept when it's real text, dropped when blank, null or junk; review links are http(s)", () => {

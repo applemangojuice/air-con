@@ -17,6 +17,7 @@ import {
   Sub,
   primaryCls,
   useAction,
+  ReachUs,
 } from "./bits";
 import { useHub } from "./controller";
 import type { PanelProps } from "./panel-types";
@@ -55,7 +56,7 @@ function ChooseDates({ data, onDone }: { data: PanelProps["data"]; onDone?: () =
   if (data.installBlocks.length === 0) {
     return (
       <Callout tone="warn" title="No install dates free online right now">
-        Call us on {data.company.phone} and we&apos;ll find dates that work for you.
+        <ReachUs company={data.company} capital /> and we&apos;ll find dates that work for you.
       </Callout>
     );
   }

@@ -9,6 +9,7 @@ import { listDocuments } from "@/lib/documents-server";
 import { fmtDate } from "@/lib/format";
 import { loadProject } from "@/lib/project-service";
 import { getSettings } from "@/lib/settings-server";
+import { reachUs, realPhone } from "@/components/site/claims";
 
 export const metadata: Metadata = {
   title: "Your documents",
@@ -44,7 +45,7 @@ export default async function DocumentsPage({ params }: { params: Promise<{ id: 
           <h1 className="font-display text-3xl text-ink-900">Sign in to see your documents</h1>
           <p className="mt-3 text-[15px] leading-relaxed text-ink-700">We&apos;ll email a sign-in link to the address we have for this project.</p>
           <div className="mt-6">
-            <LinkRequest target={{ projectId: id }} phone={settings.company.phone} />
+            <LinkRequest target={{ projectId: id }} phone={realPhone(settings.company.phone)} email={settings.company.email} />
           </div>
         </div>
       </PortalShell>
@@ -80,7 +81,7 @@ export default async function DocumentsPage({ params }: { params: Promise<{ id: 
 
       {docs === null ? (
         <p role="alert" className="mt-8 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800">
-          We couldn&apos;t load your documents just now. Please try again in a moment, or call us on {settings.company.phone}.
+          We couldn&apos;t load your documents just now. Please try again in a moment, or {reachUs(settings.company)}.
         </p>
       ) : groups.length === 0 ? (
         <div className="mt-8 rounded-3xl border border-dashed border-line bg-white/60 px-6 py-10 text-center">

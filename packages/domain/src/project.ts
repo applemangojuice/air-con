@@ -424,6 +424,15 @@ const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const MON_FRI = [1, 2, 3, 4, 5];
 
+/**
+ * Working days from the survey to the proposal, as promised to customers:
+ * the reducer's survey-submitted update, the timeline estimate, the
+ * survey-complete email and the hub all use this one number. Drafting the
+ * design from the measured survey is automatic; the technical lead's sign-off
+ * and the proposal builder fit comfortably inside it.
+ */
+export const PROPOSAL_TURNAROUND_WORKING_DAYS = 3;
+
 const dateOf = (iso: string) => iso.slice(0, 10);
 
 const fmtDate = (iso: string) => {
@@ -1108,7 +1117,8 @@ export function blockersFor(project: Project, ctx: ReadinessContext, gate: GateI
       if (!rs) {
         block("runsheet-missing", "There's no runsheet for this job yet.", "ops", "Generate the runsheet from the design");
       } else {
-        if (!rs.complete) {
+        // A step held only by an out-of-range reading is the exception below, not also "missing".
+        if (!rs.complete && (rs.missing > 0 || rs.blocked > 0 || rs.openExceptions === 0)) {
           block(
             "runsheet-incomplete",
             `The runsheet isn't finished: ${rs.missing} missing, ${rs.blocked} blocked.`,
@@ -1232,7 +1242,7 @@ export function projectTimeline(project: Project, todayIso: string): TimelineEnt
   const issuedOn = p.proposal.issuedAt && p.proposal.status !== "accepted" ? est(p.proposal.issuedAt) : undefined;
   const acceptance = p.proposal.acceptedAt
     ? dateOf(p.proposal.acceptedAt)
-    : (issuedOn ?? est(addWorkingDays(surveyBase, 3)));
+    : (issuedOn ?? est(addWorkingDays(surveyBase, PROPOSAL_TURNAROUND_WORKING_DAYS)));
   dates.proposal = p.proposal.acceptedAt
     ? { kind: "actual", iso: p.proposal.acceptedAt }
     : { kind: "estimated", iso: acceptance };
@@ -1818,7 +1828,7 @@ export function applyProjectAction(project: Project, action: ProjectAction, now:
       }
       log(
         "survey-submitted",
-        `Survey done, thanks for having us. We aim to have your proposal with you by ${fmtDate(addWorkingDays(today, 3))}.`,
+        `Survey done, thanks for having us. We aim to have your proposal with you by ${fmtDate(addWorkingDays(today, PROPOSAL_TURNAROUND_WORKING_DAYS))}.`,
         "field",
       );
       return ok();

@@ -1712,7 +1712,11 @@ export interface RunsheetProgress {
   complete: boolean;
   /** Readings outside their window that the tech lead hasn't reviewed. */
   openExceptions: number;
-  /** Install steps not finished and not blocked (failed ones count as missing). */
+  /**
+   * Install steps not finished, not blocked and not waiting on a reading
+   * review (failed ones count as missing). A step held only by an
+   * out-of-range reading is counted once, in `openExceptions`.
+   */
   missing: number;
   blocked: number;
   walkthroughDone: boolean;
@@ -1726,14 +1730,15 @@ export function runsheetProgress(job: InstallJobV2): RunsheetProgress {
   const install = views.filter((v) => !handoverIds.has(v.step.id));
   const walk = handoverSteps(job.runsheet).map((s) => views.find((v) => v.step.id === s.id)!);
   const blocked = install.filter((v) => v.state === "blocked").length;
-  const missing = install.filter((v) => !isStepFinished(v) && v.state !== "blocked").length;
+  const awaitingReview = install.filter((v) => v.state === "exception").length;
+  const missing = install.filter((v) => !isStepFinished(v) && v.state !== "blocked" && v.state !== "exception").length;
   const openExceptions = views.reduce((n, v) => n + v.slots.filter((s) => s.state === "exception").length, 0);
   const byDay = runsheetDays(job.runsheet).map((day) => {
     const dayViews = views.filter((v) => dayOf(v.step) === day);
     return { day, done: dayViews.filter(isStepFinished).length, total: dayViews.length };
   });
   return {
-    complete: install.length > 0 && missing === 0 && blocked === 0,
+    complete: install.length > 0 && missing === 0 && blocked === 0 && awaitingReview === 0,
     openExceptions,
     missing,
     blocked,

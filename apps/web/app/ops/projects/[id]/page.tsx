@@ -13,6 +13,7 @@ import {
   STAGE_INFO,
   TIME_KIND_LABEL,
   can,
+  diffAccuracyPct,
   cancellationCopy,
   cancellationStatus,
   currentStage,
@@ -53,7 +54,8 @@ import {
 import { requireStaff } from "@/lib/auth/server";
 import { listDocuments } from "@/lib/documents-server";
 import { fmtDate, fmtDay, fmtDayTime } from "@/lib/format";
-import { blockersByGate, issueKindDefaults, issueTransitionsReady, loadCommandRecords, selfSurveyDiff } from "@/lib/ops-core-server";
+import { blockersByGate, issueKindDefaults, loadCommandRecords, selfSurveyDiff } from "@/lib/ops-core-server";
+import { SelfSurveyDiff } from "@/components/field/survey/self-survey-diff";
 import { buildReadinessContext, loadProject, londonToday } from "@/lib/project-service";
 import { listForProject as messagesForProject } from "@/lib/repo/messages";
 import { getSettings } from "@/lib/settings-server";
@@ -150,15 +152,7 @@ export default async function CommandCentrePage({
   const slotDates = upcomingWorkingDays(today, settings.scheduling.workingDays, 10);
   const slotFmt = Object.fromEntries(slotDates.map((d) => [d, fmtDay(d)]));
   const diff = selfSurveyDiff(rec.selfSurvey, rec.survey);
-  const completeness = rec.survey
-    ? (() => {
-        try {
-          return surveyCompleteness(rec.survey.data).pct;
-        } catch {
-          return null; // INTEGRATION(f2): the completeness meter lands with the field survey.
-        }
-      })()
-    : null;
+  const completeness = rec.survey ? surveyCompleteness(rec.survey.data).pct : null;
   // Proposal
   const s2 = schedule2Missing(settings);
   const proposalOpen = p.proposal.status !== "accepted";
@@ -166,21 +160,12 @@ export default async function CommandCentrePage({
   const cs = cancellationStatus(p, today, settings);
   const earlyRequested = earlyStartRequestedOf(p);
   // Install
-  const progress = rec.job
-    ? (() => {
-        try {
-          return runsheetProgress(rec.job);
-        } catch {
-          return null; // INTEGRATION(f6): runsheetProgress gives day-by-day progress once the field module lands.
-        }
-      })()
-    : null;
+  const progress = rec.job ? runsheetProgress(rec.job) : null;
   // Money
   const outstanding = Math.max(0, p.money.invoicedPence - p.money.paidPence);
   // Issues
   const openIssues = rec.issues.filter(isOpen);
   const kindDefaults = issueKindDefaults();
-  const transitionsReady = issueTransitionsReady();
   // Time
   const totals = timeTotals(rec.time);
   const recentTime = [...rec.time].sort((a, b) => b.startedAt.localeCompare(a.startedAt)).slice(0, 5);
@@ -375,41 +360,8 @@ export default async function CommandCentrePage({
                   <AssignSurveyorForm action={bind(assignSurveyorAction)} surveyors={surveyors} current={p.survey.surveyor?.staffId} />
                 </Disclosure>
               )}
-              <Disclosure summary="Customer's own survey vs measured">
-                {"rows" in diff ? (
-                  diff.rows.length ? (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left text-xs">
-                        <thead className="text-ink-500">
-                          <tr>
-                            <th className="py-1 pr-2 font-semibold">Room</th>
-                            <th className="py-1 pr-2 font-semibold">What</th>
-                            <th className="py-1 pr-2 font-semibold">They said</th>
-                            <th className="py-1 pr-2 font-semibold">Measured</th>
-                            <th className="py-1 font-semibold">
-                              <span className="sr-only">Match</span>
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-line">
-                          {diff.rows.map((r, i) => (
-                            <tr key={i}>
-                              <td className="py-1 pr-2">{r.room}</td>
-                              <td className="py-1 pr-2">{r.field}</td>
-                              <td className="py-1 pr-2">{r.customerSaid}</td>
-                              <td className="py-1 pr-2">{r.measured}</td>
-                              <td className="py-1">{r.match === null ? "–" : r.match ? <span className="text-emerald-700">✓ same</span> : <span className="text-red-700">✗ differs</span>}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  ) : (
-                    <Quiet>Nothing to compare yet.</Quiet>
-                  )
-                ) : (
-                  <Quiet>{diff.unavailable}</Quiet>
-                )}
+              <Disclosure summary={`Customer's own survey vs measured${"rows" in diff && diffAccuracyPct(diff.rows) !== null ? ` (${diffAccuracyPct(diff.rows)}% right)` : ""}`}>
+                {"rows" in diff ? <SelfSurveyDiff rows={diff.rows} compact /> : <Quiet>{diff.unavailable}</Quiet>}
               </Disclosure>
             </SectionCard>
 
@@ -657,7 +609,6 @@ export default async function CommandCentrePage({
                 ))}
               </ul>
             )}
-            {!transitionsReady && <p className="mt-2 text-xs text-ink-500">Status changes on issues arrive with the field app update; raising and tracking work now.</p>}
             {canEdit && (
               <Disclosure summary="Raise an issue" className="mt-3">
                 <RaiseIssueForm action={bind(raiseIssueAction)} defaults={kindDefaults} />

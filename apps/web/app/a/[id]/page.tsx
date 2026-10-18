@@ -130,11 +130,11 @@ export default async function AddressPage({ params }: { params: Promise<{ id: st
             </ul>
             <div className="mt-5 rounded-2xl bg-surface/60 p-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-ink-300">
-                Indicative fixed price, installed
+                Indicative price, installed
               </p>
               <p className="mt-1 text-3xl font-display">{gbp(indicative.quote.totalGbp)}</p>
               <p className="mt-1 text-xs text-ink-500">
-                Locks in once you confirm a few details. It can come down if you want fewer rooms.
+                An estimate from public records. Check the details for your price; a home survey confirms it.
               </p>
             </div>
           </section>
@@ -144,7 +144,7 @@ export default async function AddressPage({ params }: { params: Promise<{ id: st
           href={funnelHref}
           className="mt-8 block w-full rounded-full bg-accent-600 px-5 py-3.5 text-center font-semibold text-white shadow-sm transition hover:bg-accent-700"
         >
-          Check the details, get my fixed price
+          Check the details, get my price
         </Link>
         <p className="mt-2 text-center text-xs text-ink-300">
           Two minutes, everything pre-filled. No salesperson, no phone calls.

@@ -7,6 +7,7 @@ import { done, refused, type ActionResult } from "@/components/ops/command/types
 import { requireStaff } from "@/lib/auth/server";
 import * as settingsRepo from "@/lib/repo/settings";
 import { saveSettings } from "@/lib/settings-server";
+import { revalidateSettingsCaches } from "@/lib/public-settings";
 
 /**
  * Save the whole settings document (admin only; saveSettings audits which
@@ -147,6 +148,7 @@ export async function saveSettingsAction(fd: FormData): Promise<ActionResult> {
 
   try {
     const saved = await saveSettings(mergeSettings(tidy(parsed.data)), admin);
+    revalidateSettingsCaches();
     revalidatePath("/ops/settings");
     revalidatePath("/ops/launch");
     revalidatePath("/ops/messages");

@@ -32,6 +32,8 @@ export const DEMO_SETTINGS: PilotSettings = mergeSettings({
   company: {
     ...DEFAULT_SETTINGS.company,
     geographicAddress: "DEMO address: 1 Demo Street, London SW16 9ZZ",
+    // Ofcom's drama range (020 7946 0xxx): never a real line.
+    phone: "020 7946 0123",
     complaintsProcess: "DEMO: tell us by phone or email and we reply within two working days.",
   },
   warranty: { workmanshipYears: null, manufacturerSummary: "DEMO: the manufacturer's parts warranty, once we've registered it for you." },

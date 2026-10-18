@@ -146,6 +146,38 @@ test("decideProjectAccess: one null for every kind of no", () => {
   );
 });
 
+test("decideProjectAccess: a quote-owner grant opens only the project made from that quote", () => {
+  const QUOTE = "11111111-2222-4333-8444-555555555555";
+  const fromQuote = { ...project, customerId: "cust-9", quoteId: QUOTE };
+  const base = { projectId: PROJECT_ID, staff: null, allowCustomer: true };
+  assert.deepEqual(
+    decideProjectAccess({ ...base, session: null, project: fromQuote, quoteGrant: [QUOTE] }),
+    { kind: "customer", customerId: "cust-9" },
+    "the browser that saved the quote opens its project",
+  );
+  assert.equal(decideProjectAccess({ ...base, session: null, project: fromQuote, quoteGrant: [] }), null, "no grant");
+  assert.equal(
+    decideProjectAccess({ ...base, session: null, project: { ...fromQuote, quoteId: "99999999-2222-4333-8444-555555555555" }, quoteGrant: [QUOTE] }),
+    null,
+    "another quote's project, even for the same customer record",
+  );
+  assert.equal(
+    decideProjectAccess({ ...base, allowCustomer: false, session: null, project: fromQuote, quoteGrant: [QUOTE] }),
+    null,
+    "customer-facing routes only",
+  );
+  assert.equal(
+    decideProjectAccess({ ...base, session: null, project: { ...fromQuote, customerId: null }, quoteGrant: [QUOTE] }),
+    null,
+    "no customer record: nothing to act as",
+  );
+  assert.equal(
+    decideProjectAccess({ ...base, session: staffSessionFor(sub), staff: sub, project: { ...otherProject, quoteId: QUOTE }, quoteGrant: [QUOTE] }),
+    null,
+    "a staff session is judged as staff",
+  );
+});
+
 test("decideStaffGate: signed out, forbidden or ok", () => {
   assert.equal(decideStaffGate(null), "signed-out");
   assert.equal(decideStaffGate(leaver), "signed-out", "inactive is signed out");

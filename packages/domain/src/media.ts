@@ -236,3 +236,61 @@ export function estimateLabel(label: string): string {
   if (!t) return "";
   return /^(≈|~|approx|about|est)/i.test(t) ? t : `≈ ${t}`;
 }
+
+/* ------------------------------------------------------------------ */
+/* Upload rules (shared by the server, the field app and the portal)   */
+/* ------------------------------------------------------------------ */
+
+/**
+ * What a phone or laptop may upload. iPhones record video as QuickTime
+ * (.mov) unless the camera is set to "Most compatible", so it's taken
+ * alongside MP4 rather than turning a field video into a refusal.
+ */
+export const MEDIA_UPLOAD_CONTENT_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/heic",
+  "application/pdf",
+  "video/mp4",
+  "video/quicktime",
+] as const;
+
+/** One file's ceiling (the same as the local storage route): about a minute of phone video. */
+export const MEDIA_MAX_BYTES = 25 * 1024 * 1024;
+
+/** The content type a file most likely is: its own, else from the extension (some browsers leave a video's blank). */
+export function uploadContentType(type: string | null | undefined, fileName = ""): string {
+  const base = (type ?? "").split(";")[0]!.trim().toLowerCase();
+  if (base === "image/jpg") return "image/jpeg";
+  if (base && base !== "application/octet-stream") return base;
+  const ext = fileName.split(".").pop()?.toLowerCase() ?? "";
+  const byExt: Record<string, string> = {
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    png: "image/png",
+    webp: "image/webp",
+    heic: "image/heic",
+    pdf: "application/pdf",
+    mp4: "video/mp4",
+    m4v: "video/mp4",
+    mov: "video/quicktime",
+  };
+  return byExt[ext] ?? base;
+}
+
+/** Why a file can't be uploaded, in words for the person holding the phone; null when it can. */
+export function mediaUploadProblem(file: { type?: string | null; name?: string; size?: number }): string | null {
+  const ct = uploadContentType(file.type, file.name ?? "");
+  if (!(MEDIA_UPLOAD_CONTENT_TYPES as readonly string[]).includes(ct)) {
+    return ct.startsWith("video/")
+      ? "This video's format can't be stored (MP4 or iPhone .mov only). Take a photo instead."
+      : "That kind of file can't be uploaded. Photos (JPEG, PNG, WebP, HEIC), PDFs and videos (MP4, .mov) only.";
+  }
+  if (typeof file.size === "number" && file.size > MEDIA_MAX_BYTES) {
+    return ct.startsWith("video/")
+      ? "That video is too long to upload (25 MB at most, about a minute). Record a shorter clip."
+      : "That file is too big (25 MB at most).";
+  }
+  return null;
+}

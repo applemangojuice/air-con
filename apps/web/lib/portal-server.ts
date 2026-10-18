@@ -47,7 +47,7 @@ import {
   surveySlotDays,
 } from "@/components/portal/schedule";
 import type { HubData, HubDocument, HubInvoice, HubIssue, HubPack, HubPhoto, PersonCard, PortalRequest } from "@/components/portal/types";
-import { customerSafeProject, hubFacts, outstandingOf, personCard } from "@/components/portal/view";
+import { customerSafeProject, hubFacts, personCard } from "@/components/portal/view";
 
 /**
  * The customer portal on the server (contract §G F1): what the hub shows,
@@ -72,8 +72,7 @@ async function safe<T>(label: string, fn: () => Promise<T>, fallback: T): Promis
   try {
     return await fn();
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    if (!message.startsWith("not implemented")) console.error(`[portal] ${label} failed:`, err);
+    console.error(`[portal] ${label} failed:`, err);
     return fallback;
   }
 }
@@ -231,10 +230,8 @@ export async function loadHub(projectId: string, access: ProjectAccess): Promise
       ...(i.issuedAt ? { issuedAt: i.issuedAt } : {}),
       ...(i.documentId ? { documentId: i.documentId } : {}),
     }));
-  // F5's outstandingPence when it exists; the same sum otherwise.
-  const outstanding = liveInvoices.length
-    ? ((await safe("outstanding", async () => outstandingPence(invoices), null as number | null)) ?? outstandingOf(liveInvoices))
-    : Math.max(0, project.money.invoicedPence - project.money.paidPence);
+  // F5's outstandingPence: what's still owed on live invoices, net of credit notes.
+  const outstanding = liveInvoices.length ? outstandingPence(invoices) : Math.max(0, project.money.invoicedPence - project.money.paidPence);
   const moneyView = liveInvoices.length
     ? {
         invoicedPence: liveInvoices.reduce((s, i) => s + i.totalPence, 0),
@@ -320,6 +317,9 @@ export function documentMediaIds(doc: Pick<DocumentRecord, "kind" | "snapshot">)
     for (const r of data.rooms ?? []) ids.push(...(r.mediaIds ?? []));
     for (const p of data.outdoor?.positions ?? []) if (p.mediaId) ids.push(p.mediaId);
   }
+  if (doc.kind === "handover-pack") {
+    for (const a of (s.asBuilt as { mediaId?: string }[] | undefined) ?? []) if (a?.mediaId) ids.push(a.mediaId);
+  }
   return [...new Set(ids.filter((id) => typeof id === "string"))];
 }
 
@@ -332,17 +332,23 @@ export interface DocPhotoView {
 }
 
 /**
- * Signed photos for a document: only this project's own files. For the
- * handover pack, also the customer-visible "finished" photos (as-built).
+ * Signed photos for a document: only this project's own files. The
+ * handover pack's as-built photos are the ones frozen into it at publish
+ * (snapshot.asBuilt); a pack from before that was recorded falls back to the
+ * customer-visible "finished" photos.
  */
 export async function documentPhotos(doc: DocumentRecord): Promise<{ photos: Map<string, DocPhotoView>; asBuilt: DocPhotoView[] }> {
   const ids = documentMediaIds(doc);
-  const [referenced, finished] = await Promise.all([
+  const frozen = doc.kind === "handover-pack" ? ((doc.snapshot as { asBuilt?: { mediaId: string }[] } | null)?.asBuilt ?? null) : null;
+  const [referenced, live] = await Promise.all([
     safe("document media", () => mediaRepo.listByIds(ids), [] as MediaItem[]),
-    doc.kind === "handover-pack"
+    doc.kind === "handover-pack" && !frozen
       ? safe("as-built media", () => mediaRepo.listForProject(doc.projectId, { tag: "completed", customerVisibleOnly: true }), [] as MediaItem[])
       : Promise.resolve([] as MediaItem[]),
   ]);
+  const finished = frozen
+    ? frozen.map((a) => referenced.find((m) => m.id === a.mediaId)).filter((m): m is MediaItem => Boolean(m))
+    : live;
   const own = [...referenced, ...finished].filter((m) => m.projectId === doc.projectId);
   const urls = await safe("document media urls", () => signedMediaUrls(own, 4 * 3600), new Map<string, string>());
   const view = (m: MediaItem): DocPhotoView => ({
@@ -354,7 +360,7 @@ export async function documentPhotos(doc: DocumentRecord): Promise<{ photos: Map
   });
   return {
     photos: new Map(own.filter((m) => ids.includes(m.id)).map((m) => [m.id, view(m)])),
-    asBuilt: finished.filter((m) => m.projectId === doc.projectId).slice(0, 8).map(view),
+    asBuilt: finished.filter((m) => m.projectId === doc.projectId).slice(0, 12).map(view),
   };
 }
 
@@ -673,14 +679,9 @@ export async function decideVariation(
 /* Problems                                                            */
 /* ------------------------------------------------------------------ */
 
-/** The fields a portal-reported fault starts with: F6's defaults when they exist, else these. */
+/** The fields a portal-reported fault starts with: the domain's fault defaults, always visible to the customer who reported it. */
 function faultDefaults(): ReturnType<typeof defaultsForKind> {
-  try {
-    return { ...defaultsForKind("fault"), customerVisible: true };
-  } catch {
-    // INTEGRATION(F6): defaultsForKind("fault") is a stub in this tree; these are the conservative defaults.
-    return { severity: "medium", blocking: false, ownerRole: "ops", customerVisible: true };
-  }
+  return { ...defaultsForKind("fault"), customerVisible: true };
 }
 
 /**

@@ -15,7 +15,7 @@ import { Disclosure, IssueTransitionForm, RaiseIssueForm } from "@/components/op
 import { fmtInstant } from "@/components/ops/command/model";
 import { requireStaff } from "@/lib/auth/server";
 import { fmtDate } from "@/lib/format";
-import { issueKindDefaults, issueTransitionsReady } from "@/lib/ops-core-server";
+import { issueKindDefaults } from "@/lib/ops-core-server";
 import { loadProject } from "@/lib/project-service";
 import * as issuesRepo from "@/lib/repo/issues";
 import { raiseIssueAction, transitionIssueAction } from "../actions";
@@ -57,7 +57,6 @@ export default async function ProjectIssuesPage({ params }: { params: Promise<{ 
   const [project, issues] = await Promise.all([loadProject(id), issuesRepo.listForProject(id)]);
   if (!project) notFound();
   const canEdit = can(staff, "projects.edit");
-  const ready = issueTransitionsReady();
   const defaults = issueKindDefaults();
   const open = issues.filter(isOpen);
   const done = issues.filter((i) => !isOpen(i));
@@ -70,11 +69,6 @@ export default async function ProjectIssuesPage({ params }: { params: Promise<{ 
         title="Issues"
         subtitle={`${open.length} open, ${done.length} done. Blocking issues hold their gate until resolved.`}
       />
-      {!ready && (
-        <p className="mb-4 rounded-2xl border border-sage-200 bg-sage-50 px-4 py-3 text-sm text-sage-900">
-          Status changes arrive with the field app update. Until then, raise issues here and track them by owner and due date.
-        </p>
-      )}
       {canEdit && (
         <section className="mb-6 rounded-2xl border border-line bg-white p-4 sm:p-5">
           <Disclosure summary="Raise an issue" open={issues.length === 0}>
@@ -134,7 +128,7 @@ export default async function ProjectIssuesPage({ params }: { params: Promise<{ 
                           </ol>
                         </Disclosure>
                       )}
-                      {canEdit && ready && (
+                      {canEdit && (
                         <div className="mt-3 border-t border-line pt-3">
                           <IssueTransitionForm action={transitionIssueAction.bind(null, id)} issueId={i.id} options={NEXT[i.status] ?? []} />
                         </div>

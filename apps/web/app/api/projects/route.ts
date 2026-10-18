@@ -13,10 +13,13 @@ import { enforceRateLimit } from "@/lib/rate-limit";
  *   POST /api/projects { quoteId } → { ok: true, demo: false, id, canOpen, linkSent, devLink? }   (unchanged shape, plus these)
  *                                  → { ok: true, demo: true }                   (no database: the demo hub)
  *
- * The project page is private, so a fresh project also emails its customer
- * a sign-in link (only ever to the address on their quote); the page they
- * land on says so and can send another. In development the link comes back
- * as `devLink`, since nothing is emailed there.
+ * The project page is private. The browser that saved the quote holds its
+ * quote-owner cookie (lib/auth/quote-owner.ts), which opens this project
+ * (and only this one) straight away, so `canOpen` is true for the customer
+ * booking from /q. Anyone else (a shared /q link, another device) gets a
+ * sign-in link emailed to the address on the quote, and the page they land
+ * on says so and can send another. In development the link comes back as
+ * `devLink`, since nothing is emailed there.
  */
 
 export const runtime = "nodejs";

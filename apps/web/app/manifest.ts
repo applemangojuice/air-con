@@ -7,7 +7,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: BRAND.name,
     short_name: BRAND.nameHot,
     description:
-      "Fixed-price home air conditioning: survey your home in two minutes, get a guaranteed price, book online.",
+      "Home air conditioning: your price online in about two minutes, confirmed at a home survey, booked and tracked online.",
     start_url: "/",
     display: "standalone",
     background_color: "#f8f5ef",

@@ -22,6 +22,7 @@ import {
   TextButton,
   primaryCls,
   useAction,
+  ReachUs,
 } from "./bits";
 import { useHub } from "./controller";
 import type { PanelProps } from "./panel-types";
@@ -120,11 +121,7 @@ function BookSurvey({ data }: { data: PanelProps["data"] }) {
   if (data.surveySlots.length === 0) {
     return (
       <Callout tone="warn" title="No survey times free online right now">
-        Call us on{" "}
-        <a className="font-semibold underline" href={`tel:${data.company.phone.replace(/\s+/g, "")}`}>
-          {data.company.phone}
-        </a>{" "}
-        and we&apos;ll find a time that works.
+        <ReachUs company={data.company} capital /> and we&apos;ll find a time that works.
       </Callout>
     );
   }
@@ -280,7 +277,7 @@ function MoveSurvey({ data }: { data: PanelProps["data"] }) {
       {days.length ? (
         <SlotPicker days={days} value={slot} onChange={setSlot} disabled={busy} legend="Pick a new day" />
       ) : (
-        <p className="text-sm text-ink-700">No other times are free online. Call us on {data.company.phone} and we&apos;ll sort it.</p>
+        <p className="text-sm text-ink-700">No other times are free online. <ReachUs company={data.company} capital /> and we&apos;ll sort it.</p>
       )}
       <ActionFeedback error={error} message={message} />
       <div className="flex flex-col gap-2 sm:flex-row">
@@ -527,7 +524,7 @@ export function ProposalPanel({ data, state, goTo, slots }: PanelProps) {
       )}
       {(p.proposal.status === "declined" || p.proposal.status === "expired") && (
         <Callout tone="warn" title={p.proposal.status === "declined" ? "You declined this proposal" : "This proposal has expired"}>
-          Changed your mind, or want an updated one? Call us on {data.company.phone} or email {data.company.email}.
+          Changed your mind, or want an updated one? {data.company.phone ? `Call us on ${data.company.phone} or email ${data.company.email}.` : `Email us at ${data.company.email}.`}
         </Callout>
       )}
       {(p.proposal.status === "not-issued" || p.proposal.status === "changes-requested") && (

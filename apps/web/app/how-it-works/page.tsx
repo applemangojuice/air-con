@@ -4,6 +4,7 @@ import { SiteFooter } from "@/components/site/footer";
 import { SiteHeader } from "@/components/site/header";
 import { DemoHub } from "@/components/portal/demo-hub";
 import { buildDemoProject } from "@/lib/project-service";
+import { PRICE_PROMISE } from "@/components/site/claims";
 
 export const metadata: Metadata = {
   title: "Our process",
@@ -13,24 +14,28 @@ export const dynamic = "force-dynamic";
 
 const sections = [
   {
-    title: "1. You survey your own home",
-    body: "Our guided survey walks you through your home room by room: how big each room is, which way it faces, where your fuse board is, where the outdoor unit could live. If we already know your address, most of it is pre-filled from public records. It replaces the traditional salesperson visit entirely.",
+    title: "1. You tell us about your home",
+    body: "Our guided questions walk you through your home room by room: how big each room is, which way it faces, where your fuse board is, where the outdoor unit could live. Add a few photos if you like. If we already know your address, some of it is pre-filled from public records.",
   },
   {
-    title: "2. We size the system properly",
-    body: "Behind the scenes, a heat-load model estimates the cooling each room needs from its size, glazing, orientation and use, then picks the smallest unit that comfortably covers it. Oversized units short-cycle and waste money; undersized ones never keep up. Sizing is the bit the industry most often gets wrong, so we automated it.",
+    title: "2. We size the system and give you a price",
+    body: "Behind the scenes, a heat-load model estimates the cooling each room needs from its size, glazing, orientation and use, then picks the smallest unit that comfortably covers it. Oversized units short-cycle and waste money; undersized ones never keep up. Your price comes with a confidence score, so you can see how firm it is and what would firm it up.",
   },
   {
-    title: "3. Your price is fixed, with a confidence score",
-    body: "Every quote comes with an Installation Confidence Score. A complete survey with photos scores high, and a high score means the price is guaranteed as-is. Missing details lower the score, and we tell you exactly what to add to lock it in. No on-the-day surprises, because the surprises got answered before we arrived.",
+    title: "3. A home survey confirms it",
+    body: PRICE_PROMISE,
   },
   {
-    title: "4. Installation, documented end to end",
-    body: "Our engineers arrive with a job pack generated from your survey: unit positions, pipe routes, electrical work. Each installation step is photographed and quality-checked (pressure tests, vacuum readings, commissioning data) and your handover documents generate automatically.",
+    title: "4. Your design and proposal, in writing",
+    body: "Our technical lead signs off the design: which units, where they go, how the pipes run. Your proposal sets out the price, what's included, the payment terms and your cancellation rights. Nothing starts until you accept it.",
   },
   {
-    title: "5. It keeps working for years",
-    body: "Modern systems heat as well as cool, and ours are monitored: energy use, runtime and error codes flow into your customer portal. Instead of a blanket annual service charge, we tell you when your system actually needs attention.",
+    title: "5. Installation, documented end to end",
+    body: "Our engineers arrive with a job pack built from your survey and design. Each installation step is photographed and checked (pressure tests, vacuum readings, commissioning readings), and your handover pack and certificates follow when the job is signed off.",
+  },
+  {
+    title: "6. Looking after it afterwards",
+    body: "Your project page keeps your documents, photos and warranty details in one place. Something not right? Report it there, with a photo, and we'll pick it up.",
   },
 ];
 
@@ -87,13 +92,13 @@ export default function OurProcessPage() {
           <div className="rounded-3xl border border-accent-100 bg-accent-50 p-8 text-center">
             <h2 className="text-2xl font-bold">See your price</h2>
             <p className="mx-auto mt-2 max-w-md text-ink-500">
-              Two minutes, your phone, and a guaranteed fixed price at the end.
+              About two minutes on your phone. Your price is confirmed at your home survey.
             </p>
             <Link
               href="/quote"
               className="mt-5 inline-block rounded-full bg-accent-600 px-6 py-3 font-semibold text-white transition hover:bg-accent-700"
             >
-              Get my fixed price
+              Get my price
             </Link>
           </div>
         </section>

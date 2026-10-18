@@ -1,6 +1,6 @@
 "use client";
 
-import type { EvidenceSpec, MediaItem, PhotoTag, StepOutcome } from "@aircon/domain";
+import { mediaUploadProblem, type EvidenceSpec, type MediaItem, type PhotoTag, type StepOutcome } from "@aircon/domain";
 import { getFieldOutbox, newOpId, type SyncOp } from "@/lib/field-outbox";
 import { prepareImage } from "@/lib/media-client";
 import { rememberPreview } from "./use-outbox";
@@ -134,5 +134,11 @@ export async function readBarcode(file: Blob): Promise<string | null> {
   }
 }
 
-/** Videos the server takes: MP4 only (an iPhone's .mov is refused, so we say so before queueing it). */
-export const VIDEO_OK = (f: File) => /^video\/mp4$/i.test(f.type) || /\.mp4$/i.test(f.name);
+/**
+ * Why the server would refuse this file (the domain's shared upload rules:
+ * MP4 and iPhone .mov video, 25 MB at most), said before it's queued; null
+ * when it's fine.
+ */
+export const uploadProblem = (f: File): string | null =>
+  // Photos are re-encoded smaller before upload, so only their type matters here.
+  mediaUploadProblem(f.type.startsWith("image/") ? { type: f.type, name: f.name } : f);

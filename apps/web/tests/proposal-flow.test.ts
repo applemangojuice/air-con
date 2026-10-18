@@ -38,7 +38,7 @@ async function readySettings() {
     settingsRepo.PILOT_SETTINGS_KEY,
     mergeSettings({
       ...DEFAULT_SETTINGS,
-      company: { ...DEFAULT_SETTINGS.company, geographicAddress: "DEMO: 1 Demo Street, London SW16 9ZZ", complaintsProcess: "DEMO: call or email us." },
+      company: { ...DEFAULT_SETTINGS.company, geographicAddress: "DEMO: 1 Demo Street, London SW16 9ZZ", phone: "020 7946 0123", complaintsProcess: "DEMO: call or email us." },
       warranty: { workmanshipYears: 0, manufacturerSummary: "DEMO: the manufacturer's standard warranty." },
     }),
     "test",

@@ -221,8 +221,8 @@ test("waitingCopy promises only the date the survey email gave", () => {
   p.survey.status = "submitted";
   p.survey.submittedAt = "2026-10-19T15:00:00.000Z";
   p.proposal.documentsByEmailConsent = { at: "2026-10-19T15:00:00.000Z", channel: "portal" };
-  assert.equal(view.proposalReadyBy(p), "2026-10-26");
-  assert.match(view.waitingCopy(p).body, /by Mon 26 Oct/);
+  assert.equal(view.proposalReadyBy(p), "2026-10-22");
+  assert.match(view.waitingCopy(p).body, /by Thu 22 Oct/);
 });
 
 test("install plan: three named days by default, extra days in the middle", () => {

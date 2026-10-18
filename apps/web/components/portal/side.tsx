@@ -25,10 +25,12 @@ export function ContactCard({ data }: { data: HubData }) {
       </h2>
       <p className="mt-1 text-sm text-ink-500">Real people, the same team doing your install.</p>
       <div className="mt-4 grid gap-2">
-        <a href={tel(data.company.phone)} className="flex min-h-12 items-center justify-between gap-3 rounded-2xl border border-line px-4 py-3 hover:border-ink-300">
-          <span className="text-sm text-ink-500">Call</span>
-          <span className="font-semibold text-ink-900">{data.company.phone}</span>
-        </a>
+        {data.company.phone && (
+          <a href={tel(data.company.phone)} className="flex min-h-12 items-center justify-between gap-3 rounded-2xl border border-line px-4 py-3 hover:border-ink-300">
+            <span className="text-sm text-ink-500">Call</span>
+            <span className="font-semibold text-ink-900">{data.company.phone}</span>
+          </a>
+        )}
         <a href={`mailto:${data.company.email}`} className="flex min-h-12 items-center justify-between gap-3 rounded-2xl border border-line px-4 py-3 hover:border-ink-300">
           <span className="text-sm text-ink-500">Email</span>
           <span className="min-w-0 truncate font-semibold text-ink-900">{data.company.email}</span>

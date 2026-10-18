@@ -14,7 +14,7 @@ export function followUpSubject(postcode: string): string {
 export function followUpLines(postcode: string): string[] {
   return [
     "Hi,",
-    `You started getting a fixed price for air conditioning at ${postcode} and got most of the way there. Picking up where you left off takes about a minute:`,
+    `You started getting a price for air conditioning at ${postcode} and got most of the way there. Picking up where you left off takes about a minute:`,
     `${appUrl()}/quote`,
     "If now isn't the time, no problem: this is the only nudge we'll send. No calls, no follow-up barrage.",
     `Stay cool,\n${BRAND.name}`,

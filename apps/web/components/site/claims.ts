@@ -4,6 +4,7 @@ import {
   cancellationSentence,
   effectiveTaxCode,
   isInServiceArea,
+  isPlaceholderPhone,
   mergeSettings,
   type ContractType,
   type PilotSettings,
@@ -74,11 +75,14 @@ const text = (v: string | null | undefined): string | null => (typeof v === "str
  */
 export function realPhone(phone: string | null | undefined): string | null {
   const t = text(phone);
-  if (!t) return null;
-  const digits = t.replace(/\D/g, "");
-  if (digits.length < 10 || digits.length > 13) return null;
-  if (/0{6,}$/.test(digits)) return null;
+  if (!t || isPlaceholderPhone(t)) return null;
   return t;
+}
+
+/** "call us on 020 …", or "email us at …" while settings hold only the placeholder number. */
+export function reachUs(company: { phone?: string | null; email: string }, capital = false): string {
+  const phone = realPhone(company.phone);
+  return phone ? `${capital ? "Call" : "call"} us on ${phone}` : `${capital ? "Email" : "email"} us at ${company.email}`;
 }
 
 /** The certificate only while it's complete and not past its expiry date. */

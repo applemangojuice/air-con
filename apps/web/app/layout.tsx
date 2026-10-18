@@ -34,7 +34,7 @@ const sansFont = localFont({
 });
 
 const DESCRIPTION =
-  "Get a fixed price for home air conditioning in minutes. Complete a guided photo survey of your home and book your installation online.";
+  "Home air conditioning that also heats: your price online in about two minutes, confirmed at a home survey, with your proposal, dates and documents online.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "https://dang.ac"),

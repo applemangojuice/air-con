@@ -1,7 +1,7 @@
-import { unstable_cache } from "next/cache";
+import { revalidatePath, revalidateTag, unstable_cache } from "next/cache";
 import { DEFAULT_SETTINGS } from "@aircon/domain";
 import { toPublicSettings, type PublicSettings } from "@/components/site/claims";
-import { getSettings } from "./settings-server";
+import { SETTINGS_CACHE_TAG, getSettings } from "./settings-server";
 
 /**
  * The public-safe subset of settings for marketing pages and the quote
@@ -9,15 +9,16 @@ import { getSettings } from "./settings-server";
  *
  * Cached for a minute across requests and tagged "settings", so public pages
  * can stay static (ISR) and a settings change reaches them within a minute,
- * or at once if the settings editor calls revalidateTag("settings").
+ * and at once when a save calls revalidateSettingsCaches().
  * Read failures fall back to the defaults, which make no warranty, VAT or
  * certification claims, so a database hiccup can only make the site quieter,
  * never boastful.
  */
 
-// INTEGRATION(F7): after saveSettings(), call revalidateTag(PUBLIC_SETTINGS_TAG)
-// so public pages pick up the change immediately instead of within 60 s.
-export const PUBLIC_SETTINGS_TAG = "settings";
+// revalidateSettingsCaches() (called after every saveSettings()) clears this
+// tag, so public pages pick up a change at once; the 60 s revalidate is only
+// the backstop.
+export const PUBLIC_SETTINGS_TAG = SETTINGS_CACHE_TAG;
 export const PUBLIC_SETTINGS_REVALIDATE_SECONDS = 60;
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
@@ -27,6 +28,17 @@ const cachedPublicSettings = unstable_cache(
   ["public-settings-v1"],
   { revalidate: PUBLIC_SETTINGS_REVALIDATE_SECONDS, tags: [PUBLIC_SETTINGS_TAG] },
 );
+
+/**
+ * After saveSettings(): drop every cached copy built from the old settings
+ * (the tagged public subset, and every statically rendered page), so the
+ * site, the funnel and the portal change at once. Server actions and route
+ * handlers only.
+ */
+export function revalidateSettingsCaches(): void {
+  revalidateTag(PUBLIC_SETTINGS_TAG);
+  revalidatePath("/", "layout");
+}
 
 export async function getPublicSettings(): Promise<PublicSettings> {
   try {

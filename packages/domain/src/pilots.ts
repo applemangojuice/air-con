@@ -5,7 +5,7 @@ import type { ProposalOption, ProposalRecord } from "./proposal.ts";
 import type { PoLine, PurchaseOrder } from "./purchasing.ts";
 import { TAX_CODES, type PilotSettings } from "./settings.ts";
 import type { StaffRole } from "./staff.ts";
-import type { SelfSurveyDiffRow } from "./survey-visit.ts";
+import { diffAccuracyPct, type SelfSurveyDiffRow } from "./survey-visit.ts";
 
 /**
  * The pilot learning loop: time, cost, learnings and the numbers that say
@@ -354,10 +354,8 @@ export function pilotMetrics(input: {
     p.events.filter((e) => e.type === "proposal-changes-requested").length +
     issues.filter((i) => i.kind === "variation" || i.kind === "customer-instruction").length;
 
-  const comparable = (input.surveyDiff ?? []).filter((r) => r.match !== null);
-  const selfSurveyAccuracyPct = comparable.length
-    ? Math.round((comparable.filter((r) => r.match === true).length / comparable.length) * 100)
-    : null;
+  // The same score the command centre's self-survey diff shows (F2's diffAccuracyPct).
+  const selfSurveyAccuracyPct = diffAccuracyPct(input.surveyDiff ?? []);
 
   return {
     projectId: p.id,

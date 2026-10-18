@@ -16,6 +16,8 @@ import {
   generateQuote,
   handoverDeadlines,
   idempotencyKey,
+  PROPOSAL_TURNAROUND_WORKING_DAYS,
+  isPlaceholderPhone,
   mergeSettings,
   plausibleValue,
   scoreInstallation,
@@ -71,6 +73,7 @@ import {
 } from "@aircon/domain";
 import { DEMO_STAFF } from "../auth/demo-staff.ts";
 import { documentInstance, planDocument } from "../documents-server";
+import { fmtDate } from "../format.ts";
 import type { InstallJobParts } from "../repo/installJobs";
 import { DEMO_CATALOGUE_ITEMS, DEMO_COMPATIBILITY_RULES, demoItem } from "./catalogue.ts";
 import { demoChecklist, keysUpTo, type ChecklistState } from "./compliance.ts";
@@ -93,8 +96,8 @@ import { DEMO_PHOTO_HEIGHT, DEMO_PHOTO_WIDTH, demoPhoto, type DemoScene } from "
  *
  * Pure and deterministic: (now, settings) → the same dataset. Ids come from
  * `demoId`, timestamps from the story's own calendar relative to `now`.
- * Domain functions that are still stubs (draftDesign, priceOption, …) are
- * never called: the records are built by hand to the exact domain types.
+ * The design and proposal records are built by hand to the exact domain
+ * types, so the story stays fixed whatever the pricing rules do.
  * Everything is labelled DEMO: names end "(DEMO)", emails are @example.com,
  * addresses are "Demo Street", catalogue ids start "demo-".
  */
@@ -214,6 +217,8 @@ export function demoSettings(base: PilotSettings = DEFAULT_SETTINGS): PilotSetti
     company: {
       ...base.company,
       geographicAddress: base.company.geographicAddress?.trim() || "DEMO address: 1 Demo Street, London SW16 9ZZ",
+      // Ofcom's drama range (020 7946 0xxx): never a real line.
+      phone: isPlaceholderPhone(base.company.phone) ? "020 7946 0123" : base.company.phone,
       complaintsProcess:
         base.company.complaintsProcess?.trim() ||
         "DEMO: tell us by phone or email and we reply within two working days.",
@@ -905,32 +910,8 @@ const INCLUSIONS = [
 const EXCLUSIONS = ["Redecorating after the install", "Moving furniture larger than one person can lift", "Any building work not listed above"];
 const ASSUMPTIONS = ["Your fuse board has the spare way the survey found", "Clear access to each unit wall on the day"];
 
-/** Customer-safe view: F4's when it exists, else the same rule by hand (no costs, margins or overrides). */
-function customerSafe(p: ProposalRecord): ProposalRecord {
-  try {
-    return customerSafeProposal(p);
-  } catch (err) {
-    if (!(err instanceof Error) || !err.message.startsWith("not implemented")) throw err;
-    const { marginOverride: _m, taxOverride: _t, ...rest } = p;
-    return {
-      ...rest,
-      options: p.options.map((o) => ({
-        ...o,
-        costLines: [],
-        labour: { crewSize: o.labour.crewSize, installerDays: 0, electricianDays: 0, techLeadDays: 0 },
-        pricing: {
-          ...o.pricing,
-          costPence: 0,
-          unpricedCostLines: 0,
-          grossMarginPct: 0,
-          grossMarginPctBeforeDiscount: 0,
-          contributionPence: 0,
-          belowMinMargin: false,
-        },
-      })),
-    };
-  }
-}
+/** Customer-safe view: F4's rule (no costs, margins or overrides). */
+const customerSafe = (p: ProposalRecord): ProposalRecord => customerSafeProposal(p);
 
 /* ------------------------------------------------------------------ */
 /* One project                                                         */
@@ -1316,7 +1297,7 @@ function buildProject(sc: Scenario, today: string, settings: PilotSettings, invo
     ...header(at(cal.survey, sv("12:10"))),
     survey: surveyRecord,
     promises: [
-      `Your design and proposal arrive by ${nextWorkingDay(addDays(cal.survey, 3))}.`,
+      `Your design and proposal arrive by ${fmtDate(workingDaysFrom(addDays(cal.survey, 1), PROPOSAL_TURNAROUND_WORKING_DAYS).at(-1)!)}.`,
       "A qualified engineer checks the design before you see a price.",
     ],
   });
@@ -1923,8 +1904,10 @@ function buildProject(sc: Scenario, today: string, settings: PilotSettings, invo
     ],
     contacts: [
       { label: "Your technical lead", name: TECH.name },
-      { label: "Dang, It's Hot", phone: settings.company.phone, email: settings.company.email },
+      { label: settings.company.tradingName, phone: settings.company.phone, email: settings.company.email },
     ],
+    // The as-built photos, frozen as the field app does: finished first, then progress.
+    asBuilt: [...finished, progress2, progress1].map((m) => ({ mediaId: m.item.id, ...(m.item.caption ? { caption: m.item.caption } : {}) })),
   });
   if (pack.id !== packId) throw new DemoSeedError("handover pack id drifted");
   story.act({ type: "handover-pack-published", documentId: packId }, at(cal.d3!, "16:00"), TECH);

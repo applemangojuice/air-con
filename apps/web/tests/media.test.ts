@@ -123,7 +123,7 @@ test("cleanAnnotations: clamps to 0..1, drops junk, unique ids, short labels", (
   assert.equal(media.cleanAnnotations(Array.from({ length: 500 }, (_, i) => ({ type: "core-hole", x: 0.1, y: 0.1, id: `h${i}` }))).length, media.MAX_ANNOTATIONS);
 });
 
-test("validateAnnotationsSafe: F2's validator when it lands, the safe check until then", () => {
+test("validateAnnotationsSafe: F2's validator, as a result", () => {
   const result = media.validateAnnotationsSafe([{ id: "a", type: "core-hole", x: 0.4, y: 0.6 }, { type: "nonsense" }]);
   assert.equal(result.ok, true);
   if (result.ok) {

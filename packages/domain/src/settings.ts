@@ -347,13 +347,24 @@ export function effectiveTaxCode(settings: PilotSettings): TaxCodeId {
  * manufacturer summary is missing. The ADR line is "where applicable", so
  * it's never required here.
  */
+/**
+ * Is this phone number unusable as a contact number: blank, the shipped
+ * stand-in ("0800 000 0000"), or not a plausible UK number (10 to 13
+ * digits)? Printing a number nobody answers is worse than printing none.
+ */
+export function isPlaceholderPhone(phone: string | null | undefined): boolean {
+  const digits = (phone ?? "").replace(/\D/g, "");
+  if (digits.length < 10 || digits.length > 13) return true;
+  return /0{6,}$/.test(digits);
+}
+
 export function schedule2Missing(settings: PilotSettings): string[] {
   const c = settings.company;
   const blank = (v: string | null | undefined) => !v || !v.trim();
   const missing: string[] = [];
   if (blank(c.tradingName)) missing.push("trading name");
   if (blank(c.geographicAddress)) missing.push("geographic address");
-  if (blank(c.phone)) missing.push("phone");
+  if (blank(c.phone) || isPlaceholderPhone(c.phone)) missing.push("phone");
   if (blank(c.email)) missing.push("email");
   if (blank(c.complaintsProcess)) missing.push("complaints process");
   if (settings.warranty.workmanshipYears === null && blank(settings.warranty.manufacturerSummary)) {

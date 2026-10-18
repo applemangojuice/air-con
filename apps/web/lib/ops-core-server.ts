@@ -162,61 +162,19 @@ export async function loadProjectRecords(ids: string[]): Promise<ProjectRecords>
   };
 }
 
-/** A stub's "not implemented" is expected and quiet; anything else is logged. Mirrors project-service. */
+/** A derived figure a page can live without: a failure is logged, and the page shows it as unknown. */
 function attempt<T>(label: string, fn: () => T): T | undefined {
   try {
     return fn();
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    if (!message.startsWith("not implemented")) console.error(`[ops-core] ${label} failed:`, err);
+    console.error(`[ops-core] ${label} failed:`, err);
     return undefined;
   }
 }
 
-/** Is a domain function a feature hasn't built yet still a stub? (Probe with harmless input.) */
-export function stubbed(fn: () => unknown): boolean {
-  try {
-    fn();
-    return false;
-  } catch (err) {
-    return err instanceof Error && err.message.startsWith("not implemented");
-  }
-}
-
-const PROBE_ISSUE: Issue = {
-  id: "probe",
-  projectId: "probe",
-  number: 0,
-  kind: "clarification",
-  title: "probe",
-  severity: "low",
-  status: "open",
-  blocking: false,
-  ownerRole: "ops",
-  raisedBy: { kind: "system", name: "probe" },
-  raisedAt: "1970-01-01T00:00:00.000Z",
-  mediaIds: [],
-  customerVisible: false,
-  history: [],
-};
-
-/** Can issues change status yet? (transitionIssue is the field module's, F6.) */
-export function issueTransitionsReady(): boolean {
-  // INTEGRATION(f6): true once transitionIssue is implemented; the status buttons then appear.
-  return !stubbed(() => transitionIssue(PROBE_ISSUE, "in-progress", "probe", "", new Date().toISOString()));
-}
-
-/** The domain's defaults per issue kind, where F6 has built them ({} until then). */
+/** The domain's defaults per issue kind (F6's issues.ts): they prefill the raise-issue form. */
 export function issueKindDefaults(): Partial<Record<IssueKind, ReturnType<typeof defaultsForKind>>> {
-  const out: Partial<Record<IssueKind, ReturnType<typeof defaultsForKind>>> = {};
-  for (const k of Object.keys(ISSUE_KIND_LABEL) as IssueKind[]) {
-    try {
-      out[k] = defaultsForKind(k);
-    } catch {
-      // INTEGRATION(f6): defaultsForKind prefills the raise-issue form once implemented.
-    }
-  }
-  return out;
+  return Object.fromEntries((Object.keys(ISSUE_KIND_LABEL) as IssueKind[]).map((k) => [k, defaultsForKind(k)]));
 }
 
 function leadEngineer(project: Project): string {
@@ -274,7 +232,7 @@ export function contextFromRecords(
     ctx.surveyCompleteness = attempt("surveyCompleteness", () => {
       const c = surveyCompleteness(survey.data);
       return { pct: c.pct, missing: c.missing.map((m) => `${m.section}: ${m.item}`) };
-    }) ?? { pct: 0, missing: ["the completeness check isn't available yet"] };
+    }) ?? { pct: 0, missing: ["the completeness check failed: see the server log"] };
   }
   const design = rec.designs.get(id);
   if (design) {
@@ -487,9 +445,6 @@ export function selfSurveyDiff(self: Survey | null, survey: SurveyRecord | null)
   try {
     return { rows: diffSelfSurvey(self, survey.data) };
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    // INTEGRATION(f2): diffSelfSurvey lands with the field survey; then swap this table for components/field/survey/self-survey-diff.tsx.
-    if (message.startsWith("not implemented")) return { unavailable: "The room-by-room comparison arrives with the field survey module." };
     console.error("[ops-core] diffSelfSurvey failed:", err);
     return { unavailable: "The comparison couldn't be worked out for this survey." };
   }

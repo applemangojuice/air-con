@@ -34,7 +34,10 @@ async function requestLink(target: Target): Promise<State> {
   }
 }
 
-function Sent({ state, again, phone, byEmail }: { state: Extract<State, { status: "sent" }>; again: () => void; phone: string; byEmail?: boolean }) {
+/** `phone` is null while settings hold only the placeholder number; then `email` is how to reach us. */
+type Contact = { phone: string | null; email?: string };
+
+function Sent({ state, again, phone, email, byEmail }: { state: Extract<State, { status: "sent" }>; again: () => void; byEmail?: boolean } & Contact) {
   return (
     <div className="space-y-4" role="status" aria-live="polite">
       {state.devLink ? (
@@ -55,16 +58,31 @@ function Sent({ state, again, phone, byEmail }: { state: Extract<State, { status
             It works once and lasts an hour. Check your spam folder if it hasn&apos;t arrived in a few minutes.
           </p>
           {!state.emailLive && (
-            <p className="mt-2 text-sm text-ink-700">Email sending isn&apos;t switched on yet, so please call us and we&apos;ll help you in.</p>
+            <p className="mt-2 text-sm text-ink-700">
+              Email sending isn&apos;t switched on yet, so please {phone ? "call us" : email ? `email us at ${email}` : "get in touch"} and we&apos;ll help you in.
+            </p>
           )}
         </div>
       )}
       <p className="text-sm text-ink-500">
-        Not arrived, or it&apos;s an old address? Call us on{" "}
-        <a href={`tel:${phone.replace(/\s+/g, "")}`} className="font-semibold text-accent-700 underline underline-offset-2">
-          {phone}
-        </a>
-        .{" "}
+        Not arrived, or it&apos;s an old address?{" "}
+        {phone ? (
+          <>
+            Call us on{" "}
+            <a href={`tel:${phone.replace(/\s+/g, "")}`} className="font-semibold text-accent-700 underline underline-offset-2">
+              {phone}
+            </a>
+            .{" "}
+          </>
+        ) : email ? (
+          <>
+            Email us at{" "}
+            <a href={`mailto:${email}`} className="font-semibold text-accent-700 underline underline-offset-2">
+              {email}
+            </a>
+            .{" "}
+          </>
+        ) : null}
         <button type="button" onClick={again} className="min-h-11 font-semibold text-accent-700 underline underline-offset-2">
           Send another link
         </button>
@@ -74,13 +92,13 @@ function Sent({ state, again, phone, byEmail }: { state: Extract<State, { status
 }
 
 /** For a project or document page: one button, the link goes to the address we hold. */
-export function LinkRequest({ target, phone, label = "Email me a sign-in link" }: { target: Target; phone: string; label?: string }) {
+export function LinkRequest({ target, phone, email, label = "Email me a sign-in link" }: { target: Target; label?: string } & Contact) {
   const [state, setState] = useState<State>({ status: "idle" });
   const send = async () => {
     setState({ status: "sending" });
     setState(await requestLink(target));
   };
-  if (state.status === "sent") return <Sent state={state} again={() => void send()} phone={phone} />;
+  if (state.status === "sent") return <Sent state={state} again={() => void send()} phone={phone} {...(email ? { email } : {})} />;
   return (
     <div className="space-y-3">
       <button type="button" onClick={() => void send()} disabled={state.status === "sending"} aria-busy={state.status === "sending" || undefined} className={primaryCls()}>
@@ -98,7 +116,7 @@ export function LinkRequest({ target, phone, label = "Email me a sign-in link" }
 }
 
 /** For /portal: an email box. */
-export function EmailSignIn({ phone }: { phone: string }) {
+export function EmailSignIn({ phone, email: supportEmail }: Contact) {
   const [email, setEmail] = useState("");
   const [state, setState] = useState<State>({ status: "idle" });
   const send = async () => {
@@ -110,7 +128,7 @@ export function EmailSignIn({ phone }: { phone: string }) {
     setState({ status: "sending" });
     setState(await requestLink({ email: clean }));
   };
-  if (state.status === "sent") return <Sent state={state} again={() => void send()} phone={phone} byEmail />;
+  if (state.status === "sent") return <Sent state={state} again={() => void send()} phone={phone} {...(supportEmail ? { email: supportEmail } : {})} byEmail />;
   return (
     <form
       className="space-y-3"

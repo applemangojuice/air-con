@@ -21,6 +21,7 @@ import {
   idempotencyKey,
   isGatePassed,
   isOpen,
+  isPlaceholderPhone,
   latestEvidence,
   meetsRequirement,
   migrateProject,
@@ -46,6 +47,7 @@ import {
   type IssueKind,
   type Learning,
   type MeasuredSurvey,
+  type MediaItem,
   type Project,
   type ProposalRecord,
   type Severity,
@@ -494,7 +496,7 @@ function surveyCard(p: Project): JobCard {
     ...(p.customer.parkingNotes ? { parkingNotes: p.customer.parkingNotes } : {}),
     crew: p.survey.surveyor ? [{ staffId: p.survey.surveyor.staffId, name: p.survey.surveyor.name, role: "surveyor", external: false }] : [],
     risks: [],
-    // INTEGRATION(F2): the survey flow lives at /field/survey/[projectId].
+    // The survey flow (F2) lives at /field/survey/[projectId].
     href: `/field/survey/${p.id}`,
   };
 }
@@ -1471,6 +1473,9 @@ export const CARE_GUIDE: string[] = [
   "If something's not right, switch it off at the remote and tell us: don't open the units.",
 ];
 
+/** How many as-built photos the pack carries (finished first, then progress). */
+export const AS_BUILT_MAX = 12;
+
 export interface HandoverDraft {
   snapshot: HandoverPackSnapshot;
   missing: string[];
@@ -1503,7 +1508,15 @@ export async function handoverDraft(projectId: string, staff: StaffMember): Prom
   const notes = catalogue.filter((c) => c.kind === "outdoor" && c.model && outdoorModels.has(c.model) && c.warranty).map((c) => `${c.model}: ${c.warranty}`);
   const warrantyText = [settings.warranty.manufacturerSummary, ...notes].filter(Boolean).join(" ") || null;
   const dueOn = project.handover.warrantyDueOn ?? (/daikin/i.test(notes.join(" ")) ? addDaysIso(completedOn, 90) : addDaysIso(completedOn, 30));
-  const crewLead = project.booking.crew.find((c) => c.role === "tech-lead") ?? project.booking.crew[0];
+  const crewLead = project.booking.crew.find((c) => c.role === "tech-lead") ?? project.booking.crew.find((c) => !c.external);
+  // The as-built photos: what the customer can already see of the finished job, frozen into the pack.
+  const asBuilt = (await mediaRepo.listForProject(projectId, { customerVisibleOnly: true }).catch(() => [] as MediaItem[]))
+    .filter((m) => m.tag === "completed" || m.tag === "progress")
+    .sort((a, b) => (a.tag === b.tag ? 0 : a.tag === "completed" ? -1 : 1))
+    .slice(0, AS_BUILT_MAX)
+    .map((m) => ({ mediaId: m.id, ...(m.caption ? { caption: m.caption } : {}) }));
+  if (asBuilt.length === 0) missing.push("There are no as-built photos the customer can see (finished or progress photos).");
+  const phone = isPlaceholderPhone(settings.company.phone) ? undefined : settings.company.phone;
   const snapshot: HandoverPackSnapshot = {
     ...header(settings, project, now),
     completedOn,
@@ -1517,9 +1530,10 @@ export async function handoverDraft(projectId: string, staff: StaffMember): Prom
     care: CARE_GUIDE,
     contacts: [
       ...(crewLead ? [{ label: "Your technical lead", name: crewLead.name }] : []),
-      { label: settings.company.tradingName, phone: settings.company.phone, email: settings.company.email },
-      { label: "Report a problem", phone: settings.company.phone, email: settings.company.email },
+      { label: settings.company.tradingName, ...(phone ? { phone } : {}), email: settings.company.email },
+      { label: "Report a problem", ...(phone ? { phone } : {}), email: settings.company.email },
     ],
+    asBuilt,
   };
   if (progress && !progress.walkthroughDone) missing.push("The customer walkthrough isn't ticked off yet.");
   return { snapshot, missing, certificate: cert ? { kind: "commissioning-certificate", ref: cert.ref, id: cert.id, title: cert.title } : null };

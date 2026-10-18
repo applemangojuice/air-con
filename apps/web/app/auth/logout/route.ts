@@ -1,9 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { safeNextPath } from "@/lib/auth/access";
+import { QUOTE_OWNER_COOKIE, quoteOwnerCookieOptions } from "@/lib/auth/quote-owner";
 import { SESSION_COOKIE, sessionCookieOptions } from "@/lib/auth/session";
 
 /**
- * Sign out: clear the session cookie and go to `next` (same-origin only),
+ * Sign out: clear the session cookie (and the funnel's quote-owner grant,
+ * lib/auth/quote-owner.ts) and go to `next` (same-origin only),
  * else the sign-in page. POST from a form; GET works too, so a plain link
  * can sign out (the worst a forged one can do is sign someone out).
  */
@@ -17,6 +19,7 @@ function signOut(request: NextRequest, next: string | null) {
     headers: { "cache-control": "no-store" },
   });
   res.cookies.set(SESSION_COOKIE, "", { ...sessionCookieOptions(), maxAge: 0 });
+  res.cookies.set(QUOTE_OWNER_COOKIE, "", { ...quoteOwnerCookieOptions(), maxAge: 0 });
   return res;
 }
 

@@ -7,6 +7,7 @@ import { EmailSignIn } from "@/components/portal/sign-in";
 import { getSession } from "@/lib/auth/server";
 import { customerHomes } from "@/lib/portal-server";
 import { getSettings } from "@/lib/settings-server";
+import { reachUs, realPhone } from "@/components/site/claims";
 
 export const metadata: Metadata = {
   title: "Your homes",
@@ -27,7 +28,7 @@ export default async function PortalPage({ searchParams }: { searchParams: Searc
   const signedOut = sp.signedOut === "1";
   const [session, settings] = await Promise.all([getSession(), getSettings()]);
   const homes = session?.kind === "customer" ? await customerHomes() : null;
-  const phone = settings.company.phone;
+  const phone = realPhone(settings.company.phone);
 
   if (homes) {
     const first = homes.name.replace(/\s*\(DEMO\)\s*/, "").split(" ")[0];
@@ -39,7 +40,7 @@ export default async function PortalPage({ searchParams }: { searchParams: Searc
           <div className="mt-8 rounded-3xl border border-dashed border-line bg-white/60 px-6 py-10 text-center">
             <p className="font-semibold text-ink-900">No projects on this account yet</p>
             <p className="mx-auto mt-1.5 max-w-md text-sm text-ink-500">
-              If you&apos;ve started one under a different email address, sign out and sign in with that one, or call us on {phone}.
+              If you&apos;ve started one under a different email address, sign out and sign in with that one, or {reachUs(settings.company)}.
             </p>
             <Link href="/quote" className={`${primaryCls(false)} mt-5`}>
               Get a price for a home
@@ -87,11 +88,17 @@ export default async function PortalPage({ searchParams }: { searchParams: Searc
           </ul>
         )}
         <p className="mt-8 text-sm text-ink-500">
-          Questions? Call us on{" "}
-          <a href={`tel:${phone.replace(/\s+/g, "")}`} className="font-semibold text-accent-700 underline underline-offset-2">
-            {phone}
-          </a>{" "}
-          or email{" "}
+          Questions?{" "}
+          {phone && (
+            <>
+              Call us on{" "}
+              <a href={`tel:${phone.replace(/\s+/g, "")}`} className="font-semibold text-accent-700 underline underline-offset-2">
+                {phone}
+              </a>{" "}
+              or email{" "}
+            </>
+          )}
+          {!phone && "Email us at "}
           <a href={`mailto:${settings.company.email}`} className="font-semibold text-accent-700 underline underline-offset-2">
             {settings.company.email}
           </a>
@@ -124,7 +131,7 @@ export default async function PortalPage({ searchParams }: { searchParams: Searc
           Your dates, your documents and the next thing to do, all in one place. We&apos;ll email you a link: one tap and you&apos;re in, no password to remember.
         </p>
         <div className="mt-6">
-          <EmailSignIn phone={phone} />
+          <EmailSignIn phone={phone} email={settings.company.email} />
         </div>
       </div>
       <div className="mt-6 grid gap-3 sm:grid-cols-2">

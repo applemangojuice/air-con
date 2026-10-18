@@ -73,3 +73,39 @@ test("clearing the email leaves the project where it is and sends no token anywh
   // v2 never falls back to the quote's address.
   assert.equal((await loadProject(id))?.customer.email, undefined);
 });
+
+test("a project made from a quote copies the funnel's consents onto the customer (marketing only when ticked)", async () => {
+  const consentsAt = (at: string, marketing: boolean) => ({
+    consents: {
+      operational: { given: true, at, version: "quote-consent-v1", text: "DEMO project updates", channels: ["email"], source: "quote-funnel" },
+      marketing: { given: marketing, at, version: "quote-consent-v1", text: "DEMO offers", channels: marketing ? ["email"] : [], source: "quote-funnel" },
+    },
+  });
+  async function fromQuote(email: string, attribution: unknown) {
+    const quoteId = crypto.randomUUID();
+    await requireDb()
+      .from("quote_requests")
+      .insert({ id: quoteId, customer_name: "DEMO Kim", email, source: "web", survey: DEMO_SURVEY, quote: generateQuote(DEMO_SURVEY), attribution });
+    const created = await createProjectForQuote(quoteId);
+    assert.ok("id" in created, JSON.stringify(created));
+  }
+
+  await fromQuote("consents@example.test", consentsAt("2026-10-01T10:00:00.000Z", true));
+  let c = await customersRepo.getByEmail("consents@example.test");
+  assert.equal(c?.opsConsent?.text, "DEMO project updates");
+  assert.match(c?.opsConsent?.source ?? "", /quote-funnel \(quote-consent-v1; email\)/);
+  assert.equal(c?.marketingConsent?.text, "DEMO offers");
+
+  // A newer quote with marketing unticked clears it; operational stays given.
+  await fromQuote("consents@example.test", consentsAt("2026-10-05T10:00:00.000Z", false));
+  c = await customersRepo.getByEmail("consents@example.test");
+  assert.equal(c?.marketingConsent, null);
+  assert.equal(c?.opsConsent?.at, "2026-10-05T10:00:00.000Z");
+
+  // An older quote never overwrites the newer answer; a quote without consents changes nothing.
+  await fromQuote("consents@example.test", consentsAt("2026-09-01T10:00:00.000Z", true));
+  await fromQuote("consents@example.test", { referrer: "https://example.test" });
+  c = await customersRepo.getByEmail("consents@example.test");
+  assert.equal(c?.marketingConsent, null);
+  assert.equal(c?.opsConsent?.at, "2026-10-05T10:00:00.000Z");
+});

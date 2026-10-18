@@ -9,6 +9,7 @@ import { DAILY_JOB_LABEL, DAILY_JOB_IDS } from "@/lib/ops-core-schedule";
 import { runDailyOps } from "@/lib/ops-core-server";
 import { getSettings, saveSettings } from "@/lib/settings-server";
 import { ALWAYS_ON } from "./always-on";
+import { revalidateSettingsCaches } from "@/lib/public-settings";
 
 /** Turn one message template on or off (settings.comms.disabledEvents). */
 export async function toggleEventAction(fd: FormData): Promise<ActionResult> {
@@ -23,6 +24,7 @@ export async function toggleEventAction(fd: FormData): Promise<ActionResult> {
   else disabled.add(event);
   try {
     await saveSettings({ ...settings, comms: { ...settings.comms, disabledEvents: [...disabled] } }, staff);
+    revalidateSettingsCaches();
   } catch (err) {
     console.error("[messages] toggle failed:", err);
     return refused("Settings couldn't be saved. Please try again.");
