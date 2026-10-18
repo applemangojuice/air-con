@@ -18,7 +18,7 @@ import {
 } from "@aircon/domain";
 import { BlockerList } from "@/components/kit/blocker-list";
 import { parseReading } from "./capture";
-import { londonTime, whenLabel } from "./format";
+import { londonTime, personName, whenLabel } from "./format";
 import { HeaderTitle, SyncBadge } from "./sync-badge";
 import type { FieldJob } from "./types";
 import { useMergedJob, useRefreshOnSync } from "./use-outbox";
@@ -84,13 +84,13 @@ function TargetRow({ projectId, target, canEdit, locked }: { projectId: string; 
           <p className="font-semibold text-ink-900">{def.label}</p>
           <p className="text-sm text-ink-700">
             {windowText({ ...(target.min !== undefined ? { min: target.min } : {}), ...(target.max !== undefined ? { max: target.max } : {}), unit: def.unit }) ?? "Record only"}
-            {target.basis === "tech-lead" && target.setBy ? ` · ${target.setBy.replace(/^DEMO /, "")}` : ""}
+            {target.basis === "tech-lead" && target.setBy ? ` · ${personName(target.setBy)}` : ""}
             {` · ${target.specCount} reading${target.specCount === 1 ? "" : "s"}`}
           </p>
         </div>
         <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ${b.tone}`}>{b.text}</span>
       </div>
-      <p className="mt-2 text-sm text-ink-500">{def.hint}</p>
+      {!locked && <p className="mt-2 text-sm text-ink-500">{def.hint}</p>}
       {target.note && target.basis !== "tech-lead" && <p className="mt-1 text-sm text-ink-500">{target.note}</p>}
       {target.basis === "tech-lead" && target.note && <p className="mt-1 text-sm text-ink-700">Note: {target.note}</p>}
       {canEdit && !locked && (
@@ -163,7 +163,7 @@ function ExceptionRow({ projectId, item, canReview }: { projectId: string; item:
         {slot.record?.value} <span className="text-base font-normal text-ink-700">{slot.spec.unit}</span>
       </p>
       <p className="text-sm text-ink-700">
-        Window {windowText(slot.spec) ?? "none"} · {slot.record?.by.replace(/^DEMO /, "")}, {londonTime(slot.record?.at)}
+        Window {windowText(slot.spec) ?? "none"} · {personName(slot.record?.by ?? "")}, {londonTime(slot.record?.at)}
       </p>
       {canReview ? (
         <div className="mt-3 space-y-2">
@@ -242,7 +242,7 @@ export function Commissioning({ data, certificateHref }: { data: FieldJob; certi
         <h1 className="font-display text-3xl leading-tight text-ink-900">{signed ? "Signed off" : "Results and sign-off"}</h1>
         <p className="mt-1 text-base text-ink-700">
           {signed
-            ? `Signed by ${signed.signedBy.name.replace(/^DEMO /, "")} (F-gas ${signed.signedBy.qualificationRef || "ref not recorded"}), ${whenLabel(signed.at, header.today)}.`
+            ? `Signed by ${personName(signed.signedBy.name)} (F-gas ${signed.signedBy.qualificationRef || "ref not recorded"}), ${whenLabel(signed.at, header.today)}.`
             : me.canSign
               ? "Check the readings against the manual, set the job's targets, review anything out of its window, then sign."
               : "The tech lead signs commissioning. You can see the results as they come in."}
@@ -424,7 +424,7 @@ export function Commissioning({ data, certificateHref }: { data: FieldJob; certi
                 </div>
               )}
               <button type="button" disabled={busy || derived.errors.length > 0} onClick={sign} className={`${PRIMARY} mt-3 w-full`}>
-                {busy ? "Signing…" : derived.errors.length ? "Not ready to sign" : `Sign as ${me.name.replace(/^DEMO /, "")}`}
+                {busy ? "Signing…" : derived.errors.length ? "Not ready to sign" : `Sign as ${personName(me.name)}`}
               </button>
             </section>
           )}

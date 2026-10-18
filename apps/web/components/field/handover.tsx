@@ -207,11 +207,38 @@ export function Handover({ data, pack, missing }: { data: FieldJob; pack: Handov
           <p role="status" className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-lg font-semibold text-emerald-800">
             Done. Thank them, and leave it tidy.
           </p>
-          {header.signoff?.outcome === "snags" && (
-            <Link href="/field/issues" className={`${SECONDARY} flex items-center justify-center`}>
-              See the snags
-            </Link>
-          )}
+          <section aria-labelledby="after" className="rounded-2xl border border-line bg-white p-4">
+            <h2 id="after" className="font-semibold text-ink-900">
+              What happens next
+            </h2>
+            <ul className="mt-2 space-y-2 text-base text-ink-700">
+              <li>{published ? "Their handover pack is on their project page." : "The office publishes their handover pack."}</li>
+              <li>
+                {header.electricalCert === "pending"
+                  ? "The electrical certificate is still to come: the office chases it and adds it to their pack."
+                  : header.electricalCert === "received"
+                    ? "The electrical certificate is in."
+                    : "No electrical certificate needed."}
+              </li>
+              {header.signoff?.outcome === "snags" && <li>Each snag has an owner and a date. The customer can see them.</li>}
+            </ul>
+            <div className="mt-4 grid gap-2">
+              {header.signoff?.outcome === "snags" && (
+                <Link href="/field/issues" className={`${PRIMARY} flex items-center justify-center`}>
+                  See the snags
+                </Link>
+              )}
+              {published && (
+                // INTEGRATION(F1): /d/[id] is the customer document viewer; until it lands this link may 404.
+                <Link href={`/d/${header.packDocumentId}`} className={`${SECONDARY} flex items-center justify-center`}>
+                  Open their handover pack
+                </Link>
+              )}
+              <Link href="/field" className={`${header.signoff?.outcome === "snags" ? SECONDARY : PRIMARY} flex items-center justify-center`}>
+                Back to today
+              </Link>
+            </div>
+          </section>
         </div>
       ) : (
         <div className="space-y-10">

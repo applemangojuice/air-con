@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { getFieldOutbox, newOpId } from "@/lib/field-outbox";
 import { nowIso } from "./capture";
-import { londonTime } from "./format";
+import { londonTime, personName } from "./format";
 import type { PackMaterial } from "./types";
 import { useOutboxState, useRefreshOnSync } from "./use-outbox";
 
@@ -33,7 +33,7 @@ export function RamsAck({
         <ul className="mb-3 space-y-1 text-base text-ink-700">
           {acknowledged.map((a) => (
             <li key={`${a.by}-${a.at}`}>
-              ✓ {a.by.replace(/^DEMO /, "")} <span className="text-sm text-ink-500">at {londonTime(a.at)}</span>
+              ✓ {personName(a.by)} <span className="text-sm text-ink-500">at {londonTime(a.at)}</span>
             </li>
           ))}
         </ul>
@@ -49,7 +49,7 @@ export function RamsAck({
         <p className="text-sm text-ink-500">The runsheet isn&apos;t ready yet, so there&apos;s nothing to acknowledge against.</p>
       ) : done ? (
         <p className="rounded-2xl bg-emerald-50 px-4 py-3 font-semibold text-emerald-800" role="status">
-          {waiting ? "Acknowledged: waiting to sync." : `You've acknowledged them, ${meName.replace(/^DEMO /, "")}.`}
+          {waiting ? "Acknowledged: waiting to sync." : `You've acknowledged them, ${personName(meName)}.`}
         </p>
       ) : (
         <button

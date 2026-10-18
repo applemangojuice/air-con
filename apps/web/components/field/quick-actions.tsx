@@ -80,8 +80,28 @@ function useClock(data: FieldJob): { running: boolean; entryId?: string; since?:
   }, [state.acked, state.items, data.clock, data.header.projectId]);
 }
 
+/** True while someone's typing in the page (not in a sheet): the floating button steps aside for the keyboard. */
+function useTyping(): boolean {
+  const [typing, setTyping] = useState(false);
+  useEffect(() => {
+    const on = (e: FocusEvent) => {
+      const t = e.target as HTMLElement | null;
+      setTyping(Boolean(t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA") && !t.closest("[role=dialog]")));
+    };
+    const off = () => setTyping(false);
+    document.addEventListener("focusin", on);
+    document.addEventListener("focusout", off);
+    return () => {
+      document.removeEventListener("focusin", on);
+      document.removeEventListener("focusout", off);
+    };
+  }, []);
+  return typing;
+}
+
 export function QuickActions({ data, merged, day }: { data: FieldJob; merged: MergedJob | null; day: number }) {
   const [panel, setPanel] = useState<Panel>(null);
+  const typing = useTyping();
   const close = () => setPanel(null);
   const { header } = data;
   const clock = useClock(data);
@@ -94,7 +114,7 @@ export function QuickActions({ data, merged, day }: { data: FieldJob; merged: Me
       <button
         type="button"
         onClick={() => setPanel("menu")}
-        className="fixed bottom-24 right-4 z-30 flex min-h-14 items-center gap-2 rounded-full bg-ink-900 px-6 text-lg font-semibold text-white shadow-lg shadow-ink-900/25 sm:right-[max(1rem,calc(50%-17rem))]"
+        className={`fixed bottom-24 right-4 z-30 flex min-h-14 items-center gap-2 rounded-full bg-ink-900 px-6 text-lg font-semibold text-white shadow-lg shadow-ink-900/25 sm:right-[max(1rem,calc(50%-17rem))] ${typing ? "hidden" : ""}`}
         aria-haspopup="dialog"
       >
         <svg aria-hidden viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round">
@@ -350,7 +370,7 @@ function ArriveSheet({ open, onClose, data, running }: { open: boolean; onClose:
   async function arrive() {
     setPhase("working");
     const fix = await locate();
-    setGpsNote(fix ? `Location recorded (within about ${fix.accuracyM ?? "?"} m).` : "No location: that's fine, it's optional.");
+    setGpsNote(fix ? (fix.accuracyM && fix.accuracyM >= 1 ? `Location recorded (within about ${fix.accuracyM} m).` : "Location recorded.") : "No location: that's fine, it's optional.");
     if (!running) {
       await getFieldOutbox().enqueue(
         { type: "time-start", id: newOpId(), projectId: data.header.projectId, kind: "install", dayN: n, at: nowIso(), note: "Arrived" },
@@ -393,6 +413,7 @@ function ArriveSheet({ open, onClose, data, running }: { open: boolean; onClose:
       }
     >
       <div aria-live="polite" className="space-y-3">
+        {phase === "working" && <p className="text-base font-semibold text-ink-900">{gpsNote ? `Starting day ${n}…` : "Getting your location (up to 5 seconds)…"}</p>}
         {phase === "ready" && (
           <ul className="space-y-2 text-base text-ink-700">
             <li>· We ask for your location once, for the arrival record (optional).</li>
@@ -412,8 +433,7 @@ function ArriveSheet({ open, onClose, data, running }: { open: boolean; onClose:
             <p role="alert" className="rounded-2xl bg-red-50 px-4 py-3 text-base font-semibold text-red-900">
               Day {n} can&apos;t start yet. Don&apos;t start work: call the office.
             </p>
-            {error && <p className="text-sm text-ink-700">{error}</p>}
-            {blockers.length > 0 && <BlockerList blockers={blockers} />}
+            {blockers.length > 0 ? <BlockerList blockers={blockers} /> : error && <p className="text-sm text-ink-700">{error}</p>}
           </>
         )}
       </div>
@@ -624,14 +644,25 @@ interface DayPhoto {
   customerVisible: boolean;
 }
 
+/** "RAMS acknowledged" stays as it is; "Core drilling" becomes "core drilling". */
+function lowerFirst(t: string): string {
+  const first = t.split(/\s+/)[0] ?? "";
+  return first.length > 1 && first === first.toUpperCase() ? t : t.charAt(0).toLowerCase() + t.slice(1);
+}
+
 function uniqueTitles(titles: string[], max = 5): string[] {
   const out: string[] = [];
   for (const t of titles) if (!out.includes(t)) out.push(t);
   return out.slice(0, max);
 }
 
-function EndDaySheet({ open, onClose, data, merged, n, clockEntryId }: { open: boolean; onClose: () => void; data: FieldJob; merged: MergedJob | null; n: number; clockEntryId?: string }) {
+function EndDaySheet({ open, onClose, data, merged, n: liveN, clockEntryId }: { open: boolean; onClose: () => void; data: FieldJob; merged: MergedJob | null; n: number; clockEntryId?: string }) {
   const router = useRouter();
+  // The day this sheet is ending, fixed when it opens: the page refreshes underneath once it's closed.
+  const [n, setN] = useState(liveN);
+  useEffect(() => {
+    if (open) setN(liveN);
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
   const online = useOnline();
   const [stage, setStage] = useState<"summary" | "photos" | "sent" | "learn" | "finished">("summary");
   const [summary, setSummary] = useState("");
@@ -656,8 +687,8 @@ function EndDaySheet({ open, onClose, data, merged, n, clockEntryId }: { open: b
       const last = v.slots.map((x) => x.record?.at).filter(Boolean).sort().pop();
       return last ? londonDateOf(last) === today : false;
     });
-    const doneTitles = uniqueTitles(doneToday.map((s) => s.title.toLowerCase()));
-    const nextTitles = uniqueTitles(stepsForDay(merged.job.runsheet, n + 1).map((s) => s.title.toLowerCase()), 3);
+    const doneTitles = uniqueTitles(doneToday.map((s) => lowerFirst(s.title)));
+    const nextTitles = uniqueTitles(stepsForDay(merged.job.runsheet, n + 1).map((s) => lowerFirst(s.title)), 3);
     const last = n >= data.header.totalDays;
     return {
       summary: doneTitles.length ? `Done today: ${doneTitles.join(", ")}.` : `Day ${n} on site.`,

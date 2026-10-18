@@ -53,14 +53,18 @@ export function SyncBadge() {
             : "This browser won't keep captures if the page closes (private browsing or storage blocked). Keep this page open until everything has synced."
         }
         footer={
-          <button
-            type="button"
-            disabled={!state.online || state.items.length === 0 || state.syncing}
-            onClick={() => void outbox?.flush(true)}
-            className="min-h-12 w-full rounded-full bg-accent-600 px-6 font-semibold text-white disabled:opacity-40"
-          >
-            {state.online ? (state.syncing ? "Syncing…" : "Sync now") : "Offline: will sync when you're back in signal"}
-          </button>
+          state.online ? (
+            <button
+              type="button"
+              disabled={state.items.length === 0 || state.syncing}
+              onClick={() => void outbox?.flush(true)}
+              className="min-h-12 w-full rounded-full bg-accent-600 px-6 font-semibold text-white disabled:opacity-40"
+            >
+              {state.syncing ? "Syncing…" : state.items.length ? "Sync now" : "Nothing to sync"}
+            </button>
+          ) : (
+            <p className="rounded-2xl bg-surface px-4 py-3 text-center text-base font-semibold text-ink-900">Offline: everything here syncs when you&apos;re back in signal.</p>
+          )
         }
       >
         <p aria-live="polite" className="mb-4 text-sm text-ink-700">

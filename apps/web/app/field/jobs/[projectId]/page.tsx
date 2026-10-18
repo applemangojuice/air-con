@@ -1,13 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ROLE_LABEL } from "@aircon/domain";
 import { AnnotatedImage } from "@/components/annotate/annotated-image";
 import { RiskChips } from "@/components/field/job-card";
 import { JobNav } from "@/components/field/job-nav";
 import { LoadList, RamsAck } from "@/components/field/pack-bits";
 import { HeaderTitle, SyncBadge } from "@/components/field/sync-badge";
-import { fmtDay, londonTime, telHref } from "@/components/field/format";
+import { crewLabel, fmtDay, londonTime, telHref } from "@/components/field/format";
 import { requireProjectAccess, requireStaff } from "@/lib/auth/server";
 import { FieldError, loadJobPack } from "@/lib/field-server";
 
@@ -30,6 +29,19 @@ function Block({ id, title, children, hint }: { id: string; title: string; child
       {hint && <p className="mb-3 mt-0.5 text-sm text-ink-500">{hint}</p>}
       <div className={hint ? "" : "mt-3"}>{children}</div>
     </section>
+  );
+}
+
+/** A list that folds away: long, and only needed while loading the van. */
+function Fold({ summary, children }: { summary: string; children: React.ReactNode }) {
+  return (
+    <details className="group rounded-2xl border border-line bg-white open:border-transparent open:bg-transparent">
+      <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between rounded-2xl px-4 font-semibold text-ink-900 group-open:mb-2 group-open:border group-open:border-line group-open:bg-white">
+        {summary}
+        <span aria-hidden className="text-ink-500 transition group-open:rotate-180">⌄</span>
+      </summary>
+      {children}
+    </details>
   );
 }
 
@@ -105,7 +117,7 @@ export default async function JobPackPage({ params }: { params: Promise<{ projec
             </div>
             <div>
               <dt className="text-xs font-semibold uppercase tracking-wide text-ink-500">Crew</dt>
-              <dd className="text-ink-900">{h.crew.length ? h.crew.map((c) => `${c.name} (${ROLE_LABEL[c.role].toLowerCase()})`).join(", ") : "No crew assigned yet."}</dd>
+              <dd className="text-ink-900">{h.crew.length ? h.crew.map(crewLabel).join(", ") : "No crew assigned yet."}</dd>
             </div>
             <div>
               <dt className="text-xs font-semibold uppercase tracking-wide text-ink-500">Kit</dt>
@@ -191,11 +203,19 @@ export default async function JobPackPage({ params }: { params: Promise<{ projec
         </Block>
 
         <Block id="materials" title="Materials" hint={pack.materials[0]?.source === "po" ? "From the purchase orders, with where each line has got to." : "From the design's bill of materials (no purchase orders yet)."}>
-          {pack.materials.length ? <LoadList projectId={projectId} kind="materials" items={pack.materials} /> : <p className="text-base text-ink-700">No materials list yet.</p>}
+          {pack.materials.length ? (
+            <Fold summary={`${pack.materials.length} line${pack.materials.length === 1 ? "" : "s"} to load`}>
+              <LoadList projectId={projectId} kind="materials" items={pack.materials} />
+            </Fold>
+          ) : (
+            <p className="text-base text-ink-700">No materials list yet.</p>
+          )}
         </Block>
 
         <Block id="tools" title="Tools" hint="The standard kit, plus what this job needs.">
-          <LoadList projectId={projectId} kind="tools" items={pack.tools.map((t, i) => ({ key: `tool-${i}`, label: t.label, ...(t.why ? { why: t.why } : {}) }))} />
+          <Fold summary={`${pack.tools.length} tools, ${pack.tools.filter((t) => t.why).length} for this job`}>
+            <LoadList projectId={projectId} kind="tools" items={pack.tools.map((t, i) => ({ key: `tool-${i}`, label: t.label, ...(t.why ? { why: t.why } : {}) }))} />
+          </Fold>
         </Block>
 
         <Block id="customer" title="What the customer asked for">

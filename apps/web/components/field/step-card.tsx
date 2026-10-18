@@ -168,7 +168,9 @@ export function StepCard({
             <legend className="mb-2 text-sm font-semibold text-ink-900">Outcome</legend>
             <div className="grid grid-cols-4 gap-1 rounded-full bg-surface p-1">
               {OUTCOMES.map((o) => {
-                const selected = picking ? picking === o.value : current === o.value;
+                // Pass shows as chosen only once it's real: recorded, or the evidence is all in.
+                const shown = view.latest ? current : view.state === "done" ? "pass" : null;
+                const selected = picking ? picking === o.value : shown === o.value;
                 return (
                   <button
                     key={o.value}

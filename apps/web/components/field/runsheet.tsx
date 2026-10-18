@@ -109,11 +109,11 @@ export function Runsheet({ data, initialDay }: { data: FieldJob; initialDay: num
         <h1 className="font-display text-3xl leading-tight text-ink-900">{day === 1 ? "Prep and building work" : day === 2 ? "Mechanical and electrical" : day === 3 ? "Test, commission, hand over" : `Day ${day}`}</h1>
         <p className="mt-1 text-base text-ink-700">
           {thisDay?.status === "in-progress"
-            ? `Under way since ${londonTime(thisDay.startedAt)}.`
+            ? `Under way since ${londonTime(thisDay.startedAt)}`
             : thisDay?.status === "done"
-              ? `Ended ${londonTime(thisDay.endedAt)}.`
-              : "Not started."}{" "}
-          {header.address}
+              ? `Ended ${londonTime(thisDay.endedAt)}`
+              : "Not started"}
+          <span className="text-ink-500"> · {header.address}</span>
         </p>
         {dayStats && (
           <div className="mt-3">
@@ -215,7 +215,13 @@ export function Runsheet({ data, initialDay }: { data: FieldJob; initialDay: num
         </div>
       )}
 
-      {header.bookingStatus === "booked" && <QuickActions data={data} merged={merged} day={day} />}
+      {header.bookingStatus === "booked" && (
+        <>
+          {/* Room under the floating Actions button, so the last step is never hidden behind it. */}
+          <div aria-hidden className="h-16" />
+          <QuickActions data={data} merged={merged} day={day} />
+        </>
+      )}
     </>
   );
 }

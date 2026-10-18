@@ -1,3 +1,4 @@
+import { ROLE_LABEL, type StaffRole } from "@aircon/domain";
 import { fmtDate, fmtDay, fmtDayTime, money } from "@/lib/format";
 
 /**
@@ -55,6 +56,16 @@ export function slotTime(iso: string): string {
 export function telHref(phone: string): string {
   const digits = phone.replace(/[^\d+]/g, "");
   return `tel:${digits.startsWith("0") ? `+44${digits.slice(1)}` : digits}`;
+}
+
+/** "DEMO Tess (technical lead)" on the crew as a technical lead → "DEMO Tess, technical lead". */
+export function crewLabel(c: { name: string; role: StaffRole }): string {
+  return `${c.name.replace(/\s*\([^)]*\)\s*$/, "")}, ${ROLE_LABEL[c.role].toLowerCase()}`;
+}
+
+/** "DEMO Tess (technical lead)" → "Tess": a person's name as a sentence uses it. */
+export function personName(name: string): string {
+  return name.replace(/^DEMO\s+/, "").replace(/\s*\([^)]*\)\s*$/, "").trim() || name;
 }
 
 /** First name for greetings, skipping the DEMO label. */

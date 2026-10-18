@@ -5,7 +5,7 @@ import { EVIDENCE_KIND_LABEL, NUMERIC_KINDS, windowText, type InstallStep, type 
 import { canScanBarcodes, capturePhoto, captureValue, locate, parseReading, readBarcode, VIDEO_OK } from "./capture";
 import { SignaturePad, type SignaturePadHandle } from "./signature-pad";
 import { Sheet } from "./sheet";
-import { londonTime } from "./format";
+import { londonTime, personName } from "./format";
 
 /**
  * One evidence slot: the capture control for its kind (camera, reading,
@@ -105,7 +105,48 @@ export function Slot({ projectId, step, slot, waiting, refused, imageUrl, disabl
   }
 
   const shownImage = imageUrl ?? localUrl ?? undefined;
-  const byLine = record ? `${record.byStaffId === meId ? "You" : record.by.replace(/^DEMO /, "")}, ${londonTime(record.at)}` : null;
+  const byLine = record ? `${record.byStaffId === meId ? "You" : personName(record.by)}, ${londonTime(record.at)}` : null;
+
+  // A tick is one row: the whole row confirms it, then says who and when.
+  if (spec.kind === "check") {
+    const done = captured && state !== "recapture";
+    return (
+      <div className={`flex min-h-16 items-center gap-3 rounded-2xl border px-3 py-2 ${done ? "border-emerald-200 bg-emerald-50/50" : "border-line bg-white"}`}>
+        <button
+          type="button"
+          disabled={done || disabled}
+          aria-pressed={done}
+          aria-labelledby={`${id}-label`}
+          aria-describedby={`${id}-state`}
+          onClick={() => void run(() => captureValue(projectId, spec, label, {}))}
+          className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-2 text-xl font-bold ${
+            done ? "border-emerald-600 bg-emerald-600 text-white" : disabled ? "border-line bg-surface text-ink-300" : "border-accent-600 bg-white text-accent-700 hover:bg-accent-50"
+          }`}
+        >
+          {done ? "✓" : ""}
+          <span className="sr-only">{done ? "Confirmed" : "Confirm"}</span>
+        </button>
+        <div className="min-w-0 flex-1">
+          <p id={`${id}-label`} className="font-semibold leading-snug text-ink-900">
+            {spec.label}
+          </p>
+          <p id={`${id}-state`} className="text-sm text-ink-500">
+            {waiting ? "Confirmed: waiting to sync" : done ? `Confirmed · ${byLine}` : disabledReason ? "Not yet" : busy ? "Saving…" : "Tap to confirm"}
+          </p>
+          {refused && (
+            <p role="alert" className="text-sm font-medium text-red-800">
+              Not saved: {refused}
+            </p>
+          )}
+          {error && (
+            <p role="alert" className="text-sm font-medium text-red-700">
+              {error}
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`rounded-2xl border p-3 ${state === "exception" && !waiting ? "border-red-300 bg-red-50/60" : state === "recapture" ? "border-amber-300 bg-amber-50/60" : "border-line bg-white"}`}>
@@ -146,13 +187,12 @@ export function Slot({ projectId, step, slot, waiting, refused, imageUrl, disabl
               {record.gps.lat.toFixed(4)}, {record.gps.lng.toFixed(4)}
             </p>
           )}
-          {spec.kind === "check" && <p className="text-base font-semibold text-emerald-800">✓ Confirmed</p>}
           {byLine && <p className="mt-1 text-xs text-ink-500">{byLine}</p>}
           {state === "exception" && !waiting && (
             <p className="mt-2 text-sm font-medium text-red-800">Saved, and flagged: the tech lead will review this reading. Re-check and capture again if it was a slip.</p>
           )}
-          {state === "accepted" && review && <p className="mt-2 text-sm text-emerald-800">Accepted by {review.by.replace(/^DEMO /, "")}: {review.reason}</p>}
-          {state === "recapture" && review && <p className="mt-2 text-sm font-medium text-amber-900">{review.by.replace(/^DEMO /, "")} asked for this again: {review.reason}</p>}
+          {state === "accepted" && review && <p className="mt-2 text-sm text-emerald-800">Accepted by {personName(review.by)}: {review.reason}</p>}
+          {state === "recapture" && review && <p className="mt-2 text-sm font-medium text-amber-900">{personName(review.by)} asked for this again: {review.reason}</p>}
         </div>
       )}
 
@@ -162,7 +202,6 @@ export function Slot({ projectId, step, slot, waiting, refused, imageUrl, disabl
         </p>
       )}
 
-      {disabledReason && needsCapture && <p className="mt-2 text-sm font-medium text-ink-700">{disabledReason}</p>}
 
       {!disabledReason && (
         <div className="mt-3">
@@ -192,11 +231,6 @@ export function Slot({ projectId, step, slot, waiting, refused, imageUrl, disabl
             </button>
           )}
 
-          {spec.kind === "check" && needsCapture && (
-            <button type="button" disabled={disabled} onClick={() => void run(() => captureValue(projectId, spec, label, {}))} className={`${PRIMARY} w-full`}>
-              {busy ? "Saving…" : "Confirm"}
-            </button>
-          )}
 
           {spec.kind === "gps" && (
             <button

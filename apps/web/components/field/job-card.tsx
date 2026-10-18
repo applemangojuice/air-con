@@ -1,7 +1,6 @@
 import Link from "next/link";
-import { ROLE_LABEL } from "@aircon/domain";
 import type { JobCard as JobCardData, RiskFlag } from "./types";
-import { fmtDay, londonTime, slotTime, telHref } from "./format";
+import { crewLabel, fmtDay, londonTime, slotTime, telHref } from "./format";
 
 /**
  * One visit on Today: where, which day, who, what to watch for, and the
@@ -45,7 +44,7 @@ function statusLine(job: JobCardData, today: string): { text: string; tone: stri
   if (job.installStatus === "complete") return { text: "Install complete", tone: "bg-emerald-50 text-emerald-800" };
   if (job.dayStatus === "in-progress") return { text: `On site since ${londonTime(job.startedAt)}`, tone: "bg-sage-50 text-sage-800" };
   if (job.dayStatus === "done") return { text: "Day done", tone: "bg-emerald-50 text-emerald-800" };
-  return { text: job.date === today ? "Not started" : `Starts ${fmtDay(job.date)}`, tone: "bg-surface text-ink-700" };
+  return { text: job.date === today ? "Not started" : "Booked", tone: "bg-surface text-ink-700" };
 }
 
 export function JobCard({ job, today, compact = false }: { job: JobCardData; today: string; compact?: boolean }) {
@@ -90,7 +89,7 @@ export function JobCard({ job, today, compact = false }: { job: JobCardData; tod
               {job.crew.length > 0 && (
                 <div>
                   <dt className="text-xs font-semibold uppercase tracking-wide text-ink-500">{job.kind === "survey" ? "Surveyor" : "Crew"}</dt>
-                  <dd className="text-ink-900">{job.crew.map((c) => `${c.name.replace(/^DEMO /, "").replace(/\s*\(.*\)$/, "")} (${ROLE_LABEL[c.role].toLowerCase()})`).join(", ")}</dd>
+                  <dd className="text-ink-900">{job.crew.map(crewLabel).join(", ")}</dd>
                 </div>
               )}
               {job.kitLabel && (

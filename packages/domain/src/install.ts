@@ -2096,7 +2096,7 @@ export function commissioningSignErrors(job: InstallJobV2, signer: StaffMember, 
   if (progress.blocked > 0) errors.push(`${progress.blocked} step${progress.blocked === 1 ? " is" : "s are"} blocked.`);
   if (progress.missing > 0) errors.push(`${progress.missing} step${progress.missing === 1 ? "" : "s"} still to finish on the runsheet.`);
   const pending = unconfirmedTargets(job.runsheet);
-  if (pending.length) errors.push(`Set or confirm the job's targets: ${pending.map((k) => JOB_TARGETS[k].label.toLowerCase()).join(", ")}.`);
+  if (pending.length) errors.push(`Set or confirm ${pending.length} of the job's targets: ${pending.map((k) => JOB_TARGETS[k].label.toLowerCase()).join("; ")}.`);
   return errors;
 }
 

@@ -84,7 +84,7 @@ export function parseReading(text: string): number | null {
 }
 
 /** One location fix, or null (no permission, no fix in time). Never throws. */
-export function locate(timeoutMs = 8000): Promise<{ lat: number; lng: number; accuracyM?: number } | null> {
+export function locate(timeoutMs = 5000): Promise<{ lat: number; lng: number; accuracyM?: number } | null> {
   if (typeof navigator === "undefined" || !navigator.geolocation) return Promise.resolve(null);
   return new Promise((resolve) => {
     let done = false;
