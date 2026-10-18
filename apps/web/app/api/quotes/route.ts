@@ -3,10 +3,22 @@ import { z } from "zod";
 import { generateQuote, type Survey } from "@aircon/domain";
 import { logServerEvent } from "@/lib/analytics-server";
 import { appUrl } from "@/lib/brand";
-import { brandedEmail, escapeHtml, sendEmail, sendTeamEmail } from "@/lib/email";
+import { escapeHtml, quoteEmail, sendEmail, sendTeamEmail } from "@/lib/email";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { UUID_RE, surveySchema } from "@/lib/schemas";
 import { getServiceClient } from "@/lib/supabase-server";
+import { getPublicSettings } from "@/lib/public-settings";
+import {
+  CONSENT_VERSION,
+  coverageFor,
+  installDaysPhrase,
+  quoteConsentRecord,
+  surveyDurationCopy,
+  surveyPriceCopy,
+  validUntil,
+  vatCopy,
+} from "@/components/site/claims";
+import { withUploadedPhotosOnly } from "@/lib/quote-draft";
 
 const attributionSchema = z
   .object({
@@ -21,6 +33,14 @@ const attributionSchema = z
   })
   .optional();
 
+/** UK-ish phone: digits, spaces, +, brackets and dashes, 10–13 digits. Empty is fine (optional). */
+const phoneSchema = z
+  .string()
+  .max(30)
+  .optional()
+  .default("")
+  .refine((v) => v.trim() === "" || (/^\+?[\d\s()-]{10,20}$/.test(v.trim()) && v.replace(/\D/g, "").length <= 13), "Invalid phone");
+
 const bodySchema = z.object({
   survey: surveySchema,
   source: z.enum(["web", "ios"]).optional().default("web"),
@@ -29,12 +49,39 @@ const bodySchema = z.object({
   /** First-touch acquisition, so a booking traces back to its campaign. */
   attribution: attributionSchema,
   contact: z.object({
-    name: z.string().min(2).max(120),
-    email: z.string().email().max(200),
-    phone: z.string().max(30).optional().default(""),
+    name: z.string().trim().min(2).max(120),
+    email: z.string().trim().email().max(200),
+    phone: phoneSchema,
     timeframe: z.enum(["asap", "1-3-months", "researching"]),
   }),
+  /**
+   * Operational consent (required to save) and marketing consent (optional,
+   * never assumed), with the wording version the customer saw.
+   */
+  consents: z.object({
+    operational: z.literal(true),
+    marketing: z.boolean(),
+    version: z.string().max(40).optional(),
+  }),
 });
+
+/** Paths /api/uploads mints: `<uuid>/<kind>-<safe name>`. Anything else is dropped. */
+const STORAGE_PATH_RE = /^[0-9a-f-]{36}\/[a-z-]+-[A-Za-z0-9._-]{1,80}$/;
+
+/** Only photos we uploaded ourselves, and not too many of them. */
+function trustedPhotos(survey: Survey): Survey {
+  const kept = withUploadedPhotosOnly(survey);
+  const ok = (p: { storagePath?: string }) => STORAGE_PATH_RE.test(p.storagePath ?? "");
+  let budget = 40;
+  const take = <T extends { storagePath?: string }>(photos: T[]) =>
+    photos.filter((p) => ok(p) && budget-- > 0);
+  return {
+    ...kept,
+    rooms: kept.rooms.map((r) => ({ ...r, photos: take(r.photos) })),
+    outdoor: { ...kept.outdoor, photos: take(kept.outdoor.photos) },
+    electrics: { ...kept.electrics, photos: take(kept.electrics.photos) },
+  };
+}
 
 export async function POST(request: Request) {
   // A brake on scripted spam, sized for shared IPs (CGNAT, office wifi): a
@@ -48,23 +95,44 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid survey" }, { status: 400 });
   }
 
-  const { survey, contact, source, draftId, attribution } = parsed.data;
+  const { contact, source, draftId, attribution, consents } = parsed.data;
+  const survey = trustedPhotos(parsed.data.survey as Survey);
   if (survey.rooms.length === 0) {
     return NextResponse.json({ error: "No rooms selected" }, { status: 400 });
   }
+
+  const settings = await getPublicSettings();
+  // The server decides coverage; the browser's check is only a preview.
+  const coverage = coverageFor(settings.serviceArea, survey.postcode);
+  if (!coverage.covered) {
+    return NextResponse.json({ error: "out-of-area", outcode: coverage.outcode }, { status: 422 });
+  }
+
   // The server recomputes the quote; the stored price never comes from the client.
-  const quote = generateQuote(survey as Survey);
+  const quote = generateQuote(survey);
 
   const supabase = getServiceClient();
   if (!supabase) {
-    console.info("[demo mode] quote request:", contact.email, quote.totalGbp);
+    console.info("[demo mode] quote request:", quote.totalGbp);
     return NextResponse.json({ ok: true, demo: true });
   }
+
+  const now = new Date().toISOString();
+  const phone = contact.phone.trim();
+  const consentRecord = {
+    ...quoteConsentRecord({
+      marketing: consents.marketing,
+      hasPhone: phone.length > 0,
+      at: now,
+      version: consents.version ?? CONSENT_VERSION,
+    }),
+    termsVersion: settings.legal.termsVersion,
+  };
 
   const record = {
     customer_name: contact.name,
     email: contact.email,
-    phone: contact.phone || null,
+    phone: phone || null,
     timeframe: contact.timeframe,
     postcode: survey.postcode,
     address_line: survey.addressLine,
@@ -76,7 +144,9 @@ export async function POST(request: Request) {
     confidence_score: quote.confidence.score,
     confidence_band: quote.confidence.band,
     source,
-    attribution: attribution ?? null,
+    // Consents ride in the attribution JSON (no migration needed): who agreed
+    // to what, when, and in which words (UK GDPR Art 7(1)).
+    attribution: { ...(attribution ?? {}), consents: consentRecord },
     referrer: attribution?.referrer ?? null,
     utm_source: attribution?.utmSource ?? null,
   };
@@ -91,9 +161,9 @@ export async function POST(request: Request) {
       .eq("id", draftId)
       .eq("status", "draft")
       .select("id")
-      .single();
+      .maybeSingle();
     if (error) saveError = error.message;
-    id = data?.id ?? null;
+    id = (data?.id as string | undefined) ?? null;
 
     // Already finalised (double-submit, browser Back): idempotent success —
     // return the existing quote instead of inserting a duplicate row and
@@ -104,35 +174,43 @@ export async function POST(request: Request) {
         .select("id, status")
         .eq("id", draftId)
         .maybeSingle();
-      if (existing && existing.status !== "draft") {
+      if (existing && existing.status !== "draft" && existing.status !== "declined") {
         return NextResponse.json({ ok: true, demo: false, id: existing.id, emailed: false });
       }
     }
   }
   if (!id) {
-    const { data, error } = await supabase
-      .from("quote_requests")
-      .insert(record)
-      .select("id")
-      .single();
+    const { data, error } = await supabase.from("quote_requests").insert(record).select("id").single();
     if (error || !data) {
-      saveError = error?.message ?? "no row returned";
+      saveError = error?.message ?? saveError ?? "no row returned";
       console.error("quote insert failed:", saveError);
       // Safety net: never lose a lead to a database hiccup. Email the details
-      // to the team so it can be recovered by hand, then tell the client the
-      // quote is still valid.
+      // to the team so it can be recovered by hand.
       await Promise.all([
         alertLeadLost(contact, quote.totalGbp, survey.postcode, saveError),
         logServerEvent("server_error", { where: "quote_insert", error: saveError }),
       ]);
       return NextResponse.json({ error: "Could not save quote", saved: false }, { status: 502 });
     }
-    id = data.id;
+    id = data.id as string;
   }
 
-  const emailed = await sendQuoteEmail(contact.name, contact.email, id!, quote.totalGbp);
-  // Ping the team so a real submission (an investor, a friend) is never missed.
-  await notifyNewLead(contact, quote.totalGbp, survey.postcode, id!, attribution);
+  const email = quoteEmail({
+    name: contact.name,
+    link: `${appUrl()}/q/${id}`,
+    totalGbp: quote.totalGbp,
+    roomCount: survey.rooms.length,
+    validUntil: validUntil(settings, now),
+    installDays: installDaysPhrase(settings),
+    vatLine: vatCopy(settings).short,
+    surveyPrice: surveyPriceCopy(settings),
+    surveyDuration: surveyDurationCopy(settings),
+    supportEmail: settings.company.email,
+    supportPhone: settings.company.phone,
+  });
+  const emailed = await sendEmail(contact.email, email.subject, email.html);
+  // Ping the team so a real submission is never missed.
+  await notifyNewLead(contact, quote.totalGbp, survey.postcode, id, attribution, consents.marketing);
   return NextResponse.json({ ok: true, demo: false, id, emailed });
 }
 
@@ -145,30 +223,27 @@ async function notifyNewLead(
   postcode: string,
   id: string,
   attribution: Attribution,
+  marketing: boolean,
 ): Promise<void> {
   const base = appUrl();
   const source = attribution?.utmCampaign || attribution?.utmSource || attribution?.referrer || "direct";
   await sendTeamEmail(
     `New quote: ${escapeHtml(contact.name)} · ${gbpText(totalGbp)}`,
-    `<p><strong>${escapeHtml(contact.name)}</strong> just got a fixed price.</p>
+    `<p><strong>${escapeHtml(contact.name)}</strong> just got a price.</p>
 <ul>
   <li>Email: ${escapeHtml(contact.email)}</li>
   <li>Phone: ${escapeHtml(contact.phone || "—")}</li>
   <li>Postcode: ${escapeHtml(postcode)}</li>
   <li>Timeframe: ${escapeHtml(contact.timeframe)}</li>
   <li>Total: ${gbpText(totalGbp)}</li>
+  <li>Marketing consent: ${marketing ? "yes" : "no"}</li>
   <li>Came from: ${escapeHtml(source)}</li>
 </ul>
 <p><a href="${base}/ops/quotes/${id}">Open in ops →</a></p>`,
   );
 }
 
-async function alertLeadLost(
-  contact: Contact,
-  totalGbp: number,
-  postcode: string,
-  reason: string,
-): Promise<void> {
+async function alertLeadLost(contact: Contact, totalGbp: number, postcode: string, reason: string): Promise<void> {
   await sendTeamEmail(
     `⚠️ Quote FAILED TO SAVE: ${escapeHtml(contact.name)} — recover by hand`,
     `<p>A customer completed the funnel but the database write failed, so this
@@ -179,44 +254,13 @@ lead is <strong>not</strong> in the system. Reach out to them directly.</p>
   <li>Phone: ${escapeHtml(contact.phone || "—")}</li>
   <li>Postcode: ${escapeHtml(postcode)}</li>
   <li>Timeframe: ${escapeHtml(contact.timeframe)}</li>
-  <li>Indicative total: ${gbpText(totalGbp)}</li>
+  <li>Total shown: ${gbpText(totalGbp)}</li>
 </ul>
 <p>Database error: <code>${escapeHtml(reason)}</code></p>
-<p>Check <a href="${appUrl()}/ops/status">/ops/status</a> — the schema is probably not fully migrated.</p>`,
+<p>Check <a href="${appUrl()}/ops/status">/ops/status</a>: the schema is probably not fully migrated.</p>`,
   );
 }
 
 function gbpText(totalGbp: number): string {
-  return new Intl.NumberFormat("en-GB", {
-    style: "currency",
-    currency: "GBP",
-    maximumFractionDigits: 0,
-  }).format(totalGbp);
+  return `£${String(Math.round(totalGbp)).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`;
 }
-
-/** Best-effort quote email. Returns false when not configured or failed. */
-async function sendQuoteEmail(
-  name: string,
-  email: string,
-  quoteId: string,
-  totalGbp: number,
-): Promise<boolean> {
-  const link = `${appUrl()}/q/${quoteId}`;
-  const total = gbpText(totalGbp);
-  return sendEmail(
-    email,
-    `Your fixed price: ${total} installed`,
-    brandedEmail(`<p style="margin:0 0 14px">Hi ${escapeHtml(name)},</p>
-    <p style="margin:0 0 6px;color:#6e7482;font-size:14px">Your fixed installation price, VAT included:</p>
-    <p style="margin:0 0 16px;font-size:36px;font-weight:700">${total}</p>
-    <p style="margin:0 0 20px;color:#454b58">That's the actual price, not an estimate — your full quote with the system design, price breakdown and finance options is saved at the link below, and it doesn't expire.</p>
-    <p style="margin:0 0 24px">
-      <a href="${link}" style="display:inline-block;background:#d55a0a;color:#ffffff;text-decoration:none;font-weight:600;padding:12px 28px;border-radius:999px">View my quote</a>
-    </p>
-    <p style="margin:0 0 6px;font-size:13px;color:#6e7482">Or copy this link:</p>
-    <p style="margin:0 0 24px;font-size:13px"><a href="${link}" style="color:#a84508">${link}</a></p>
-    <p style="margin:0 0 28px;color:#454b58">You can book your installation from that page whenever you're ready. No calls, no chasing.</p>`),
-  );
-}
-
-

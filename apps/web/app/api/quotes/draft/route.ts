@@ -1,19 +1,23 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { generateQuote, type Survey } from "@aircon/domain";
+import { coverageFor } from "@/components/site/claims";
+import { getPublicSettings } from "@/lib/public-settings";
+import { withUploadedPhotosOnly } from "@/lib/quote-draft";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { surveySchema } from "@/lib/schemas";
 import { getServiceClient } from "@/lib/supabase-server";
 
 const bodySchema = z.object({
-  email: z.string().email().max(200),
+  email: z.string().trim().email().max(200),
   survey: surveySchema,
 });
 
 /**
  * Save-early: creates the quote_request the moment we have address + email
  * (step 1 of the funnel), status 'draft'. The row is updated as the customer
- * progresses and finalised by POST /api/quotes with the same id.
+ * progresses and finalised by POST /api/quotes with the same id. Only for
+ * postcodes we cover: an out-of-area enquiry goes to /api/quotes/waitlist.
  */
 export async function POST(request: Request) {
   // One draft insert per funnel entry; stop scripted row-stuffing.
@@ -24,8 +28,14 @@ export async function POST(request: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid draft" }, { status: 400 });
   }
-  const { email, survey } = parsed.data;
-  const quote = generateQuote(survey as Survey);
+  const { email } = parsed.data;
+  const survey = withUploadedPhotosOnly(parsed.data.survey as Survey);
+
+  const coverage = coverageFor((await getPublicSettings()).serviceArea, survey.postcode);
+  if (!coverage.covered) {
+    return NextResponse.json({ error: "out-of-area", outcode: coverage.outcode }, { status: 422 });
+  }
+  const quote = generateQuote(survey);
 
   const supabase = getServiceClient();
   if (!supabase) {
