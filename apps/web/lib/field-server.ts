@@ -189,6 +189,8 @@ const KIT: Record<Project["kit"]["status"], { label: string; tone: JobCard["kitT
   inspected: { label: "Kit checked", tone: "success" },
 };
 
+// INTEGRATION(F5): p.kit is the project's own kit status; F5 keeps it in step with purchase orders. In this tree the
+// ready-to-install gate reads F5's kit summary (a stub), so the badge can say "Kit checked" while the gate still refuses.
 export function kitBadge(p: Project): { label: string; tone: NonNullable<JobCard["kitTone"]> } {
   const k = KIT[p.kit.status] ?? KIT["not-ordered"];
   const short = p.kit.shortages > 0 ? `, ${p.kit.shortages} short` : "";
