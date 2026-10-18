@@ -1,0 +1,1154 @@
+{
+  "researchedAt": "2026-10-18",
+  "scope": "Default values for the installer app's commissioning checklist: R32 domestic split and multi-split heat pumps (Daikin, Panasonic, Mitsubishi Electric), GB.",
+  "companionDoc": "docs/research/commissioning-standards.md",
+  "gradeLegend": {
+    "M": "manufacturer manual/guide/official page, via search-engine extract (not opened directly)",
+    "O": "legislation or scheme body document, via search-engine extract",
+    "S": "secondary (retailer, installer blog, trade press, council leaflet, job advert)",
+    "C": "computed (CoolProp 8.0.0 or arithmetic on sourced inputs)",
+    "U": "unverified recall or general trade practice; numeric U items are null with a 'candidate'"
+  },
+  "defaults": [
+    {
+      "key": "pressure.testGas",
+      "label": "Pressure test gas",
+      "group": "pressureTest",
+      "value": "oxygen-free (dry) nitrogen",
+      "unit": null,
+      "min": null,
+      "max": null,
+      "source": "NOT VERIFIED - no source retrieved this session (web search budget exhausted; WebFetch DNS failures). General trade practice.",
+      "grade": "U",
+      "candidate": null,
+      "notes": null
+    },
+    {
+      "key": "pressure.testPressureBarG",
+      "label": "Strength/tightness test pressure",
+      "group": "pressureTest",
+      "value": null,
+      "unit": "bar g",
+      "min": null,
+      "max": null,
+      "source": "NOT VERIFIED - no source retrieved this session (web search budget exhausted; WebFetch DNS failures). Take per model from the installation manual.",
+      "grade": null,
+      "candidate": {
+        "daikin": {
+          "min": 2,
+          "recommended": 30
+        },
+        "basis": "Recall of Daikin R32 split installer reference guides: nitrogen to at least 200 kPa (2 bar), 3000 kPa (30 bar) recommended to find small leaks, then bubble-test joints. Not verified.",
+        "confidence": "moderate",
+        "confirmAt": [
+          "https://www.daikin.eu/content/dam/document-library/Installer-reference-guide/ac/split/arxm-a/ARXM25A.ARXM35A9.ARXM-A8.RXM(20.42)A.RXM(25.35)A9.RXM-A8.%20RXP-N8_Installer%20reference%20guide_4P769827-4C_English.pdf",
+          "https://www.daikin.eu/content/dam/document-library/installation-manuals/ac/split/arxm-a/ARXM25-35A.RXM20-42A_Installation%20manual_3PEN645642-7N_English.pdf"
+        ]
+      },
+      "notes": "Never exceed the outdoor unit's nameplate PS. No Mitsubishi or Panasonic figure was recalled with enough confidence to list. Repo placeholder INSTALL_TARGETS.pressureTestBar = 38 is unsourced."
+    },
+    {
+      "key": "pressure.maxTestPressureBarG",
+      "label": "Maximum test pressure",
+      "group": "pressureTest",
+      "value": "nameplate PS (high side) of the outdoor unit",
+      "unit": "bar g",
+      "min": null,
+      "max": null,
+      "source": "NOT VERIFIED - no source retrieved this session (web search budget exhausted; WebFetch DNS failures). BS EN 378-2 ties test pressures to PS; the factors were not verified.",
+      "grade": "U",
+      "candidate": null,
+      "notes": "Capture a nameplate photo; the app compares every applied pressure against it."
+    },
+    {
+      "key": "pressure.holdMinutes",
+      "label": "Pressure hold duration",
+      "group": "pressureTest",
+      "value": null,
+      "unit": "min",
+      "min": null,
+      "max": null,
+      "source": "NOT VERIFIED - no source retrieved this session (web search budget exhausted; WebFetch DNS failures). ",
+      "grade": null,
+      "candidate": null,
+      "notes": "No manufacturer figure recalled with confidence. Repo placeholder is 15 min (unsourced). Keep it as a company setting."
+    },
+    {
+      "key": "pressure.maxDropBar",
+      "label": "Acceptable pressure drop over hold",
+      "group": "pressureTest",
+      "value": null,
+      "unit": "bar",
+      "min": null,
+      "max": null,
+      "source": "NOT VERIFIED - no source retrieved this session (web search budget exhausted; WebFetch DNS failures). ",
+      "grade": null,
+      "candidate": {
+        "value": 0,
+        "basis": "Trade practice: no drop after correcting for ambient temperature change. Not verified.",
+        "confidence": "low"
+      },
+      "notes": "Record the ambient temperature at the start and end of the hold."
+    },
+    {
+      "key": "vacuum.targetMicrons",
+      "label": "Evacuation target",
+      "group": "evacuation",
+      "value": null,
+      "unit": "micron",
+      "min": null,
+      "max": null,
+      "source": "NOT VERIFIED - no source retrieved this session (web search budget exhausted; WebFetch DNS failures). ",
+      "grade": null,
+      "candidate": {
+        "value": 500,
+        "basis": "Common trade practice used as a company standard (matches repo placeholder). RAC manuals instead specify a compound-gauge reading of -0.1 MPa / -76 cmHg (recall). Not verified.",
+        "confidence": "moderate (as practice)"
+      },
+      "notes": "500 micron = 66.7 Pa = 0.667 mbar absolute (computed)."
+    },
+    {
+      "key": "vacuum.decayHoldMinutes",
+      "label": "Decay (standing vacuum) hold, pump isolated",
+      "group": "evacuation",
+      "value": null,
+      "unit": "min",
+      "min": null,
+      "max": null,
+      "source": "NOT VERIFIED - no source retrieved this session (web search budget exhausted; WebFetch DNS failures). ",
+      "grade": null,
+      "candidate": {
+        "daikin": 5,
+        "range": [
+          4,
+          5
+        ],
+        "basis": "Recall of Daikin RAC installer guides: after -0.1 MPa is reached, leave 4-5 min; a rise means moisture or a leak. Not verified.",
+        "confidence": "moderate",
+        "confirmAt": [
+          "https://www.daikin.eu/content/dam/document-library/Installer-reference-guide/ac/split/arxm-a/ARXM25A.ARXM35A9.ARXM-A8.RXM(20.42)A.RXM(25.35)A9.RXM-A8.%20RXP-N8_Installer%20reference%20guide_4P769827-4C_English.pdf"
+        ]
+      },
+      "notes": "Repo placeholder uses 15 min (unsourced)."
+    },
+    {
+      "key": "vacuum.decayMaxRiseMicrons",
+      "label": "Maximum rise during decay hold",
+      "group": "evacuation",
+      "value": null,
+      "unit": "micron",
+      "min": null,
+      "max": null,
+      "source": "NOT VERIFIED - no source retrieved this session (web search budget exhausted; WebFetch DNS failures). ",
+      "grade": null,
+      "candidate": null,
+      "notes": "No figure recalled with confidence. Repo placeholder +300 micron is unsourced. Tech lead to set."
+    },
+    {
+      "key": "vacuum.micronGaugeRequired",
+      "label": "Digital micron gauge reading required",
+      "group": "evacuation",
+      "value": "yes",
+      "unit": null,
+      "min": null,
+      "max": null,
+      "source": "Computed: -0.1 MPa gauge = 1.33 kPa abs = about 9,900 micron (standard atmosphere 101.325 kPa), so a compound gauge cannot verify a deep vacuum or a decay test.",
+      "grade": "C",
+      "candidate": null,
+      "notes": null
+    },
+    {
+      "key": "torque.flare_6_35",
+      "label": "Flare nut torque, 6.35 mm (1/4\")",
+      "group": "flareTorque",
+      "value": null,
+      "unit": "N·m",
+      "min": null,
+      "max": null,
+      "source": "NOT VERIFIED - no source retrieved this session (web search budget exhausted; WebFetch DNS failures). Take per model and pipe size from the installation manual.",
+      "grade": null,
+      "candidate": {
+        "daikin": {
+          "min": 15,
+          "max": 17
+        },
+        "mitsubishi": {
+          "min": 13.7,
+          "max": 17.7
+        },
+        "panasonic": {
+          "value": 18
+        },
+        "basis": "Recall of manufacturer installation-manual torque tables (Daikin RXM/RXF; Mitsubishi MSZ/MUZ, kgf*cm converted; Panasonic CU-Z/TZ single values). Not verified.",
+        "confidence": "high (Daikin, Mitsubishi); moderate (Panasonic)",
+        "confirmAt": [
+          "https://www.daikin.eu/content/dam/document-library/installation-manuals/ac/split/arxm-a/ARXM25-35A.RXM20-42A_Installation%20manual_3PEN645642-7N_English.pdf",
+          "https://www.daikin.es/content/dam/document-library/installation-manuals/ac/split/rxf-f/RXF50F_Installation%20manual_3PEN748643-17H_English.pdf",
+          "https://www.daikin.eu/content/dam/document-library/installation-manuals/ac/multisplit/2mxm-a8/2MXM68A8.3MXM-A8.4MXM-A8.5MXM-A8_Installation%20manual_3PEN818734-2_English.pdf",
+          "https://library.mitsubishielectric.co.uk/pdf/download_full/3405",
+          "https://www.aircon.panasonic.eu/GB_en/model/kit-z25-cke-cs-z25ckew-cu-z25cke/"
+        ]
+      },
+      "notes": "Applies to every flare (indoor and outdoor ends, liquid and gas). Repo default {min:33,max:42} only fits 9.52 mm lines; 5 kW indoor units often use 12.7 mm gas."
+    },
+    {
+      "key": "torque.flare_9_52",
+      "label": "Flare nut torque, 9.52 mm (3/8\")",
+      "group": "flareTorque",
+      "value": null,
+      "unit": "N·m",
+      "min": null,
+      "max": null,
+      "source": "NOT VERIFIED - no source retrieved this session (web search budget exhausted; WebFetch DNS failures). Take per model and pipe size from the installation manual.",
+      "grade": null,
+      "candidate": {
+        "daikin": {
+          "min": 33,
+          "max": 39
+        },
+        "mitsubishi": {
+          "min": 34.3,
+          "max": 41.2
+        },
+        "panasonic": {
+          "value": 42
+        },
+        "basis": "Recall of manufacturer installation-manual torque tables (Daikin RXM/RXF; Mitsubishi MSZ/MUZ, kgf*cm converted; Panasonic CU-Z/TZ single values). Not verified.",
+        "confidence": "high (Daikin, Mitsubishi); moderate (Panasonic)",
+        "confirmAt": [
+          "https://www.daikin.eu/content/dam/document-library/installation-manuals/ac/split/arxm-a/ARXM25-35A.RXM20-42A_Installation%20manual_3PEN645642-7N_English.pdf",
+          "https://www.daikin.es/content/dam/document-library/installation-manuals/ac/split/rxf-f/RXF50F_Installation%20manual_3PEN748643-17H_English.pdf",
+          "https://www.daikin.eu/content/dam/document-library/installation-manuals/ac/multisplit/2mxm-a8/2MXM68A8.3MXM-A8.4MXM-A8.5MXM-A8_Installation%20manual_3PEN818734-2_English.pdf",
+          "https://library.mitsubishielectric.co.uk/pdf/download_full/3405",
+          "https://www.aircon.panasonic.eu/GB_en/model/kit-z25-cke-cs-z25ckew-cu-z25cke/"
+        ]
+      },
+      "notes": "Applies to every flare (indoor and outdoor ends, liquid and gas). Repo default {min:33,max:42} only fits 9.52 mm lines; 5 kW indoor units often use 12.7 mm gas."
+    },
+    {
+      "key": "torque.flare_12_7",
+      "label": "Flare nut torque, 12.7 mm (1/2\")",
+      "group": "flareTorque",
+      "value": null,
+      "unit": "N·m",
+      "min": null,
+      "max": null,
+      "source": "NOT VERIFIED - no source retrieved this session (web search budget exhausted; WebFetch DNS failures). Take per model and pipe size from the installation manual.",
+      "grade": null,
+      "candidate": {
+        "daikin": {
+          "min": 50,
+          "max": 60
+        },
+        "mitsubishi": {
+          "min": 49.0,
+          "max": 56.4
+        },
+        "panasonic": {
+          "value": 55
+        },
+        "basis": "Recall of manufacturer installation-manual torque tables (Daikin RXM/RXF; Mitsubishi MSZ/MUZ, kgf*cm converted; Panasonic CU-Z/TZ single values). Not verified.",
+        "confidence": "high (Daikin, Mitsubishi); moderate (Panasonic)",
+        "confirmAt": [
+          "https://www.daikin.eu/content/dam/document-library/installation-manuals/ac/split/arxm-a/ARXM25-35A.RXM20-42A_Installation%20manual_3PEN645642-7N_English.pdf",
+          "https://www.daikin.es/content/dam/document-library/installation-manuals/ac/split/rxf-f/RXF50F_Installation%20manual_3PEN748643-17H_English.pdf",
+          "https://www.daikin.eu/content/dam/document-library/installation-manuals/ac/multisplit/2mxm-a8/2MXM68A8.3MXM-A8.4MXM-A8.5MXM-A8_Installation%20manual_3PEN818734-2_English.pdf",
+          "https://library.mitsubishielectric.co.uk/pdf/download_full/3405",
+          "https://www.aircon.panasonic.eu/GB_en/model/kit-z25-cke-cs-z25ckew-cu-z25cke/"
+        ]
+      },
+      "notes": "Applies to every flare (indoor and outdoor ends, liquid and gas). Repo default {min:33,max:42} only fits 9.52 mm lines; 5 kW indoor units often use 12.7 mm gas."
+    },
+    {
+      "key": "torque.flare_15_88",
+      "label": "Flare nut torque, 15.88 mm (5/8\")",
+      "group": "flareTorque",
+      "value": null,
+      "unit": "N·m",
+      "min": null,
+      "max": null,
+      "source": "NOT VERIFIED - no source retrieved this session (web search budget exhausted; WebFetch DNS failures). Take per model and pipe size from the installation manual.",
+      "grade": null,
+      "candidate": {
+        "daikin": {
+          "min": 62,
+          "max": 75
+        },
+        "mitsubishi": {
+          "min": 73.5,
+          "max": 78.4
+        },
+        "panasonic": {
+          "value": 65
+        },
+        "basis": "Recall of manufacturer installation-manual torque tables (Daikin RXM/RXF; Mitsubishi MSZ/MUZ, kgf*cm converted; Panasonic CU-Z/TZ single values). Not verified.",
+        "confidence": "high (Daikin, Mitsubishi); moderate (Panasonic)",
+        "confirmAt": [
+          "https://www.daikin.eu/content/dam/document-library/installation-manuals/ac/split/arxm-a/ARXM25-35A.RXM20-42A_Installation%20manual_3PEN645642-7N_English.pdf",
+          "https://www.daikin.es/content/dam/document-library/installation-manuals/ac/split/rxf-f/RXF50F_Installation%20manual_3PEN748643-17H_English.pdf",
+          "https://www.daikin.eu/content/dam/document-library/installation-manuals/ac/multisplit/2mxm-a8/2MXM68A8.3MXM-A8.4MXM-A8.5MXM-A8_Installation%20manual_3PEN818734-2_English.pdf",
+          "https://library.mitsubishielectric.co.uk/pdf/download_full/3405",
+          "https://www.aircon.panasonic.eu/GB_en/model/kit-z25-cke-cs-z25ckew-cu-z25cke/"
+        ]
+      },
+      "notes": "Applies to every flare (indoor and outdoor ends, liquid and gas). Repo default {min:33,max:42} only fits 9.52 mm lines; 5 kW indoor units often use 12.7 mm gas."
+    },
+    {
+      "key": "commissioning.coolingSplitK",
+      "label": "Return-supply air temperature split, cooling",
+      "group": "commissioning",
+      "value": null,
+      "unit": "K",
+      "min": null,
+      "max": null,
+      "source": "NOT VERIFIED - no source retrieved this session (web search budget exhausted; WebFetch DNS failures). No manufacturer acceptance figure retrieved.",
+      "grade": null,
+      "candidate": null,
+      "notes": "Record only, no pass/fail until a fleet baseline exists per model. Repo placeholder 8-16 C is unsourced. Record RH: the cooling split depends heavily on humidity."
+    },
+    {
+      "key": "commissioning.heatingSplitK",
+      "label": "Supply-return air temperature split, heating",
+      "group": "commissioning",
+      "value": null,
+      "unit": "K",
+      "min": null,
+      "max": null,
+      "source": "NOT VERIFIED - no source retrieved this session (web search budget exhausted; WebFetch DNS failures). ",
+      "grade": null,
+      "candidate": null,
+      "notes": "Record only."
+    },
+    {
+      "key": "commissioning.recordFields",
+      "label": "Per indoor unit readings to record",
+      "group": "commissioning",
+      "value": "mode; set point; fan speed (highest); test/forced operation used; return air C; supply air C; split K; outdoor ambient dry-bulb C; indoor RH %; outdoor unit run current A vs nameplate; error codes; controller/app pairing",
+      "unit": null,
+      "min": null,
+      "max": null,
+      "source": "NOT VERIFIED - no source retrieved this session (web search budget exhausted; WebFetch DNS failures). Trade practice.",
+      "grade": "U",
+      "candidate": null,
+      "notes": "Use the same probe for return and supply after 10-15 min steady running (practice, unverified)."
+    },
+    {
+      "key": "commissioning.standingPressureBarG",
+      "label": "Standing pressure before start-up",
+      "group": "commissioning",
+      "value": "R32 saturation pressure at ambient (see r32SaturationTable), e.g. 13.73 bar g at 20 C",
+      "unit": "bar g",
+      "min": null,
+      "max": null,
+      "source": "http://www.coolprop.org/ (CoolProp 8.0.0, https://pypi.org/project/CoolProp/)",
+      "grade": "C",
+      "candidate": null,
+      "notes": "Sanity check of gauge and gas identity."
+    },
+    {
+      "key": "commissioning.chargeMethod",
+      "label": "Charging method",
+      "group": "commissioning",
+      "value": "by weight from the outdoor-unit formula; superheat/subcooling recorded as diagnostics only",
+      "unit": null,
+      "min": null,
+      "max": null,
+      "source": "NOT VERIFIED - no source retrieved this session (web search budget exhausted; WebFetch DNS failures). Practice for inverter RAC splits with EEV.",
+      "grade": "U",
+      "candidate": null,
+      "notes": "RAC service port is usually on the gas stop valve: low side in cooling, high side in heating (unverified). Record whether gauges were reconnected after charge release."
+    },
+    {
+      "key": "charge.formula",
+      "label": "Additional charge formula",
+      "group": "refrigerantCharge",
+      "value": "additional_g = max(0, oneWayLiquidLengthM - chargelessLengthM) * gPerM (per outdoor-unit record; use as-built measured length)",
+      "unit": "g",
+      "min": null,
+      "max": null,
+      "source": "Daikin RXF20-42F installer reference guide https://www.daikin.es/content/dam/document-library/Installer-reference-guide/ac/split/rxf-f/RXF20-42F_Installer%20reference%20guide_4PES769827-15G_Spanish.pdf; Mitsubishi MUZ-AP service manual http://www.mitsubishitech.co.uk/Data/M-Series/MSZ/2019/MUZ-AP-VG/MUZ-AP25-50VG_SM_OBH789.pdf; Panasonic model pages e.g. https://www.aircon.panasonic.eu/GB_en/model/kit-z25-cke-cs-z25ckew-cu-z25cke/ (all via search-engine extracts; per-model data in docs/research/data/*.json)",
+      "grade": "M",
+      "candidate": null,
+      "notes": "Daikin rounds to 0.01 kg. Record the weight actually added from the scale."
+    },
+    {
+      "key": "charge.daikinSplit.chargelessM",
+      "label": "Daikin RXF-F / RXM-A9 / RXA-A8 chargeless length",
+      "group": "refrigerantCharge",
+      "value": 10,
+      "unit": "m",
+      "min": null,
+      "max": null,
+      "source": "https://www.daikin.es/content/dam/document-library/Installer-reference-guide/ac/split/rxf-f/RXF20-42F_Installer%20reference%20guide_4PES769827-15G_Spanish.pdf (via search extract); docs/research/data/daikin.json",
+      "grade": "M",
+      "candidate": null,
+      "notes": null
+    },
+    {
+      "key": "charge.daikinSplit.gPerM",
+      "label": "Daikin RXF-F / RXM-A9 / RXA-A8 additional charge rate",
+      "group": "refrigerantCharge",
+      "value": 20,
+      "unit": "g/m",
+      "min": null,
+      "max": null,
+      "source": "https://www.daikin.es/content/dam/document-library/Installer-reference-guide/ac/split/rxf-f/RXF20-42F_Installer%20reference%20guide_4PES769827-15G_Spanish.pdf (via search extract); docs/research/data/daikin.json",
+      "grade": "M",
+      "candidate": null,
+      "notes": "Some older Daikin RXF-A/RXF-B models use 35 g/m - check each manual."
+    },
+    {
+      "key": "charge.daikinMulti.chargelessM",
+      "label": "Daikin 3/4/5MXM-A8/A9 chargeless total length",
+      "group": "refrigerantCharge",
+      "value": 30,
+      "unit": "m",
+      "min": null,
+      "max": null,
+      "source": "https://www.daikin.eu/content/dam/document-library/installation-manuals/ac/multisplit/2mxm-a8/2MXM68A8.3MXM-A8.4MXM-A8.5MXM-A8_Installation%20manual_3PEN818734-2_English.pdf (via search extract); docs/research/data/daikin.json",
+      "grade": "M",
+      "candidate": null,
+      "notes": "2MXM50A8: 10 m vs 20 m conflict in sources."
+    },
+    {
+      "key": "charge.daikinMulti.gPerM",
+      "label": "Daikin 3/4/5MXM-A8/A9 additional charge rate",
+      "group": "refrigerantCharge",
+      "value": 20,
+      "unit": "g/m",
+      "min": null,
+      "max": null,
+      "source": "https://www.daikin.eu/content/dam/document-library/installation-manuals/ac/multisplit/2mxm-a8/2MXM68A8.3MXM-A8.4MXM-A8.5MXM-A8_Installation%20manual_3PEN818734-2_English.pdf (via search extract); docs/research/data/daikin.json",
+      "grade": "M",
+      "candidate": null,
+      "notes": null
+    },
+    {
+      "key": "charge.mitsubishiMSeries.chargelessM",
+      "label": "Mitsubishi MUZ-AP / LN / HR25-35 chargeless length",
+      "group": "refrigerantCharge",
+      "value": 7,
+      "unit": "m",
+      "min": null,
+      "max": null,
+      "source": "http://www.mitsubishitech.co.uk/Data/M-Series/MSZ/2019/MUZ-AP-VG/MUZ-AP25-50VG_SM_OBH789.pdf (via search extract); docs/research/data/mitsubishi.json (provisional)",
+      "grade": "M",
+      "candidate": null,
+      "notes": null
+    },
+    {
+      "key": "charge.mitsubishiMSeries.gPerM",
+      "label": "Mitsubishi MUZ-AP / LN / HR25-35 additional charge rate",
+      "group": "refrigerantCharge",
+      "value": 20,
+      "unit": "g/m",
+      "min": null,
+      "max": null,
+      "source": "http://www.mitsubishitech.co.uk/Data/M-Series/MSZ/2019/MUZ-AP-VG/MUZ-AP25-50VG_SM_OBH789.pdf (via search extract); docs/research/data/mitsubishi.json (provisional)",
+      "grade": "M",
+      "candidate": null,
+      "notes": null
+    },
+    {
+      "key": "charge.panasonicCKE_25_35.chargelessM",
+      "label": "Panasonic CU-Z/TZ25-35CKE chargeless length",
+      "group": "refrigerantCharge",
+      "value": 7.5,
+      "unit": "m",
+      "min": null,
+      "max": null,
+      "source": "https://www.aircon.panasonic.eu/GB_en/model/kit-z25-cke-cs-z25ckew-cu-z25cke/ (via search extract); docs/research/data/panasonic.json",
+      "grade": "M",
+      "candidate": null,
+      "notes": null
+    },
+    {
+      "key": "charge.panasonicCKE_25_35.gPerM",
+      "label": "Panasonic CU-Z/TZ25-35CKE additional charge rate",
+      "group": "refrigerantCharge",
+      "value": 10,
+      "unit": "g/m",
+      "min": null,
+      "max": null,
+      "source": "https://www.aircon.panasonic.eu/GB_en/model/kit-z25-cke-cs-z25ckew-cu-z25cke/ (via search extract); docs/research/data/panasonic.json",
+      "grade": "M",
+      "candidate": null,
+      "notes": "Z50CKE 7.5 m/15 g/m; TZ50CKE 10 m/15 g/m; Z/TZ71CKE 10 m/25 g/m; 2Z50/3Z68/4Z80CBE 20/30/45 m at 15/20/20 g/m (panasonic.json)."
+    },
+    {
+      "key": "fgas.r32Gwp",
+      "label": "R32 GWP",
+      "group": "fgas",
+      "value": 675,
+      "unit": null,
+      "min": null,
+      "max": null,
+      "source": "Daikin R32 split installer guide extract (https://www.daikin.es/content/dam/document-library/Installer-reference-guide/ac/split/rxf-f/RXF20-42F_Installer%20reference%20guide_4PES769827-15G_Spanish.pdf); Panasonic CU-4Z80CBE page 2.72 kg = 1.836 tCO2e (https://www.aircon.panasonic.eu/GB_en/model/cu-4z80cbe/)",
+      "grade": "M",
+      "candidate": null,
+      "notes": null
+    },
+    {
+      "key": "fgas.tco2ePerKgR32",
+      "label": "tCO2e per kg R32",
+      "group": "fgas",
+      "value": 0.675,
+      "unit": "tCO2e/kg",
+      "min": null,
+      "max": null,
+      "source": "Computed: GWP 675 / 1000",
+      "grade": "C",
+      "candidate": null,
+      "notes": null
+    },
+    {
+      "key": "fgas.labelRequired",
+      "label": "F-gas label completed with total charge",
+      "group": "fgas",
+      "value": "yes",
+      "unit": null,
+      "min": null,
+      "max": null,
+      "source": "Daikin R32 split installer guide extract: total = factory + additional; the fluorinated gas label inside the outdoor unit must record the charge in kg and tCO2e (https://www.daikin.es/content/dam/document-library/Installer-reference-guide/ac/split/rxf-f/RXF20-42F_Installer%20reference%20guide_4PES769827-15G_Spanish.pdf)",
+      "grade": "M",
+      "candidate": null,
+      "notes": "Capture factory, additional and total kg, total tCO2e and a label photo."
+    },
+    {
+      "key": "fgas.leakCheckThresholdTco2e",
+      "label": "Mandatory periodic leak-check / records threshold",
+      "group": "fgas",
+      "value": null,
+      "unit": "tCO2e",
+      "min": null,
+      "max": null,
+      "source": "NOT VERIFIED - no source retrieved this session (web search budget exhausted; WebFetch DNS failures). ",
+      "grade": null,
+      "candidate": {
+        "value": 5,
+        "equivalentKgR32": 7.41,
+        "hermeticallySealedValue": 10,
+        "basis": "Recall of GB-retained Regulation (EU) 517/2014 Art. 4/6. Not verified; GB amendments 2025/2026 not checked.",
+        "confidence": "moderate",
+        "confirmAt": [
+          "https://www.legislation.gov.uk/eur/2014/517/contents"
+        ]
+      },
+      "notes": "Largest pilot-relevant systems computed from repo data: Panasonic CU-4Z80CBE max about 3.22 kg = 2.17 tCO2e; Daikin 5MXM90A at 75 m about 4.2 kg = 2.84 tCO2e. Keep the commissioning record regardless (warranty registration, sale-to-end-user evidence)."
+    },
+    {
+      "key": "fgas.companyCertRequired",
+      "label": "Company F-gas certificate required",
+      "group": "fgas",
+      "value": "yes",
+      "unit": null,
+      "min": null,
+      "max": null,
+      "source": "https://hf-group.co.uk/accreditations/refcom-f-gas-certification/ ; https://www.trade2base.com/blog/fgas-certification-uk",
+      "grade": "S",
+      "candidate": null,
+      "notes": "REFCOM named by HF Group. Other GB bodies (Quidos, BESCA) are unverified recall - confirm the approved list on gov.uk."
+    },
+    {
+      "key": "fgas.engineerCategory",
+      "label": "Engineer F-gas category",
+      "group": "fgas",
+      "value": "Category I",
+      "unit": null,
+      "min": null,
+      "max": null,
+      "source": "https://findajob.dwp.gov.uk/details/16822375 (job advert: F-Gas Category 1 essential)",
+      "grade": "S",
+      "candidate": null,
+      "notes": "Whether Category II (systems under 3 kg) suffices is unverified; require Category I unless the tech lead confirms otherwise."
+    },
+    {
+      "key": "fgas.singleSplitRestriction",
+      "label": "GB single-split restriction",
+      "group": "fgas",
+      "value": "single splits with < 3 kg F-gas and GWP >= 750 banned from GB market since 2025-01-01 (R32, GWP 675, unaffected)",
+      "unit": null,
+      "min": null,
+      "max": null,
+      "source": "https://refindustry.com/news/great-britain-updates-guidance-on-2025-split-ac-f-gas-ban/",
+      "grade": "S",
+      "candidate": null,
+      "notes": null
+    },
+    {
+      "key": "condensate.minFallMmPerM",
+      "label": "Minimum condensate drain fall",
+      "group": "condensate",
+      "value": null,
+      "unit": "mm/m",
+      "min": null,
+      "max": null,
+      "source": "NOT VERIFIED - no source retrieved this session (web search budget exhausted; WebFetch DNS failures). ",
+      "grade": null,
+      "candidate": {
+        "value": 10,
+        "ratio": "1/100",
+        "basis": "Recall: commonly stated in ducted/cassette indoor-unit manuals; wall units usually say 'slope downwards'. Not verified.",
+        "confidence": "low-moderate"
+      },
+      "notes": "Repo placeholder 20 mm/m is unsourced. Drain connection sizes in repo data: 16 mm (Daikin FTXM-A), 18 mm (Daikin FTXF-F/FTXA)."
+    },
+    {
+      "key": "condensate.drainTest",
+      "label": "Drain test",
+      "group": "condensate",
+      "value": "pour water into the indoor drain pan; confirm free discharge at termination; no leaks at joints or wall sleeve; video",
+      "unit": null,
+      "min": null,
+      "max": null,
+      "source": "NOT VERIFIED - no source retrieved this session (web search budget exhausted; WebFetch DNS failures). Trade practice.",
+      "grade": "U",
+      "candidate": null,
+      "notes": null
+    },
+    {
+      "key": "condensate.pumpTest",
+      "label": "Condensate pump test",
+      "group": "condensate",
+      "value": "pump starts and discharges; overfill to prove the high-level switch stops the unit or raises an alarm; record pump model and alarm wiring",
+      "unit": null,
+      "min": null,
+      "max": null,
+      "source": "NOT VERIFIED - no source retrieved this session (web search budget exhausted; WebFetch DNS failures). Trade practice.",
+      "grade": "U",
+      "candidate": null,
+      "notes": null
+    },
+    {
+      "key": "condensate.defrostDrainage",
+      "label": "Outdoor defrost water route (heating mode)",
+      "group": "condensate",
+      "value": "to gully/gravel/soakaway, never onto path, step, drive or neighbour's land; unit raised clear of standing water/snow; ice-path photo",
+      "unit": null,
+      "min": null,
+      "max": null,
+      "source": "NOT VERIFIED - no source retrieved this session (web search budget exhausted; WebFetch DNS failures). Trade practice; pilot-build-plan already requires a drainage and ice-path check.",
+      "grade": "U",
+      "candidate": null,
+      "notes": null
+    },
+    {
+      "key": "electrical.partPNotifiable",
+      "label": "New circuit is Part P notifiable",
+      "group": "electrical",
+      "value": "yes",
+      "unit": null,
+      "min": null,
+      "max": null,
+      "source": "https://electrical.theiet.org/bs-7671/building-regulations/part-p-england-and-wales/ ; https://www.carlisle.gov.uk/Portals/0/Documents/Residents/Building%20Control/PLAN_Part_P_Leaflet.pdf ; https://www.bolton.gov.uk/downloads/file/6360/electrical-safety-guidance-note",
+      "grade": "S",
+      "candidate": null,
+      "notes": "Council leaflets date from about 2005-2023; check the current Approved Document P."
+    },
+    {
+      "key": "electrical.certificate",
+      "label": "Electrical certificate",
+      "group": "electrical",
+      "value": "BS 7671 Electrical Installation Certificate (design, installation, inspection & test) with schedule of test results; plus competent-person scheme notification reference",
+      "unit": null,
+      "min": null,
+      "max": null,
+      "source": "https://www.carlisle.gov.uk/Portals/0/Documents/Residents/Building%20Control/PLAN_Part_P_Leaflet.pdf ; https://www.lancaster.gov.uk/assets/attach/737/Guidance-Note-Electrical-Safety.pdf ; https://electrical.theiet.org/bs-7671/building-regulations/part-p-england-and-wales/",
+      "grade": "S",
+      "candidate": null,
+      "notes": null
+    },
+    {
+      "key": "electrical.signatory",
+      "label": "Who signs",
+      "group": "electrical",
+      "value": "electrician registered with a Part P competent-person scheme (e.g. NICEIC, NAPIT, ECA); otherwise Building Control application or registered third-party sign-off",
+      "unit": null,
+      "min": null,
+      "max": null,
+      "source": "https://www.carlisle.gov.uk/Portals/0/Documents/Residents/Building%20Control/PLAN_Part_P_Leaflet.pdf ; https://www.bolton.gov.uk/downloads/file/6360/electrical-safety-guidance-note ; https://www.lancaster.gov.uk/assets/attach/737/Guidance-Note-Electrical-Safety.pdf",
+      "grade": "S",
+      "candidate": null,
+      "notes": "EIC has designer, installer and inspector/tester signatures (one person may sign all three) - unverified recall."
+    },
+    {
+      "key": "electrical.insulationResistanceMinMOhm",
+      "label": "Insulation resistance, minimum",
+      "group": "electrical",
+      "value": null,
+      "unit": "MΩ",
+      "min": null,
+      "max": null,
+      "source": "NOT VERIFIED - no source retrieved this session (web search budget exhausted; WebFetch DNS failures). ",
+      "grade": null,
+      "candidate": {
+        "value": 1,
+        "testVoltageVdc": 500,
+        "basis": "Recall of BS 7671 Table 64 for circuits up to 500 V. Not verified.",
+        "confidence": "moderate"
+      },
+      "notes": null
+    },
+    {
+      "key": "electrical.rcdTripMaxMs1x",
+      "label": "RCD trip time at rated residual current",
+      "group": "electrical",
+      "value": null,
+      "unit": "ms",
+      "min": null,
+      "max": null,
+      "source": "NOT VERIFIED - no source retrieved this session (web search budget exhausted; WebFetch DNS failures). ",
+      "grade": null,
+      "candidate": {
+        "value": 300,
+        "basis": "Recall of BS 7671 / GN3 for general-type RCDs. Not verified.",
+        "confidence": "moderate"
+      },
+      "notes": null
+    },
+    {
+      "key": "electrical.rcdTripMaxMs5x",
+      "label": "RCD trip time at 5x rated residual current (30 mA additional protection)",
+      "group": "electrical",
+      "value": null,
+      "unit": "ms",
+      "min": null,
+      "max": null,
+      "source": "NOT VERIFIED - no source retrieved this session (web search budget exhausted; WebFetch DNS failures). ",
+      "grade": null,
+      "candidate": {
+        "value": 40,
+        "basis": "Recall of BS 7671 / GN3. Not verified.",
+        "confidence": "moderate"
+      },
+      "notes": null
+    },
+    {
+      "key": "electrical.earthContinuity",
+      "label": "Protective conductor continuity / Zs",
+      "group": "electrical",
+      "value": "record R1+R2 and Zs; Zs must not exceed the maximum for the protective device (BS 7671 tables)",
+      "unit": "Ω",
+      "min": null,
+      "max": null,
+      "source": "NOT VERIFIED - no source retrieved this session (web search budget exhausted; WebFetch DNS failures). ",
+      "grade": "U",
+      "candidate": null,
+      "notes": "Repo placeholder 'earth continuity <= 1 Ohm' is unsourced and not how BS 7671 judges it."
+    },
+    {
+      "key": "electrical.breakerA",
+      "label": "Protective device rating",
+      "group": "electrical",
+      "value": "per outdoor-unit record (Panasonic 16 A for 2.5-5 kW, 20 A for 7.1 kW and CU-3Z68CBE, 25 A for CU-4Z80CBE; Mitsubishi 10 A for AP/HR 25-35, provisional)",
+      "unit": "A",
+      "min": null,
+      "max": null,
+      "source": "docs/research/data/panasonic.json ; docs/research/data/mitsubishi.json ; https://www.aircon.panasonic.eu/GB_en/model/cu-4z80cbe/",
+      "grade": "M",
+      "candidate": null,
+      "notes": null
+    },
+    {
+      "key": "noise.pdLimitDbA",
+      "label": "Permitted development noise limit at assessment position",
+      "group": "noisePlanning",
+      "value": 42,
+      "unit": "dB(A)",
+      "min": null,
+      "max": 42,
+      "source": "https://mcscertified.com/wp-content/uploads/2024/11/MCS-020-Consultation-Response-Final.pdf",
+      "grade": "O",
+      "candidate": null,
+      "notes": null
+    },
+    {
+      "key": "noise.standard",
+      "label": "Noise calculation standard",
+      "group": "noisePlanning",
+      "value": "MCS 020(a)",
+      "unit": null,
+      "min": null,
+      "max": null,
+      "source": "https://www.legislation.gov.uk/uksi/2025/560 (Class G now references MCS 020(a); 'or equivalent standards' removed; via search extract)",
+      "grade": "O",
+      "candidate": null,
+      "notes": null
+    },
+    {
+      "key": "noise.inputMetric",
+      "label": "Calculation input",
+      "group": "noisePlanning",
+      "value": "A-weighted sound power level (LWA) of the outdoor unit (not sound pressure)",
+      "unit": null,
+      "min": null,
+      "max": null,
+      "source": "https://payaca.com/uk/blog/heat-pump-permitted-development-mcs-020",
+      "grade": "S",
+      "candidate": null,
+      "notes": null
+    },
+    {
+      "key": "noise.assessmentPosition",
+      "label": "Assessment position",
+      "group": "noisePlanning",
+      "value": "nearest habitable room of the neighbouring property",
+      "unit": null,
+      "min": null,
+      "max": null,
+      "source": "https://payaca.com/uk/blog/heat-pump-permitted-development-mcs-020",
+      "grade": "S",
+      "candidate": {
+        "value": "1 m from the centre of that habitable-room window or door",
+        "basis": "Recall of MCS 020. Not verified.",
+        "confidence": "moderate"
+      },
+      "notes": null
+    },
+    {
+      "key": "noise.commissioningRecord",
+      "label": "Noise record at commissioning",
+      "group": "noisePlanning",
+      "value": "as-built recheck of MCS 020(a) inputs (model/LWA, distance to each assessment position, reflecting surfaces Q, barrier) with photos; recalculate if anything moved. Optional LAeq at 1 m (Class 2 meter) as a QA/defect check only.",
+      "unit": null,
+      "min": null,
+      "max": null,
+      "source": "NOT VERIFIED - no source retrieved this session (web search budget exhausted; WebFetch DNS failures). Recommendation derived from the calculation-based PD test.",
+      "grade": "U",
+      "candidate": null,
+      "notes": "Replaces the repo's 'noise at the boundary <= 42 dB(A)' reading, which is the wrong test."
+    },
+    {
+      "key": "planning.notSolelyCooling",
+      "label": "Heat pump must not be used solely for cooling (Class G G.3(aa))",
+      "group": "noisePlanning",
+      "value": "yes",
+      "unit": null,
+      "min": null,
+      "max": null,
+      "source": "https://www.legislation.gov.uk/uksi/2025/560 (via search extract)",
+      "grade": "O",
+      "candidate": null,
+      "notes": null
+    },
+    {
+      "key": "planning.maxUnitVolumeM3",
+      "label": "Maximum outdoor unit volume, dwellinghouse",
+      "group": "noisePlanning",
+      "value": 1.5,
+      "unit": "m³",
+      "min": null,
+      "max": 1.5,
+      "source": "https://www.legislation.gov.uk/uksi/2025/560 (via search extract)",
+      "grade": "O",
+      "candidate": null,
+      "notes": "0.6 m3 for blocks of flats; detached house may have up to two units."
+    },
+    {
+      "key": "planning.oneMetreBoundaryRuleRemoved",
+      "label": "Old 1 m-from-boundary rule removed (from 2025-05-29)",
+      "group": "noisePlanning",
+      "value": "yes",
+      "unit": null,
+      "min": null,
+      "max": null,
+      "source": "https://planningjungle.com/2025/05/18/important-new-legislation-amendments-to-other-parts-of-the-gpdo-29-05-2025/ ; secondary blogs summarised in the orchestrator's search",
+      "grade": "S",
+      "candidate": null,
+      "notes": "Repo 'distance to nearest neighbouring window min 1 m' should become an MCS 020 input, not a pass/fail."
+    },
+    {
+      "key": "warranty.daikinRegisterWithinDays",
+      "label": "Daikin installer registration on Stand By Me after commissioning",
+      "group": "handover",
+      "value": 90,
+      "unit": "days",
+      "min": null,
+      "max": null,
+      "source": "https://discoveryhomesltd.uk/wp-content/uploads/2026/02/Daikin-UK-Residential-End-User-Warranty-Policy_July-2025_Final.pdf (third-party-hosted copy of Daikin UK policy, July 2025)",
+      "grade": "S",
+      "candidate": null,
+      "notes": "Customer activation within 24 months of commissioning per the same policy; confirm for air-to-air splits."
+    },
+    {
+      "key": "warranty.mitsubishiRegisterWithinMonths",
+      "label": "Mitsubishi registration window",
+      "group": "handover",
+      "value": null,
+      "unit": "months",
+      "min": null,
+      "max": null,
+      "source": "NOT VERIFIED - no source retrieved this session (web search budget exhausted; WebFetch DNS failures). Air-to-air terms not found.",
+      "grade": null,
+      "candidate": {
+        "value": 3,
+        "basis": "Mitsubishi Lossnay guarantee page (registration within 3 months of commissioning) and one regional installer - not confirmed for splits.",
+        "confidence": "low",
+        "confirmAt": [
+          "https://les.mitsubishielectric.co.uk/homeowners/register-lossnay-guarantee"
+        ]
+      },
+      "notes": null
+    },
+    {
+      "key": "warranty.panasonicRegistration",
+      "label": "Panasonic registration",
+      "group": "handover",
+      "value": "register the unit on the PRO Club portal (time limit not found)",
+      "unit": null,
+      "min": null,
+      "max": null,
+      "source": "docs/research/data/panasonic.json warranty note (secondary sources)",
+      "grade": "S",
+      "candidate": null,
+      "notes": null
+    }
+  ],
+  "r32SaturationTable": {
+    "source": "http://www.coolprop.org/ (CoolProp 8.0.0, https://pypi.org/project/CoolProp/)",
+    "grade": "C",
+    "rows": [
+      {
+        "tC": -20,
+        "barAbs": 4.06,
+        "barG": 3.04
+      },
+      {
+        "tC": -10,
+        "barAbs": 5.83,
+        "barG": 4.81
+      },
+      {
+        "tC": -5,
+        "barAbs": 6.91,
+        "barG": 5.89
+      },
+      {
+        "tC": 0,
+        "barAbs": 8.13,
+        "barG": 7.12
+      },
+      {
+        "tC": 5,
+        "barAbs": 9.51,
+        "barG": 8.5
+      },
+      {
+        "tC": 10,
+        "barAbs": 11.07,
+        "barG": 10.06
+      },
+      {
+        "tC": 15,
+        "barAbs": 12.81,
+        "barG": 11.79
+      },
+      {
+        "tC": 20,
+        "barAbs": 14.75,
+        "barG": 13.73
+      },
+      {
+        "tC": 25,
+        "barAbs": 16.9,
+        "barG": 15.88
+      },
+      {
+        "tC": 30,
+        "barAbs": 19.28,
+        "barG": 18.26
+      },
+      {
+        "tC": 35,
+        "barAbs": 21.9,
+        "barG": 20.89
+      },
+      {
+        "tC": 40,
+        "barAbs": 24.78,
+        "barG": 23.77
+      },
+      {
+        "tC": 45,
+        "barAbs": 27.95,
+        "barG": 26.93
+      },
+      {
+        "tC": 50,
+        "barAbs": 31.41,
+        "barG": 30.4
+      }
+    ]
+  },
+  "vacuumConversions": {
+    "source": "Computed: 1 micron = 101325/760000 Pa = 0.1333 Pa; gauge figures relative to 101.325 kPa standard atmosphere",
+    "grade": "C",
+    "rows": [
+      {
+        "reading": "250 micron",
+        "pa": 33.3,
+        "microns": 250
+      },
+      {
+        "reading": "500 micron",
+        "pa": 66.7,
+        "microns": 500
+      },
+      {
+        "reading": "1000 micron",
+        "pa": 133.3,
+        "microns": 1000
+      },
+      {
+        "reading": "1500 micron",
+        "pa": 200.0,
+        "microns": 1500
+      },
+      {
+        "reading": "5 Torr",
+        "pa": 666.6,
+        "microns": 5000
+      },
+      {
+        "reading": "-0.1 MPa gauge (-100 kPa g)",
+        "pa": 1325,
+        "microns": 9938
+      },
+      {
+        "reading": "-100.7 kPa gauge",
+        "pa": 625,
+        "microns": 4688
+      }
+    ]
+  },
+  "labour": {
+    "durations": {
+      "singleSplitBackToBackFirstFloor2PersonDays": null,
+      "multiSplit2to3Rooms2PersonDays": null,
+      "source": "NOT VERIFIED - no source retrieved this session (web search budget exhausted; WebFetch DNS failures). No sourced installation durations found.",
+      "candidate": {
+        "singleSplitBackToBackFirstFloor2PersonDays": 1,
+        "multiSplit2to3Rooms2PersonDays": {
+          "min": 2,
+          "max": 3
+        },
+        "basis": "Unverified planning assumption (low confidence). Electrician's new circuit extra unless a crew member is Part P registered.",
+        "confidence": "low"
+      },
+      "repoPlaceholder": {
+        "installBlockDays": 3,
+        "source": "docs/pilot-architecture.md (defaults)"
+      },
+      "recommendation": "Keep editable; replace with actual hours from runsheet timestamps after each pilot."
+    },
+    "dayRates": {
+      "acEngineerGbpPerDay": null,
+      "electricianGbpPerDay": null,
+      "source": "NOT VERIFIED - no source retrieved this session (web search budget exhausted; WebFetch DNS failures). No sourced UK day rates found.",
+      "repoPlaceholders": {
+        "installerGbpPerDay": 220,
+        "electricianGbpPerDay": 250,
+        "techLeadGbpPerDay": 280,
+        "surveyorGbpPerHour": 40,
+        "source": "docs/pilot-architecture.md ('These are placeholders; research may refine them.')"
+      }
+    },
+    "marketPriceAnchors": [
+      {
+        "item": "Installation labour, Daikin Sensira 3.5 kW single split",
+        "priceGbp": 385,
+        "qualifier": "from",
+        "vat": "not stated",
+        "grade": "S",
+        "source": "https://www.basildonacr.co.uk/product/daikin-sensira-air-conditioning-ftxf35d-rxf35d-3-5kw-12000btu-wall-mounted-wifi-optional/"
+      },
+      {
+        "item": "Supply and install, Daikin FTXF35F/RXF35F, London",
+        "priceGbp": 910,
+        "qualifier": "from",
+        "vat": "not stated",
+        "grade": "S",
+        "source": "https://micro-climate.co.uk/daikin-sensira-ftxf35f-rxf35f-3-5kw",
+        "notes": "Conflicts with GBP 850 equipment-only price on same site."
+      },
+      {
+        "item": "Supplied and fitted, typical 2.5-3.5 kW room",
+        "priceGbpMin": 1500,
+        "priceGbpMax": 1900,
+        "grade": "S",
+        "source": "https://airconadviser.co.uk/products/wall-mounted-split-systems/daikin-sensira-ftxf"
+      },
+      {
+        "item": "Costco UK installed package, 2.5 kW (members)",
+        "priceGbp": 1849.99,
+        "grade": "S",
+        "source": "https://airconadviser.co.uk/products/wall-mounted-split-systems/daikin-sensira-ftxf"
+      },
+      {
+        "item": "Costco UK installed package, 3.5 kW (members)",
+        "priceGbp": 1899.99,
+        "grade": "S",
+        "source": "https://airconadviser.co.uk/products/wall-mounted-split-systems/daikin-sensira-ftxf"
+      },
+      {
+        "item": "Supply and install, Daikin FTXM35R + RXM35R9",
+        "priceGbp": 2549.99,
+        "regularGbp": 2699.99,
+        "vat": "VAT-free for domestic customers",
+        "grade": "S",
+        "source": "https://rimy.co.uk/products/supply-installation-of-daikin-prefera-series-ftxm35r-rxm35r9-3-5-kw-wall-mounted-for-home-or-office-upto-25m-br-br-vat-free-for-domestic-customers"
+      }
+    ],
+    "notes": "Market anchors are customer prices read via search-engine extracts, not labour costs."
+  },
+  "existingPlaceholderReview": [
+    {
+      "field": "INSTALL_TARGETS.pressureTestBar (min 38)",
+      "assessment": "Unsourced; make per model with max = nameplate PS; tech lead sets min."
+    },
+    {
+      "field": "INSTALL_TARGETS.pressureHoldMinutes (15)",
+      "assessment": "Unsourced; keep as company setting."
+    },
+    {
+      "field": "INSTALL_TARGETS.vacuumMicrons (500) / vacuumHoldRiseMicrons (300)",
+      "assessment": "Plausible company standard, unsourced; label as company standard."
+    },
+    {
+      "field": "INSTALL_TARGETS.tempSplitMinC (8) and max 16",
+      "assessment": "Unsourced; record only until fleet baseline."
+    },
+    {
+      "field": "INSTALL_TARGETS.drainFallMinMmPerM (20)",
+      "assessment": "Unsourced; 2x the 1/100 candidate; confirm per indoor-unit manual."
+    },
+    {
+      "field": "buildRunsheet torque default {min 33, max 42}",
+      "assessment": "Only fits 9.52 mm lines; take per pipe size per model."
+    },
+    {
+      "field": "Terminal torque 1.2-2.8 N·m; earth continuity <= 1 Ω",
+      "assessment": "Unsourced; device-specific / judge by R1+R2 and Zs."
+    },
+    {
+      "field": "Noise at the boundary <= 42 dB(A)",
+      "assessment": "Wrong test: PD limit is calculated at neighbour assessment position under MCS 020(a)."
+    },
+    {
+      "field": "Distance to nearest neighbouring window min 1 m",
+      "assessment": "Old 1 m boundary rule removed in 2025; use as MCS 020 input."
+    }
+  ],
+  "caveats": [
+    "Live research was not possible: the workflow's shared web-search budget (200) was exhausted before this task, WebFetch failed DNS for every host, and shell egress to manufacturer, MCS, REFCOM, gov.uk and legislation.gov.uk hosts was refused. Re-run with web access (send a follow-up, or raise CLAUDE_CODE_MAX_WEB_SEARCHES_PER_SESSION) to verify.",
+    "Grade M/O/S figures were read from search-engine extracts gathered earlier today by other research agents in this workflow; nobody opened the underlying pages or PDFs. Spot-check against the PDF before relying on them.",
+    "Every core manufacturer test parameter (nitrogen test pressure and hold, vacuum target, decay test, flare torque) is null. The 'candidate' objects are the researcher's recall of the named manuals - NOT sources. Use them only as clearly labelled, editable placeholders that the F-gas tech lead confirms against each pilot model's installation manual before Pilot 1.",
+    "Never apply a test pressure above the outdoor unit's nameplate PS, whatever default the app shows.",
+    "Additional-charge rules are per outdoor model; several Mitsubishi rules are provisional and Daikin 2MXM50A8's chargeless length conflicts (10 m vs 20 m) in sources.",
+    "F-gas leak-check/record thresholds, certificate categories and approved company certification bodies (beyond REFCOM) are unverified; GB F-gas changes during 2025-2026 were not checked.",
+    "Electrical test limits (insulation resistance, RCD times, Zs) are recall of BS 7671/GN3 and unverified; the electrician's own EIC is the authority.",
+    "MCS 020(a) method details (background noise treatment, which sound power figure) were not verified; only the 42 dB(A) limit and the SI 2025/560 references are sourced. Whether air-to-air units fall within Class G was not confirmed from the legislation text.",
+    "No sourced labour durations or UK day rates were found; the labour block holds repo placeholders and low-confidence assumptions only.",
+    "Temperature-split acceptance windows have no manufacturer source; record them, do not fail jobs on them, until a per-model fleet baseline exists."
+  ]
+}

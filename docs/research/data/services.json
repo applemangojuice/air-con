@@ -1,0 +1,405 @@
+{
+  "researchedOn": "2026-10-18",
+  "verificationKey": {
+    "vendor-source": "Read from the vendor's own public GitHub repo, the source of its pricing page or docs, at the commit in the URL",
+    "vendor-authored": "From a vendor-authored agent-skill or plugin repo, not the pricing page itself",
+    "secondary": "Community-maintained list (free-for-dev, stack-on-a-budget); may lag price changes",
+    "unverified": "Could not be fetched in this session (network policy blocked the vendor site, web-search budget exhausted); figures left null",
+    "not-applicable": "No third-party price involved"
+  },
+  "services": [
+    {
+      "name": "Vercel",
+      "plan": "Hobby",
+      "monthlyUsd": 0,
+      "perUnit": null,
+      "limits": "Functions: 300 s default and max duration, fixed 2 GB / 1 vCPU, single region, 4.5 MB request/response body (vendor-authored). Cron limits NOT verified.",
+      "commercialUseOk": false,
+      "url": "https://github.com/255kb/stack-on-a-budget/blob/268acebd6c8de3b9c87bd5209bcf2aa92b67252a/pages/app-hosting.md",
+      "verification": "secondary",
+      "sources": [
+        "https://github.com/255kb/stack-on-a-budget/blob/268acebd6c8de3b9c87bd5209bcf2aa92b67252a/pages/app-hosting.md",
+        "https://github.com/vercel/vercel-plugin/blob/137e9f44a243a939c5eaea30e4dff96aee744f64/skills/vercel-functions/SKILL.md"
+      ],
+      "note": "Secondary source states 'Free tier does not allow commercial usage'. vercel.com/docs/limits/fair-use-guidelines could not be fetched."
+    },
+    {
+      "name": "Vercel",
+      "plan": "Pro",
+      "monthlyUsd": 20,
+      "perUnit": "Usage beyond the included $20/month credit is billed on demand (rates not verified)",
+      "limits": "$20/month platform fee includes $20/month usage credit; 1 deploying seat + unlimited free Viewer seats; 1 TB Fast Data Transfer and 10M Edge Requests/month included; functions up to 800 s (1800 s beta), configurable memory/CPU, up to 3 regions, 4.5 MB body. Cron limits NOT verified.",
+      "commercialUseOk": true,
+      "url": "https://github.com/vercel-labs/agent-skills/blob/063bee94c3f4df8453406c830b0a7df0f2860278/skills/vercel-cli-with-tokens/SKILL.md",
+      "verification": "vendor-authored",
+      "sources": [
+        "https://github.com/vercel-labs/agent-skills/blob/063bee94c3f4df8453406c830b0a7df0f2860278/skills/vercel-cli-with-tokens/SKILL.md",
+        "https://github.com/vercel/vercel-plugin/blob/137e9f44a243a939c5eaea30e4dff96aee744f64/skills/vercel-functions/SKILL.md"
+      ],
+      "note": "commercialUseOk inferred: Pro is the paid plan and the Hobby restriction does not apply to it."
+    },
+    {
+      "name": "Supabase",
+      "plan": "Free",
+      "monthlyUsd": 0,
+      "perUnit": null,
+      "limits": "500 MB database (read-only above it), shared CPU / 500 MB RAM, 1 GB file storage, 50 MB max upload, 5 GB egress + 5 GB cached egress, 50,000 MAU, 500,000 Edge Function invocations, NO automatic backups, paused after 1 week of low activity (restorable for 1 year), 2 free projects.",
+      "commercialUseOk": null,
+      "url": "https://github.com/supabase/supabase/blob/7425d4930528931400fb3e656e860b1094cb224e/packages/shared-data/plans.ts",
+      "verification": "vendor-source",
+      "sources": [
+        "https://github.com/supabase/supabase/blob/7425d4930528931400fb3e656e860b1094cb224e/packages/shared-data/plans.ts",
+        "https://github.com/supabase/supabase/blob/7425d4930528931400fb3e656e860b1094cb224e/packages/shared-data/pricing.ts",
+        "https://github.com/supabase/supabase/blob/7425d4930528931400fb3e656e860b1094cb224e/apps/docs/content/guides/platform/free-project-pausing.mdx",
+        "https://github.com/supabase/supabase/blob/7425d4930528931400fb3e656e860b1094cb224e/apps/docs/content/guides/platform/backups.mdx",
+        "https://github.com/supabase/supabase/blob/7425d4930528931400fb3e656e860b1094cb224e/apps/docs/content/guides/platform/database-size.mdx",
+        "https://github.com/supabase/supabase/blob/7425d4930528931400fb3e656e860b1094cb224e/apps/docs/content/guides/platform/billing-on-supabase.mdx"
+      ],
+      "note": "Commercial use is neither stated nor banned in the sources read. The built-in Auth SMTP sends 2 emails/hour, only to team members."
+    },
+    {
+      "name": "Supabase",
+      "plan": "Pro",
+      "monthlyUsd": 25,
+      "perUnit": "Disk $0.125/GB over 8 GB; egress $0.09/GB over 250 GB; cached egress $0.03/GB over 250 GB; storage $0.0213/GB over 100 GB; MAU $0.00325 over 100k; Edge Functions $2 per 1M over 2M; extra Micro project about $10/month; PITR $100/month per 7 days retention",
+      "limits": "Includes one project on Micro compute ($10 compute credit), 8 GB disk, 100 GB storage, 500 GB max upload, 250 GB + 250 GB cached egress, 100k MAU, daily backups kept 7 days (Storage objects NOT included in backups), never paused, spend cap available (does not cover compute, custom domain, IPv4, PITR, log drains).",
+      "commercialUseOk": true,
+      "url": "https://github.com/supabase/supabase/blob/7425d4930528931400fb3e656e860b1094cb224e/packages/shared-data/plans.ts",
+      "verification": "vendor-source",
+      "sources": [
+        "https://github.com/supabase/supabase/blob/7425d4930528931400fb3e656e860b1094cb224e/packages/shared-data/plans.ts",
+        "https://github.com/supabase/supabase/blob/7425d4930528931400fb3e656e860b1094cb224e/packages/shared-data/pricing.ts",
+        "https://github.com/supabase/supabase/blob/7425d4930528931400fb3e656e860b1094cb224e/apps/docs/content/guides/platform/manage-your-usage/compute.mdx",
+        "https://github.com/supabase/supabase/blob/7425d4930528931400fb3e656e860b1094cb224e/apps/docs/content/guides/platform/backups.mdx",
+        "https://github.com/supabase/supabase/blob/7425d4930528931400fb3e656e860b1094cb224e/apps/docs/content/guides/platform/cost-control.mdx"
+      ],
+      "note": "Vendor describes Pro as 'For production applications'."
+    },
+    {
+      "name": "Resend",
+      "plan": "Free",
+      "monthlyUsd": 0,
+      "perUnit": null,
+      "limits": "3,000 emails/month, 100 emails/day, 1 custom domain (secondary). Daily usage counts sent + received. Default API rate limit 2 requests/second (vendor-authored); batch max 100.",
+      "commercialUseOk": null,
+      "url": "https://github.com/ripienaar/free-for-dev/blob/e2f3fa6030bea82aca8233e705c1545aa8c0fd6d/README.md",
+      "verification": "secondary",
+      "sources": [
+        "https://github.com/ripienaar/free-for-dev/blob/e2f3fa6030bea82aca8233e705c1545aa8c0fd6d/README.md",
+        "https://github.com/resend/resend-skills/blob/b2ae7b1798b70134faf679f35fc05b4331462988/skills/resend/references/usage.md",
+        "https://github.com/resend/resend-skills/blob/b2ae7b1798b70134faf679f35fc05b4331462988/skills/resend/references/sending/overview.md"
+      ],
+      "note": "GET https://api.resend.com/usage returns the plan's live daily/monthly limits; use it on /ops/status."
+    },
+    {
+      "name": "Resend",
+      "plan": "Next paid tier",
+      "monthlyUsd": null,
+      "perUnit": null,
+      "limits": "Not verified (resend.com unreachable).",
+      "commercialUseOk": true,
+      "url": "https://resend.com/pricing",
+      "verification": "unverified",
+      "sources": [],
+      "note": "Check resend.com/pricing before upgrading."
+    },
+    {
+      "name": "Postmark",
+      "plan": "Free / Developer",
+      "monthlyUsd": 0,
+      "perUnit": null,
+      "limits": "100 emails/month (secondary). Paid tiers not verified.",
+      "commercialUseOk": null,
+      "url": "https://github.com/255kb/stack-on-a-budget/blob/268acebd6c8de3b9c87bd5209bcf2aa92b67252a/pages/emailing.md",
+      "verification": "secondary",
+      "sources": [
+        "https://github.com/255kb/stack-on-a-budget/blob/268acebd6c8de3b9c87bd5209bcf2aa92b67252a/pages/emailing.md",
+        "https://github.com/ripienaar/free-for-dev/blob/e2f3fa6030bea82aca8233e705c1545aa8c0fd6d/README.md"
+      ],
+      "note": "Too small for ~300 emails/month on the free tier."
+    },
+    {
+      "name": "Brevo",
+      "plan": "Free",
+      "monthlyUsd": 0,
+      "perUnit": null,
+      "limits": "9,000 emails/month, 300 emails/day (secondary).",
+      "commercialUseOk": null,
+      "url": "https://github.com/ripienaar/free-for-dev/blob/e2f3fa6030bea82aca8233e705c1545aa8c0fd6d/README.md",
+      "verification": "secondary",
+      "sources": [
+        "https://github.com/ripienaar/free-for-dev/blob/e2f3fa6030bea82aca8233e705c1545aa8c0fd6d/README.md"
+      ],
+      "note": "Fallback if Resend's 100/day cap bites."
+    },
+    {
+      "name": "Twilio SMS (UK)",
+      "plan": "Pay as you go",
+      "monthlyUsd": null,
+      "perUnit": null,
+      "limits": "Per-message price, alphanumeric sender rules and whether a number is needed NOT verified (twilio.com unreachable). GSM message = 160 chars, 2 parts up to 306, non-GSM character drops a single message to 70 (UK benchmark from GOV.UK Notify).",
+      "commercialUseOk": true,
+      "url": "https://www.twilio.com/en-us/sms/pricing/gb",
+      "verification": "unverified",
+      "sources": [
+        "https://github.com/alphagov/notifications-admin/blob/d19509b1a0ec7e86ed9d3d541d060b31755c32a0/app/templates/views/guidance/pricing/text-message-pricing.html"
+      ],
+      "note": "Existing code (lib/providers/sms.ts) targets Twilio REST. Use alphanumeric sender 'DangItsHot' (10 chars; 11 max per GOV.UK Notify rules). Budget allowance $5/month for 60 SMS."
+    },
+    {
+      "name": "GOV.UK Notify (benchmark only)",
+      "plan": "Public sector only",
+      "monthlyUsd": null,
+      "perUnit": "2.4p + VAT per 160-character text from 1 April 2026",
+      "limits": "Sender ID up to 11 characters; alphanumeric sender IDs cannot receive replies; going live requires a responsible public-sector body.",
+      "commercialUseOk": false,
+      "url": "https://github.com/alphagov/notifications-admin/blob/d19509b1a0ec7e86ed9d3d541d060b31755c32a0/app/templates/views/guidance/pricing/text-message-pricing.html",
+      "verification": "vendor-source",
+      "sources": [
+        "https://github.com/alphagov/notifications-admin/blob/d19509b1a0ec7e86ed9d3d541d060b31755c32a0/app/templates/views/guidance/pricing/text-message-pricing.html",
+        "https://github.com/alphagov/notifications-admin/blob/d19509b1a0ec7e86ed9d3d541d060b31755c32a0/app/templates/views/request-to-go-live.html",
+        "https://github.com/alphagov/notifications-admin/blob/d19509b1a0ec7e86ed9d3d541d060b31755c32a0/app/templates/views/service-settings/sms-sender/edit.html"
+      ],
+      "note": "Not usable by a private installer; included only as a UK price floor reference."
+    },
+    {
+      "name": "The SMS Works",
+      "plan": "Pay as you go",
+      "monthlyUsd": null,
+      "perUnit": null,
+      "limits": "Not verified (site unreachable).",
+      "commercialUseOk": null,
+      "url": "https://thesmsworks.co.uk/pricing",
+      "verification": "unverified",
+      "sources": [],
+      "note": "UK alternative to compare on price per SMS and API auth."
+    },
+    {
+      "name": "Textlocal",
+      "plan": "Unknown",
+      "monthlyUsd": null,
+      "perUnit": null,
+      "limits": "Not verified; current availability to new customers also not verified.",
+      "commercialUseOk": null,
+      "url": "https://www.textlocal.com/",
+      "verification": "unverified",
+      "sources": [],
+      "note": null
+    },
+    {
+      "name": "ClickSend",
+      "plan": "Pay as you go",
+      "monthlyUsd": null,
+      "perUnit": null,
+      "limits": "Not verified (site unreachable).",
+      "commercialUseOk": null,
+      "url": "https://www.clicksend.com/gb/pricing/gb/",
+      "verification": "unverified",
+      "sources": [],
+      "note": null
+    },
+    {
+      "name": "Vonage SMS API",
+      "plan": "Pay as you go",
+      "monthlyUsd": null,
+      "perUnit": null,
+      "limits": "Not verified (site unreachable).",
+      "commercialUseOk": null,
+      "url": "https://www.vonage.co.uk/communications-apis/sms/pricing/",
+      "verification": "unverified",
+      "sources": [],
+      "note": null
+    },
+    {
+      "name": "UK SMS SenderID Protection Registry",
+      "plan": "Registration (if required)",
+      "monthlyUsd": null,
+      "perUnit": null,
+      "limits": "Requirements and cost not verified.",
+      "commercialUseOk": null,
+      "url": "https://mobileecosystemforum.com/sms-sender-id-protection-registry/",
+      "verification": "unverified",
+      "sources": [],
+      "note": "Check that 'DangItsHot' does not collide with a protected sender, and whether to register it."
+    },
+    {
+      "name": "Stripe UK (cards via Checkout / Payment Links)",
+      "plan": "Standard (pay per transaction)",
+      "monthlyUsd": null,
+      "perUnit": null,
+      "limits": "Card fees, monthly fee (believed none) and Payment Links/Checkout pricing NOT verified (stripe.com unreachable). Each 1 percentage point of fee = £30 per £3,000 payment.",
+      "commercialUseOk": true,
+      "url": "https://stripe.com/gb/pricing",
+      "verification": "unverified",
+      "sources": [
+        "https://github.com/stripe/ai/blob/24947f1632ee3440ba9f27f92404beea164517b9/skills/stripe-best-practices/references/payments.md"
+      ],
+      "note": "Stripe's own engineering guidance (verified): prefer Payment Links/Checkout, do not hard-code payment_method_types, fulfil from webhooks incl. checkout.session.async_payment_succeeded/failed, verify signatures."
+    },
+    {
+      "name": "Stripe UK (Pay by Bank / bank transfers)",
+      "plan": "Per transaction",
+      "monthlyUsd": null,
+      "perUnit": null,
+      "limits": "Fees not verified.",
+      "commercialUseOk": true,
+      "url": "https://stripe.com/gb/pricing",
+      "verification": "unverified",
+      "sources": [],
+      "note": "Delayed-notification methods must be handled via async webhook events."
+    },
+    {
+      "name": "Direct bank transfer (Faster Payments to business account)",
+      "plan": "No processor",
+      "monthlyUsd": 0,
+      "perUnit": "No processor fee; the business bank's own tariff applies",
+      "limits": "Manual reconciliation in /ops; publish bank details only via the authenticated portal and invoice PDF (invoice-redirection fraud risk).",
+      "commercialUseOk": true,
+      "url": "docs/research/services-and-costs.md#45-payments-stripe-uk-and-bank-transfer",
+      "verification": "not-applicable",
+      "sources": [],
+      "note": "No third-party service involved, so no third-party fee. Recommended default for £3,000 balances."
+    },
+    {
+      "name": "getAddress.io",
+      "plan": "Free / paid tiers",
+      "monthlyUsd": null,
+      "perUnit": null,
+      "limits": "Free-tier daily/monthly limits and paid tiers NOT verified (site unreachable). Existing code calls /find/{postcode}; confirm the endpoint is current.",
+      "commercialUseOk": null,
+      "url": "https://getaddress.io/pricing",
+      "verification": "unverified",
+      "sources": [],
+      "note": "Use only as a fallback after the repo's own EPC address table."
+    },
+    {
+      "name": "postcodes.io",
+      "plan": "Public API (open source, self-hostable)",
+      "monthlyUsd": 0,
+      "perUnit": null,
+      "limits": "Postcode-level data only (ONS Postcode Directory, OS Open Names): lookup, autocomplete, reverse geocode, bulk. No full addresses. Rate limits not stated in README.",
+      "commercialUseOk": null,
+      "url": "https://github.com/ideal-postcodes/postcodes.io/blob/810eebaf0da419d4726268babaeb8a41f748b89c/README.md",
+      "verification": "vendor-source",
+      "sources": [
+        "https://github.com/ideal-postcodes/postcodes.io/blob/810eebaf0da419d4726268babaeb8a41f748b89c/README.md"
+      ],
+      "note": null
+    },
+    {
+      "name": "Ideal Postcodes",
+      "plan": "Paid (PAF address lookup)",
+      "monthlyUsd": null,
+      "perUnit": null,
+      "limits": "Not verified (site unreachable).",
+      "commercialUseOk": true,
+      "url": "https://ideal-postcodes.co.uk/pricing",
+      "verification": "unverified",
+      "sources": [],
+      "note": null
+    },
+    {
+      "name": "OS Places API",
+      "plan": "OS Data Hub premium",
+      "monthlyUsd": null,
+      "perUnit": null,
+      "limits": "Not verified (site unreachable).",
+      "commercialUseOk": null,
+      "url": "https://osdatahub.os.uk/plans",
+      "verification": "unverified",
+      "sources": [],
+      "note": null
+    },
+    {
+      "name": "Sentry",
+      "plan": "Developer (free)",
+      "monthlyUsd": 0,
+      "perUnit": null,
+      "limits": "About 5k errors/month, 1 user (secondary). Free plan existence and 14-day trial verified from Sentry docs; paid plans include 50k errors, 5M spans, 50 replays, 1 uptime monitor, 1 cron monitor.",
+      "commercialUseOk": null,
+      "url": "https://github.com/getsentry/sentry-docs/blob/290554a6da3e858067d4184b5220262a71a84421/docs/pricing/index.mdx",
+      "verification": "secondary",
+      "sources": [
+        "https://github.com/getsentry/sentry-docs/blob/290554a6da3e858067d4184b5220262a71a84421/docs/pricing/index.mdx",
+        "https://github.com/ripienaar/free-for-dev/blob/e2f3fa6030bea82aca8233e705c1545aa8c0fd6d/README.md",
+        "https://github.com/255kb/stack-on-a-budget/blob/268acebd6c8de3b9c87bd5209bcf2aa92b67252a/pages/error-reporting.md"
+      ],
+      "note": "Team plan price not verified."
+    },
+    {
+      "name": "GitHub Actions",
+      "plan": "GitHub Free",
+      "monthlyUsd": 0,
+      "perUnit": "Linux 2-core overage $0.006/min; each job rounded up to a whole minute",
+      "limits": "Public repos: free for standard runners. Private repos: 2,000 min/month, 500 MB artifacts, 10 GB cache per repo. Schedule: minimum every 5 min, may be delayed or dropped at high load; public-repo schedules disabled after 60 days without repo activity.",
+      "commercialUseOk": true,
+      "url": "https://github.com/github/docs/blob/dae83f7d28f3b8e10015bd6b6d8b72267cedceca/data/reusables/billing/actions-included-quotas.md",
+      "verification": "vendor-source",
+      "sources": [
+        "https://github.com/github/docs/blob/dae83f7d28f3b8e10015bd6b6d8b72267cedceca/data/reusables/billing/actions-included-quotas.md",
+        "https://github.com/github/docs/blob/dae83f7d28f3b8e10015bd6b6d8b72267cedceca/data/reusables/actions/actions-billing.md",
+        "https://github.com/github/docs/blob/dae83f7d28f3b8e10015bd6b6d8b72267cedceca/content/billing/reference/actions-runner-pricing.md",
+        "https://github.com/github/docs/blob/dae83f7d28f3b8e10015bd6b6d8b72267cedceca/data/reusables/billing/actions-standard-runner-prices.md",
+        "https://github.com/github/docs/blob/dae83f7d28f3b8e10015bd6b6d8b72267cedceca/data/reusables/repositories/actions-scheduled-workflow-example.md",
+        "https://github.com/github/docs/blob/dae83f7d28f3b8e10015bd6b6d8b72267cedceca/data/reusables/actions/schedule-delay.md"
+      ],
+      "note": "commercialUseOk: GitHub Free accounts are used by businesses; not explicitly checked in this session. A health check every 4 h uses about 186 min/month; every 15 min uses about 2,976 (over quota on private repos)."
+    },
+    {
+      "name": "Better Stack (uptime)",
+      "plan": "Free",
+      "monthlyUsd": 0,
+      "perUnit": null,
+      "limits": "10 monitors, 3-minute checks, status pages (secondary).",
+      "commercialUseOk": null,
+      "url": "https://github.com/ripienaar/free-for-dev/blob/e2f3fa6030bea82aca8233e705c1545aa8c0fd6d/README.md",
+      "verification": "secondary",
+      "sources": [
+        "https://github.com/ripienaar/free-for-dev/blob/e2f3fa6030bea82aca8233e705c1545aa8c0fd6d/README.md"
+      ],
+      "note": null
+    },
+    {
+      "name": "UptimeRobot",
+      "plan": "Free",
+      "monthlyUsd": 0,
+      "perUnit": null,
+      "limits": "50 monitors, 5-minute checks; described as 'for hobby projects' (secondary).",
+      "commercialUseOk": null,
+      "url": "https://github.com/ripienaar/free-for-dev/blob/e2f3fa6030bea82aca8233e705c1545aa8c0fd6d/README.md",
+      "verification": "secondary",
+      "sources": [
+        "https://github.com/ripienaar/free-for-dev/blob/e2f3fa6030bea82aca8233e705c1545aa8c0fd6d/README.md"
+      ],
+      "note": "Check commercial-use terms before relying on it."
+    }
+  ],
+  "recommendedMonthlyUsd": 50,
+  "recommendedStack": {
+    "fixedMonthlyUsd": 45,
+    "variableAllowanceUsd": 5,
+    "components": [
+      "Vercel Pro $20 (vendor-authored)",
+      "Supabase Pro $25 (vendor-source)",
+      "Resend Free",
+      "Twilio SMS pay as you go (price unverified, $5 allowance)",
+      "Bank transfer default + Stripe Checkout for cards (fees unverified)",
+      "Own EPC address table + postcodes.io, getAddress.io fallback",
+      "Sentry Developer",
+      "GitHub Actions health check"
+    ],
+    "leanVariantMonthlyUsd": 25,
+    "leanVariant": "Vercel Pro $20 + Supabase Free + the same free tiers + $5 SMS allowance; only while uploads stay at or under 50 MB, storage under 1 GB and the database under 500 MB, with a nightly pg_dump and daily DB activity."
+  },
+  "notes": [
+    "recommendedMonthlyUsd = 50 is an upper bound: $45 fixed (Vercel Pro $20, Supabase Pro $25) + a $5 SMS allowance. Twilio's UK per-message price was not verified; $5 covers 60 single-part SMS at any price up to about 8 US cents.",
+    "Excluded: card-processing fees (per transaction, unverified), domain name, possible UK VAT on US-billed SaaS, GBP/USD conversion.",
+    "Card fees on £3,000 balances will exceed all SaaS costs combined: each 1 percentage point is £30 per payment. Default to bank transfer for balances; use Stripe Checkout for deposits or customers who insist on card.",
+    "Vercel Hobby is treated as not allowed for commercial use (secondary source); Pro is the minimum for a trading business.",
+    "Supabase Free has no automatic backups, a 50 MB upload cap, 1 GB storage, read-only mode above a 500 MB database, and pauses after a week of low activity. Use Pro before real customer media is uploaded.",
+    "Supabase backups (Pro) do not include Storage objects (photos, PDFs); never hard-delete customer media.",
+    "Supabase's built-in Auth SMTP is limited to 2 emails/hour and team members only; route any Supabase Auth email through Resend SMTP.",
+    "Keep SMS at or under 160 GSM characters (2 parts up to 306; any non-GSM character limits a single message to 70). Use sender 'DangItsHot' (11-character max).",
+    "Research limits: web search budget exhausted and vendor sites blocked by network policy. Verified figures come from vendors' own public GitHub repos at pinned commits; secondary figures from free-for-dev and stack-on-a-budget. All null figures must be checked at the listed URL before go-live."
+  ]
+}

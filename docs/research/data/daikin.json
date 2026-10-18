@@ -1,0 +1,2214 @@
+{
+  "manufacturer": "Daikin",
+  "researchedAt": "2026-10-18",
+  "models": [
+    {
+      "kind": "indoor",
+      "manufacturer": "Daikin",
+      "series": "Sensira (FTXF-F)",
+      "model": "FTXF25F5V1B",
+      "label": "Daikin Sensira 2.5 kW",
+      "tier": "standard",
+      "multiSplitCapable": false,
+      "ports": null,
+      "pairedWith": "RXF25F5V1B",
+      "specs": {
+        "coolingKw": 2.5,
+        "heatingKw": 2.8,
+        "seer": 6.5,
+        "scop": 4.2,
+        "energyClassCooling": "A++",
+        "energyClassHeating": "A+",
+        "soundPressureLowDb": 20,
+        "soundPressureHighDb": 40,
+        "soundPowerDb": null,
+        "dimensionsMm": {
+          "w": 770,
+          "h": 286,
+          "d": 225
+        },
+        "weightKg": 8,
+        "refrigerant": "R32",
+        "liquidPipeMm": 6.4,
+        "gasPipeMm": 9.5,
+        "maxPipeM": null,
+        "maxHeightDiffM": null,
+        "prechargedPipeM": null,
+        "additionalChargeGPerM": null,
+        "powerSupply": null,
+        "recommendedBreakerA": null,
+        "wifi": "Onecta app Wi-Fi. UK retailers disagree: Ocean Air and Micro-Climate say built-in as standard on FTXF-F, but Basildon ACR (UK) lists Sensira systems as 'Wi-Fi optional' (URL slugs .../ftxf35d-rxf35d-...-wifi-optional/ and .../ftxf50d-rxf50d-...-wifi-optional/, which name the older D generation); a French retailer lists an optional adapter. Confirm on the UK spec sheet and budget for an adapter until confirmed",
+        "operatingRangeCoolingC": null,
+        "operatingRangeHeatingC": null
+      },
+      "warranty": "NOT confirmed for residential air-to-air splits. Daikin UK installer warranty page: standard commercial warranty 'typically 1 or 3 years depending on product type'; Daikin UK Certified Installers 'up to 5 years on AC equipment'; D1/D1+ partners 'up to 7 years on AC equipment' (exact terms behind the Daikin Partner Portal). Daikin UK residential Stand By Me pages describe a free 2 -> 5 year extension when the installer registers the install, but that text is written for air-to-water heat pumps; the July 2025 residential end-user policy (third-party hosted copy) says installer registers on Stand By Me within 90 days of commissioning, customer activates within 24 months, annual maintenance required. UK retailer claims vary: some list Daikin splits with a '3 years manufacturer's parts warranty' (e.g. Rimy, FTXF35E/RXF35E), but Air Conditioning World lists FTXM25R/RXM25R9 with a 5-year manufacturer parts warranty (https://www.airconditioningworld.co.uk/daikin-ftxm25r-rxm25r9-2-5kw-, search extract recorded in docs/research/data/equipment-prices.json, not live-verified). Confirm the air-to-air terms and the Certified Installer route with Daikin UK before quoting customers.",
+      "sources": [
+        {
+          "url": "https://energylabel.daikin.eu/eu/en_US/lot10/jcr:content/root/services.json/lot10/energylabel/pdf?product=FTXF25F5V1B+/+RXF25F5V1B",
+          "title": "Daikin Lot 10 energy label FTXF25F5V1B / RXF25F5V1B (created 03.12.2025)"
+        },
+        {
+          "url": "https://www.daikin.eu/en_us/products/product.table.html/FTXF-F---RXF-F.html",
+          "title": "Daikin EU - Specifications table FTXF-F / RXF-F"
+        },
+        {
+          "url": "https://www.daikin.eu/en_us/products/product.table.html/FTXF-F.html",
+          "title": "Daikin EU - Specifications table FTXF-F (indoor)"
+        },
+        {
+          "url": "https://www.daikin.es/content/dam/MDM/TechnicalDrawings/Split/ATXF-F_ATXF-G_CTXF-F_FTXF-F/LV/ATXF25F.FTXF25F_spres_3D108790A_ES.pdf",
+          "title": "Daikin technical drawing ATXF25F/FTXF25F sound pressure"
+        },
+        {
+          "url": "https://www.daikin.es/content/dam/document-library/Installer-reference-guide/ac/split/rxf-f/RXF20-42F_Installer%20reference%20guide_4PES769827-15G_Spanish.pdf",
+          "title": "Daikin RXF20-42F installer reference guide (Spanish, 4PES769827-15G)"
+        },
+        {
+          "url": "https://www.daikin.co.uk/en_gb/products/product.html/FTXF-F.html",
+          "title": "Daikin UK - FTXF-F product page"
+        },
+        {
+          "url": "https://www.oceanairuk.com/products/daikin-sensira-ftxf25f-wall-mount-split-air-conditioner-indoor-unit-white-2-5kw",
+          "title": "Ocean Air UK - Daikin Sensira FTXF25F (retailer)"
+        },
+        {
+          "url": "https://micro-climate.co.uk/daikin-sensira-ftxf25f-rxf25f-2-5kw",
+          "title": "Micro-Climate (London installer) - Daikin Sensira FTXF25F RXF25F"
+        },
+        {
+          "url": "https://www.daikin.co.uk/en_gb/installers/support/warranty.html",
+          "title": "Daikin UK - Installer warranty page"
+        },
+        {
+          "url": "https://www.daikin.co.uk/en_gb/residential/services/warranty.html",
+          "title": "Daikin UK - Residential product warranty page"
+        },
+        {
+          "url": "https://discoveryhomesltd.uk/wp-content/uploads/2026/02/Daikin-UK-Residential-End-User-Warranty-Policy_July-2025_Final.pdf",
+          "title": "Daikin UK Residential End-User Warranty Policy July 2025 (third-party hosted copy)"
+        }
+      ],
+      "confidence": "verified",
+      "notes": "Current UK Sensira generation is FTXF-F/RXF-F (Daikin UK FTXF-F page; energy label created 03.12.2025). Capacities are nominal (cooling 1.3/2.5/2.8 kW min/nom/max, heating 1.3/2.8/3.7 kW). Energy label: cooling A++, heating A+ (average climate), Pdesignc 2.50 kW, 135 kWh/a. Sound pressure cooling silent/low/med/high 20/26/33/40 dB(A); indoor sound power 54 dB(A) cooling / 55 heating. Pipe sizes from the RXF20-42F installer guide (1/4in & 3/8in). Some retailers quote SCOP 4.11 (older FTXF-E/D test basis) - use Daikin's 4.2. Multi-split: no Daikin FTXF-F + MXM combination table found; Sensira multi uses CTXF-F indoors with 2MXF/3MXF outdoors (not catalogued). All figures were read from search-engine extracts of the cited Daikin pages/PDFs (direct page fetch was DNS-blocked in the research sandbox); spot-check against the PDF before quoting. fact-check (2026-10-18): Wi-Fi 'built in on UK stock' is contested by a UK retailer (Basildon ACR, 'wifi-optional'); not confirmed either way."
+    },
+    {
+      "kind": "outdoor",
+      "manufacturer": "Daikin",
+      "series": "Sensira (RXF-F)",
+      "model": "RXF25F5V1B",
+      "label": "Daikin Sensira 2.5 kW outdoor",
+      "tier": "standard",
+      "multiSplitCapable": false,
+      "ports": 1,
+      "pairedWith": "FTXF25F5V1B",
+      "specs": {
+        "coolingKw": 2.5,
+        "heatingKw": 2.8,
+        "seer": 6.5,
+        "scop": 4.2,
+        "energyClassCooling": "A++",
+        "energyClassHeating": "A+",
+        "soundPressureLowDb": null,
+        "soundPressureHighDb": 46,
+        "soundPowerDb": 60,
+        "dimensionsMm": {
+          "w": 740,
+          "h": 556,
+          "d": 343
+        },
+        "weightKg": 24,
+        "refrigerant": "R32",
+        "liquidPipeMm": 6.4,
+        "gasPipeMm": 9.5,
+        "maxPipeM": 20,
+        "maxHeightDiffM": 12,
+        "prechargedPipeM": 10,
+        "additionalChargeGPerM": 20,
+        "powerSupply": "1~ 220-240 V 50 Hz (per Daikin RXF25F capacity-table drawing title)",
+        "recommendedBreakerA": null,
+        "wifi": null,
+        "operatingRangeCoolingC": "-10 to 48 (deg C DB ambient)",
+        "operatingRangeHeatingC": "-15 to 18 (deg C WB ambient)"
+      },
+      "warranty": "NOT confirmed for residential air-to-air splits. Daikin UK installer warranty page: standard commercial warranty 'typically 1 or 3 years depending on product type'; Daikin UK Certified Installers 'up to 5 years on AC equipment'; D1/D1+ partners 'up to 7 years on AC equipment' (exact terms behind the Daikin Partner Portal). Daikin UK residential Stand By Me pages describe a free 2 -> 5 year extension when the installer registers the install, but that text is written for air-to-water heat pumps; the July 2025 residential end-user policy (third-party hosted copy) says installer registers on Stand By Me within 90 days of commissioning, customer activates within 24 months, annual maintenance required. UK retailer claims vary: some list Daikin splits with a '3 years manufacturer's parts warranty' (e.g. Rimy, FTXF35E/RXF35E), but Air Conditioning World lists FTXM25R/RXM25R9 with a 5-year manufacturer parts warranty (https://www.airconditioningworld.co.uk/daikin-ftxm25r-rxm25r9-2-5kw-, search extract recorded in docs/research/data/equipment-prices.json, not live-verified). Confirm the air-to-air terms and the Certified Installer route with Daikin UK before quoting customers.",
+      "sources": [
+        {
+          "url": "https://www.daikin.co.uk/en_gb/products/product.table.html/RXF-F.html",
+          "title": "Daikin UK - Specifications table RXF-F"
+        },
+        {
+          "url": "https://www.daikin.es/en_us/products/product.table.html/RXF-F.html",
+          "title": "Daikin ES (EN) - Specifications table RXF-F"
+        },
+        {
+          "url": "https://www.daikin.eu/en_us/products/product.table.html/FTXF-F---RXF-F.html",
+          "title": "Daikin EU - Specifications table FTXF-F / RXF-F"
+        },
+        {
+          "url": "https://energylabel.daikin.eu/eu/en_US/lot10/jcr:content/root/services.json/lot10/energylabel/pdf?product=FTXF25F5V1B+/+RXF25F5V1B",
+          "title": "Daikin Lot 10 energy label FTXF25F5V1B / RXF25F5V1B (created 03.12.2025)"
+        },
+        {
+          "url": "https://www.daikin.es/content/dam/document-library/Installer-reference-guide/ac/split/rxf-f/RXF20-42F_Installer%20reference%20guide_4PES769827-15G_Spanish.pdf",
+          "title": "Daikin RXF20-42F installer reference guide (Spanish, 4PES769827-15G)"
+        },
+        {
+          "url": "https://www.daikin.es/content/dam/MDM/TechnicalDrawings/Split/ARXF-F_RXF-F/EN/RXF25F_capcoolheat_4D153057_EN.pdf",
+          "title": "Daikin technical drawing FTXF25F / RXF25F capacity tables (50Hz 220-240V)"
+        },
+        {
+          "url": "https://www.daikin.co.uk/en_gb/installers/support/warranty.html",
+          "title": "Daikin UK - Installer warranty page"
+        },
+        {
+          "url": "https://www.daikin.co.uk/en_gb/residential/services/warranty.html",
+          "title": "Daikin UK - Residential product warranty page"
+        },
+        {
+          "url": "https://discoveryhomesltd.uk/wp-content/uploads/2026/02/Daikin-UK-Residential-End-User-Warranty-Policy_July-2025_Final.pdf",
+          "title": "Daikin UK Residential End-User Warranty Policy July 2025 (third-party hosted copy)"
+        }
+      ],
+      "confidence": "verified",
+      "notes": "Daikin UK RXF-F table: 556x740x343 mm (HxWxD), 24 kg, max pipe 20 m, max level difference 12 m; factory charge 0.42 kg R32. Minimum pipe 1.5 m (installer guide). Additional charge = (liquid length - 10 m) x 0.020 kg (installer guide), i.e. chargeless to 10 m. Sound pressure 46 dB(A) cooling / 47 heating (high). soundPowerDb=60 is the outdoor sound-power value read from the Lot 10 label PDF text (unlabelled in the extract; inferred to be outdoor because indoor value 54 matches the indoor table) - treat as provisional. Some retailers list 658x550x275 mm / 28 kg - that appears to be the older RXF-D/E casing. Breaker size not found. All figures were read from search-engine extracts of the cited Daikin pages/PDFs (direct page fetch was DNS-blocked in the research sandbox); spot-check against the PDF before quoting."
+    },
+    {
+      "kind": "indoor",
+      "manufacturer": "Daikin",
+      "series": "Sensira (FTXF-F)",
+      "model": "FTXF35F5V1B",
+      "label": "Daikin Sensira 3.5 kW",
+      "tier": "standard",
+      "multiSplitCapable": false,
+      "ports": null,
+      "pairedWith": "RXF35F5V1B",
+      "specs": {
+        "coolingKw": 3.3,
+        "heatingKw": 3.5,
+        "seer": 6.5,
+        "scop": 4.2,
+        "energyClassCooling": "A++",
+        "energyClassHeating": "A+",
+        "soundPressureLowDb": 20,
+        "soundPressureHighDb": 43,
+        "soundPowerDb": null,
+        "dimensionsMm": {
+          "w": 770,
+          "h": 286,
+          "d": 225
+        },
+        "weightKg": null,
+        "refrigerant": "R32",
+        "liquidPipeMm": 6.4,
+        "gasPipeMm": 9.5,
+        "maxPipeM": null,
+        "maxHeightDiffM": null,
+        "prechargedPipeM": null,
+        "additionalChargeGPerM": null,
+        "powerSupply": null,
+        "recommendedBreakerA": null,
+        "wifi": "Onecta app Wi-Fi. UK retailers disagree: Ocean Air and Micro-Climate say built-in as standard on FTXF-F, but Basildon ACR (UK) lists Sensira systems as 'Wi-Fi optional' (URL slugs .../ftxf35d-rxf35d-...-wifi-optional/ and .../ftxf50d-rxf50d-...-wifi-optional/, which name the older D generation); a French retailer lists an optional adapter. Confirm on the UK spec sheet and budget for an adapter until confirmed",
+        "operatingRangeCoolingC": null,
+        "operatingRangeHeatingC": null
+      },
+      "warranty": "NOT confirmed for residential air-to-air splits. Daikin UK installer warranty page: standard commercial warranty 'typically 1 or 3 years depending on product type'; Daikin UK Certified Installers 'up to 5 years on AC equipment'; D1/D1+ partners 'up to 7 years on AC equipment' (exact terms behind the Daikin Partner Portal). Daikin UK residential Stand By Me pages describe a free 2 -> 5 year extension when the installer registers the install, but that text is written for air-to-water heat pumps; the July 2025 residential end-user policy (third-party hosted copy) says installer registers on Stand By Me within 90 days of commissioning, customer activates within 24 months, annual maintenance required. UK retailer claims vary: some list Daikin splits with a '3 years manufacturer's parts warranty' (e.g. Rimy, FTXF35E/RXF35E), but Air Conditioning World lists FTXM25R/RXM25R9 with a 5-year manufacturer parts warranty (https://www.airconditioningworld.co.uk/daikin-ftxm25r-rxm25r9-2-5kw-, search extract recorded in docs/research/data/equipment-prices.json, not live-verified). Confirm the air-to-air terms and the Certified Installer route with Daikin UK before quoting customers.",
+      "sources": [
+        {
+          "url": "https://energylabel.daikin.eu/eu/en_US/lot10/jcr:content/root/services.json/lot10/energylabel/pdf?product=FTXF35F5V1B+/+RXF35F5V1B",
+          "title": "Daikin Lot 10 energy label FTXF35F5V1B / RXF35F5V1B (created 13.03.2026)"
+        },
+        {
+          "url": "https://www.daikin.eu/en_us/products/product.table.html/FTXF-F---RXF-F.html",
+          "title": "Daikin EU - Specifications table FTXF-F / RXF-F"
+        },
+        {
+          "url": "https://www.daikin.es/en_us/products/product.table.html/FTXF-F---RXF-F.html",
+          "title": "Daikin ES (EN) - Specifications table FTXF-F / RXF-F"
+        },
+        {
+          "url": "https://www.oceanairuk.com/cdn/shop/files/RXF-F_Data_Book_EEDEN25A_English.pdf",
+          "title": "Daikin RXF-F Data Book EEDEN25A (hosted by UK distributor Ocean Air)"
+        },
+        {
+          "url": "https://www.daikin.eu/en_us/products/product.table.html/FTXF-F.html",
+          "title": "Daikin EU - Specifications table FTXF-F (indoor)"
+        },
+        {
+          "url": "https://www.daikin.es/content/dam/document-library/Installer-reference-guide/ac/split/rxf-f/RXF20-42F_Installer%20reference%20guide_4PES769827-15G_Spanish.pdf",
+          "title": "Daikin RXF20-42F installer reference guide (Spanish, 4PES769827-15G)"
+        },
+        {
+          "url": "https://www.daikin.co.uk/en_gb/installers/support/warranty.html",
+          "title": "Daikin UK - Installer warranty page"
+        },
+        {
+          "url": "https://www.daikin.co.uk/en_gb/residential/services/warranty.html",
+          "title": "Daikin UK - Residential product warranty page"
+        },
+        {
+          "url": "https://discoveryhomesltd.uk/wp-content/uploads/2026/02/Daikin-UK-Residential-End-User-Warranty-Policy_July-2025_Final.pdf",
+          "title": "Daikin UK Residential End-User Warranty Policy July 2025 (third-party hosted copy)"
+        },
+        {
+          "url": "https://www.basildonacr.co.uk/product/daikin-sensira-air-conditioning-ftxf35d-rxf35d-3-5kw-12000btu-wall-mounted-wifi-optional/",
+          "title": "Basildon ACR - Daikin Sensira 3.5 kW listing, 'Wi-Fi optional' (retailer; URL names FTXF35D/RXF35D)"
+        }
+      ],
+      "confidence": "provisional",
+      "notes": "Energy label (13.03.2026): cooling A++, heating A+, Pdesignc 3.50 kW, SEER 6.50, 188 kWh/a. Daikin EU table and RXF-F data book give NOMINAL cooling 1.3/3.3/3.8 kW and heating 1.3/3.5/4.4 kW (data book lists heating min 1.43 kW) - so 'coolingKw' is the 3.3 kW nominal, while the rated/label design capacity is 3.5 kW; retailers round to 3.5/4.0 kW. Sound pressure cooling silent/low/med/high 20/27/34/43 dB(A); heating high 40; sound power 54 cooling / 56 heating. Indoor weight: FTXF-F 20-50 class listed at about 8-9 kg - exact 35 value not isolated. Not MXM multi-connectable (see FTXF25F note). All figures were read from search-engine extracts of the cited Daikin pages/PDFs (direct page fetch was DNS-blocked in the research sandbox); spot-check against the PDF before quoting. fact-check (2026-10-18): Wi-Fi 'built in on UK stock' is contested by a UK retailer (Basildon ACR, 'wifi-optional'); not confirmed either way."
+    },
+    {
+      "kind": "outdoor",
+      "manufacturer": "Daikin",
+      "series": "Sensira (RXF-F)",
+      "model": "RXF35F5V1B",
+      "label": "Daikin Sensira 3.5 kW outdoor",
+      "tier": "standard",
+      "multiSplitCapable": false,
+      "ports": 1,
+      "pairedWith": "FTXF35F5V1B",
+      "specs": {
+        "coolingKw": 3.3,
+        "heatingKw": 3.5,
+        "seer": 6.5,
+        "scop": 4.2,
+        "energyClassCooling": "A++",
+        "energyClassHeating": "A+",
+        "soundPressureLowDb": null,
+        "soundPressureHighDb": 48,
+        "soundPowerDb": null,
+        "dimensionsMm": {
+          "w": 740,
+          "h": 556,
+          "d": 343
+        },
+        "weightKg": 24,
+        "refrigerant": "R32",
+        "liquidPipeMm": 6.4,
+        "gasPipeMm": 9.5,
+        "maxPipeM": 20,
+        "maxHeightDiffM": 12,
+        "prechargedPipeM": 10,
+        "additionalChargeGPerM": 20,
+        "powerSupply": "1~ 220-240 V 50 Hz (RXF-F 'V1' variant; electrical data drawing not retrieved)",
+        "recommendedBreakerA": null,
+        "wifi": null,
+        "operatingRangeCoolingC": "-10 to 48 (deg C DB ambient)",
+        "operatingRangeHeatingC": "-15 to 18 (deg C WB ambient)"
+      },
+      "warranty": "NOT confirmed for residential air-to-air splits. Daikin UK installer warranty page: standard commercial warranty 'typically 1 or 3 years depending on product type'; Daikin UK Certified Installers 'up to 5 years on AC equipment'; D1/D1+ partners 'up to 7 years on AC equipment' (exact terms behind the Daikin Partner Portal). Daikin UK residential Stand By Me pages describe a free 2 -> 5 year extension when the installer registers the install, but that text is written for air-to-water heat pumps; the July 2025 residential end-user policy (third-party hosted copy) says installer registers on Stand By Me within 90 days of commissioning, customer activates within 24 months, annual maintenance required. UK retailer claims vary: some list Daikin splits with a '3 years manufacturer's parts warranty' (e.g. Rimy, FTXF35E/RXF35E), but Air Conditioning World lists FTXM25R/RXM25R9 with a 5-year manufacturer parts warranty (https://www.airconditioningworld.co.uk/daikin-ftxm25r-rxm25r9-2-5kw-, search extract recorded in docs/research/data/equipment-prices.json, not live-verified). Confirm the air-to-air terms and the Certified Installer route with Daikin UK before quoting customers.",
+      "sources": [
+        {
+          "url": "https://www.daikin.co.uk/en_gb/products/product.table.html/RXF-F.html",
+          "title": "Daikin UK - Specifications table RXF-F"
+        },
+        {
+          "url": "https://www.daikin.es/en_us/products/product.table.html/RXF-F.html",
+          "title": "Daikin ES (EN) - Specifications table RXF-F"
+        },
+        {
+          "url": "https://www.daikin.eu/en_us/products/product.table.html/FTXF-F---RXF-F.html",
+          "title": "Daikin EU - Specifications table FTXF-F / RXF-F"
+        },
+        {
+          "url": "https://energylabel.daikin.eu/eu/en_US/lot10/jcr:content/root/services.json/lot10/energylabel/pdf?product=FTXF35F5V1B+/+RXF35F5V1B",
+          "title": "Daikin Lot 10 energy label FTXF35F5V1B / RXF35F5V1B (created 13.03.2026)"
+        },
+        {
+          "url": "https://www.daikin.es/content/dam/document-library/Installer-reference-guide/ac/split/rxf-f/RXF20-42F_Installer%20reference%20guide_4PES769827-15G_Spanish.pdf",
+          "title": "Daikin RXF20-42F installer reference guide (Spanish, 4PES769827-15G)"
+        },
+        {
+          "url": "https://www.daikin.co.uk/en_gb/installers/support/warranty.html",
+          "title": "Daikin UK - Installer warranty page"
+        },
+        {
+          "url": "https://www.daikin.co.uk/en_gb/residential/services/warranty.html",
+          "title": "Daikin UK - Residential product warranty page"
+        },
+        {
+          "url": "https://discoveryhomesltd.uk/wp-content/uploads/2026/02/Daikin-UK-Residential-End-User-Warranty-Policy_July-2025_Final.pdf",
+          "title": "Daikin UK Residential End-User Warranty Policy July 2025 (third-party hosted copy)"
+        }
+      ],
+      "confidence": "verified",
+      "notes": "Same casing as RXF25F per Daikin UK RXF-F table (556x740x343 mm, 24 kg, 20 m / 12 m). Factory charge CONFLICT: Daikin UK table 0.55 kg vs Daikin ES table 0.500 kg. Sound pressure 48 dB(A) cooling and heating (high). Chargeless to 10 m, then 20 g/m. Capacity: nominal 3.3 kW cooling / 3.5 kW heating; label design capacity 3.5 kW. All figures were read from search-engine extracts of the cited Daikin pages/PDFs (direct page fetch was DNS-blocked in the research sandbox); spot-check against the PDF before quoting."
+    },
+    {
+      "kind": "indoor",
+      "manufacturer": "Daikin",
+      "series": "Sensira (FTXF-F)",
+      "model": "FTXF50F5V1B",
+      "label": "Daikin Sensira 5.0 kW",
+      "tier": "standard",
+      "multiSplitCapable": false,
+      "ports": null,
+      "pairedWith": "RXF50F5V1B",
+      "specs": {
+        "coolingKw": 5.0,
+        "heatingKw": 5.4,
+        "seer": 6.5,
+        "scop": 4.1,
+        "energyClassCooling": "A++",
+        "energyClassHeating": "A+",
+        "soundPressureLowDb": 31,
+        "soundPressureHighDb": 45,
+        "soundPowerDb": null,
+        "dimensionsMm": {
+          "w": 770,
+          "h": 286,
+          "d": 225
+        },
+        "weightKg": 9,
+        "refrigerant": "R32",
+        "liquidPipeMm": 6.4,
+        "gasPipeMm": 12.7,
+        "maxPipeM": null,
+        "maxHeightDiffM": null,
+        "prechargedPipeM": null,
+        "additionalChargeGPerM": null,
+        "powerSupply": null,
+        "recommendedBreakerA": null,
+        "wifi": "Onecta app Wi-Fi. UK retailers disagree: Ocean Air and Micro-Climate say built-in as standard on FTXF-F, but Basildon ACR (UK) lists Sensira systems as 'Wi-Fi optional' (URL slugs .../ftxf35d-rxf35d-...-wifi-optional/ and .../ftxf50d-rxf50d-...-wifi-optional/, which name the older D generation); a French retailer lists an optional adapter. Confirm on the UK spec sheet and budget for an adapter until confirmed",
+        "operatingRangeCoolingC": null,
+        "operatingRangeHeatingC": null
+      },
+      "warranty": "NOT confirmed for residential air-to-air splits. Daikin UK installer warranty page: standard commercial warranty 'typically 1 or 3 years depending on product type'; Daikin UK Certified Installers 'up to 5 years on AC equipment'; D1/D1+ partners 'up to 7 years on AC equipment' (exact terms behind the Daikin Partner Portal). Daikin UK residential Stand By Me pages describe a free 2 -> 5 year extension when the installer registers the install, but that text is written for air-to-water heat pumps; the July 2025 residential end-user policy (third-party hosted copy) says installer registers on Stand By Me within 90 days of commissioning, customer activates within 24 months, annual maintenance required. UK retailer claims vary: some list Daikin splits with a '3 years manufacturer's parts warranty' (e.g. Rimy, FTXF35E/RXF35E), but Air Conditioning World lists FTXM25R/RXM25R9 with a 5-year manufacturer parts warranty (https://www.airconditioningworld.co.uk/daikin-ftxm25r-rxm25r9-2-5kw-, search extract recorded in docs/research/data/equipment-prices.json, not live-verified). Confirm the air-to-air terms and the Certified Installer route with Daikin UK before quoting customers.",
+      "sources": [
+        {
+          "url": "https://www.daikin.eu/en_us/products/product.table.html/FTXF-F---RXF-F.html",
+          "title": "Daikin EU - Specifications table FTXF-F / RXF-F"
+        },
+        {
+          "url": "https://www.daikin.es/en_us/products/product.table.html/FTXF-F---RXF-F.html",
+          "title": "Daikin ES (EN) - Specifications table FTXF-F / RXF-F"
+        },
+        {
+          "url": "https://www.daikin.eu/en_us/products/product.table.html/FTXF-F.html",
+          "title": "Daikin EU - Specifications table FTXF-F (indoor)"
+        },
+        {
+          "url": "https://www.daikin.eu/content/dam/document-library/installation-manuals/ac/split/ftxf-f/FTXF50F_Installation%20manual_3PEN748643-13M_English.pdf",
+          "title": "Daikin FTXF50F installation manual (3PEN748643-13M)"
+        },
+        {
+          "url": "https://my.daikin.eu/content/dam/b2c/south-africa/dasa-pdf/new/FTXF-F_Data%20books_EEDEN25A_English.pdf/_jcr_content/renditions/original./FTXF-F_Data%20books_EEDEN25A_English.pdf",
+          "title": "Daikin FTXF-F Data book EEDEN25A"
+        },
+        {
+          "url": "https://www.cityplumbing.co.uk/p/daikin-sensira-5-0kw-outdoor-unit-rxf50f/p/296079",
+          "title": "City Plumbing UK - Daikin Sensira 5.0kW outdoor RXF50F (retailer)"
+        },
+        {
+          "url": "https://www.basildonacr.co.uk/product/daikin-sensira-wall-mounted-air-conditioning-ftxf50d-rxf50d-5-0kw-18000btu-a-inverter-wifi-optional/",
+          "title": "Basildon ACR - Daikin Sensira 5.0 kW listing (retailer; URL names FTXF50D/RXF50D and 'wifi-optional', extract title named FTXF50F/RXF50F)"
+        },
+        {
+          "url": "https://www.daikin.co.uk/en_gb/installers/support/warranty.html",
+          "title": "Daikin UK - Installer warranty page"
+        },
+        {
+          "url": "https://www.daikin.co.uk/en_gb/residential/services/warranty.html",
+          "title": "Daikin UK - Residential product warranty page"
+        },
+        {
+          "url": "https://discoveryhomesltd.uk/wp-content/uploads/2026/02/Daikin-UK-Residential-End-User-Warranty-Policy_July-2025_Final.pdf",
+          "title": "Daikin UK Residential End-User Warranty Policy July 2025 (third-party hosted copy)"
+        }
+      ],
+      "confidence": "provisional",
+      "notes": "Daikin FTXF-F/RXF-F table: cooling nominal 5.0 kW (max 5.3), heating nominal 5.4 kW (max 6.13), EER 3.30, COP 3.71, SEER 6.50, SCOP 4.10, 269 kWh/a cooling. No Lot 10 label for this exact pair was found in search, so energy classes are derived from the EU 626/2011 thresholds (SEER 6.1-8.5 = A++; SCOP 4.0-4.6 = A+), not read from a label. Sound pressure cooling silent/low/med/high 31/34/39/45 dB(A); sound power 59. Daikin tables put the 50 in the same 286x770x225 mm body as the 20-42 classes (9 kg) - surprising, so check before planning a wall position. Pipe 1/4in liquid, 1/2in gas (FTXF50F installation manual). Retail seen in UK: City Plumbing (RXF50F), Basildon ACR (pair ~GBP 830 inc VAT - generation doubtful, see fact-check). Some retailers still quote the older FTXF50D/RXF50D (SEER 6.21) - different model. All figures were read from search-engine extracts of the cited Daikin pages/PDFs (direct page fetch was DNS-blocked in the research sandbox); spot-check against the PDF before quoting. fact-check (2026-10-18): Wi-Fi 'built in on UK stock' is contested by a UK retailer (Basildon ACR, 'wifi-optional'); not confirmed either way. fact-check (2026-10-18): the Basildon ACR URL cited for the ~GBP 830 pair price is '.../ftxf50d-rxf50d-5-0kw-...-wifi-optional/', i.e. the older FTXF50D/RXF50D that this record says is a different model, so the price may not apply to FTXF50F/RXF50F. City Plumbing's RXF50F ~GBP 820 has no stated VAT basis. Use neither as an F-generation trade price."
+    },
+    {
+      "kind": "outdoor",
+      "manufacturer": "Daikin",
+      "series": "Sensira (RXF-F)",
+      "model": "RXF50F5V1B",
+      "label": "Daikin Sensira 5.0 kW outdoor",
+      "tier": "standard",
+      "multiSplitCapable": false,
+      "ports": 1,
+      "pairedWith": "FTXF50F5V1B",
+      "specs": {
+        "coolingKw": 5.0,
+        "heatingKw": 5.4,
+        "seer": 6.5,
+        "scop": 4.1,
+        "energyClassCooling": "A++",
+        "energyClassHeating": "A+",
+        "soundPressureLowDb": null,
+        "soundPressureHighDb": 48,
+        "soundPowerDb": null,
+        "dimensionsMm": {
+          "w": 923,
+          "h": 610,
+          "d": 367
+        },
+        "weightKg": 40,
+        "refrigerant": "R32",
+        "liquidPipeMm": 6.4,
+        "gasPipeMm": 12.7,
+        "maxPipeM": 30,
+        "maxHeightDiffM": 20,
+        "prechargedPipeM": 10,
+        "additionalChargeGPerM": 20,
+        "powerSupply": "1~ 220-240 V 50 Hz (RXF-F 'V1' variant; electrical data drawing not retrieved)",
+        "recommendedBreakerA": null,
+        "wifi": null,
+        "operatingRangeCoolingC": "-10 to 48 (deg C DB ambient)",
+        "operatingRangeHeatingC": "-15 to 18 (deg C WB ambient)"
+      },
+      "warranty": "NOT confirmed for residential air-to-air splits. Daikin UK installer warranty page: standard commercial warranty 'typically 1 or 3 years depending on product type'; Daikin UK Certified Installers 'up to 5 years on AC equipment'; D1/D1+ partners 'up to 7 years on AC equipment' (exact terms behind the Daikin Partner Portal). Daikin UK residential Stand By Me pages describe a free 2 -> 5 year extension when the installer registers the install, but that text is written for air-to-water heat pumps; the July 2025 residential end-user policy (third-party hosted copy) says installer registers on Stand By Me within 90 days of commissioning, customer activates within 24 months, annual maintenance required. UK retailer claims vary: some list Daikin splits with a '3 years manufacturer's parts warranty' (e.g. Rimy, FTXF35E/RXF35E), but Air Conditioning World lists FTXM25R/RXM25R9 with a 5-year manufacturer parts warranty (https://www.airconditioningworld.co.uk/daikin-ftxm25r-rxm25r9-2-5kw-, search extract recorded in docs/research/data/equipment-prices.json, not live-verified). Confirm the air-to-air terms and the Certified Installer route with Daikin UK before quoting customers.",
+      "sources": [
+        {
+          "url": "https://www.daikin.es/en_us/products/product.table.html/RXF-F.html",
+          "title": "Daikin ES (EN) - Specifications table RXF-F"
+        },
+        {
+          "url": "https://www.daikin.es/content/dam/document-library/installation-manuals/ac/split/rxf-f/RXF50F_Installation%20manual_3PEN748643-17H_English.pdf",
+          "title": "Daikin RXF50F installation manual (3PEN748643-17H)"
+        },
+        {
+          "url": "https://www.daikin.eu/content/dam/document-library/installation-manuals/ac/split/ftxf-f/FTXF50F_Installation%20manual_3PEN748643-13M_English.pdf",
+          "title": "Daikin FTXF50F installation manual (3PEN748643-13M)"
+        },
+        {
+          "url": "https://www.daikin.eu/en_us/products/product.table.html/FTXF-F---RXF-F.html",
+          "title": "Daikin EU - Specifications table FTXF-F / RXF-F"
+        },
+        {
+          "url": "https://www.cityplumbing.co.uk/p/daikin-sensira-5-0kw-outdoor-unit-rxf50f/p/296079",
+          "title": "City Plumbing UK - Daikin Sensira 5.0kW outdoor RXF50F (retailer)"
+        },
+        {
+          "url": "https://www.climatico.ro/aparat-de-aer-conditionat-daikin-sensira-bluevolution-ftxf50f-rxf50f-inverter-18000-btu.html",
+          "title": "Climatico (RO retailer) - FTXF50F/RXF50F"
+        },
+        {
+          "url": "https://www.daikin.co.uk/en_gb/installers/support/warranty.html",
+          "title": "Daikin UK - Installer warranty page"
+        },
+        {
+          "url": "https://www.daikin.co.uk/en_gb/residential/services/warranty.html",
+          "title": "Daikin UK - Residential product warranty page"
+        },
+        {
+          "url": "https://discoveryhomesltd.uk/wp-content/uploads/2026/02/Daikin-UK-Residential-End-User-Warranty-Policy_July-2025_Final.pdf",
+          "title": "Daikin UK Residential End-User Warranty Policy July 2025 (third-party hosted copy)"
+        }
+      ],
+      "confidence": "verified",
+      "notes": "Daikin RXF-F table: 610x923x367 mm (HxWxD), 40 kg, factory charge 0.80 kg R32, max pipe 30 m, max level difference 20 m, 0.02 kg/m beyond 10 m; RXF50F installation manual confirms 30 m / 20 m, min 1.5 m and the (L-10) x 0.020 kg formula. Sound pressure 48 dB(A) cooling / 49 heating (high). Energy classes derived from thresholds (see FTXF50F). City Plumbing UK lists RXF50F at about GBP 820 (VAT basis not stated in the extract - fact-check 2026-10-18). All figures were read from search-engine extracts of the cited Daikin pages/PDFs (direct page fetch was DNS-blocked in the research sandbox); spot-check against the PDF before quoting."
+    },
+    {
+      "kind": "indoor",
+      "manufacturer": "Daikin",
+      "series": "Perfera wall (FTXM-A)",
+      "model": "FTXM25A5V1B",
+      "label": "Daikin Perfera 2.5 kW",
+      "tier": "premium",
+      "multiSplitCapable": true,
+      "ports": null,
+      "pairedWith": "RXM25A5V1B9",
+      "specs": {
+        "coolingKw": 2.5,
+        "heatingKw": 2.8,
+        "seer": 9.47,
+        "scop": 5.2,
+        "energyClassCooling": "A+++",
+        "energyClassHeating": "A+++",
+        "soundPressureLowDb": 19,
+        "soundPressureHighDb": 45,
+        "soundPowerDb": null,
+        "dimensionsMm": {
+          "w": 804,
+          "h": 298,
+          "d": 252
+        },
+        "weightKg": 11.5,
+        "refrigerant": "R32",
+        "liquidPipeMm": 6.4,
+        "gasPipeMm": 9.5,
+        "maxPipeM": null,
+        "maxHeightDiffM": null,
+        "prechargedPipeM": null,
+        "additionalChargeGPerM": null,
+        "powerSupply": null,
+        "recommendedBreakerA": null,
+        "wifi": "Built-in Wi-Fi, Daikin Onecta app (Daikin flyer 'Onecta via app'; UK retailers state built-in adaptor)",
+        "operatingRangeCoolingC": null,
+        "operatingRangeHeatingC": null
+      },
+      "warranty": "NOT confirmed for residential air-to-air splits. Daikin UK installer warranty page: standard commercial warranty 'typically 1 or 3 years depending on product type'; Daikin UK Certified Installers 'up to 5 years on AC equipment'; D1/D1+ partners 'up to 7 years on AC equipment' (exact terms behind the Daikin Partner Portal). Daikin UK residential Stand By Me pages describe a free 2 -> 5 year extension when the installer registers the install, but that text is written for air-to-water heat pumps; the July 2025 residential end-user policy (third-party hosted copy) says installer registers on Stand By Me within 90 days of commissioning, customer activates within 24 months, annual maintenance required. UK retailer claims vary: some list Daikin splits with a '3 years manufacturer's parts warranty' (e.g. Rimy, FTXF35E/RXF35E), but Air Conditioning World lists FTXM25R/RXM25R9 with a 5-year manufacturer parts warranty (https://www.airconditioningworld.co.uk/daikin-ftxm25r-rxm25r9-2-5kw-, search extract recorded in docs/research/data/equipment-prices.json, not live-verified). Confirm the air-to-air terms and the Certified Installer route with Daikin UK before quoting customers.",
+      "sources": [
+        {
+          "url": "https://energylabel.daikin.eu/eu/en_US/lot10/jcr:content/root/services.json/lot10/energylabel/pdf?product=FTXM25A5V1B+/+RXM25A5V1B9",
+          "title": "Daikin Lot 10 energy label FTXM25A5V1B / RXM25A5V1B9 (created 03.11.2025)"
+        },
+        {
+          "url": "https://www.daikin.eu/en_us/products/product.table.html/FTXM-A---RXM-A9.html",
+          "title": "Daikin EU - Specifications table FTXM-A / RXM-A9"
+        },
+        {
+          "url": "https://www.daikin.co.uk/content/internet/internet-uk/en_gb/products/product.table.html/FTXM-A.html",
+          "title": "Daikin UK - Specifications table FTXM-A (indoor)"
+        },
+        {
+          "url": "https://www.daikin.eu/en_us/products/product.table.html/FTXM-A.html",
+          "title": "Daikin EU - Specifications table FTXM-A (indoor)"
+        },
+        {
+          "url": "https://my.daikin.eu/content/dam/b2c/south-africa/dasa-pdf/new/FTXM-A_Data%20book_EEDEN24A_English.pdf/_jcr_content/renditions/original./FTXM-A_Data%20book_EEDEN24A_English.pdf",
+          "title": "Daikin FTXM-A Data book EEDEN24A"
+        },
+        {
+          "url": "https://www.daikin.eu/content/dam/document-library/catalogues/ac/split/ftxm-a/FTXM-A,%20RXM-A_Product%20flyer_ECPEN24-022_English.pdf",
+          "title": "Daikin FTXM-A + RXM-A product flyer ECPEN24-022 (multi model application, Onecta)"
+        },
+        {
+          "url": "https://www.daikin.co.uk/en_gb/products/product.html/FTXM-A.html",
+          "title": "Daikin UK - FTXM-A product page"
+        },
+        {
+          "url": "https://www.airconspares.com/products/daikin-perfera-2-5kw-9000-btu-wall-mounted-air-conditioning-system",
+          "title": "Aircon Spares UK - Daikin Perfera FTXM25A / RXM25A9 (retailer)"
+        },
+        {
+          "url": "https://www.cityplumbing.co.uk/p/daikin-perfera-indoor-unit-class-25-ftxm25a/p/138908",
+          "title": "City Plumbing UK - Daikin Perfera FTXM25A (retailer)"
+        },
+        {
+          "url": "https://www.daikin.co.uk/en_gb/installers/support/warranty.html",
+          "title": "Daikin UK - Installer warranty page"
+        },
+        {
+          "url": "https://www.daikin.co.uk/en_gb/residential/services/warranty.html",
+          "title": "Daikin UK - Residential product warranty page"
+        },
+        {
+          "url": "https://discoveryhomesltd.uk/wp-content/uploads/2026/02/Daikin-UK-Residential-End-User-Warranty-Policy_July-2025_Final.pdf",
+          "title": "Daikin UK Residential End-User Warranty Policy July 2025 (third-party hosted copy)"
+        }
+      ],
+      "confidence": "provisional",
+      "notes": "Energy label (03.11.2025): cooling A+++, heating A+++, Pdesignc 2.5 kW, SEER 9.47, 92 kWh/a. Daikin FTXM-A/RXM-A9 table: cooling 0.9/2.5/3.8 kW, heating 0.8/2.8/5.0 kW, EER 5.2, COP 5.0, SCOP 5.2. Dimensions 298x804x252 mm, 11.5 kg (Daikin UK table). Pipes 6.4/9.5 mm (data book, 20-35 class). Indoor sound power 54 dB(A). Sound pressure: 19 dB(A) silent is confirmed for the range; the 45 dB(A) 'high' comes from a flyer table whose columns could not be mapped with certainty (19/29/45 vs 19/25/41) - hence provisional. UK pairing seen as FTXM25A / RXM25A9 (Aircon Spares UK). Also sold paired with the non-'9' RXM25A5V1B (lower SEER; see FTXM-A/RXM-A table). Multi-split: Perfera FTXM-A is marketed for multi model application and appears in Daikin FTXM-A / 3MXM-A8 and /3MXM-A9 combination pages. All figures were read from search-engine extracts of the cited Daikin pages/PDFs (direct page fetch was DNS-blocked in the research sandbox); spot-check against the PDF before quoting."
+    },
+    {
+      "kind": "outdoor",
+      "manufacturer": "Daikin",
+      "series": "Perfera (RXM-A9)",
+      "model": "RXM25A5V1B9",
+      "label": "Daikin Perfera 2.5 kW outdoor",
+      "tier": "premium",
+      "multiSplitCapable": false,
+      "ports": 1,
+      "pairedWith": "FTXM25A5V1B",
+      "specs": {
+        "coolingKw": 2.5,
+        "heatingKw": 2.8,
+        "seer": 9.47,
+        "scop": 5.2,
+        "energyClassCooling": "A+++",
+        "energyClassHeating": "A+++",
+        "soundPressureLowDb": null,
+        "soundPressureHighDb": 46,
+        "soundPowerDb": 58,
+        "dimensionsMm": {
+          "w": 923,
+          "h": 610,
+          "d": 367
+        },
+        "weightKg": 36,
+        "refrigerant": "R32",
+        "liquidPipeMm": 6.4,
+        "gasPipeMm": 9.5,
+        "maxPipeM": 20,
+        "maxHeightDiffM": 15,
+        "prechargedPipeM": 10,
+        "additionalChargeGPerM": 20,
+        "powerSupply": "1~ 220-240 V 50 Hz (sibling RXM20-42A installation manual; A9 electrical drawing not retrieved)",
+        "recommendedBreakerA": null,
+        "wifi": null,
+        "operatingRangeCoolingC": "-10 to 50 (deg C DB ambient)",
+        "operatingRangeHeatingC": "-21 to 18 (deg C WB ambient); installer guide states -20 to 24 deg C DB"
+      },
+      "warranty": "NOT confirmed for residential air-to-air splits. Daikin UK installer warranty page: standard commercial warranty 'typically 1 or 3 years depending on product type'; Daikin UK Certified Installers 'up to 5 years on AC equipment'; D1/D1+ partners 'up to 7 years on AC equipment' (exact terms behind the Daikin Partner Portal). Daikin UK residential Stand By Me pages describe a free 2 -> 5 year extension when the installer registers the install, but that text is written for air-to-water heat pumps; the July 2025 residential end-user policy (third-party hosted copy) says installer registers on Stand By Me within 90 days of commissioning, customer activates within 24 months, annual maintenance required. UK retailer claims vary: some list Daikin splits with a '3 years manufacturer's parts warranty' (e.g. Rimy, FTXF35E/RXF35E), but Air Conditioning World lists FTXM25R/RXM25R9 with a 5-year manufacturer parts warranty (https://www.airconditioningworld.co.uk/daikin-ftxm25r-rxm25r9-2-5kw-, search extract recorded in docs/research/data/equipment-prices.json, not live-verified). Confirm the air-to-air terms and the Certified Installer route with Daikin UK before quoting customers.",
+      "sources": [
+        {
+          "url": "https://www.daikin.eu/en_us/products/product.table.html/RXM-A9.html",
+          "title": "Daikin EU - Specifications table RXM-A9"
+        },
+        {
+          "url": "https://www.daikin.eu/en_us/products/product.table.html/FTXM-A---RXM-A9.html",
+          "title": "Daikin EU - Specifications table FTXM-A / RXM-A9"
+        },
+        {
+          "url": "https://energylabel.daikin.eu/eu/en_US/lot10/jcr:content/root/services.json/lot10/energylabel/pdf?product=FTXM25A5V1B+/+RXM25A5V1B9",
+          "title": "Daikin Lot 10 energy label FTXM25A5V1B / RXM25A5V1B9 (created 03.11.2025)"
+        },
+        {
+          "url": "https://www.daikin.eu/content/dam/document-library/Installer-reference-guide/ac/split/arxm-a/ARXM25A.ARXM35A9.ARXM-A8.RXM(20.42)A.RXM(25.35)A9.RXM-A8.%20RXP-N8_Installer%20reference%20guide_4P769827-4C_English.pdf",
+          "title": "Daikin installer reference guide RXM(20-42)A / RXM(25,35)A9 / RXM-A8 (4P769827-4C)"
+        },
+        {
+          "url": "https://www.daikin.eu/content/dam/document-library/installation-manuals/ac/split/arxm-a/ARXM25-35A.RXM20-42A_Installation%20manual_3PEN645642-7N_English.pdf",
+          "title": "Daikin installation manual ARXM25-35A / RXM20-42A (3PEN645642-7N)"
+        },
+        {
+          "url": "https://www.heizungsdiscount24.de/klimaanlagen/daikin-rxm25a9-aussengeraet-fuer-monosplit-klimaanlage-25-kw-r32.html",
+          "title": "Heizungsdiscount24 (DE retailer) - Daikin RXM25A9"
+        },
+        {
+          "url": "https://www.airconspares.com/products/daikin-perfera-2-5kw-9000-btu-wall-mounted-air-conditioning-system",
+          "title": "Aircon Spares UK - Daikin Perfera FTXM25A / RXM25A9 (retailer)"
+        },
+        {
+          "url": "https://www.daikin.co.uk/en_gb/installers/support/warranty.html",
+          "title": "Daikin UK - Installer warranty page"
+        },
+        {
+          "url": "https://www.daikin.co.uk/en_gb/residential/services/warranty.html",
+          "title": "Daikin UK - Residential product warranty page"
+        },
+        {
+          "url": "https://discoveryhomesltd.uk/wp-content/uploads/2026/02/Daikin-UK-Residential-End-User-Warranty-Policy_July-2025_Final.pdf",
+          "title": "Daikin UK Residential End-User Warranty Policy July 2025 (third-party hosted copy)"
+        }
+      ],
+      "confidence": "provisional",
+      "notes": "Daikin RXM-A9 table: 610x923x367 mm (HxWxD), 36 kg (a German retailer also lists 36 kg), factory charge 0.95 kg R32 (extract also said 0.65 tCO2e - inconsistent, see fact-check), max pipe 20 m, max level difference 15 m, 0.02 kg/m beyond 10 m; min pipe 1.5 m (installer guide). Sound pressure 46 dB(A) cooling / 47 heating (nominal). soundPowerDb=58 read from the Lot 10 label text (unlabelled pair 54/58; 54 matches the indoor table) - provisional. Breaker: sibling RXM25-42A (non-A9) manual gives 13 A recommended breaker and a 16 A field fuse - not confirmed for A9, so left null. All figures were read from search-engine extracts of the cited Daikin pages/PDFs (direct page fetch was DNS-blocked in the research sandbox); spot-check against the PDF before quoting. fact-check (2026-10-18): refuted as written: at R32 GWP 675, 0.95 kg = 0.641 t, i.e. 0.64 tCO2e; 0.65 t would need about 0.96-0.97 kg. One of the two extracted figures is misread. Confirm the factory charge on the RXM25A5V1B9 nameplate or spec table before using it for the F-gas label or tCO2e records. Confidence lowered from verified to provisional; structured spec fields unchanged."
+    },
+    {
+      "kind": "indoor",
+      "manufacturer": "Daikin",
+      "series": "Perfera wall (FTXM-A)",
+      "model": "FTXM35A5V1B",
+      "label": "Daikin Perfera 3.5 kW",
+      "tier": "premium",
+      "multiSplitCapable": true,
+      "ports": null,
+      "pairedWith": "RXM35A5V1B9",
+      "specs": {
+        "coolingKw": 3.5,
+        "heatingKw": 4.0,
+        "seer": 9.25,
+        "scop": 5.2,
+        "energyClassCooling": "A+++",
+        "energyClassHeating": "A+++",
+        "soundPressureLowDb": 21,
+        "soundPressureHighDb": 45,
+        "soundPowerDb": null,
+        "dimensionsMm": {
+          "w": 804,
+          "h": 298,
+          "d": 252
+        },
+        "weightKg": 11.5,
+        "refrigerant": "R32",
+        "liquidPipeMm": 6.4,
+        "gasPipeMm": 9.5,
+        "maxPipeM": null,
+        "maxHeightDiffM": null,
+        "prechargedPipeM": null,
+        "additionalChargeGPerM": null,
+        "powerSupply": null,
+        "recommendedBreakerA": null,
+        "wifi": "Built-in Wi-Fi, Daikin Onecta app (Daikin flyer 'Onecta via app'; UK retailers state built-in adaptor)",
+        "operatingRangeCoolingC": null,
+        "operatingRangeHeatingC": null
+      },
+      "warranty": "NOT confirmed for residential air-to-air splits. Daikin UK installer warranty page: standard commercial warranty 'typically 1 or 3 years depending on product type'; Daikin UK Certified Installers 'up to 5 years on AC equipment'; D1/D1+ partners 'up to 7 years on AC equipment' (exact terms behind the Daikin Partner Portal). Daikin UK residential Stand By Me pages describe a free 2 -> 5 year extension when the installer registers the install, but that text is written for air-to-water heat pumps; the July 2025 residential end-user policy (third-party hosted copy) says installer registers on Stand By Me within 90 days of commissioning, customer activates within 24 months, annual maintenance required. UK retailer claims vary: some list Daikin splits with a '3 years manufacturer's parts warranty' (e.g. Rimy, FTXF35E/RXF35E), but Air Conditioning World lists FTXM25R/RXM25R9 with a 5-year manufacturer parts warranty (https://www.airconditioningworld.co.uk/daikin-ftxm25r-rxm25r9-2-5kw-, search extract recorded in docs/research/data/equipment-prices.json, not live-verified). Confirm the air-to-air terms and the Certified Installer route with Daikin UK before quoting customers.",
+      "sources": [
+        {
+          "url": "https://energylabel.daikin.eu/eu/en_US/lot10/jcr:content/root/services.json/lot10/energylabel/pdf?product=FTXM35A5V1B+/+RXM35A5V1B9",
+          "title": "Daikin Lot 10 energy label FTXM35A5V1B / RXM35A5V1B9 (created 12.11.2025)"
+        },
+        {
+          "url": "https://www.daikin.eu/en_us/products/product.table.html/FTXM-A---RXM-A9.html",
+          "title": "Daikin EU - Specifications table FTXM-A / RXM-A9"
+        },
+        {
+          "url": "https://www.daikin.co.uk/content/internet/internet-uk/en_gb/products/product.table.html/FTXM-A.html",
+          "title": "Daikin UK - Specifications table FTXM-A (indoor)"
+        },
+        {
+          "url": "https://www.daikin.eu/en_us/products/product.table.html/FTXM-A.html",
+          "title": "Daikin EU - Specifications table FTXM-A (indoor)"
+        },
+        {
+          "url": "https://my.daikin.eu/content/dam/b2c/south-africa/dasa-pdf/new/FTXM-A_Data%20book_EEDEN24A_English.pdf/_jcr_content/renditions/original./FTXM-A_Data%20book_EEDEN24A_English.pdf",
+          "title": "Daikin FTXM-A Data book EEDEN24A"
+        },
+        {
+          "url": "https://www.daikin.eu/content/dam/document-library/catalogues/ac/split/ftxm-a/FTXM-A,%20RXM-A_Product%20flyer_ECPEN24-022_English.pdf",
+          "title": "Daikin FTXM-A + RXM-A product flyer ECPEN24-022 (multi model application, Onecta)"
+        },
+        {
+          "url": "https://my.daikin.eu/content/dam/b2c/germany/beg-foerderung/f%C3%B6rderlisten/2025_05_F%C3%B6rderliste%20Split.pdf/_jcr_content/renditions/original./2025_05_F%C3%B6rderliste%20Split.pdf",
+          "title": "Daikin Germany BEG eligible split combinations list (May 2025)"
+        },
+        {
+          "url": "https://www.daikin.co.uk/en_gb/installers/support/warranty.html",
+          "title": "Daikin UK - Installer warranty page"
+        },
+        {
+          "url": "https://www.daikin.co.uk/en_gb/residential/services/warranty.html",
+          "title": "Daikin UK - Residential product warranty page"
+        },
+        {
+          "url": "https://discoveryhomesltd.uk/wp-content/uploads/2026/02/Daikin-UK-Residential-End-User-Warranty-Policy_July-2025_Final.pdf",
+          "title": "Daikin UK Residential End-User Warranty Policy July 2025 (third-party hosted copy)"
+        }
+      ],
+      "confidence": "provisional",
+      "notes": "Energy label (12.11.2025): cooling A+++, heating A+++, Pdesignc 3.5 kW, SEER 9.25, 132 kWh/a. Daikin table: cooling 0.9/3.5/4.4 kW, heating 0.8/4.0/5.5 kW, EER 4.63, COP 4.55, SCOP 5.2 (also on Daikin DE BEG list). Dimensions/weight per Daikin UK table (same body as 25). Sound pressure 21/45 dB(A) silent/high from a flyer column whose model mapping is uncertain - provisional. Multi-capable as FTXM25A. All figures were read from search-engine extracts of the cited Daikin pages/PDFs (direct page fetch was DNS-blocked in the research sandbox); spot-check against the PDF before quoting."
+    },
+    {
+      "kind": "outdoor",
+      "manufacturer": "Daikin",
+      "series": "Perfera (RXM-A9)",
+      "model": "RXM35A5V1B9",
+      "label": "Daikin Perfera 3.5 kW outdoor",
+      "tier": "premium",
+      "multiSplitCapable": false,
+      "ports": 1,
+      "pairedWith": "FTXM35A5V1B",
+      "specs": {
+        "coolingKw": 3.5,
+        "heatingKw": 4.0,
+        "seer": 9.25,
+        "scop": 5.2,
+        "energyClassCooling": "A+++",
+        "energyClassHeating": "A+++",
+        "soundPressureLowDb": null,
+        "soundPressureHighDb": 47,
+        "soundPowerDb": null,
+        "dimensionsMm": {
+          "w": 923,
+          "h": 610,
+          "d": 367
+        },
+        "weightKg": 36,
+        "refrigerant": "R32",
+        "liquidPipeMm": 6.4,
+        "gasPipeMm": 9.5,
+        "maxPipeM": 20,
+        "maxHeightDiffM": 15,
+        "prechargedPipeM": 10,
+        "additionalChargeGPerM": 20,
+        "powerSupply": "1~ 220-240 V 50 Hz (sibling RXM20-42A installation manual; A9 electrical drawing not retrieved)",
+        "recommendedBreakerA": null,
+        "wifi": null,
+        "operatingRangeCoolingC": "-10 to 50 (deg C DB ambient)",
+        "operatingRangeHeatingC": "-21 to 18 (deg C WB ambient); installer guide states -20 to 24 deg C DB"
+      },
+      "warranty": "NOT confirmed for residential air-to-air splits. Daikin UK installer warranty page: standard commercial warranty 'typically 1 or 3 years depending on product type'; Daikin UK Certified Installers 'up to 5 years on AC equipment'; D1/D1+ partners 'up to 7 years on AC equipment' (exact terms behind the Daikin Partner Portal). Daikin UK residential Stand By Me pages describe a free 2 -> 5 year extension when the installer registers the install, but that text is written for air-to-water heat pumps; the July 2025 residential end-user policy (third-party hosted copy) says installer registers on Stand By Me within 90 days of commissioning, customer activates within 24 months, annual maintenance required. UK retailer claims vary: some list Daikin splits with a '3 years manufacturer's parts warranty' (e.g. Rimy, FTXF35E/RXF35E), but Air Conditioning World lists FTXM25R/RXM25R9 with a 5-year manufacturer parts warranty (https://www.airconditioningworld.co.uk/daikin-ftxm25r-rxm25r9-2-5kw-, search extract recorded in docs/research/data/equipment-prices.json, not live-verified). Confirm the air-to-air terms and the Certified Installer route with Daikin UK before quoting customers.",
+      "sources": [
+        {
+          "url": "https://www.daikin.eu/en_us/products/product.table.html/RXM-A9.html",
+          "title": "Daikin EU - Specifications table RXM-A9"
+        },
+        {
+          "url": "https://www.daikin.eu/en_us/products/product.table.html/FTXM-A---RXM-A9.html",
+          "title": "Daikin EU - Specifications table FTXM-A / RXM-A9"
+        },
+        {
+          "url": "https://energylabel.daikin.eu/eu/en_US/lot10/jcr:content/root/services.json/lot10/energylabel/pdf?product=FTXM35A5V1B+/+RXM35A5V1B9",
+          "title": "Daikin Lot 10 energy label FTXM35A5V1B / RXM35A5V1B9 (created 12.11.2025)"
+        },
+        {
+          "url": "https://www.daikin.eu/content/dam/document-library/Installer-reference-guide/ac/split/arxm-a/ARXM25A.ARXM35A9.ARXM-A8.RXM(20.42)A.RXM(25.35)A9.RXM-A8.%20RXP-N8_Installer%20reference%20guide_4P769827-4C_English.pdf",
+          "title": "Daikin installer reference guide RXM(20-42)A / RXM(25,35)A9 / RXM-A8 (4P769827-4C)"
+        },
+        {
+          "url": "https://www.daikin.co.uk/en_gb/installers/support/warranty.html",
+          "title": "Daikin UK - Installer warranty page"
+        },
+        {
+          "url": "https://www.daikin.co.uk/en_gb/residential/services/warranty.html",
+          "title": "Daikin UK - Residential product warranty page"
+        },
+        {
+          "url": "https://discoveryhomesltd.uk/wp-content/uploads/2026/02/Daikin-UK-Residential-End-User-Warranty-Policy_July-2025_Final.pdf",
+          "title": "Daikin UK Residential End-User Warranty Policy July 2025 (third-party hosted copy)"
+        }
+      ],
+      "confidence": "verified",
+      "notes": "Same casing as RXM25A9 (610x923x367 mm, 36 kg), factory charge 0.95 kg, 20 m / 15 m, chargeless to 10 m then 20 g/m. Sound pressure 47 dB(A) cooling / 49 heating (nominal). Operating range read for RXM25A5V1B9; assumed identical for the 35 in the same table - verify. All figures were read from search-engine extracts of the cited Daikin pages/PDFs (direct page fetch was DNS-blocked in the research sandbox); spot-check against the PDF before quoting."
+    },
+    {
+      "kind": "indoor",
+      "manufacturer": "Daikin",
+      "series": "Perfera wall (FTXM-A)",
+      "model": "FTXM50A5V1B",
+      "label": "Daikin Perfera 5.0 kW",
+      "tier": "premium",
+      "multiSplitCapable": true,
+      "ports": null,
+      "pairedWith": "RXM50A5V1B",
+      "specs": {
+        "coolingKw": 5.0,
+        "heatingKw": 5.8,
+        "seer": 7.8,
+        "scop": 4.8,
+        "energyClassCooling": "A++",
+        "energyClassHeating": "A++",
+        "soundPressureLowDb": null,
+        "soundPressureHighDb": null,
+        "soundPowerDb": null,
+        "dimensionsMm": {
+          "w": 804,
+          "h": 298,
+          "d": 252
+        },
+        "weightKg": 11.5,
+        "refrigerant": "R32",
+        "liquidPipeMm": null,
+        "gasPipeMm": null,
+        "maxPipeM": null,
+        "maxHeightDiffM": null,
+        "prechargedPipeM": null,
+        "additionalChargeGPerM": null,
+        "powerSupply": null,
+        "recommendedBreakerA": null,
+        "wifi": "Built-in Wi-Fi, Daikin Onecta app (Daikin flyer 'Onecta via app'; UK retailers state built-in adaptor)",
+        "operatingRangeCoolingC": null,
+        "operatingRangeHeatingC": null
+      },
+      "warranty": "NOT confirmed for residential air-to-air splits. Daikin UK installer warranty page: standard commercial warranty 'typically 1 or 3 years depending on product type'; Daikin UK Certified Installers 'up to 5 years on AC equipment'; D1/D1+ partners 'up to 7 years on AC equipment' (exact terms behind the Daikin Partner Portal). Daikin UK residential Stand By Me pages describe a free 2 -> 5 year extension when the installer registers the install, but that text is written for air-to-water heat pumps; the July 2025 residential end-user policy (third-party hosted copy) says installer registers on Stand By Me within 90 days of commissioning, customer activates within 24 months, annual maintenance required. UK retailer claims vary: some list Daikin splits with a '3 years manufacturer's parts warranty' (e.g. Rimy, FTXF35E/RXF35E), but Air Conditioning World lists FTXM25R/RXM25R9 with a 5-year manufacturer parts warranty (https://www.airconditioningworld.co.uk/daikin-ftxm25r-rxm25r9-2-5kw-, search extract recorded in docs/research/data/equipment-prices.json, not live-verified). Confirm the air-to-air terms and the Certified Installer route with Daikin UK before quoting customers.",
+      "sources": [
+        {
+          "url": "https://energylabel.daikin.eu/eu/en_US/lot10/jcr:content/root/services.json/lot10/energylabel/pdf?product=FTXM50A5V1B+%2F+RXM50A5V1B",
+          "title": "Daikin Lot 10 energy label FTXM50A5V1B / RXM50A5V1B (created 30.09.2026)"
+        },
+        {
+          "url": "https://www.daikin.eu/en_us/products/product.table.html/FTXM-A---RXM-A.html",
+          "title": "Daikin EU - Specifications table FTXM-A / RXM-A"
+        },
+        {
+          "url": "https://www.daikin.eu/en_us/products/product.table.html/FTXM-A---RXM-A8.html",
+          "title": "Daikin EU - Specifications table FTXM-A / RXM-A8"
+        },
+        {
+          "url": "https://my.daikin.eu/content/dam/b2c/germany/beg-foerderung/f%C3%B6rderlisten/2025_05_F%C3%B6rderliste%20Split.pdf/_jcr_content/renditions/original./2025_05_F%C3%B6rderliste%20Split.pdf",
+          "title": "Daikin Germany BEG eligible split combinations list (May 2025)"
+        },
+        {
+          "url": "https://www.daikin.co.uk/content/internet/internet-uk/en_gb/products/product.table.html/FTXM-A.html",
+          "title": "Daikin UK - Specifications table FTXM-A (indoor)"
+        },
+        {
+          "url": "https://www.daikin.eu/en_us/products/product.table.html/FTXM-A.html",
+          "title": "Daikin EU - Specifications table FTXM-A (indoor)"
+        },
+        {
+          "url": "https://www.daikin.eu/content/dam/document-library/catalogues/ac/split/ftxm-a/FTXM-A,%20RXM-A_Product%20flyer_ECPEN24-022_English.pdf",
+          "title": "Daikin FTXM-A + RXM-A product flyer ECPEN24-022 (multi model application, Onecta)"
+        },
+        {
+          "url": "https://www.daikin.co.uk/en_gb/installers/support/warranty.html",
+          "title": "Daikin UK - Installer warranty page"
+        },
+        {
+          "url": "https://www.daikin.co.uk/en_gb/residential/services/warranty.html",
+          "title": "Daikin UK - Residential product warranty page"
+        },
+        {
+          "url": "https://discoveryhomesltd.uk/wp-content/uploads/2026/02/Daikin-UK-Residential-End-User-Warranty-Policy_July-2025_Final.pdf",
+          "title": "Daikin UK Residential End-User Warranty Policy July 2025 (third-party hosted copy)"
+        }
+      ],
+      "confidence": "provisional",
+      "notes": "Energy label FTXM50A5V1B / RXM50A5V1B (created 30.09.2026): cooling A++, heating A++, Pdesignc 5.00 kW, SEER 7.80, 224 kWh/a; SCOP 4.8 (Daikin DE BEG list and label extract). Daikin FTXM-A/RXM-A table: nominal cooling 5.00 kW, heating 5.80 kW. ALTERNATIVE pairing FTXM50A5V1B / RXM50A5V1B8 shows SEER 7.55 / SCOP 4.75 - which outdoor suffix Daikin UK currently ships is unconfirmed. Daikin UK table gives the same 298x804x252 mm / 11.5 kg body as the 25/35. Sound pressure: a flyer column reads 27/33/46 dB(A) silent/low/high but may belong to the 42 class - left null. Pipe sizes for the 50 class not isolated - left null. All figures were read from search-engine extracts of the cited Daikin pages/PDFs (direct page fetch was DNS-blocked in the research sandbox); spot-check against the PDF before quoting."
+    },
+    {
+      "kind": "outdoor",
+      "manufacturer": "Daikin",
+      "series": "Perfera (RXM-A)",
+      "model": "RXM50A5V1B",
+      "label": "Daikin Perfera 5.0 kW outdoor",
+      "tier": "premium",
+      "multiSplitCapable": false,
+      "ports": 1,
+      "pairedWith": "FTXM50A5V1B",
+      "specs": {
+        "coolingKw": 5.0,
+        "heatingKw": 5.8,
+        "seer": 7.8,
+        "scop": 4.8,
+        "energyClassCooling": "A++",
+        "energyClassHeating": "A++",
+        "soundPressureLowDb": null,
+        "soundPressureHighDb": 48,
+        "soundPowerDb": null,
+        "dimensionsMm": {
+          "w": 954,
+          "h": 734,
+          "d": 401
+        },
+        "weightKg": 49,
+        "refrigerant": "R32",
+        "liquidPipeMm": null,
+        "gasPipeMm": null,
+        "maxPipeM": 30,
+        "maxHeightDiffM": 20,
+        "prechargedPipeM": 10,
+        "additionalChargeGPerM": 20,
+        "powerSupply": null,
+        "recommendedBreakerA": null,
+        "wifi": null,
+        "operatingRangeCoolingC": null,
+        "operatingRangeHeatingC": null
+      },
+      "warranty": "NOT confirmed for residential air-to-air splits. Daikin UK installer warranty page: standard commercial warranty 'typically 1 or 3 years depending on product type'; Daikin UK Certified Installers 'up to 5 years on AC equipment'; D1/D1+ partners 'up to 7 years on AC equipment' (exact terms behind the Daikin Partner Portal). Daikin UK residential Stand By Me pages describe a free 2 -> 5 year extension when the installer registers the install, but that text is written for air-to-water heat pumps; the July 2025 residential end-user policy (third-party hosted copy) says installer registers on Stand By Me within 90 days of commissioning, customer activates within 24 months, annual maintenance required. UK retailer claims vary: some list Daikin splits with a '3 years manufacturer's parts warranty' (e.g. Rimy, FTXF35E/RXF35E), but Air Conditioning World lists FTXM25R/RXM25R9 with a 5-year manufacturer parts warranty (https://www.airconditioningworld.co.uk/daikin-ftxm25r-rxm25r9-2-5kw-, search extract recorded in docs/research/data/equipment-prices.json, not live-verified). Confirm the air-to-air terms and the Certified Installer route with Daikin UK before quoting customers.",
+      "sources": [
+        {
+          "url": "https://www.daikin.eu/en_us/products/product.table.html/RXM-A.html",
+          "title": "Daikin EU - Specifications table RXM-A"
+        },
+        {
+          "url": "https://www.daikin.eu/content/dam/document-library/installation-manuals/ac/split/arxm-a/ARXM50A.RXM50A_Installation%20manual_3PEN645642-6L_English.pdf",
+          "title": "Daikin installation manual ARXM50A / RXM50A (3PEN645642-6L)"
+        },
+        {
+          "url": "https://energylabel.daikin.eu/eu/en_US/lot10/jcr:content/root/services.json/lot10/energylabel/pdf?product=FTXM50A5V1B+%2F+RXM50A5V1B",
+          "title": "Daikin Lot 10 energy label FTXM50A5V1B / RXM50A5V1B (created 30.09.2026)"
+        },
+        {
+          "url": "https://www.daikin.eu/content/dam/document-library/catalogues/ac/split/ftxm-a/FTXM-A,%20RXM-A_Product%20flyer_ECPEN24-022_English.pdf",
+          "title": "Daikin FTXM-A + RXM-A product flyer ECPEN24-022 (multi model application, Onecta)"
+        },
+        {
+          "url": "https://www.daikin.eu/en_us/products/product.table.html/RXM-A9.html",
+          "title": "Daikin EU - Specifications table RXM-A9"
+        },
+        {
+          "url": "https://www.daikin.co.uk/en_gb/installers/support/warranty.html",
+          "title": "Daikin UK - Installer warranty page"
+        },
+        {
+          "url": "https://www.daikin.co.uk/en_gb/residential/services/warranty.html",
+          "title": "Daikin UK - Residential product warranty page"
+        },
+        {
+          "url": "https://discoveryhomesltd.uk/wp-content/uploads/2026/02/Daikin-UK-Residential-End-User-Warranty-Policy_July-2025_Final.pdf",
+          "title": "Daikin UK Residential End-User Warranty Policy July 2025 (third-party hosted copy)"
+        }
+      ],
+      "confidence": "provisional",
+      "notes": "Daikin RXM-A table: 734x954x401 mm (HxWxD), 49 kg, factory charge 1.10 kg R32, max pipe 30 m, max level difference 20 m, 0.02 kg/m beyond 10 m (flyer: chargeless to 10 m). Sound pressure 48 dB(A) cooling / 49 heating. The extract mixed RXM50A5V1B and RXM50A5V1B9 columns (the B9 lists 0.95 kg) - confirm the suffix and nameplate. Operating range and electrical data not retrieved. All figures were read from search-engine extracts of the cited Daikin pages/PDFs (direct page fetch was DNS-blocked in the research sandbox); spot-check against the PDF before quoting."
+    },
+    {
+      "kind": "indoor",
+      "manufacturer": "Daikin",
+      "series": "Stylish (FTXA-C)",
+      "model": "FTXA25C2V1BW",
+      "label": "Daikin Stylish 2.5 kW (white)",
+      "tier": "premium",
+      "multiSplitCapable": true,
+      "ports": null,
+      "pairedWith": "RXA25A5V1B8",
+      "specs": {
+        "coolingKw": 2.5,
+        "heatingKw": 2.8,
+        "seer": 8.74,
+        "scop": 5.15,
+        "energyClassCooling": "A+++",
+        "energyClassHeating": "A+++",
+        "soundPressureLowDb": 19,
+        "soundPressureHighDb": 40,
+        "soundPowerDb": null,
+        "dimensionsMm": {
+          "w": 798,
+          "h": 295,
+          "d": 189
+        },
+        "weightKg": 11.5,
+        "refrigerant": "R32",
+        "liquidPipeMm": 6.35,
+        "gasPipeMm": 9.5,
+        "maxPipeM": null,
+        "maxHeightDiffM": null,
+        "prechargedPipeM": null,
+        "additionalChargeGPerM": null,
+        "powerSupply": null,
+        "recommendedBreakerA": null,
+        "wifi": "Built-in Wi-Fi, Daikin Onecta app (installer/retailer pages; Daikin product page lists Onecta)",
+        "operatingRangeCoolingC": null,
+        "operatingRangeHeatingC": null
+      },
+      "warranty": "NOT confirmed for residential air-to-air splits. Daikin UK installer warranty page: standard commercial warranty 'typically 1 or 3 years depending on product type'; Daikin UK Certified Installers 'up to 5 years on AC equipment'; D1/D1+ partners 'up to 7 years on AC equipment' (exact terms behind the Daikin Partner Portal). Daikin UK residential Stand By Me pages describe a free 2 -> 5 year extension when the installer registers the install, but that text is written for air-to-water heat pumps; the July 2025 residential end-user policy (third-party hosted copy) says installer registers on Stand By Me within 90 days of commissioning, customer activates within 24 months, annual maintenance required. UK retailer claims vary: some list Daikin splits with a '3 years manufacturer's parts warranty' (e.g. Rimy, FTXF35E/RXF35E), but Air Conditioning World lists FTXM25R/RXM25R9 with a 5-year manufacturer parts warranty (https://www.airconditioningworld.co.uk/daikin-ftxm25r-rxm25r9-2-5kw-, search extract recorded in docs/research/data/equipment-prices.json, not live-verified). Confirm the air-to-air terms and the Certified Installer route with Daikin UK before quoting customers.",
+      "sources": [
+        {
+          "url": "https://www.daikin.co.uk/en_gb/products/product.table.html/FTXA-CW---RXA-A8.html",
+          "title": "Daikin UK - Specifications table FTXA-CW / RXA-A8"
+        },
+        {
+          "url": "https://www.daikin.eu/en_us/products/product.table.html/FTXA-CW---RXA-A8.html",
+          "title": "Daikin EU - Specifications table FTXA-CW / RXA-A8"
+        },
+        {
+          "url": "https://www.daikin.co.uk/en_gb/products/product.table.html/FTXA-CW.html",
+          "title": "Daikin UK - Specifications table FTXA-CW (indoor)"
+        },
+        {
+          "url": "https://www.daikin.eu/en_us/products/product.table.html/FTXA-CW.html",
+          "title": "Daikin EU - Specifications table FTXA-CW (indoor)"
+        },
+        {
+          "url": "https://www.daikin.co.uk/content/dam/document-library/Installer-reference-guide/ac/split/ctxa-c/CTXA-C(B.S.W).FTXA-C(B.S.W)_Installer%20reference%20guide_4PEN518023-15Q_English.pdf",
+          "title": "Daikin installer reference guide CTXA-C / FTXA-C (4PEN518023-15Q)"
+        },
+        {
+          "url": "https://www.coolingcompany.co.uk/product/daikin-air-conditioning-stylish-ftxa25cw-rxa25a8-wall-mounted-r32/",
+          "title": "Cooling Company (London) - Daikin Stylish FTXA25CW-RXA25A8 (retailer)"
+        },
+        {
+          "url": "https://airconadviser.co.uk/products/wall-mounted-split-systems/daikin-stylish",
+          "title": "Aircon Adviser UK - Daikin Stylish FTXA review (secondary)"
+        },
+        {
+          "url": "https://www.daikin.eu/en_us/products/product.html/FTXA-DY.html",
+          "title": "Daikin EU - FTXA-DY (Stylish, 2026) product page"
+        },
+        {
+          "url": "https://www.daikin.co.uk/en_gb/installers/support/warranty.html",
+          "title": "Daikin UK - Installer warranty page"
+        },
+        {
+          "url": "https://www.daikin.co.uk/en_gb/residential/services/warranty.html",
+          "title": "Daikin UK - Residential product warranty page"
+        },
+        {
+          "url": "https://discoveryhomesltd.uk/wp-content/uploads/2026/02/Daikin-UK-Residential-End-User-Warranty-Policy_July-2025_Final.pdf",
+          "title": "Daikin UK Residential End-User Warranty Policy July 2025 (third-party hosted copy)"
+        }
+      ],
+      "confidence": "verified",
+      "notes": "Daikin UK FTXA-CW / RXA-A8 table: cooling nominal 2.50 kW (EER 4.46), heating 1.30 min / 2.80 nominal (COP 5.00), SEER 8.74 (100 kWh/a), SCOP 5.15, Pdesignh 2.45 kW. (The daikin.eu copy shows 4.00 kW heating in this column - misaligned; UK value used.) Indoor 295x798x189 mm, 11.5 kg; sound pressure cooling silent/low/med/high 19/25/33/40 dB(A); pipes 6.35/9.5 mm, drain 18 mm. Energy classes: no Lot 10 label retrieved - classes derived from EU thresholds (SEER >= 8.5 and SCOP >= 5.10 = A+++), consistent with installer pages. Colour variants FTXA25C2V1BS (silver) / BB (black) / BT (blackwood). From 2026 Daikin also lists FTXA-D(Y) textured-front Stylish (FTXA-DY / 3MXM-A8 page on daikin.co.uk) with the same headline efficiencies - check which generation distributors supply for the pilot. Multi-capable (FTXA-CS / 3MXM-A8, FTXA-DY / 3MXM-A8 pages). All figures were read from search-engine extracts of the cited Daikin pages/PDFs (direct page fetch was DNS-blocked in the research sandbox); spot-check against the PDF before quoting."
+    },
+    {
+      "kind": "outdoor",
+      "manufacturer": "Daikin",
+      "series": "Stylish (RXA-A8)",
+      "model": "RXA25A5V1B8",
+      "label": "Daikin Stylish 2.5 kW outdoor",
+      "tier": "premium",
+      "multiSplitCapable": false,
+      "ports": 1,
+      "pairedWith": "FTXA25C2V1BW",
+      "specs": {
+        "coolingKw": 2.5,
+        "heatingKw": 2.8,
+        "seer": 8.74,
+        "scop": 5.15,
+        "energyClassCooling": "A+++",
+        "energyClassHeating": "A+++",
+        "soundPressureLowDb": null,
+        "soundPressureHighDb": 46,
+        "soundPowerDb": null,
+        "dimensionsMm": {
+          "w": 840,
+          "h": 550,
+          "d": 350
+        },
+        "weightKg": 32,
+        "refrigerant": "R32",
+        "liquidPipeMm": null,
+        "gasPipeMm": null,
+        "maxPipeM": 20,
+        "maxHeightDiffM": 15,
+        "prechargedPipeM": 10,
+        "additionalChargeGPerM": 20,
+        "powerSupply": "1~ 220-240 V 50 Hz (RXA-A8 electrical data drawing 4D133678B)",
+        "recommendedBreakerA": null,
+        "wifi": null,
+        "operatingRangeCoolingC": "-10 to 46 (deg C DB ambient)",
+        "operatingRangeHeatingC": null
+      },
+      "warranty": "NOT confirmed for residential air-to-air splits. Daikin UK installer warranty page: standard commercial warranty 'typically 1 or 3 years depending on product type'; Daikin UK Certified Installers 'up to 5 years on AC equipment'; D1/D1+ partners 'up to 7 years on AC equipment' (exact terms behind the Daikin Partner Portal). Daikin UK residential Stand By Me pages describe a free 2 -> 5 year extension when the installer registers the install, but that text is written for air-to-water heat pumps; the July 2025 residential end-user policy (third-party hosted copy) says installer registers on Stand By Me within 90 days of commissioning, customer activates within 24 months, annual maintenance required. UK retailer claims vary: some list Daikin splits with a '3 years manufacturer's parts warranty' (e.g. Rimy, FTXF35E/RXF35E), but Air Conditioning World lists FTXM25R/RXM25R9 with a 5-year manufacturer parts warranty (https://www.airconditioningworld.co.uk/daikin-ftxm25r-rxm25r9-2-5kw-, search extract recorded in docs/research/data/equipment-prices.json, not live-verified). Confirm the air-to-air terms and the Certified Installer route with Daikin UK before quoting customers.",
+      "sources": [
+        {
+          "url": "https://www.daikin.eu/en_us/products/product.table.html/RXA-A8.html",
+          "title": "Daikin EU - Specifications table RXA-A8"
+        },
+        {
+          "url": "https://www.daikin.co.uk/en_gb/products/product.table.html/FTXA-CW---RXA-A8.html",
+          "title": "Daikin UK - Specifications table FTXA-CW / RXA-A8"
+        },
+        {
+          "url": "https://www.daikin.eu/en_us/products/product.table.html/FTXA-CW---RXA-A8.html",
+          "title": "Daikin EU - Specifications table FTXA-CW / RXA-A8"
+        },
+        {
+          "url": "https://www.daikin.es/content/dam/MDM/TechnicalDrawings/Split/RXA-A8/EN/RXA-A8_eldata_4D133678B_EN.pdf",
+          "title": "Daikin technical drawing RXA-A8 electrical data (4D133678B)"
+        },
+        {
+          "url": "https://www.daikin.co.uk/en_gb/products/product.html/RXA-A8.html",
+          "title": "Daikin UK - RXA-A8 product page"
+        },
+        {
+          "url": "https://www.coolingcompany.co.uk/product/daikin-air-conditioning-stylish-ftxa25cw-rxa25a8-wall-mounted-r32/",
+          "title": "Cooling Company (London) - Daikin Stylish FTXA25CW-RXA25A8 (retailer)"
+        },
+        {
+          "url": "https://www.daikin.co.uk/en_gb/installers/support/warranty.html",
+          "title": "Daikin UK - Installer warranty page"
+        },
+        {
+          "url": "https://www.daikin.co.uk/en_gb/residential/services/warranty.html",
+          "title": "Daikin UK - Residential product warranty page"
+        },
+        {
+          "url": "https://discoveryhomesltd.uk/wp-content/uploads/2026/02/Daikin-UK-Residential-End-User-Warranty-Policy_July-2025_Final.pdf",
+          "title": "Daikin UK Residential End-User Warranty Policy July 2025 (third-party hosted copy)"
+        }
+      ],
+      "confidence": "provisional",
+      "notes": "Daikin RXA-A8 table (RXA20/25/35A5V1B8 identical): 550x840x350 mm (HxWxD), 32 kg, max pipe 20 m, max level difference 15 m, 0.02 kg/m beyond 10 m; factory charge 0.76 kg R32; sound pressure 46 dB(A) cooling. UK/EU retailers quote 550x765x285 mm / 32 kg - that looks like the earlier RXA-A casing; confirm before plinth/bracket planning. Heating operating range not retrieved. All figures were read from search-engine extracts of the cited Daikin pages/PDFs (direct page fetch was DNS-blocked in the research sandbox); spot-check against the PDF before quoting."
+    },
+    {
+      "kind": "indoor",
+      "manufacturer": "Daikin",
+      "series": "Stylish (FTXA-C)",
+      "model": "FTXA35C2V1BW",
+      "label": "Daikin Stylish 3.5 kW (white)",
+      "tier": "premium",
+      "multiSplitCapable": true,
+      "ports": null,
+      "pairedWith": "RXA35A5V1B8",
+      "specs": {
+        "coolingKw": 3.4,
+        "heatingKw": 4.0,
+        "seer": 8.73,
+        "scop": 5.15,
+        "energyClassCooling": "A+++",
+        "energyClassHeating": "A+++",
+        "soundPressureLowDb": 19,
+        "soundPressureHighDb": 41,
+        "soundPowerDb": null,
+        "dimensionsMm": {
+          "w": 798,
+          "h": 295,
+          "d": 189
+        },
+        "weightKg": 11.5,
+        "refrigerant": "R32",
+        "liquidPipeMm": 6.35,
+        "gasPipeMm": 9.5,
+        "maxPipeM": null,
+        "maxHeightDiffM": null,
+        "prechargedPipeM": null,
+        "additionalChargeGPerM": null,
+        "powerSupply": null,
+        "recommendedBreakerA": null,
+        "wifi": "Built-in Wi-Fi, Daikin Onecta app (installer/retailer pages; Daikin product page lists Onecta)",
+        "operatingRangeCoolingC": null,
+        "operatingRangeHeatingC": null
+      },
+      "warranty": "NOT confirmed for residential air-to-air splits. Daikin UK installer warranty page: standard commercial warranty 'typically 1 or 3 years depending on product type'; Daikin UK Certified Installers 'up to 5 years on AC equipment'; D1/D1+ partners 'up to 7 years on AC equipment' (exact terms behind the Daikin Partner Portal). Daikin UK residential Stand By Me pages describe a free 2 -> 5 year extension when the installer registers the install, but that text is written for air-to-water heat pumps; the July 2025 residential end-user policy (third-party hosted copy) says installer registers on Stand By Me within 90 days of commissioning, customer activates within 24 months, annual maintenance required. UK retailer claims vary: some list Daikin splits with a '3 years manufacturer's parts warranty' (e.g. Rimy, FTXF35E/RXF35E), but Air Conditioning World lists FTXM25R/RXM25R9 with a 5-year manufacturer parts warranty (https://www.airconditioningworld.co.uk/daikin-ftxm25r-rxm25r9-2-5kw-, search extract recorded in docs/research/data/equipment-prices.json, not live-verified). Confirm the air-to-air terms and the Certified Installer route with Daikin UK before quoting customers.",
+      "sources": [
+        {
+          "url": "https://www.daikin.eu/en_us/products/product.table.html/FTXA-CW---RXA-A8.html",
+          "title": "Daikin EU - Specifications table FTXA-CW / RXA-A8"
+        },
+        {
+          "url": "https://www.daikin.co.uk/en_gb/products/product.table.html/FTXA-CW---RXA-A8.html",
+          "title": "Daikin UK - Specifications table FTXA-CW / RXA-A8"
+        },
+        {
+          "url": "https://www.daikin.co.uk/en_gb/products/product.table.html/FTXA-CW.html",
+          "title": "Daikin UK - Specifications table FTXA-CW (indoor)"
+        },
+        {
+          "url": "https://www.daikin.eu/en_us/products/product.table.html/FTXA-CW.html",
+          "title": "Daikin EU - Specifications table FTXA-CW (indoor)"
+        },
+        {
+          "url": "https://airconadviser.co.uk/products/wall-mounted-split-systems/daikin-stylish",
+          "title": "Aircon Adviser UK - Daikin Stylish FTXA review (secondary)"
+        },
+        {
+          "url": "https://www.daikin.co.uk/en_gb/installers/support/warranty.html",
+          "title": "Daikin UK - Installer warranty page"
+        },
+        {
+          "url": "https://www.daikin.co.uk/en_gb/residential/services/warranty.html",
+          "title": "Daikin UK - Residential product warranty page"
+        },
+        {
+          "url": "https://discoveryhomesltd.uk/wp-content/uploads/2026/02/Daikin-UK-Residential-End-User-Warranty-Policy_July-2025_Final.pdf",
+          "title": "Daikin UK Residential End-User Warranty Policy July 2025 (third-party hosted copy)"
+        }
+      ],
+      "confidence": "provisional",
+      "notes": "Daikin FTXA-CW / RXA-A8 table: nominal cooling 3.40 kW (EER 4.37), nominal heating 4.00 kW, SEER 8.73, SCOP 5.15, heating at -10 C 2.10 kW. Annual cooling 136 kWh/a appears on sibling tables (B9 / CB variants), not isolated for this exact pair. Energy classes derived from EU thresholds. Sound pressure cooling silent/low/med/high 19/25/33/41 dB(A). All figures were read from search-engine extracts of the cited Daikin pages/PDFs (direct page fetch was DNS-blocked in the research sandbox); spot-check against the PDF before quoting."
+    },
+    {
+      "kind": "outdoor",
+      "manufacturer": "Daikin",
+      "series": "Stylish (RXA-A8)",
+      "model": "RXA35A5V1B8",
+      "label": "Daikin Stylish 3.5 kW outdoor",
+      "tier": "premium",
+      "multiSplitCapable": false,
+      "ports": 1,
+      "pairedWith": "FTXA35C2V1BW",
+      "specs": {
+        "coolingKw": 3.4,
+        "heatingKw": 4.0,
+        "seer": 8.73,
+        "scop": 5.15,
+        "energyClassCooling": "A+++",
+        "energyClassHeating": "A+++",
+        "soundPressureLowDb": null,
+        "soundPressureHighDb": null,
+        "soundPowerDb": null,
+        "dimensionsMm": {
+          "w": 840,
+          "h": 550,
+          "d": 350
+        },
+        "weightKg": 32,
+        "refrigerant": "R32",
+        "liquidPipeMm": null,
+        "gasPipeMm": null,
+        "maxPipeM": 20,
+        "maxHeightDiffM": 15,
+        "prechargedPipeM": 10,
+        "additionalChargeGPerM": 20,
+        "powerSupply": "1~ 220-240 V 50 Hz (RXA-A8 electrical data drawing 4D133678B)",
+        "recommendedBreakerA": null,
+        "wifi": null,
+        "operatingRangeCoolingC": "-10 to 46 (deg C DB ambient)",
+        "operatingRangeHeatingC": null
+      },
+      "warranty": "NOT confirmed for residential air-to-air splits. Daikin UK installer warranty page: standard commercial warranty 'typically 1 or 3 years depending on product type'; Daikin UK Certified Installers 'up to 5 years on AC equipment'; D1/D1+ partners 'up to 7 years on AC equipment' (exact terms behind the Daikin Partner Portal). Daikin UK residential Stand By Me pages describe a free 2 -> 5 year extension when the installer registers the install, but that text is written for air-to-water heat pumps; the July 2025 residential end-user policy (third-party hosted copy) says installer registers on Stand By Me within 90 days of commissioning, customer activates within 24 months, annual maintenance required. UK retailer claims vary: some list Daikin splits with a '3 years manufacturer's parts warranty' (e.g. Rimy, FTXF35E/RXF35E), but Air Conditioning World lists FTXM25R/RXM25R9 with a 5-year manufacturer parts warranty (https://www.airconditioningworld.co.uk/daikin-ftxm25r-rxm25r9-2-5kw-, search extract recorded in docs/research/data/equipment-prices.json, not live-verified). Confirm the air-to-air terms and the Certified Installer route with Daikin UK before quoting customers.",
+      "sources": [
+        {
+          "url": "https://www.daikin.eu/en_us/products/product.table.html/RXA-A8.html",
+          "title": "Daikin EU - Specifications table RXA-A8"
+        },
+        {
+          "url": "https://www.daikin.eu/en_us/products/product.table.html/FTXA-CW---RXA-A8.html",
+          "title": "Daikin EU - Specifications table FTXA-CW / RXA-A8"
+        },
+        {
+          "url": "https://www.daikin.es/content/dam/MDM/TechnicalDrawings/Split/RXA-A8/EN/RXA-A8_eldata_4D133678B_EN.pdf",
+          "title": "Daikin technical drawing RXA-A8 electrical data (4D133678B)"
+        },
+        {
+          "url": "https://www.daikin.co.uk/en_gb/installers/support/warranty.html",
+          "title": "Daikin UK - Installer warranty page"
+        },
+        {
+          "url": "https://www.daikin.co.uk/en_gb/residential/services/warranty.html",
+          "title": "Daikin UK - Residential product warranty page"
+        },
+        {
+          "url": "https://discoveryhomesltd.uk/wp-content/uploads/2026/02/Daikin-UK-Residential-End-User-Warranty-Policy_July-2025_Final.pdf",
+          "title": "Daikin UK Residential End-User Warranty Policy July 2025 (third-party hosted copy)"
+        }
+      ],
+      "confidence": "provisional",
+      "notes": "Same RXA-A8 casing and piping limits as RXA25A8 (see that record, incl. retailer dimension conflict). Sound pressure not isolated for the 35. All figures were read from search-engine extracts of the cited Daikin pages/PDFs (direct page fetch was DNS-blocked in the research sandbox); spot-check against the PDF before quoting."
+    },
+    {
+      "kind": "indoor",
+      "manufacturer": "Daikin",
+      "series": "Stylish (FTXA-C)",
+      "model": "FTXA50C2V1BW",
+      "label": "Daikin Stylish 5.0 kW (white)",
+      "tier": "premium",
+      "multiSplitCapable": true,
+      "ports": null,
+      "pairedWith": "RXA50B5V1B8",
+      "specs": {
+        "coolingKw": 5.0,
+        "heatingKw": 5.8,
+        "seer": 7.33,
+        "scop": 4.6,
+        "energyClassCooling": "A++",
+        "energyClassHeating": "A++",
+        "soundPressureLowDb": 24,
+        "soundPressureHighDb": 46,
+        "soundPowerDb": null,
+        "dimensionsMm": {
+          "w": 798,
+          "h": 295,
+          "d": 189
+        },
+        "weightKg": 11.5,
+        "refrigerant": "R32",
+        "liquidPipeMm": 6.35,
+        "gasPipeMm": 12.7,
+        "maxPipeM": null,
+        "maxHeightDiffM": null,
+        "prechargedPipeM": null,
+        "additionalChargeGPerM": null,
+        "powerSupply": null,
+        "recommendedBreakerA": null,
+        "wifi": "Built-in Wi-Fi, Daikin Onecta app (installer/retailer pages; Daikin product page lists Onecta)",
+        "operatingRangeCoolingC": null,
+        "operatingRangeHeatingC": null
+      },
+      "warranty": "NOT confirmed for residential air-to-air splits. Daikin UK installer warranty page: standard commercial warranty 'typically 1 or 3 years depending on product type'; Daikin UK Certified Installers 'up to 5 years on AC equipment'; D1/D1+ partners 'up to 7 years on AC equipment' (exact terms behind the Daikin Partner Portal). Daikin UK residential Stand By Me pages describe a free 2 -> 5 year extension when the installer registers the install, but that text is written for air-to-water heat pumps; the July 2025 residential end-user policy (third-party hosted copy) says installer registers on Stand By Me within 90 days of commissioning, customer activates within 24 months, annual maintenance required. UK retailer claims vary: some list Daikin splits with a '3 years manufacturer's parts warranty' (e.g. Rimy, FTXF35E/RXF35E), but Air Conditioning World lists FTXM25R/RXM25R9 with a 5-year manufacturer parts warranty (https://www.airconditioningworld.co.uk/daikin-ftxm25r-rxm25r9-2-5kw-, search extract recorded in docs/research/data/equipment-prices.json, not live-verified). Confirm the air-to-air terms and the Certified Installer route with Daikin UK before quoting customers.",
+      "sources": [
+        {
+          "url": "https://www.daikin-ce.com/en_us/products/product.table.html/FTXA-CW---RXA-B8.html",
+          "title": "Daikin Central Europe - Specifications table FTXA-CW / RXA-B8"
+        },
+        {
+          "url": "https://www.daikin.co.uk/en_gb/products/product.table.html/FTXA-CW.html",
+          "title": "Daikin UK - Specifications table FTXA-CW (indoor)"
+        },
+        {
+          "url": "https://www.daikin.eu/en_us/products/product.table.html/FTXA-CW.html",
+          "title": "Daikin EU - Specifications table FTXA-CW (indoor)"
+        },
+        {
+          "url": "https://www.daikin.eu/en_us/products/product.table.html/rxa-b.html",
+          "title": "Daikin EU - Specifications table RXA-B"
+        },
+        {
+          "url": "https://www.daikin.cz/cs_cz/produkty/product.table.html/FTXA-DY---RXA-B.html",
+          "title": "Daikin CZ - Specifications table FTXA-DY / RXA-B"
+        },
+        {
+          "url": "https://airconadviser.co.uk/products/wall-mounted-split-systems/daikin-stylish",
+          "title": "Aircon Adviser UK - Daikin Stylish FTXA review (secondary)"
+        },
+        {
+          "url": "https://www.daikin.co.uk/en_gb/installers/support/warranty.html",
+          "title": "Daikin UK - Installer warranty page"
+        },
+        {
+          "url": "https://www.daikin.co.uk/en_gb/residential/services/warranty.html",
+          "title": "Daikin UK - Residential product warranty page"
+        },
+        {
+          "url": "https://discoveryhomesltd.uk/wp-content/uploads/2026/02/Daikin-UK-Residential-End-User-Warranty-Policy_July-2025_Final.pdf",
+          "title": "Daikin UK Residential End-User Warranty Policy July 2025 (third-party hosted copy)"
+        }
+      ],
+      "confidence": "provisional",
+      "notes": "Daikin CE FTXA-CW / RXA-B8 table: cooling 1.7/5.0/5.3 kW, heating 1.7/5.8/6.5 kW, SEER 7.33, SCOP 4.6, Pdesignh 4.0 kW. An older daikin.eu table lists FTXA50C2V1BW / RXA50B5V1B as 'Archived' with the same SEER/SCOP and 'A++' cooling; heating class derived from threshold (SCOP 4.6 = A++ lower bound). FTXA-DY / RXA-B (2026) Czech table gives the same SEER 7.33 / SCOP 4.60. Sound pressure cooling silent/low/med/high 24/31/39/46 dB(A). Pipes 6.35 / 12.7 mm. Outdoor suffix for UK supply (RXA50B5V1B8 vs RXA50B2V1B) not confirmed. All figures were read from search-engine extracts of the cited Daikin pages/PDFs (direct page fetch was DNS-blocked in the research sandbox); spot-check against the PDF before quoting."
+    },
+    {
+      "kind": "indoor",
+      "manufacturer": "Daikin",
+      "series": "Emura (FTXJ-A)",
+      "model": "FTXJ25A2V1BW",
+      "label": "Daikin Emura 2.5 kW (matt white)",
+      "tier": "premium",
+      "multiSplitCapable": true,
+      "ports": null,
+      "pairedWith": "RXJ25A5V1B",
+      "specs": {
+        "coolingKw": null,
+        "heatingKw": null,
+        "seer": 8.74,
+        "scop": 5.15,
+        "energyClassCooling": "A+++",
+        "energyClassHeating": "A+++",
+        "soundPressureLowDb": 19,
+        "soundPressureHighDb": null,
+        "soundPowerDb": null,
+        "dimensionsMm": {
+          "w": 900,
+          "h": 305,
+          "d": 212
+        },
+        "weightKg": 12,
+        "refrigerant": "R32",
+        "liquidPipeMm": null,
+        "gasPipeMm": null,
+        "maxPipeM": null,
+        "maxHeightDiffM": null,
+        "prechargedPipeM": null,
+        "additionalChargeGPerM": null,
+        "powerSupply": null,
+        "recommendedBreakerA": null,
+        "wifi": "Wi-Fi control as standard via Onecta app (Daikin UK Emura datasheet, 2022)",
+        "operatingRangeCoolingC": null,
+        "operatingRangeHeatingC": null
+      },
+      "warranty": "NOT confirmed for residential air-to-air splits. Daikin UK installer warranty page: standard commercial warranty 'typically 1 or 3 years depending on product type'; Daikin UK Certified Installers 'up to 5 years on AC equipment'; D1/D1+ partners 'up to 7 years on AC equipment' (exact terms behind the Daikin Partner Portal). Daikin UK residential Stand By Me pages describe a free 2 -> 5 year extension when the installer registers the install, but that text is written for air-to-water heat pumps; the July 2025 residential end-user policy (third-party hosted copy) says installer registers on Stand By Me within 90 days of commissioning, customer activates within 24 months, annual maintenance required. UK retailer claims vary: some list Daikin splits with a '3 years manufacturer's parts warranty' (e.g. Rimy, FTXF35E/RXF35E), but Air Conditioning World lists FTXM25R/RXM25R9 with a 5-year manufacturer parts warranty (https://www.airconditioningworld.co.uk/daikin-ftxm25r-rxm25r9-2-5kw-, search extract recorded in docs/research/data/equipment-prices.json, not live-verified). Confirm the air-to-air terms and the Certified Installer route with Daikin UK before quoting customers.",
+      "sources": [
+        {
+          "url": "https://www.daikin.eu/en_us/products/product.table.html/ftxj-aw---rxj-a.html",
+          "title": "Daikin EU - Specifications table FTXJ-AW / RXJ-A"
+        },
+        {
+          "url": "https://www.daikin.eu/content/dam/document-library/catalogues/ac/split/FTXJ-AW,%20FTXJ-AS,%20FTXJ-AB,%20RXJ-A_Product%20flyer_ECPEN22-041_English.pdf",
+          "title": "Daikin FTXJ-AS/AW/AB + RXJ-A product flyer ECPEN22-041 (multi model application)"
+        },
+        {
+          "url": "https://www.oceanairuk.com/cdn/shop/files/RXJ-A_Emura_Datasheet_RXJ25A_RX325A_RXJ50A.pdf",
+          "title": "Daikin UK Emura RXJ-A datasheet (2022, hosted by Ocean Air UK)"
+        },
+        {
+          "url": "https://www.daikin.eu/content/dam/document-library/installation-manuals/ac/split/rxj-a/RXJ20-35A_Installation%20manual_3PEN708853-1_English.pdf",
+          "title": "Daikin RXJ20-35A installation manual (3PEN708853-1)"
+        },
+        {
+          "url": "https://www.daikin.co.uk/en_gb/installers/support/warranty.html",
+          "title": "Daikin UK - Installer warranty page"
+        },
+        {
+          "url": "https://www.daikin.co.uk/en_gb/residential/services/warranty.html",
+          "title": "Daikin UK - Residential product warranty page"
+        },
+        {
+          "url": "https://discoveryhomesltd.uk/wp-content/uploads/2026/02/Daikin-UK-Residential-End-User-Warranty-Policy_July-2025_Final.pdf",
+          "title": "Daikin UK Residential End-User Warranty Policy July 2025 (third-party hosted copy)"
+        }
+      ],
+      "confidence": "provisional",
+      "notes": "Daikin FTXJ-AW / RXJ-A table and flyer: SEER 8.74, SCOP 5.15, 100 kWh/a, Pdesignh 2.45 kW (energy classes derived from thresholds). Indoor 305x900x212 mm, 12 kg from a flyer table covering the whole FTXJ range. 19 dB(A) is the range minimum, not confirmed for the 25. Nominal capacities not isolated - left null. UK availability in 2025-26 NOT confirmed (only a 2022 UK datasheet and EU retailers found). Colours AW (matt white) / AS (silver) / AB (matt black). Multi-capable (flyer: 'multi model application'). All figures were read from search-engine extracts of the cited Daikin pages/PDFs (direct page fetch was DNS-blocked in the research sandbox); spot-check against the PDF before quoting."
+    },
+    {
+      "kind": "outdoor",
+      "manufacturer": "Daikin",
+      "series": "Multi-split 2MXM-A9",
+      "model": "2MXM40A2V1B9",
+      "label": "Daikin multi-split outdoor, 2 rooms (2MXM40)",
+      "tier": "standard",
+      "multiSplitCapable": true,
+      "ports": 2,
+      "pairedWith": null,
+      "specs": {
+        "coolingKw": null,
+        "heatingKw": null,
+        "seer": null,
+        "scop": null,
+        "energyClassCooling": null,
+        "energyClassHeating": null,
+        "soundPressureLowDb": null,
+        "soundPressureHighDb": null,
+        "soundPowerDb": 60,
+        "dimensionsMm": null,
+        "weightKg": null,
+        "refrigerant": "R32",
+        "liquidPipeMm": 6.4,
+        "gasPipeMm": 9.5,
+        "maxPipeM": 20,
+        "maxHeightDiffM": null,
+        "prechargedPipeM": null,
+        "additionalChargeGPerM": null,
+        "powerSupply": "1~ 220-240 V 50 Hz (installation manual; ~9.8 A running current)",
+        "recommendedBreakerA": null,
+        "wifi": null,
+        "operatingRangeCoolingC": null,
+        "operatingRangeHeatingC": null
+      },
+      "warranty": "NOT confirmed for residential air-to-air splits. Daikin UK installer warranty page: standard commercial warranty 'typically 1 or 3 years depending on product type'; Daikin UK Certified Installers 'up to 5 years on AC equipment'; D1/D1+ partners 'up to 7 years on AC equipment' (exact terms behind the Daikin Partner Portal). Daikin UK residential Stand By Me pages describe a free 2 -> 5 year extension when the installer registers the install, but that text is written for air-to-water heat pumps; the July 2025 residential end-user policy (third-party hosted copy) says installer registers on Stand By Me within 90 days of commissioning, customer activates within 24 months, annual maintenance required. UK retailer claims vary: some list Daikin splits with a '3 years manufacturer's parts warranty' (e.g. Rimy, FTXF35E/RXF35E), but Air Conditioning World lists FTXM25R/RXM25R9 with a 5-year manufacturer parts warranty (https://www.airconditioningworld.co.uk/daikin-ftxm25r-rxm25r9-2-5kw-, search extract recorded in docs/research/data/equipment-prices.json, not live-verified). Confirm the air-to-air terms and the Certified Installer route with Daikin UK before quoting customers.",
+      "sources": [
+        {
+          "url": "https://www.daikin.co.uk/content/dam/document-library/installation-manuals/ac/multisplit/2mxm-a8/2MXM40A9.2MXM50A8_Installation%20manual_3PEN818734-1_English.pdf",
+          "title": "Daikin UK - installation manual 2MXM40A9 / 2MXM50A8 (3PEN818734-1, 2025.05)"
+        },
+        {
+          "url": "https://www.daikin.eu/content/dam/document-library/Installer-reference-guide/ac/split/2mxm-a8/2MXM40A9.2MXM50A8_Installer%20reference%20guide_4PEN766272-4C_English.pdf",
+          "title": "Daikin installer reference guide 2MXM40A9 / 2MXM50A8 (4PEN766272-4C)"
+        },
+        {
+          "url": "https://www.daikin.co.uk/en_gb/products/product.html/2MXM-A9.html",
+          "title": "Daikin UK - 2MXM-A9 product page"
+        },
+        {
+          "url": "https://energylabel.daikin.eu/at/de_AT/lot10/jcr:content/root/services.json/lot10/productFiche/html?product=FTXM20R5V1B+%2F+FTXM35R5V1B+%2F+2MXM40A2V1B9&locale=de_AT",
+          "title": "Daikin product fiche FTXM20R5V1B / FTXM35R5V1B / 2MXM40A2V1B9"
+        },
+        {
+          "url": "https://catalogues.daikin.eu/flipbooks/EN/General_catalogue/04split/329/",
+          "title": "Daikin general catalogue ECPEN26-500 - Split (multi model application)"
+        },
+        {
+          "url": "https://www.daikin.eu/en_us/products/product.table.html/2mxm-a.html",
+          "title": "Daikin EU - Specifications table 2MXM-A"
+        },
+        {
+          "url": "https://www.daikin.co.uk/en_gb/installers/support/warranty.html",
+          "title": "Daikin UK - Installer warranty page"
+        },
+        {
+          "url": "https://www.daikin.co.uk/en_gb/residential/services/warranty.html",
+          "title": "Daikin UK - Residential product warranty page"
+        },
+        {
+          "url": "https://discoveryhomesltd.uk/wp-content/uploads/2026/02/Daikin-UK-Residential-End-User-Warranty-Policy_July-2025_Final.pdf",
+          "title": "Daikin UK Residential End-User Warranty Policy July 2025 (third-party hosted copy)"
+        }
+      ],
+      "confidence": "provisional",
+      "notes": "2-port outdoor; Daikin's 2026 catalogue still lists 2MXM40A9 (not A8). Ports 2x 6.4 mm liquid, 2x 9.5 mm gas (installer guide). soundPowerDb=60 from the Lot 10 product fiche FTXM20R/FTXM35R/2MXM40A9 (outdoor sound power 60 dB(A)). Max 20 m per room is taken from the 2MXM-A spec table (stated for 2MXM50; assumed same for 40). Total-capacity limit, dimensions, weight, seasonal efficiency (combination-dependent) and operating range not retrieved - null. All figures were read from search-engine extracts of the cited Daikin pages/PDFs (direct page fetch was DNS-blocked in the research sandbox); spot-check against the PDF before quoting."
+    },
+    {
+      "kind": "outdoor",
+      "manufacturer": "Daikin",
+      "series": "Multi-split 2MXM-A8",
+      "model": "2MXM50A2V1B8",
+      "label": "Daikin multi-split outdoor, 2 rooms (2MXM50)",
+      "tier": "standard",
+      "multiSplitCapable": true,
+      "ports": 2,
+      "pairedWith": null,
+      "specs": {
+        "coolingKw": null,
+        "heatingKw": null,
+        "seer": null,
+        "scop": null,
+        "energyClassCooling": null,
+        "energyClassHeating": null,
+        "soundPressureLowDb": null,
+        "soundPressureHighDb": null,
+        "soundPowerDb": null,
+        "dimensionsMm": {
+          "w": 852,
+          "h": 552,
+          "d": 350
+        },
+        "weightKg": 41,
+        "refrigerant": "R32",
+        "liquidPipeMm": 6.4,
+        "gasPipeMm": null,
+        "maxPipeM": 20,
+        "maxHeightDiffM": 15,
+        "prechargedPipeM": 20,
+        "additionalChargeGPerM": 20,
+        "powerSupply": "1~ 220-240 V 50 Hz (installation manual; ~13.3 A running current)",
+        "recommendedBreakerA": null,
+        "wifi": null,
+        "operatingRangeCoolingC": "-10 to 50 (deg C DB, MXM-A8 range)",
+        "operatingRangeHeatingC": "-20 to 24 (deg C DB, MXM-A8 range)"
+      },
+      "warranty": "NOT confirmed for residential air-to-air splits. Daikin UK installer warranty page: standard commercial warranty 'typically 1 or 3 years depending on product type'; Daikin UK Certified Installers 'up to 5 years on AC equipment'; D1/D1+ partners 'up to 7 years on AC equipment' (exact terms behind the Daikin Partner Portal). Daikin UK residential Stand By Me pages describe a free 2 -> 5 year extension when the installer registers the install, but that text is written for air-to-water heat pumps; the July 2025 residential end-user policy (third-party hosted copy) says installer registers on Stand By Me within 90 days of commissioning, customer activates within 24 months, annual maintenance required. UK retailer claims vary: some list Daikin splits with a '3 years manufacturer's parts warranty' (e.g. Rimy, FTXF35E/RXF35E), but Air Conditioning World lists FTXM25R/RXM25R9 with a 5-year manufacturer parts warranty (https://www.airconditioningworld.co.uk/daikin-ftxm25r-rxm25r9-2-5kw-, search extract recorded in docs/research/data/equipment-prices.json, not live-verified). Confirm the air-to-air terms and the Certified Installer route with Daikin UK before quoting customers.",
+      "sources": [
+        {
+          "url": "https://www.daikin.eu/en_us/products/product.table.html/2MXM-A8.html",
+          "title": "Daikin EU - Specifications table 2MXM-A8"
+        },
+        {
+          "url": "https://www.daikin.co.uk/content/dam/document-library/installation-manuals/ac/multisplit/2mxm-a8/2MXM40A9.2MXM50A8_Installation%20manual_3PEN818734-1_English.pdf",
+          "title": "Daikin UK - installation manual 2MXM40A9 / 2MXM50A8 (3PEN818734-1, 2025.05)"
+        },
+        {
+          "url": "https://www.daikin.eu/content/dam/document-library/Installer-reference-guide/ac/split/2mxm-a8/2MXM40A9.2MXM50A8_Installer%20reference%20guide_4PEN766272-4C_English.pdf",
+          "title": "Daikin installer reference guide 2MXM40A9 / 2MXM50A8 (4PEN766272-4C)"
+        },
+        {
+          "url": "https://www.daikin.eu/en_us/products/product.table.html/2mxm-a.html",
+          "title": "Daikin EU - Specifications table 2MXM-A"
+        },
+        {
+          "url": "https://www.daikin.co.uk/content/dam/document-library/Installer-reference-guide/ac/split/2mxm-a/2MXM40-50A_Installer%20reference%20guide_4PEN600463-4E_English.pdf",
+          "title": "Daikin UK - installer reference guide 2MXM40A / 2MXM50A (4PEN600463-4E)"
+        },
+        {
+          "url": "https://www.daikin.eu/content/dam/document-library/installation-manuals/ac/split/2mxm-a/2MXM40-50A_Installation%20manual_3PES600450-5L_Spanish.pdf",
+          "title": "Daikin installation manual 2MXM40-50A (Spanish, 3PES600450-5L)"
+        },
+        {
+          "url": "https://www.principalclimate.co.uk/assets/ckfinder_library/files/Daikin%20MXM-A%20Multi%20Splits%20Upgrade%20-%20September%202025.pdf",
+          "title": "Daikin MXM-A Multi Splits Upgrade - September 2025 (A9 -> A8)"
+        },
+        {
+          "url": "https://catalogues.daikin.eu/flipbooks/EN/General_catalogue/04split/329/",
+          "title": "Daikin general catalogue ECPEN26-500 - Split (multi model application)"
+        },
+        {
+          "url": "https://www.daikin.co.uk/en_gb/installers/support/warranty.html",
+          "title": "Daikin UK - Installer warranty page"
+        },
+        {
+          "url": "https://www.daikin.co.uk/en_gb/residential/services/warranty.html",
+          "title": "Daikin UK - Residential product warranty page"
+        },
+        {
+          "url": "https://discoveryhomesltd.uk/wp-content/uploads/2026/02/Daikin-UK-Residential-End-User-Warranty-Policy_July-2025_Final.pdf",
+          "title": "Daikin UK Residential End-User Warranty Policy July 2025 (third-party hosted copy)"
+        }
+      ],
+      "confidence": "provisional",
+      "notes": "2MXM50A9 became 2MXM50A8 in Oct 2025 (wider operating range; Daikin says efficiencies, sizes, power draw and pipe sizes unchanged). Ports: liquid 2x 6.4 mm; gas 1x 9.5 mm + 1x 12.7 mm (so gasPipeMm left null). Daikin 2MXM-A8 table: 552x852x350 mm, 41 kg, 1.15 kg R32 (extract column mapping not certain). Limits (2MXM-A table/installer guide): 20 m per room, 30 m total, 15 m IU-OU level, 7.5 m IU-IU, min 3 m per room; 0.02 kg/m added beyond 20 m (installer guide; a catalogue row said 10 m - conflict). Seasonal efficiency depends on indoor combination - not recorded. All figures were read from search-engine extracts of the cited Daikin pages/PDFs (direct page fetch was DNS-blocked in the research sandbox); spot-check against the PDF before quoting."
+    },
+    {
+      "kind": "outdoor",
+      "manufacturer": "Daikin",
+      "series": "Multi-split 3MXM-A8",
+      "model": "3MXM52A2V1B8",
+      "label": "Daikin multi-split outdoor, 3 rooms (3MXM52)",
+      "tier": "standard",
+      "multiSplitCapable": true,
+      "ports": 3,
+      "pairedWith": null,
+      "specs": {
+        "coolingKw": null,
+        "heatingKw": null,
+        "seer": null,
+        "scop": null,
+        "energyClassCooling": null,
+        "energyClassHeating": null,
+        "soundPressureLowDb": null,
+        "soundPressureHighDb": 46,
+        "soundPowerDb": null,
+        "dimensionsMm": {
+          "w": 974,
+          "h": 734,
+          "d": 408
+        },
+        "weightKg": 57,
+        "refrigerant": "R32",
+        "liquidPipeMm": 6.4,
+        "gasPipeMm": null,
+        "maxPipeM": 25,
+        "maxHeightDiffM": 15,
+        "prechargedPipeM": 30,
+        "additionalChargeGPerM": 20,
+        "powerSupply": "1~ 220-240 V 50 Hz (3MXM-A8/A9 tables)",
+        "recommendedBreakerA": null,
+        "wifi": null,
+        "operatingRangeCoolingC": "-10 to 50 (deg C DB, MXM-A8 range)",
+        "operatingRangeHeatingC": "-20 to 24 (deg C DB, MXM-A8 range)"
+      },
+      "warranty": "NOT confirmed for residential air-to-air splits. Daikin UK installer warranty page: standard commercial warranty 'typically 1 or 3 years depending on product type'; Daikin UK Certified Installers 'up to 5 years on AC equipment'; D1/D1+ partners 'up to 7 years on AC equipment' (exact terms behind the Daikin Partner Portal). Daikin UK residential Stand By Me pages describe a free 2 -> 5 year extension when the installer registers the install, but that text is written for air-to-water heat pumps; the July 2025 residential end-user policy (third-party hosted copy) says installer registers on Stand By Me within 90 days of commissioning, customer activates within 24 months, annual maintenance required. UK retailer claims vary: some list Daikin splits with a '3 years manufacturer's parts warranty' (e.g. Rimy, FTXF35E/RXF35E), but Air Conditioning World lists FTXM25R/RXM25R9 with a 5-year manufacturer parts warranty (https://www.airconditioningworld.co.uk/daikin-ftxm25r-rxm25r9-2-5kw-, search extract recorded in docs/research/data/equipment-prices.json, not live-verified). Confirm the air-to-air terms and the Certified Installer route with Daikin UK before quoting customers.",
+      "sources": [
+        {
+          "url": "https://www.daikin.eu/en_us/products/product.table.html/3MXM-A8.html",
+          "title": "Daikin EU - Specifications table 3MXM-A8"
+        },
+        {
+          "url": "https://www.daikin.eu/en_us/products/product.table.html/3MXM-A9.html",
+          "title": "Daikin EU - Specifications table 3MXM-A9"
+        },
+        {
+          "url": "https://www.daikin.eu/content/dam/document-library/installation-manuals/ac/multisplit/2mxm-a8/2MXM68A8.3MXM-A8.4MXM-A8.5MXM-A8_Installation%20manual_3PEN818734-2_English.pdf",
+          "title": "Daikin installation manual 2MXM68A8 / 3MXM-A8 / 4MXM-A8 / 5MXM-A8 (3PEN818734-2)"
+        },
+        {
+          "url": "https://www.daikin.eu/content/dam/document-library/Installer-reference-guide/ac/split/2mxm-a9/2MXM68A9.3MXM-A9.4MXM-A9.5MXM-A9_Installer%20reference%20guide_4PEN600463-7J_English.pdf",
+          "title": "Daikin installer reference guide 2MXM68A9 / 3MXM-A9 / 4MXM-A9 / 5MXM-A9 (4PEN600463-7J)"
+        },
+        {
+          "url": "https://www.daikin.eu/content/dam/document-library/installation-manuals/ac/split/2mxm-a9/2MXM68A9.3MXM-A9.4MXM-A9.5MXM-A9_Installation%20manual_3PES600450-9V_Spanish.pdf",
+          "title": "Daikin installation manual 2MXM68A9 / 3MXM-A9 / 4MXM-A9 / 5MXM-A9 (Spanish, 3PES600450-9V)"
+        },
+        {
+          "url": "https://www.principalclimate.co.uk/assets/ckfinder_library/files/Daikin%20MXM-A%20Multi%20Splits%20Upgrade%20-%20September%202025.pdf",
+          "title": "Daikin MXM-A Multi Splits Upgrade - September 2025 (A9 -> A8)"
+        },
+        {
+          "url": "https://www.daikin.co.uk/en_gb/products/product.html/3MXM-A8.html",
+          "title": "Daikin UK - 3MXM-A8 product page"
+        },
+        {
+          "url": "https://oceanairuk.com/cdn/shop/files/3MXM40A9_3MXM52A9_3MXM68A9_technical_data.pdf",
+          "title": "Daikin 3MXM40A9/52A9/68A9 technical data (hosted by Ocean Air UK)"
+        },
+        {
+          "url": "https://www.daikin.co.uk/en_gb/installers/support/warranty.html",
+          "title": "Daikin UK - Installer warranty page"
+        },
+        {
+          "url": "https://www.daikin.co.uk/en_gb/residential/services/warranty.html",
+          "title": "Daikin UK - Residential product warranty page"
+        },
+        {
+          "url": "https://discoveryhomesltd.uk/wp-content/uploads/2026/02/Daikin-UK-Residential-End-User-Warranty-Policy_July-2025_Final.pdf",
+          "title": "Daikin UK Residential End-User Warranty Policy July 2025 (third-party hosted copy)"
+        }
+      ],
+      "confidence": "provisional",
+      "notes": "Dimensions 734x974x408 mm, 57 kg, 1.8 kg R32, sound pressure 46 dB(A) cooling / 47 heating, from the 3MXM-A9 table (Daikin: A8 sizes unchanged). Ports: port A 9.5 mm gas (class 15-42), ports B+C 12.7 mm gas (15-35 with reducer, 42/50 direct). Limits: 25 m per room, 50 m total (30 m total when combined with CVXM-A/FVXM-A floor units, no extra charge allowed), 15 m IU-OU, 7.5 m IU-IU; extra 0.02 kg/m beyond 30 m. Min 2 indoor units. All figures were read from search-engine extracts of the cited Daikin pages/PDFs (direct page fetch was DNS-blocked in the research sandbox); spot-check against the PDF before quoting."
+    },
+    {
+      "kind": "outdoor",
+      "manufacturer": "Daikin",
+      "series": "Multi-split 3MXM-A8",
+      "model": "3MXM68A2V1B8",
+      "label": "Daikin multi-split outdoor, 3 rooms (3MXM68)",
+      "tier": "standard",
+      "multiSplitCapable": true,
+      "ports": 3,
+      "pairedWith": null,
+      "specs": {
+        "coolingKw": null,
+        "heatingKw": null,
+        "seer": null,
+        "scop": null,
+        "energyClassCooling": null,
+        "energyClassHeating": null,
+        "soundPressureLowDb": null,
+        "soundPressureHighDb": 48,
+        "soundPowerDb": null,
+        "dimensionsMm": {
+          "w": 974,
+          "h": 734,
+          "d": 408
+        },
+        "weightKg": 62,
+        "refrigerant": "R32",
+        "liquidPipeMm": 6.4,
+        "gasPipeMm": null,
+        "maxPipeM": 25,
+        "maxHeightDiffM": 15,
+        "prechargedPipeM": 30,
+        "additionalChargeGPerM": 20,
+        "powerSupply": "1~ 220-240 V 50 Hz (3MXM-A8/A9 tables)",
+        "recommendedBreakerA": null,
+        "wifi": null,
+        "operatingRangeCoolingC": "-10 to 50 (deg C DB, MXM-A8 range)",
+        "operatingRangeHeatingC": "-20 to 24 (deg C DB, MXM-A8 range)"
+      },
+      "warranty": "NOT confirmed for residential air-to-air splits. Daikin UK installer warranty page: standard commercial warranty 'typically 1 or 3 years depending on product type'; Daikin UK Certified Installers 'up to 5 years on AC equipment'; D1/D1+ partners 'up to 7 years on AC equipment' (exact terms behind the Daikin Partner Portal). Daikin UK residential Stand By Me pages describe a free 2 -> 5 year extension when the installer registers the install, but that text is written for air-to-water heat pumps; the July 2025 residential end-user policy (third-party hosted copy) says installer registers on Stand By Me within 90 days of commissioning, customer activates within 24 months, annual maintenance required. UK retailer claims vary: some list Daikin splits with a '3 years manufacturer's parts warranty' (e.g. Rimy, FTXF35E/RXF35E), but Air Conditioning World lists FTXM25R/RXM25R9 with a 5-year manufacturer parts warranty (https://www.airconditioningworld.co.uk/daikin-ftxm25r-rxm25r9-2-5kw-, search extract recorded in docs/research/data/equipment-prices.json, not live-verified). Confirm the air-to-air terms and the Certified Installer route with Daikin UK before quoting customers.",
+      "sources": [
+        {
+          "url": "https://www.daikin.eu/en_us/products/product.table.html/3MXM-A8.html",
+          "title": "Daikin EU - Specifications table 3MXM-A8"
+        },
+        {
+          "url": "https://www.daikin.eu/en_us/products/product.table.html/3MXM-A9.html",
+          "title": "Daikin EU - Specifications table 3MXM-A9"
+        },
+        {
+          "url": "https://www.daikin.eu/content/dam/document-library/installation-manuals/ac/multisplit/2mxm-a8/2MXM68A8.3MXM-A8.4MXM-A8.5MXM-A8_Installation%20manual_3PEN818734-2_English.pdf",
+          "title": "Daikin installation manual 2MXM68A8 / 3MXM-A8 / 4MXM-A8 / 5MXM-A8 (3PEN818734-2)"
+        },
+        {
+          "url": "https://www.daikin.eu/content/dam/document-library/Installer-reference-guide/ac/split/2mxm-a9/2MXM68A9.3MXM-A9.4MXM-A9.5MXM-A9_Installer%20reference%20guide_4PEN600463-7J_English.pdf",
+          "title": "Daikin installer reference guide 2MXM68A9 / 3MXM-A9 / 4MXM-A9 / 5MXM-A9 (4PEN600463-7J)"
+        },
+        {
+          "url": "https://www.principalclimate.co.uk/assets/ckfinder_library/files/Daikin%20MXM-A%20Multi%20Splits%20Upgrade%20-%20September%202025.pdf",
+          "title": "Daikin MXM-A Multi Splits Upgrade - September 2025 (A9 -> A8)"
+        },
+        {
+          "url": "https://www.oceanairuk.com/products/daikin-3mxm-a9-multi-split-3-room-outdoor-air-conditioning-unit-6-8kw",
+          "title": "Ocean Air UK - Daikin 3MXM68A8 multi split 3 room outdoor 6.8kW (retailer)"
+        },
+        {
+          "url": "https://www.daikin.co.uk/en_gb/installers/support/warranty.html",
+          "title": "Daikin UK - Installer warranty page"
+        },
+        {
+          "url": "https://www.daikin.co.uk/en_gb/residential/services/warranty.html",
+          "title": "Daikin UK - Residential product warranty page"
+        },
+        {
+          "url": "https://discoveryhomesltd.uk/wp-content/uploads/2026/02/Daikin-UK-Residential-End-User-Warranty-Policy_July-2025_Final.pdf",
+          "title": "Daikin UK Residential End-User Warranty Policy July 2025 (third-party hosted copy)"
+        }
+      ],
+      "confidence": "provisional",
+      "notes": "Dimensions 734x974x408 mm, 62 kg, 2.0 kg R32, sound pressure 48 dB(A) cooling / 48 heating (3MXM-A9 table). Limits: 25 m per room, 50 m total, 15 m IU-OU, 7.5 m IU-IU, extra 0.02 kg/m beyond 30 m. Sold in UK as 3MXM68A8 (Ocean Air UK). All figures were read from search-engine extracts of the cited Daikin pages/PDFs (direct page fetch was DNS-blocked in the research sandbox); spot-check against the PDF before quoting."
+    },
+    {
+      "kind": "outdoor",
+      "manufacturer": "Daikin",
+      "series": "Multi-split 4MXM-A8",
+      "model": "4MXM80A2V1B8",
+      "label": "Daikin multi-split outdoor, 4 rooms (4MXM80)",
+      "tier": "standard",
+      "multiSplitCapable": true,
+      "ports": 4,
+      "pairedWith": null,
+      "specs": {
+        "coolingKw": null,
+        "heatingKw": null,
+        "seer": null,
+        "scop": null,
+        "energyClassCooling": null,
+        "energyClassHeating": null,
+        "soundPressureLowDb": null,
+        "soundPressureHighDb": 48,
+        "soundPowerDb": null,
+        "dimensionsMm": {
+          "w": 974,
+          "h": 734,
+          "d": 408
+        },
+        "weightKg": 67,
+        "refrigerant": "R32",
+        "liquidPipeMm": 6.4,
+        "gasPipeMm": null,
+        "maxPipeM": 25,
+        "maxHeightDiffM": 15,
+        "prechargedPipeM": 30,
+        "additionalChargeGPerM": 20,
+        "powerSupply": "1~ 220-240 V 50 Hz",
+        "recommendedBreakerA": null,
+        "wifi": null,
+        "operatingRangeCoolingC": "-10 to 50 (deg C DB, MXM-A8 range)",
+        "operatingRangeHeatingC": "-20 to 24 (deg C DB, MXM-A8 range)"
+      },
+      "warranty": "NOT confirmed for residential air-to-air splits. Daikin UK installer warranty page: standard commercial warranty 'typically 1 or 3 years depending on product type'; Daikin UK Certified Installers 'up to 5 years on AC equipment'; D1/D1+ partners 'up to 7 years on AC equipment' (exact terms behind the Daikin Partner Portal). Daikin UK residential Stand By Me pages describe a free 2 -> 5 year extension when the installer registers the install, but that text is written for air-to-water heat pumps; the July 2025 residential end-user policy (third-party hosted copy) says installer registers on Stand By Me within 90 days of commissioning, customer activates within 24 months, annual maintenance required. UK retailer claims vary: some list Daikin splits with a '3 years manufacturer's parts warranty' (e.g. Rimy, FTXF35E/RXF35E), but Air Conditioning World lists FTXM25R/RXM25R9 with a 5-year manufacturer parts warranty (https://www.airconditioningworld.co.uk/daikin-ftxm25r-rxm25r9-2-5kw-, search extract recorded in docs/research/data/equipment-prices.json, not live-verified). Confirm the air-to-air terms and the Certified Installer route with Daikin UK before quoting customers.",
+      "sources": [
+        {
+          "url": "https://www.daikin.eu/en_us/products/product.table.html/4MXM-A9.html",
+          "title": "Daikin EU - Specifications table 4MXM-A9"
+        },
+        {
+          "url": "https://www.daikin.co.uk/en_gb/products/product.table.html/4MXM-A9.html",
+          "title": "Daikin UK - Specifications table 4MXM-A9"
+        },
+        {
+          "url": "https://www.daikin.eu/content/dam/document-library/installation-manuals/ac/multisplit/2mxm-a8/2MXM68A8.3MXM-A8.4MXM-A8.5MXM-A8_Installation%20manual_3PEN818734-2_English.pdf",
+          "title": "Daikin installation manual 2MXM68A8 / 3MXM-A8 / 4MXM-A8 / 5MXM-A8 (3PEN818734-2)"
+        },
+        {
+          "url": "https://www.daikin.eu/content/dam/document-library/Installer-reference-guide/ac/split/2mxm-a9/2MXM68A9.3MXM-A9.4MXM-A9.5MXM-A9_Installer%20reference%20guide_4PEN600463-7J_English.pdf",
+          "title": "Daikin installer reference guide 2MXM68A9 / 3MXM-A9 / 4MXM-A9 / 5MXM-A9 (4PEN600463-7J)"
+        },
+        {
+          "url": "https://www.daikin.eu/content/dam/document-library/installation-manuals/ac/split/2mxm-a9/2MXM68A9.3MXM-A9.4MXM-A9.5MXM-A9_Installation%20manual_3PES600450-9V_Spanish.pdf",
+          "title": "Daikin installation manual 2MXM68A9 / 3MXM-A9 / 4MXM-A9 / 5MXM-A9 (Spanish, 3PES600450-9V)"
+        },
+        {
+          "url": "https://www.principalclimate.co.uk/assets/ckfinder_library/files/Daikin%20MXM-A%20Multi%20Splits%20Upgrade%20-%20September%202025.pdf",
+          "title": "Daikin MXM-A Multi Splits Upgrade - September 2025 (A9 -> A8)"
+        },
+        {
+          "url": "https://catalogues.daikin.eu/flipbooks/EN/General_catalogue/04split/329/",
+          "title": "Daikin general catalogue ECPEN26-500 - Split (multi model application)"
+        },
+        {
+          "url": "https://www.daikin.co.uk/en_gb/installers/support/warranty.html",
+          "title": "Daikin UK - Installer warranty page"
+        },
+        {
+          "url": "https://www.daikin.co.uk/en_gb/residential/services/warranty.html",
+          "title": "Daikin UK - Residential product warranty page"
+        },
+        {
+          "url": "https://discoveryhomesltd.uk/wp-content/uploads/2026/02/Daikin-UK-Residential-End-User-Warranty-Policy_July-2025_Final.pdf",
+          "title": "Daikin UK Residential End-User Warranty Policy July 2025 (third-party hosted copy)"
+        }
+      ],
+      "confidence": "provisional",
+      "notes": "4MXM-A9 table: 734x974x408 mm, 67 kg, sound pressure 48 dB(A) cooling / 49 heating; factory charge CONFLICT 2.4 kg (table) vs 3.2 kg (installer guide). Ports: 4x 6.4 mm liquid; gas 1x 9.5 + 1x 12.7 + 2x 15.9 mm (installation manual). Limits: 25 m per room, 70 m total, 15 m IU-OU, 7.5 m IU-IU, extra 0.02 kg/m beyond 30 m. Power supply 1~ 220-240 V 50 Hz is the MXM range value (3MXM table / manuals) - not isolated for the 4MXM80. All figures were read from search-engine extracts of the cited Daikin pages/PDFs (direct page fetch was DNS-blocked in the research sandbox); spot-check against the PDF before quoting."
+    },
+    {
+      "kind": "outdoor",
+      "manufacturer": "Daikin",
+      "series": "Multi-split 5MXM-A8",
+      "model": "5MXM90A2V1B8",
+      "label": "Daikin multi-split outdoor, 5 rooms (5MXM90)",
+      "tier": "standard",
+      "multiSplitCapable": true,
+      "ports": 5,
+      "pairedWith": null,
+      "specs": {
+        "coolingKw": null,
+        "heatingKw": null,
+        "seer": null,
+        "scop": null,
+        "energyClassCooling": null,
+        "energyClassHeating": null,
+        "soundPressureLowDb": null,
+        "soundPressureHighDb": 52,
+        "soundPowerDb": null,
+        "dimensionsMm": {
+          "w": 974,
+          "h": 734,
+          "d": 408
+        },
+        "weightKg": 68,
+        "refrigerant": "R32",
+        "liquidPipeMm": 6.4,
+        "gasPipeMm": null,
+        "maxPipeM": 25,
+        "maxHeightDiffM": 15,
+        "prechargedPipeM": 30,
+        "additionalChargeGPerM": 20,
+        "powerSupply": "1~ 220-240 V 50 Hz",
+        "recommendedBreakerA": null,
+        "wifi": null,
+        "operatingRangeCoolingC": "-10 to 50 (deg C DB, MXM-A8 range)",
+        "operatingRangeHeatingC": "-20 to 24 (deg C DB, MXM-A8 range)"
+      },
+      "warranty": "NOT confirmed for residential air-to-air splits. Daikin UK installer warranty page: standard commercial warranty 'typically 1 or 3 years depending on product type'; Daikin UK Certified Installers 'up to 5 years on AC equipment'; D1/D1+ partners 'up to 7 years on AC equipment' (exact terms behind the Daikin Partner Portal). Daikin UK residential Stand By Me pages describe a free 2 -> 5 year extension when the installer registers the install, but that text is written for air-to-water heat pumps; the July 2025 residential end-user policy (third-party hosted copy) says installer registers on Stand By Me within 90 days of commissioning, customer activates within 24 months, annual maintenance required. UK retailer claims vary: some list Daikin splits with a '3 years manufacturer's parts warranty' (e.g. Rimy, FTXF35E/RXF35E), but Air Conditioning World lists FTXM25R/RXM25R9 with a 5-year manufacturer parts warranty (https://www.airconditioningworld.co.uk/daikin-ftxm25r-rxm25r9-2-5kw-, search extract recorded in docs/research/data/equipment-prices.json, not live-verified). Confirm the air-to-air terms and the Certified Installer route with Daikin UK before quoting customers.",
+      "sources": [
+        {
+          "url": "https://www.daikin.eu/en_us/products/product.table.html/5MXM-A9.html",
+          "title": "Daikin EU - Specifications table 5MXM-A9"
+        },
+        {
+          "url": "https://www.daikin.eu/content/dam/document-library/installation-manuals/ac/multisplit/2mxm-a8/2MXM68A8.3MXM-A8.4MXM-A8.5MXM-A8_Installation%20manual_3PEN818734-2_English.pdf",
+          "title": "Daikin installation manual 2MXM68A8 / 3MXM-A8 / 4MXM-A8 / 5MXM-A8 (3PEN818734-2)"
+        },
+        {
+          "url": "https://www.daikin.eu/content/dam/document-library/Installer-reference-guide/ac/split/2mxm-a9/2MXM68A9.3MXM-A9.4MXM-A9.5MXM-A9_Installer%20reference%20guide_4PEN600463-7J_English.pdf",
+          "title": "Daikin installer reference guide 2MXM68A9 / 3MXM-A9 / 4MXM-A9 / 5MXM-A9 (4PEN600463-7J)"
+        },
+        {
+          "url": "https://www.oceanairuk.com/cdn/shop/files/5MXM-A8_Data_book_EEDEN25_English.pdf",
+          "title": "Daikin 5MXM-A8 Data book EEDEN25 (hosted by Ocean Air UK)"
+        },
+        {
+          "url": "https://climaled.fr/en/outdoor-unit-daikin-5mxm90a8-multi-split-5-connections",
+          "title": "Climaled (FR retailer) - Daikin 5MXM90A8"
+        },
+        {
+          "url": "https://www.saturnsales.co.uk/Daikin-5MXM90A-Outdoor-Unit-5-Indoor-Units.html",
+          "title": "Saturn Sales UK - Daikin 5MXM90A (retailer)"
+        },
+        {
+          "url": "https://www.principalclimate.co.uk/assets/ckfinder_library/files/Daikin%20MXM-A%20Multi%20Splits%20Upgrade%20-%20September%202025.pdf",
+          "title": "Daikin MXM-A Multi Splits Upgrade - September 2025 (A9 -> A8)"
+        },
+        {
+          "url": "https://www.daikin.co.uk/en_gb/installers/support/warranty.html",
+          "title": "Daikin UK - Installer warranty page"
+        },
+        {
+          "url": "https://www.daikin.co.uk/en_gb/residential/services/warranty.html",
+          "title": "Daikin UK - Residential product warranty page"
+        },
+        {
+          "url": "https://discoveryhomesltd.uk/wp-content/uploads/2026/02/Daikin-UK-Residential-End-User-Warranty-Policy_July-2025_Final.pdf",
+          "title": "Daikin UK Residential End-User Warranty Policy July 2025 (third-party hosted copy)"
+        }
+      ],
+      "confidence": "provisional",
+      "notes": "5MXM-A9 table: 734x974x408 mm, 68 kg, sound pressure 52 dB(A); factory charge CONFLICT 2.4 kg (table) vs 3.3 kg (installer guide). Ports: 5x 6.4 mm liquid; gas 2x 9.5 + 1x 12.7 + 2x 15.9 mm. Limits: 25 m per room, 75 m total, 15 m IU-OU (taken from the 3/4MXM tables; not isolated for 5MXM), extra 0.02 kg/m beyond 30 m. 5MXM-A8 data book (EEDEN25) confirms -20 to +50 C extended range and up to 5 indoor units. A French retailer quotes SEER 7.65 / SCOP 4.65 (secondary, combination not stated) - not recorded. All figures were read from search-engine extracts of the cited Daikin pages/PDFs (direct page fetch was DNS-blocked in the research sandbox); spot-check against the PDF before quoting."
+    }
+  ],
+  "compatibility": [
+    {
+      "outdoorModel": "2MXM40A2V1B9",
+      "maxIndoorUnits": 2,
+      "connectableIndoorSeries": [
+        "Perfera wall FTXM (FTXM-R shown in the Daikin 2MXM40A9 product fiche; FTXM-A expected)",
+        "Comfora FTXP-M9 (FTXP-M9 / 2MXM-A9 table)",
+        "Multi-only CTXM 1.5 kW (CTXM-R / 2MXM-A9 table)",
+        "Slim ducted FDXM-F9 (FDXM-F9 / 2MXM-A9 table)",
+        "Stylish FTXA / Emura FTXJ: likely (both marketed for multi) but no 2MXM40A9 table retrieved"
+      ],
+      "connectableIndoorModels": [
+        "FTXM25A5V1B",
+        "FTXM35A5V1B",
+        "FTXA25C2V1BW",
+        "FTXA35C2V1BW",
+        "FTXJ25A2V1BW"
+      ],
+      "minConnectedKw": null,
+      "maxConnectedKw": null,
+      "maxTotalPipeM": 30,
+      "maxPipePerRoomM": 20,
+      "source": {
+        "url": "https://www.daikin.co.uk/content/dam/document-library/installation-manuals/ac/multisplit/2mxm-a8/2MXM40A9.2MXM50A8_Installation%20manual_3PEN818734-1_English.pdf",
+        "title": "Daikin UK - installation manual 2MXM40A9 / 2MXM50A8 (3PEN818734-1, 2025.05)"
+      },
+      "confidence": "provisional",
+      "notes": "Both gas ports are 9.5 mm, so the list is limited to 2.5/3.5 kW indoor units from this catalogue (our inference from port size; 50-class units use 12.7 mm gas). The total connectable capacity limit for the 2MXM40 was NOT found (only a combination table exists in the data book) - check before allowing 35+35. Pipe limits taken from the 2MXM-A table/installer guide (20 m per room, 30 m total, 15 m level, 7.5 m IU-IU, min 3 m per room). Min 2 indoor units connected."
+    },
+    {
+      "outdoorModel": "2MXM50A2V1B8",
+      "maxIndoorUnits": 2,
+      "connectableIndoorSeries": [
+        "Perfera wall FTXM-A (FTXM-A / 3MXM-A8 and /3MXM-A9 Daikin pages; earlier FTXM-R in 2MXM/4MXM/5MXM tables)",
+        "Stylish FTXA-C / FTXA-D (FTXA-CS / 3MXM-A8, FTXA-DY / 3MXM-A8 Daikin pages)",
+        "Emura FTXJ-A (Daikin flyer: multi model application; FTXJ pairings on 3MXM-A8 listing)",
+        "Comfora FTXP-M9 (FTXP-M9 / 3MXM-A8, FTXP-M9 / 2MXM-A9 pages)",
+        "Multi-only 1.5 kW wall CTXM-A / CTXA-C (class 15)",
+        "Cassette FFA-A9 (FFA-A9 / 2MXM-A8 page)"
+      ],
+      "connectableIndoorModels": [
+        "FTXM25A5V1B",
+        "FTXM35A5V1B",
+        "FTXA25C2V1BW",
+        "FTXA35C2V1BW",
+        "FTXJ25A2V1BW"
+      ],
+      "minConnectedKw": null,
+      "maxConnectedKw": 8.5,
+      "maxTotalPipeM": 30,
+      "maxPipePerRoomM": 20,
+      "source": {
+        "url": "https://www.daikin.eu/content/dam/document-library/installation-manuals/ac/split/2mxm-a/2MXM40-50A_Installation%20manual_3PES600450-5L_Spanish.pdf",
+        "title": "Daikin installation manual 2MXM40-50A (Spanish, 3PES600450-5L)"
+      },
+      "confidence": "provisional",
+      "notes": "Total indoor capacity class <= 8.5 kW (2MXM-A installation manual; German 2MXM40A9/2MXM50A8 manual agrees, and requires at least 2 indoor units). Port table lists indoor classes 15/20/25/35/42 (some need reducers) - no 50 class, so 5.0 kW indoor units are excluded. 20 m per room, 30 m total, 15 m IU-OU, 7.5 m IU-IU (2MXM-A spec table). Daikin says the A9->A8 change (Oct 2025) did not alter pipe sizes or limits."
+    },
+    {
+      "outdoorModel": "3MXM52A2V1B8",
+      "maxIndoorUnits": 3,
+      "connectableIndoorSeries": [
+        "Perfera wall FTXM-A (FTXM-A / 3MXM-A8 and /3MXM-A9 Daikin pages; earlier FTXM-R in 2MXM/4MXM/5MXM tables)",
+        "Stylish FTXA-C / FTXA-D (FTXA-CS / 3MXM-A8, FTXA-DY / 3MXM-A8 Daikin pages)",
+        "Emura FTXJ-A (Daikin flyer: multi model application; FTXJ pairings on 3MXM-A8 listing)",
+        "Comfora FTXP-M9 (FTXP-M9 / 3MXM-A8, FTXP-M9 / 2MXM-A9 pages)",
+        "Multi-only 1.5 kW wall CTXM-A / CTXA-C (class 15)",
+        "Non-wall types not catalogued here: Perfera floor FVXM, slim ducted FDXM-F9, ducted FBA-A9, 60x60 cassette FFA-A9"
+      ],
+      "connectableIndoorModels": [
+        "FTXM25A5V1B",
+        "FTXM35A5V1B",
+        "FTXM50A5V1B",
+        "FTXA25C2V1BW",
+        "FTXA35C2V1BW",
+        "FTXA50C2V1BW",
+        "FTXJ25A2V1BW"
+      ],
+      "minConnectedKw": null,
+      "maxConnectedKw": 9.0,
+      "maxTotalPipeM": 50,
+      "maxPipePerRoomM": 25,
+      "source": {
+        "url": "https://www.daikin.eu/content/dam/document-library/installation-manuals/ac/multisplit/2mxm-a8/2MXM68A8.3MXM-A8.4MXM-A8.5MXM-A8_Installation%20manual_3PEN818734-2_English.pdf",
+        "title": "Daikin installation manual 2MXM68A8 / 3MXM-A8 / 4MXM-A8 / 5MXM-A8 (3PEN818734-2)"
+      },
+      "confidence": "provisional",
+      "notes": "Total indoor capacity class <= 9.0 kW (A8 installation manual; A9 manual same). Port A (9.5 mm gas) takes classes 15-42; ports B+C (12.7 mm gas) take 15-35 with reducer or 42/50 direct - so at most two 5.0 kW indoor units, on ports B/C. 25 m per room, 50 m total; 30 m total and no additional charge when combined with CVXM-A/FVXM-A floor units. 15 m IU-OU, 7.5 m IU-IU. Min 2 indoor units."
+    },
+    {
+      "outdoorModel": "3MXM68A2V1B8",
+      "maxIndoorUnits": 3,
+      "connectableIndoorSeries": [
+        "Perfera wall FTXM-A (FTXM-A / 3MXM-A8 and /3MXM-A9 Daikin pages; earlier FTXM-R in 2MXM/4MXM/5MXM tables)",
+        "Stylish FTXA-C / FTXA-D (FTXA-CS / 3MXM-A8, FTXA-DY / 3MXM-A8 Daikin pages)",
+        "Emura FTXJ-A (Daikin flyer: multi model application; FTXJ pairings on 3MXM-A8 listing)",
+        "Comfora FTXP-M9 (FTXP-M9 / 3MXM-A8, FTXP-M9 / 2MXM-A9 pages)",
+        "Multi-only 1.5 kW wall CTXM-A / CTXA-C (class 15)",
+        "Non-wall types not catalogued here: Perfera floor FVXM, slim ducted FDXM-F9, ducted FBA-A9, 60x60 cassette FFA-A9"
+      ],
+      "connectableIndoorModels": [
+        "FTXM25A5V1B",
+        "FTXM35A5V1B",
+        "FTXM50A5V1B",
+        "FTXA25C2V1BW",
+        "FTXA35C2V1BW",
+        "FTXA50C2V1BW",
+        "FTXJ25A2V1BW"
+      ],
+      "minConnectedKw": null,
+      "maxConnectedKw": 11.0,
+      "maxTotalPipeM": 50,
+      "maxPipePerRoomM": 25,
+      "source": {
+        "url": "https://www.daikin.eu/content/dam/document-library/installation-manuals/ac/multisplit/2mxm-a8/2MXM68A8.3MXM-A8.4MXM-A8.5MXM-A8_Installation%20manual_3PEN818734-2_English.pdf",
+        "title": "Daikin installation manual 2MXM68A8 / 3MXM-A8 / 4MXM-A8 / 5MXM-A8 (3PEN818734-2)"
+      },
+      "confidence": "provisional",
+      "notes": "Total indoor capacity class <= 11.0 kW (A8 and A9 installation manuals / installer guide). 25 m per room, 50 m total, 15 m IU-OU, 7.5 m IU-IU. Port-to-class table for the 68 not retrieved - check which ports accept 50 class. Min 2 indoor units."
+    },
+    {
+      "outdoorModel": "4MXM68A2V1B8",
+      "maxIndoorUnits": 4,
+      "connectableIndoorSeries": [
+        "Perfera wall FTXM-A (FTXM-A / 3MXM-A8 and /3MXM-A9 Daikin pages; earlier FTXM-R in 2MXM/4MXM/5MXM tables)",
+        "Stylish FTXA-C / FTXA-D (FTXA-CS / 3MXM-A8, FTXA-DY / 3MXM-A8 Daikin pages)",
+        "Emura FTXJ-A (Daikin flyer: multi model application; FTXJ pairings on 3MXM-A8 listing)",
+        "Comfora FTXP-M9 (FTXP-M9 / 3MXM-A8, FTXP-M9 / 2MXM-A9 pages)",
+        "Multi-only 1.5 kW wall CTXM-A / CTXA-C (class 15)",
+        "Non-wall types not catalogued here: Perfera floor FVXM, slim ducted FDXM-F9, ducted FBA-A9, 60x60 cassette FFA-A9"
+      ],
+      "connectableIndoorModels": [
+        "FTXM25A5V1B",
+        "FTXM35A5V1B",
+        "FTXA25C2V1BW",
+        "FTXA35C2V1BW",
+        "FTXJ25A2V1BW"
+      ],
+      "minConnectedKw": null,
+      "maxConnectedKw": 11.0,
+      "maxTotalPipeM": 60,
+      "maxPipePerRoomM": 25,
+      "source": {
+        "url": "https://www.daikin.eu/content/dam/document-library/Installer-reference-guide/ac/split/2mxm-a9/2MXM68A9.3MXM-A9.4MXM-A9.5MXM-A9_Installer%20reference%20guide_4PEN600463-7J_English.pdf",
+        "title": "Daikin installer reference guide 2MXM68A9 / 3MXM-A9 / 4MXM-A9 / 5MXM-A9 (4PEN600463-7J)"
+      },
+      "confidence": "provisional",
+      "notes": "No model record for the 4MXM68 outdoor (dimensions/weight not retrieved). Total indoor capacity class <= 11.0 kW; 60 m total, 25 m per room, 15 m IU-OU, 7.5 m IU-IU (4MXM-A9 table, installer guide). Ports 4x 6.4 liquid; gas 2x 9.5 + 2x 12.7 mm; German A8 manual shows A+B (9.5 mm) classes 15-42 and C+D (12.7 mm) classes 15-42 with reducer - 50-class acceptance on C/D not confirmed. Renamed 4MXM68A8 from Oct 2025. fact-check (2026-10-18): refuted as listed: this record's own port data (German A8 manual extract: ports A+B 9.5 mm classes 15-42, ports C+D 12.7 mm classes 15-42 with reducer) gives no port that takes a 50-class indoor unit, so FTXM50A5V1B and FTXA50C2V1BW were removed from connectableIndoorModels. Add them back only if the 4MXM68A8 port/class table shows 50-class acceptance."
+    },
+    {
+      "outdoorModel": "4MXM80A2V1B8",
+      "maxIndoorUnits": 4,
+      "connectableIndoorSeries": [
+        "Perfera wall FTXM-A (FTXM-A / 3MXM-A8 and /3MXM-A9 Daikin pages; earlier FTXM-R in 2MXM/4MXM/5MXM tables)",
+        "Stylish FTXA-C / FTXA-D (FTXA-CS / 3MXM-A8, FTXA-DY / 3MXM-A8 Daikin pages)",
+        "Emura FTXJ-A (Daikin flyer: multi model application; FTXJ pairings on 3MXM-A8 listing)",
+        "Comfora FTXP-M9 (FTXP-M9 / 3MXM-A8, FTXP-M9 / 2MXM-A9 pages)",
+        "Multi-only 1.5 kW wall CTXM-A / CTXA-C (class 15)",
+        "Non-wall types not catalogued here: Perfera floor FVXM, slim ducted FDXM-F9, ducted FBA-A9, 60x60 cassette FFA-A9"
+      ],
+      "connectableIndoorModels": [
+        "FTXM25A5V1B",
+        "FTXM35A5V1B",
+        "FTXM50A5V1B",
+        "FTXA25C2V1BW",
+        "FTXA35C2V1BW",
+        "FTXA50C2V1BW",
+        "FTXJ25A2V1BW"
+      ],
+      "minConnectedKw": null,
+      "maxConnectedKw": 14.5,
+      "maxTotalPipeM": 70,
+      "maxPipePerRoomM": 25,
+      "source": {
+        "url": "https://www.daikin.eu/content/dam/document-library/installation-manuals/ac/multisplit/2mxm-a8/2MXM68A8.3MXM-A8.4MXM-A8.5MXM-A8_Installation%20manual_3PEN818734-2_English.pdf",
+        "title": "Daikin installation manual 2MXM68A8 / 3MXM-A8 / 4MXM-A8 / 5MXM-A8 (3PEN818734-2)"
+      },
+      "confidence": "provisional",
+      "notes": "Total indoor capacity class <= 14.5 kW (A8 manual and Spanish A9 manual agree). 70 m total, 25 m per room, 15 m IU-OU, 7.5 m IU-IU; extra 0.02 kg/m beyond 30 m. Gas ports 1x 9.5 + 1x 12.7 + 2x 15.9 mm (reducers needed for small classes on the 15.9 ports - table not retrieved). Min 2 indoor units."
+    },
+    {
+      "outdoorModel": "5MXM90A2V1B8",
+      "maxIndoorUnits": 5,
+      "connectableIndoorSeries": [
+        "Perfera wall FTXM-A (FTXM-A / 3MXM-A8 and /3MXM-A9 Daikin pages; earlier FTXM-R in 2MXM/4MXM/5MXM tables)",
+        "Stylish FTXA-C / FTXA-D (FTXA-CS / 3MXM-A8, FTXA-DY / 3MXM-A8 Daikin pages)",
+        "Emura FTXJ-A (Daikin flyer: multi model application; FTXJ pairings on 3MXM-A8 listing)",
+        "Comfora FTXP-M9 (FTXP-M9 / 3MXM-A8, FTXP-M9 / 2MXM-A9 pages)",
+        "Multi-only 1.5 kW wall CTXM-A / CTXA-C (class 15)",
+        "Non-wall types not catalogued here: Perfera floor FVXM, slim ducted FDXM-F9, ducted FBA-A9, 60x60 cassette FFA-A9"
+      ],
+      "connectableIndoorModels": [
+        "FTXM25A5V1B",
+        "FTXM35A5V1B",
+        "FTXM50A5V1B",
+        "FTXA25C2V1BW",
+        "FTXA35C2V1BW",
+        "FTXA50C2V1BW",
+        "FTXJ25A2V1BW"
+      ],
+      "minConnectedKw": null,
+      "maxConnectedKw": 15.6,
+      "maxTotalPipeM": 75,
+      "maxPipePerRoomM": 25,
+      "source": {
+        "url": "https://www.daikin.eu/content/dam/document-library/Installer-reference-guide/ac/split/2mxm-a9/2MXM68A9.3MXM-A9.4MXM-A9.5MXM-A9_Installer%20reference%20guide_4PEN600463-7J_English.pdf",
+        "title": "Daikin installer reference guide 2MXM68A9 / 3MXM-A9 / 4MXM-A9 / 5MXM-A9 (4PEN600463-7J)"
+      },
+      "confidence": "provisional",
+      "notes": "Total indoor capacity class <= 15.6 kW (A9 installer guide 4PEN600463-7J and Spanish A9 manual; A8 manual extract agrees). 75 m total (5MXM-A9 table: actual length), 25 m per room; extra 0.02 kg/m beyond 30 m. Gas ports 2x 9.5 + 1x 12.7 + 2x 15.9 mm; port/reducer table not retrieved. Min 2 indoor units. 'Up to 5 indoor units' confirmed by the 5MXM-A8 data book."
+    }
+  ],
+  "openQuestions": [
+    "Method caveat: WebFetch could not resolve daikin.co.uk / daikin.eu / energylabel.daikin.eu (DNS) in the research sandbox, so every figure comes from search-engine extracts of the cited official pages/PDFs. Column-mapping errors are possible in multi-model tables; spot-check each figure against the PDF before customer quotes.",
+    "Daikin UK warranty for residential air-to-air splits is not confirmed: installer page says up to 5 years (Certified Installer) / 7 years (D1/D1+) on 'AC equipment' but residential Stand By Me 2->5 year text is written for air-to-water heat pumps. Ask Daikin UK which scheme a new installer can join for the pilot and the registration deadline (policy copy says 90 days).",
+    "Sensira FTXF-F: is Onecta Wi-Fi built in on UK stock (UK retailers say yes; a French retailer says optional adapter)? Can FTXF-F connect to any multi outdoor (only CTXF-F + 2MXF/3MXF Sensira multi seen)?",
+    "Sensira FTXF35F: nominal cooling is 3.3 kW in Daikin tables while the label design capacity is 3.5 kW - decide which figure the app shows customers. RXF35F factory charge 0.55 kg (UK table) vs 0.50 kg (ES table).",
+    "FTXF50F indoor shown in the same 286x770x225 mm body as the 20-42 classes in Daikin tables - confirm (older FTXF50A was 295x990x263 mm).",
+    "Stylish generation: FTXA-C (FTXA25CW + RXA25A8) vs 2026 FTXA-D/DY textured fronts - which will UK distributors ship for pilot dates? RXA-A8 outdoor dimensions 550x840x350 mm (Daikin table) vs 550x765x285 mm (retailers).",
+    "Perfera 5.0 kW: UK outdoor suffix RXM50A5V1B (SEER 7.80 / SCOP 4.8) vs RXM50A5V1B8 (SEER 7.55 / SCOP 4.75) vs B9 - confirm with distributor. Perfera 25/35: confirm UK stock is RXM25A9/RXM35A9 (high-SEER, 36 kg, 610x923x367 mm) rather than plain RXM25A/RXM35A.",
+    "FTXM-A sound pressure per size (flyer columns 19/25/41, 19/29/45, 21/30/45, 27/33/46 not mapped with certainty).",
+    "Multi-split: total-capacity limit for 2MXM40A9 not found; per-port class/reducer tables for 3MXM68, 4MXM68/80 and 5MXM90 not retrieved; 2MXM chargeless length (10 m vs 20 m) conflict; 4MXM80/5MXM90 factory charge 2.4 kg (table) vs 3.2/3.3 kg (installer guide).",
+    "Multi-split seasonal efficiency (SEER/SCOP) depends on the indoor combination - generate per-combination values from Daikin's Lot 10 label tool for each quoted combo.",
+    "Outdoor sound power: only RXF25F (60), RXM25A9 (58) and 2MXM40A9 (60) were read from Lot 10 label/fiche text; others null - needed for MCS 020-style noise checks.",
+    "Recommended breaker / fuse sizes not found for RXF-F, RXM-A9, RXA-A8 or MXM-A8 (sibling RXM20-42A manual: 13 A breaker, 16 A field fuse). Get from each installation manual's electrical table.",
+    "Emura FTXJ-A: UK availability in 2025-26 not confirmed; nominal capacities and outdoor RXJ25A details (flyer: 552x840x350 mm, 33 kg, 61 dB(A) sound power) not cross-checked, so no RXJ outdoor record was written.",
+    "7.1 kW sizes (FTXF71A / FTXM71A etc.) not researched.",
+    "UK trade prices not collected here (only incidental retail: RXF50F ~GBP 820 City Plumbing; FTXF50F/RXF50F pair ~GBP 830 inc VAT Basildon ACR; FTXM25A ~GBP 996 inc VAT Aircon Spares). Fact-check: the Basildon ACR 5.0 kW URL names FTXF50D/RXF50D (older generation) and City Plumbing's VAT basis is not stated, so treat both as unconfirmed for the F generation; every Perfera listing in equipment-prices.json is the FTXM-R / RXM-R(9) generation, whereas this file catalogues FTXM-A - confirm which generation UK distributors ship for the pilot.",
+    "Fact-check pass (2026-10-18) method limit: the run's shared WebSearch budget was already used up, WebFetch failed DNS on every host (including daikin.co.uk, daikin.eu, oceanairuk.com, cityplumbing.co.uk, en.wikipedia.org) and shell egress was refused, so NO claim could be re-checked against a live independent source. Checks were limited to arithmetic and regulatory consistency and to cross-referencing other repo research files (equipment-prices.json).",
+    "Fact-check: unverifiable this pass (left unchanged): RXF-F, RXM-A9, RXM-A, RXA-A8 and MXM-A8 dimensions, weights, max pipe and level limits; multi-split total-capacity limits (2MXM50 8.5, 3MXM52 9.0, 3MXM68 11.0, 4MXM68 11.0, 4MXM80 14.5, 5MXM90 15.6 kW) and total pipe lengths (30/50/60/70/75 m); MXM A9 -> A8 change date (Oct 2025); Daikin UK warranty terms (up to 5 / 7 years, 90-day registration, 24-month activation); outdoor sound power values RXF25F 60, RXM25A9 58, 2MXM40A9 60 dB(A).",
+    "Fact-check (confirmed by arithmetic): every annual cooling consumption figure equals Pdesignc x 350 h / SEER within rounding (FTXF25F 135, FTXF35F 188, FTXF50F 269, FTXM25A 92, FTXM35A 132, FTXM50A 224, FTXA25C 100, FTXJ25A 100 kWh/a). FTXA35C's 136 kWh/a fits Pdesignc 3.4 kW (3.5 kW would give 140), supporting coolingKw 3.4. FTXF35F's 188 kWh/a fits Pdesignc 3.5 kW, not the 3.3 kW nominal. Threshold-derived energy classes match the Reg (EU) 626/2011 Annex II bands already quoted in this file (from knowledge of the regulation; not re-fetched).",
+    "Fact-check: FTXM25A soundPressureHighDb 45 is doubtful. Its gap to the 54 dB(A) sound power is 9 dB, against about 14 dB in the other Daikin indoor records here (FTXF25F 40/54, FTXF50F 45/59), which fits the alternative 19/25/41 flyer column better. Not changed (no source); confirm before using indoor noise figures. Similarly FTXF35F (43 dB(A) high, same 54 dB(A) sound power as FTXF25F at 40) may be a column mismatch.",
+    "Fact-check: RXM35A9 notes also give a 0.95 kg factory charge from the same extract whose 0.65 tCO2e figure for RXM25A9 does not match 0.95 kg (0.64 t at GWP 675) - confirm both nameplates.",
+    "Fact-check: 1/4 in liquid pipe is recorded as 6.4 mm (FTXF, FTXM, MXM) and 6.35 mm (FTXA). Normalise before any equality-based pipe-size compatibility check in the app.",
+    "Fact-check: 2MXM40A9 connectableIndoorModels (FTXM-A, FTXA-C, FTXJ-A) is inferred from port size only - no 2MXM40A9 combination table was retrieved; 3MXM68 lists 50-class units without a retrieved port/class table. Gate these in the app until confirmed."
+  ]
+}
