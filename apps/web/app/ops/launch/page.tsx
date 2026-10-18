@@ -4,6 +4,7 @@ import { healthReport } from "@/lib/health";
 import { appUrl } from "@/lib/brand";
 import { getServiceClient } from "@/lib/supabase-server";
 import { requireStaff } from "@/lib/auth/server";
+import { goLiveChecks, type GoLiveCheck } from "@/lib/ops-core-server";
 
 export const metadata: Metadata = {
   title: "Launch readiness · ops",
@@ -100,7 +101,7 @@ async function liveChecks(): Promise<{ checks: Check[]; score: number; total: nu
       ok: (propertyCount ?? 0) > 0,
       detail:
         (propertyCount ?? 0) > 0
-          ? `${(propertyCount ?? 0).toLocaleString("en-GB")} properties in the book.`
+          ? `${String(propertyCount ?? 0).replace(/\B(?=(\d{3})+(?!\d))/g, ",")} properties in the book.`
           : "Empty — address prefill and per-address pages have nothing to serve.",
       fix: "Seed the sample book on /ops/intel, or run the EPC importer (docs/loading-data.md).",
     });
@@ -159,11 +160,17 @@ const MANUAL: { label: string; how: string }[] = [
 
 export default async function LaunchPage() {
   await requireStaff("settings.edit");
-  const { checks, score, total } = await liveChecks();
+  const [{ checks, score, total }, pilot] = await Promise.all([
+    liveChecks(),
+    goLiveChecks().catch((err) => {
+      console.error("[launch] go-live checks failed:", err);
+      return null;
+    }),
+  ]);
   const ready = score === total;
 
   return (
-    <main className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
+    <main className="mx-auto w-full min-w-0 max-w-4xl px-4 py-10 sm:px-6">
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-display">Launch readiness</h1>
@@ -190,6 +197,8 @@ export default async function LaunchPage() {
             : "Fix the red rows below first — each one is customer-visible."}
         </p>
       </div>
+
+      <PilotChecklist checks={pilot} />
 
       <section className="mt-8">
         <h2 className="mb-3 text-lg font-display">Checked live, right now</h2>
@@ -227,7 +236,7 @@ export default async function LaunchPage() {
         </div>
       </section>
 
-      <p className="mt-8 text-xs text-ink-300">
+      <p className="mt-8 text-xs text-ink-500">
         After launch, this page stays useful: it&apos;s the first stop when anything smells off,
         alongside{" "}
         <Link href="/ops/status" className="text-accent-700 hover:underline">
@@ -236,5 +245,74 @@ export default async function LaunchPage() {
         .
       </p>
     </main>
+  );
+}
+
+const LEVEL: Record<GoLiveCheck["level"], { dot: string; label: string; text: string }> = {
+  green: { dot: "bg-emerald-600", label: "Ready", text: "text-emerald-800" },
+  amber: { dot: "bg-amber-500", label: "Check", text: "text-amber-800" },
+  red: { dot: "bg-red-600", label: "Fix before go-live", text: "text-red-700" },
+};
+
+/**
+ * The pilot go-live checklist (feature F7): every setting, secret and
+ * record the four pilots depend on, with the exact fix for anything that
+ * isn't green. Amber items can go live knowingly; red ones can't.
+ */
+function PilotChecklist({ checks }: { checks: GoLiveCheck[] | null }) {
+  if (!checks) {
+    return (
+      <section className="mt-8">
+        <h2 className="mb-3 text-lg font-display">Pilot go-live checklist</h2>
+        <p role="alert" className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
+          The checklist couldn&apos;t run. Reload in a moment; if it keeps failing, check System status.
+        </p>
+      </section>
+    );
+  }
+  const red = checks.filter((c) => c.level === "red").length;
+  const amber = checks.filter((c) => c.level === "amber").length;
+  const order = { red: 0, amber: 1, green: 2 } as const;
+  const sorted = [...checks].sort((a, b) => order[a.level] - order[b.level]);
+  return (
+    <section className="mt-8" aria-labelledby="pilot-checks">
+      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+        <h2 id="pilot-checks" className="text-lg font-display">
+          Pilot go-live checklist
+        </h2>
+        <p className={`text-sm font-semibold ${red ? "text-red-700" : amber ? "text-amber-800" : "text-emerald-800"}`}>
+          {red ? `${red} to fix before real customers` : amber ? `Ready, with ${amber} to check` : "Ready for real customers"}
+        </p>
+      </div>
+      <ul className="divide-y divide-line rounded-2xl border border-line bg-white">
+        {sorted.map((c) => {
+          const l = LEVEL[c.level];
+          return (
+            <li key={c.id} className="flex items-start gap-3 px-4 py-3">
+              <span aria-hidden className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${l.dot}`} />
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold text-ink-900">
+                  {c.label} <span className={`ml-1 text-xs font-semibold ${l.text}`}>{l.label}</span>
+                </p>
+                <p className="text-sm text-ink-700">{c.detail}</p>
+                {c.level !== "green" && c.fix && (
+                  <p className="mt-0.5 text-sm text-accent-700">
+                    Fix: {c.fix}
+                    {c.href && (
+                      <>
+                        {" "}
+                        <Link href={c.href} className="font-semibold underline">
+                          Go there
+                        </Link>
+                      </>
+                    )}
+                  </p>
+                )}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }
