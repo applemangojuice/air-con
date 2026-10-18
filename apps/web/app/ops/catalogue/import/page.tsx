@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export default async function ImportPage() {
   await requireStaff("catalogue.edit");
   return (
-    <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
+    <main className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6">
       <PageHeader
         back={{ href: "/ops/catalogue", label: "Catalogue" }}
         eyebrow="Catalogue"

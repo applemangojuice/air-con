@@ -51,7 +51,7 @@ export function LoadResearch({ researchedAt, caveats, empty = false }: { researc
     <div className={empty ? "mx-auto max-w-xl text-left" : ""}>
       {!empty && <h2 className="font-display text-xl text-ink-900">Researched catalogue</h2>}
       <p className={`text-sm text-ink-500 ${empty ? "" : "mt-1.5"}`}>
-        Researched {fmtDate(researchedAt)}. Loading adds anything missing and leaves what's already here untouched.
+        Researched {fmtDate(researchedAt)}. {empty ? "Every item keeps its sources and says how sure the figures are." : "Loading adds anything missing and leaves what's already here untouched."}
       </p>
       <details className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
         <summary className="cursor-pointer font-semibold">What the research says to be careful about</summary>
@@ -61,16 +61,18 @@ export function LoadResearch({ researchedAt, caveats, empty = false }: { researc
           ))}
         </ul>
       </details>
-      <Checkbox
-        className="mt-2"
-        checked={overwrite}
-        onChange={(e) => {
-          setOverwrite(e.target.checked);
-          setConfirming(false);
-        }}
-        label="Overwrite items that are already here"
-        hint="Replaces costs, edits and retirements on researched items with the research. Your own items aren't touched."
-      />
+      {!empty && (
+        <Checkbox
+          className="mt-2"
+          checked={overwrite}
+          onChange={(e) => {
+            setOverwrite(e.target.checked);
+            setConfirming(false);
+          }}
+          label="Overwrite items that are already here"
+          hint="Replaces costs, edits and retirements on researched items with the research. Your own items aren't touched."
+        />
+      )}
       {confirming && (
         <p role="alert" className="mt-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
           This replaces any supplier prices and edits on researched items. Press the button again to go ahead.

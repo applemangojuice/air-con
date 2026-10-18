@@ -281,6 +281,7 @@ const nonNegative = (n: number | undefined): n is number => typeof n === "number
  * height, plus about two people's worth for a busy room. Labelled as a
  * rule of thumb wherever it's shown.
  */
+// INTEGRATION(F2): measuredToEngineSurvey (F2) maps measured rooms for the engines too; this stays local so drafting never depends on another feature's code.
 export function preliminaryLoadW(room: MeasuredRoom, base?: SurveyRoom): { loadW: number; areaM2?: number; estimatedArea: boolean } {
   const measuredArea = positive(room.areaM2) ? room.areaM2 : positive(room.lengthM) && positive(room.widthM) ? room.lengthM * room.widthM : undefined;
   const ceiling = positive(room.ceilingHeightM) ? room.ceilingHeightM : 2.4;

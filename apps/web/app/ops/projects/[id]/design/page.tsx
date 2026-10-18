@@ -34,7 +34,7 @@ export default async function DesignPage({ params }: { params: Promise<{ id: str
   const proposalHref = `/ops/projects/${id}/proposal`;
 
   return (
-    <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+    <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6">
       <PageHeader
         back={{ href: `/ops/projects/${id}`, label: project.customer.name || "Project" }}
         eyebrow={[project.pilot?.label, "Design"].filter(Boolean).join(" · ")}

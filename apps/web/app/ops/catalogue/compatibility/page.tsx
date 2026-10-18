@@ -20,7 +20,7 @@ export default async function CompatibilityPage() {
   const sorted = [...rules].sort((a, b) => (a.manufacturer ?? "").localeCompare(b.manufacturer ?? "") || a.outdoorModel.localeCompare(b.outdoorModel));
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
+    <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
       <PageHeader
         back={{ href: "/ops/catalogue", label: "Catalogue" }}
         eyebrow="Catalogue"

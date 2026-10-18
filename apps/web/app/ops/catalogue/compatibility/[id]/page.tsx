@@ -24,7 +24,7 @@ export default async function RulePage({ params }: { params: Promise<{ id: strin
   const connectable = rule ? items.filter((i) => i.kind === "indoor" && i.active && isConnectable(rule, i)) : [];
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
+    <main className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6">
       <PageHeader
         back={{ href: "/ops/catalogue/compatibility", label: "Compatibility rules" }}
         eyebrow={rule?.manufacturer ?? "Compatibility rule"}

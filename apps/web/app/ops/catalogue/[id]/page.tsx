@@ -55,7 +55,7 @@ export default async function CatalogueItemPage({ params }: { params: Promise<{ 
     .map((i) => ({ id: i.id, label: itemDisplayName(i) }));
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
+    <main className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6">
       <PageHeader
         back={{ href: "/ops/catalogue", label: "Catalogue" }}
         eyebrow={`${CATALOGUE_KIND_LABEL[item.kind]}${item.manufacturer ? ` · ${item.manufacturer}` : ""}`}

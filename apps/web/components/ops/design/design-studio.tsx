@@ -173,7 +173,7 @@ export function DesignStudio(props: DesignStudioProps) {
   async function save(submit: boolean): Promise<Extract<DesignActionResult, { ok: true }> | null> {
     const r = await saveDesignAction(projectId, { baseId: design.id, baseVersion: design.version, edits, ...(submit ? { submit: true } : {}) });
     if (!r.ok) {
-      say("error", r.conflict ? r.error : r.error);
+      say("error", r.error);
       return null;
     }
     try {

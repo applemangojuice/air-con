@@ -828,6 +828,7 @@ export const DEMO_CATALOGUE: CatalogueItem[] = [
   demo({ id: "demo-mat-sleeve", kind: "material", label: "Wall sleeve and fire-stop (DEMO)", unit: "each", category: "pipework", costPence: 600, supplier: DEMO_TRADE }),
 
   // Beyond the seeded nineteen: what a complete bill also needs.
+  // INTEGRATION(foundation demo seed): lib/demo-seed/catalogue.ts could load DEMO_CATALOGUE itself, so demo bills have no "not in catalogue" lines.
   demo({ id: "demo-mat-lineset-12", kind: "material", label: "Insulated copper line set, 1/4 + 1/2 (DEMO)", unit: "m", category: "pipework", costPence: 1_100, supplier: DEMO_TRADE }),
   demo({ id: "demo-mat-interconnect", kind: "material", label: "4-core 1.5 mm² interconnect cable (DEMO)", unit: "m", category: "cable", costPence: 150, supplier: DEMO_TRADE }),
   demo({ id: "demo-mat-rcbo20", kind: "material", label: "20 A Type C RCBO (DEMO)", unit: "each", category: "electrical", costPence: 2_400, supplier: DEMO_TRADE }),

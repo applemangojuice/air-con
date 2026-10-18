@@ -497,6 +497,7 @@ export async function saveDesign(projectId: string, staff: StaffMember, input: u
     return fail("Someone saved a newer version at the same moment. Reload to see it; your changes are kept on this device.", 409, { conflict: true });
   }
   await supersedeOlder(projectId, saved.id);
+  // INTEGRATION(F4): a proposal already issued from the superseded version keeps pointing at it (designId/designVersion); the proposal builder should offer a revision once this version is approved.
   await audit({ actor: staff, action: submit ? "design.submit" : "design.save", entity: "design", entityId: saved.id, detail: { projectId, version: saved.version, from: base.version } });
   const pointed = await pointProjectAt(projectId, saved, staff);
   if (!pointed.ok) return fail(`Version ${saved.version} is saved, but the project couldn't be updated: ${pointed.error}`, pointed.status);
@@ -594,18 +595,15 @@ export async function approveDesignRecord(projectId: string, staff: StaffMember,
 /** Lock every layout photo of an approved design. Returns how many couldn't be locked (retry from the page). */
 export async function lockLayout(design: DesignRecord): Promise<number> {
   if (design.status !== "approved") return 0;
-  const items = await mediaRepo.listByIds(layoutMediaIdsOf(design));
-  let failures = 0;
-  for (const m of items) {
-    if (m.locked) continue;
-    try {
-      await mediaRepo.update({ ...m, locked: true });
-    } catch (err) {
-      failures++;
-      console.error(`[design] couldn't lock layout photo ${m.id}:`, err);
-    }
+  const ids = (await mediaRepo.listByIds(layoutMediaIdsOf(design))).filter((m) => !m.locked).map((m) => m.id);
+  if (ids.length === 0) return 0;
+  // Only the lock column: a whole-row write could undo a drawing saved a moment earlier.
+  const { error } = await db().from("media").update({ locked: true, updated_at: new Date().toISOString() }).in("id", ids);
+  if (error) {
+    console.error(`[design] couldn't lock ${ids.length} layout photo(s):`, error.message);
+    return ids.length;
   }
-  return failures;
+  return 0;
 }
 
 /** Retry the photo lock on the project's approved design. */
