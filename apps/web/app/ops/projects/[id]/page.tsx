@@ -477,7 +477,7 @@ export default async function CommandCentrePage({
               <Facts
                 items={[
                   ["Dates", p.booking.dates.length ? p.booking.dates.map((d) => fmtDay(d)).join(", ") : null],
-                  ["Crew", p.booking.crew.length ? p.booking.crew.map((c) => `${c.name} (${ROLE_LABEL[c.role]}${c.external ? ", external" : ""})`).join("; ") : null],
+                  ["Crew", p.booking.crew.length ? p.booking.crew.map((c) => crewLabel(c.name, ROLE_LABEL[c.role], c.external)).join("; ") : null],
                   ["Deposit", plain(p.booking.depositStatus)],
                   ["Prep ticked", `${p.booking.prep.filter((i) => i.confirmable && i.done).length} of ${p.booking.prep.filter((i) => i.confirmable).length}`],
                 ]}
@@ -987,4 +987,11 @@ function BlockerLinks({ blockers, projectId }: { blockers: string[]; projectId: 
       ))}
     </p>
   );
+}
+
+/** "Name (Role, external)", without repeating a role the name already carries. */
+function crewLabel(name: string, role: string, external?: boolean): string {
+  const parts = name.toLowerCase().includes(role.toLowerCase()) ? [] : [role];
+  if (external) parts.push("external");
+  return parts.length ? `${name} (${parts.join(", ")})` : name;
 }
