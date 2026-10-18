@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState, type ReactNode } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import { TAX_CODES, schedule2Missing, type DiscountCode, type PilotSettings, type TaxCodeId } from "@aircon/domain";
 import { Badge } from "@/components/kit/badge";
 import { Button } from "@/components/kit/button";
@@ -115,6 +115,17 @@ export function SettingsEditor({
   const [slots, setSlots] = useState(initial.scheduling.surveySlotTimes.join(", "));
   const [dirty, setDirty] = useState(false);
   const missing = schedule2Missing(s);
+
+  // Unsaved changes survive a mis-tap on Back or a refresh prompt, not silently vanish.
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
 
   const patch = <K extends keyof PilotSettings>(key: K, value: Partial<PilotSettings[K]>) => {
     setDirty(true);

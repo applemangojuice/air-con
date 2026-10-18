@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { createContext, useContext, useRef, useState, useTransition, type FormEvent, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, useTransition, type FormEvent, type ReactNode } from "react";
 import { BlockerList } from "@/components/kit/blocker-list";
 import { Button, type ButtonProps } from "@/components/kit/button";
 import type { ActionResult } from "./types";
@@ -15,10 +15,13 @@ import type { ActionResult } from "./types";
  *
  * Not React's form `action` prop on purpose: that resets the form however
  * the action ended, which would throw away what someone typed on a bad
- * connection.
+ * connection. Until the page's script has loaded the submit button stays
+ * disabled, so a tap on a slow connection can't fall through to a plain
+ * browser submit (which would put the form's contents in the URL).
  */
 
 const PendingContext = createContext(false);
+const ReadyContext = createContext(false);
 
 export const OFFLINE_ERROR = "We couldn't reach the server, so nothing was saved. Check your signal and try again.";
 
@@ -47,7 +50,9 @@ export function ActionForm({
   id?: string;
 }) {
   const [pending, start] = useTransition();
+  const [ready, setReady] = useState(false);
   const [result, setResult] = useState<ActionResult | null>(null);
+  useEffect(() => setReady(true), []);
   const formRef = useRef<HTMLFormElement>(null);
   const router = useRouter();
 
@@ -77,21 +82,24 @@ export function ActionForm({
 
   return (
     <PendingContext.Provider value={pending}>
-      <form ref={formRef} id={id} onSubmit={onSubmit} className={className} aria-busy={pending || undefined}>
+      <ReadyContext.Provider value={ready}>
+      <form ref={formRef} id={id} method="post" onSubmit={onSubmit} className={className} aria-busy={pending || undefined}>
         <fieldset disabled={pending} className="m-0 min-w-0 border-0 p-0">
           {children}
         </fieldset>
         <ResultNote result={result} quietSuccess={quietSuccess} />
       </form>
+      </ReadyContext.Provider>
     </PendingContext.Provider>
   );
 }
 
 /** The form's submit button: locks and says so while the action runs. */
-export function SubmitButton({ children, busyLabel = "Saving…", ...rest }: ButtonProps & { busyLabel?: ReactNode }) {
+export function SubmitButton({ children, busyLabel = "Saving…", disabled, ...rest }: ButtonProps & { busyLabel?: ReactNode }) {
   const pending = useContext(PendingContext);
+  const ready = useContext(ReadyContext);
   return (
-    <Button type="submit" busy={pending} busyLabel={busyLabel} {...rest}>
+    <Button type="submit" busy={pending} busyLabel={busyLabel} disabled={disabled || !ready} {...rest}>
       {children}
     </Button>
   );

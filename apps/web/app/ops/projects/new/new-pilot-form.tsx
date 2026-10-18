@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   LAYOUT_LABEL,
   buildDefaultConfig,
@@ -52,7 +52,9 @@ export function NewPilotForm({
   serviceOutcodes: string[];
 }) {
   const router = useRouter();
-  const [requestId] = useState(() => crypto.randomUUID());
+  // Minted in the browser after load (not during server render), and kept for retries of this form.
+  const [requestId, setRequestId] = useState("");
+  useEffect(() => setRequestId(crypto.randomUUID()), []);
   const [postcode, setPostcode] = useState("");
   const [type, setType] = useState<PropertyType>("semi-detached");
   const [era, setEra] = useState<PropertyEra>("1930-1950");
