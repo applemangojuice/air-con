@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ISSUE_KIND_LABEL, ISSUE_STATUS_LABEL, SEVERITY_LABEL } from "@aircon/domain";
@@ -28,7 +28,10 @@ export function IssueCard({ issue, showJob = false, canUpdate = true }: { issue:
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // What was just saved, shown until the refreshed issue arrives (so the buttons don't come back meanwhile).
+  const [saved, setSaved] = useState<null | "in-progress" | "resolved">(null);
   const open = issue.status === "open" || issue.status === "in-progress" || issue.status === "awaiting-customer";
+  useEffect(() => setSaved(null), [issue.status]);
 
   async function save() {
     if (!mode) return;
@@ -42,6 +45,7 @@ export function IssueCard({ issue, showJob = false, canUpdate = true }: { issue:
       });
       const body = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) throw new Error(body.error ?? "That didn't save.");
+      setSaved(mode);
       setMode(null);
       setNote("");
       router.refresh();
@@ -88,7 +92,12 @@ export function IssueCard({ issue, showJob = false, canUpdate = true }: { issue:
         {issue.customerVisible ? " · the customer can see this" : ""}
       </p>
 
-      {canUpdate && open && issue.kind !== "variation" && (
+      {saved && (
+        <p role="status" className="mt-3 rounded-xl bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800">
+          {saved === "resolved" ? "Marked fixed. The office sees it now." : "Marked as in hand."}
+        </p>
+      )}
+      {canUpdate && open && !saved && issue.kind !== "variation" && (
         <div className="mt-3">
           {mode ? (
             <div className="space-y-2">

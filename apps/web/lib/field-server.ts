@@ -4,6 +4,7 @@ import {
   LINK_PLACEHOLDER,
   LEARNING_PROMPTS,
   TAX_CODES,
+  blockersFor,
   buildCommissioningRecord,
   can,
   canRecord,
@@ -18,6 +19,7 @@ import {
   fgasFromJob,
   handoverDeadlines,
   idempotencyKey,
+  isGatePassed,
   isOpen,
   latestEvidence,
   meetsRequirement,
@@ -76,7 +78,7 @@ import { appMode } from "./env-mode";
 import type { SyncOp, SyncResult } from "./field-outbox";
 import { fmtDate } from "./format";
 import { signedMediaUrls } from "./media-server";
-import { dispatch, loadProject, londonToday } from "./project-service";
+import { buildReadinessContext, dispatch, loadProject, londonToday } from "./project-service";
 import { db, isUniqueViolation, isUuid, must, nowIso, type Row } from "./repo/base";
 import * as catalogueRepo from "./repo/catalogue";
 import * as designsRepo from "./repo/designs";
@@ -526,7 +528,9 @@ export async function listMyJobs(staff: StaffMember): Promise<MyJobs> {
       if (todayDate) out.todayJobs.push(await installCard(p, today, todayDate));
       else {
         const next = p.install.status === "complete" ? undefined : p.booking.dates.find((d) => d > today);
-        const last = [...p.booking.dates].reverse().find((d) => d < today);
+        // Days actually worked count too: a crew can start before the booked dates.
+        const worked = p.install.days.flatMap((d) => (d.date ? [d.date] : []));
+        const last = [...p.booking.dates, ...worked].filter((d) => d <= today).sort().pop();
         if (next && next <= horizon) out.upcoming.push(await installCard(p, today, next));
         else if (p.install.status === "complete" || (last && last >= since)) {
           if (last && last >= since) out.recent.push(await installCard(p, today, last));
@@ -1366,6 +1370,35 @@ export async function setTarget(
 
 function header(settings: Awaited<ReturnType<typeof getSettings>>, project: Project, at: string) {
   return { company: documentCompany(settings), customer: documentCustomer(project), issuedAt: at };
+}
+
+/** Gate codes the commissioning screen already explains from the runsheet itself. */
+const RUNSHEET_GATE_CODES = new Set(["install-not-started", "runsheet-missing", "runsheet-incomplete", "exceptions-open", "install-not-complete", "commissioning-unsigned"]);
+
+/**
+ * What else holds commissioning, beyond the runsheet: open blocking issues
+ * and compliance items. Shown before the tech lead signs, so the project
+ * gate's answer is no surprise. A preview only: signing re-checks.
+ */
+export async function commissioningHolds(projectId: string, staff: StaffMember): Promise<Blocker[]> {
+  try {
+    const project = await projectForStaff(projectId, staff);
+    const ctx = await buildReadinessContext(project, staff);
+    const seen = new Set<string>();
+    // Only the install-complete gate: the commissioned gate's own items
+    // (the commissioning record itself) are what signing produces.
+    return (["install-complete"] as const)
+      .filter((g) => !isGatePassed(project, g))
+      .flatMap((g) => blockersFor(project, ctx, g))
+      .filter((b) => {
+        if (b.severity !== "block" || RUNSHEET_GATE_CODES.has(b.code) || seen.has(b.code)) return false;
+        seen.add(b.code);
+        return true;
+      });
+  } catch {
+    // INTEGRATION(F5): the readiness context leans on F5's kit and compliance modules; without them the preview stays quiet and signing still checks.
+    return [];
+  }
 }
 
 /**

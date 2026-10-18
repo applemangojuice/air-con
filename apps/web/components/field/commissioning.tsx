@@ -194,7 +194,7 @@ function ExceptionRow({ projectId, item, canReview }: { projectId: string; item:
 
 const fmtNum = (v: number | undefined, unit: string) => (v === undefined ? "Not recorded" : `${v} ${unit}`);
 
-export function Commissioning({ data, certificateHref }: { data: FieldJob; certificateHref?: string }) {
+export function Commissioning({ data, certificateHref, holds = [] }: { data: FieldJob; certificateHref?: string; holds?: Blocker[] }) {
   useRefreshOnSync();
   const router = useRouter();
   const { header, me } = data;
@@ -278,13 +278,25 @@ export function Commissioning({ data, certificateHref }: { data: FieldJob; certi
               <h2 id="readiness" className="font-display text-2xl text-ink-900">
                 Ready to sign?
               </h2>
-              {derived.errors.length === 0 ? (
+              {derived.errors.length === 0 && holds.length === 0 ? (
                 <p className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 font-medium text-emerald-800">Everything is in. Ready for your signature.</p>
               ) : (
                 <ul className="mt-3 space-y-2">
                   {derived.errors.map((e) => (
                     <li key={e} className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-base text-amber-900">
                       {e}
+                    </li>
+                  ))}
+                  {holds.map((h) => (
+                    <li key={h.code} className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-base text-amber-900">
+                      {h.message.replace(/([^.])$/, "$1.")}
+                      {h.code.startsWith("issue:") ? (
+                        <Link href="/field/issues" className="ml-1 font-semibold text-accent-700 underline underline-offset-2">
+                          Resolve it in Issues
+                        </Link>
+                      ) : h.action ? (
+                        <span className="text-amber-800"> {h.action}.</span>
+                      ) : null}
                     </li>
                   ))}
                 </ul>
@@ -423,8 +435,8 @@ export function Commissioning({ data, certificateHref }: { data: FieldJob; certi
                   <BlockerList blockers={blockers} />
                 </div>
               )}
-              <button type="button" disabled={busy || derived.errors.length > 0} onClick={sign} className={`${PRIMARY} mt-3 w-full`}>
-                {busy ? "Signing…" : derived.errors.length ? "Not ready to sign" : `Sign as ${personName(me.name)}`}
+              <button type="button" disabled={busy || derived.errors.length + holds.length > 0} onClick={sign} className={`${PRIMARY} mt-3 w-full`}>
+                {busy ? "Signing…" : derived.errors.length + holds.length ? "Not ready to sign" : `Sign as ${personName(me.name)}`}
               </button>
             </section>
           )}
