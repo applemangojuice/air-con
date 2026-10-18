@@ -109,6 +109,23 @@ export default async function ProposalBuilderPage({ params }: { params: Promise<
         </div>
       </Card>
     );
+  } else if (current.status === "draft" && current.designId !== design.id) {
+    body = (
+      <Card>
+        <div className="grid gap-6 md:grid-cols-[1fr_auto] md:items-end">
+          <div>
+            <h2 className="font-display text-2xl text-ink-900">The design has changed</h2>
+            <p className="mt-1 text-base text-ink-700">
+              This draft (version {current.version}) was built on an earlier design. Design version {design.version} is now the approved one, so start
+              the draft again from it: the rooms, units and costs all come from the design.
+            </p>
+          </div>
+          <ProposalActionButton kind="start" projectId={id}>
+            Start again from design v{design.version}
+          </ProposalActionButton>
+        </div>
+      </Card>
+    );
   } else if (current.status === "draft" && data.ctx && data.engine) {
     // Staff without margin access never receive costs: stripped here, before anything reaches the browser.
     const ctx: OptionContext = canSeeMargins ? data.ctx : { ...data.ctx, catalogue: data.ctx.catalogue.map((i) => ({ ...i, costPence: null })) };

@@ -291,15 +291,83 @@ export function ProposalBuilder(props: BuilderProps) {
         </Card>
       </div>
 
-      {/* Issue panel */}
-      <aside className="space-y-4 lg:sticky lg:top-4" aria-label="Issue">
+      {/* Issue panel: the checks sit right next to the one action they gate. */}
+      <aside className="order-first space-y-4 lg:sticky lg:top-4 lg:order-none" aria-label="Issue">
         <Card>
           <div className="flex items-center justify-between gap-3">
             <p className="text-sm font-semibold text-ink-900">Draft · version {proposal.version}</p>
             <SaveStatus state={save} onRetry={() => void runSave()} />
           </div>
+          <div className="mt-4 space-y-3">
+            {liveErrors.length === 0 && blocking.length === 0 ? (
+              <p className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">Ready to issue.</p>
+            ) : (
+              <>
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-500">Before it can go</h3>
+                {liveErrors.length > 0 && (
+                  <ul className="space-y-2">
+                    {liveErrors.map((e) => (
+                      <li key={e} className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-900">
+                        {e}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </>
+            )}
+            {projectBlockers.length > 0 && <BlockerList blockers={projectBlockers} empty={null} />}
+            <Fixes {...props} blockers={projectBlockers} />
+          </div>
+          <div className="mt-5 space-y-3 border-t border-line pt-5">
+            {canIssue ? (
+              <Button size="lg" block onClick={onIssue} busy={issue.busy} busyLabel="Issuing…">
+                Issue proposal
+              </Button>
+            ) : (
+              <p className="rounded-2xl bg-cream px-4 py-3 text-sm text-ink-700">A technical lead or admin issues proposals. Your draft saves as you go: let them know it&apos;s ready.</p>
+            )}
+            <a href={previewHref} target="_blank" rel="noreferrer" className="inline-flex min-h-11 w-full items-center justify-center rounded-full border border-line bg-white px-4 text-sm font-semibold text-ink-900 hover:bg-surface">
+              Preview as the customer ↗
+            </a>
+            <p className="text-xs text-ink-500">
+              The preview shows the last saved version. Issuing emails {props.customer.email ?? "the customer"} the proposal with the pre-contract information and cancellation form, and freezes this version.
+            </p>
+            <div aria-live="polite" role="status">
+              {issue.result && !issue.result.ok && (
+                <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-900">
+                  <p className="font-semibold">{issue.result.error}</p>
+                  {issue.result.errors && (
+                    <ul className="mt-2 list-disc space-y-1 pl-5">
+                      {issue.result.errors.map((e) => (
+                        <li key={e}>{e}</li>
+                      ))}
+                    </ul>
+                  )}
+                  {issue.result.blockers && (
+                    <ul className="mt-2 list-disc space-y-1 pl-5">
+                      {issue.result.blockers
+                        .filter((b) => b.severity === "block")
+                        .map((b) => (
+                          <li key={b.code}>
+                            {b.message}
+                            {b.action ? ` (${b.action})` : ""}
+                          </li>
+                        ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+              {issue.result?.ok && <p className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-800">Issued. The email is on its way.</p>}
+            </div>
+          </div>
+        </Card>
 
-          <div className="mt-4 space-y-4">
+        {(isAdmin || proposal.marginOverride || proposal.taxOverride) && (belowMin || proposal.marginOverride || ctx.settings.tax.vatRegistered) && (
+          <Overrides projectId={projectId} proposal={proposal} isAdmin={isAdmin} showMargin={belowMin || Boolean(proposal.marginOverride)} showTax={ctx.settings.tax.vatRegistered} />
+        )}
+
+        <Card>
+          <div className="space-y-4">
             <Fieldset legend="Contract">
               <div className="space-y-2">
                 {(
@@ -330,82 +398,13 @@ export function ProposalBuilder(props: BuilderProps) {
               <Textarea
                 label="Why it's more than the online estimate"
                 hint={`Their online estimate was ${money(props.instantPricePence)}. The customer sees this reason.`}
-                rows={3}
+                rows={4}
                 maxLength={1000}
                 required={anyAboveInstant}
                 value={form.increaseReason ?? ""}
                 onChange={(e) => setForm((f) => ({ ...f, increaseReason: e.target.value }))}
               />
             )}
-          </div>
-        </Card>
-
-        <Card>
-          <h3 className="text-sm font-semibold text-ink-900">Before it can go</h3>
-          <div className="mt-3 space-y-3">
-            {liveErrors.length === 0 && blocking.length === 0 ? (
-              <p className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">Ready to issue.</p>
-            ) : (
-              <ul className="space-y-2">
-                {liveErrors.map((e) => (
-                  <li key={e} className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-900">
-                    {e}
-                  </li>
-                ))}
-              </ul>
-            )}
-            {projectBlockers.length > 0 && <BlockerList blockers={projectBlockers} empty={null} />}
-            <Fixes {...props} blockers={projectBlockers} />
-          </div>
-        </Card>
-
-        {(isAdmin || proposal.marginOverride || proposal.taxOverride) && (belowMin || proposal.marginOverride || ctx.settings.tax.vatRegistered) && (
-          <Overrides projectId={projectId} proposal={proposal} isAdmin={isAdmin} showMargin={belowMin || Boolean(proposal.marginOverride)} showTax={ctx.settings.tax.vatRegistered} />
-        )}
-
-        <Card>
-          <div className="space-y-3">
-            <a href={previewHref} target="_blank" rel="noreferrer" className="inline-flex min-h-11 w-full items-center justify-center rounded-full border border-line bg-white px-4 text-sm font-semibold text-ink-900 hover:bg-surface">
-              Preview as the customer ↗
-            </a>
-            <p className="text-xs text-ink-500">Shows the last saved version.</p>
-            {canIssue ? (
-              <Button size="lg" block onClick={onIssue} busy={issue.busy} busyLabel="Issuing…">
-                Issue proposal
-              </Button>
-            ) : (
-              <p className="rounded-2xl bg-cream px-4 py-3 text-sm text-ink-700">A technical lead or admin issues proposals. Save your draft and let them know.</p>
-            )}
-            <p className="text-xs text-ink-500">
-              Issuing emails {props.customer.email ?? "the customer"} the proposal with the pre-contract information and cancellation form, and freezes this version.
-            </p>
-            <div aria-live="polite" role="status">
-              {issue.result && !issue.result.ok && (
-                <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-900">
-                  <p className="font-semibold">{issue.result.error}</p>
-                  {issue.result.errors && (
-                    <ul className="mt-2 list-disc space-y-1 pl-5">
-                      {issue.result.errors.map((e) => (
-                        <li key={e}>{e}</li>
-                      ))}
-                    </ul>
-                  )}
-                  {issue.result.blockers && (
-                    <ul className="mt-2 list-disc space-y-1 pl-5">
-                      {issue.result.blockers
-                        .filter((b) => b.severity === "block")
-                        .map((b) => (
-                          <li key={b.code}>
-                            {b.message}
-                            {b.action ? ` (${b.action})` : ""}
-                          </li>
-                        ))}
-                    </ul>
-                  )}
-                </div>
-              )}
-              {issue.result?.ok && <p className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-800">Issued. The email is on its way.</p>}
-            </div>
           </div>
         </Card>
       </aside>

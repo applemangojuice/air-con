@@ -359,10 +359,14 @@ export async function startDraft(projectId: string, staff: StaffMember): Promise
   if (!project) return fail("Project not found", 404);
   if (project.proposal.status === "accepted") return fail("The proposal is accepted. Changes now go through a variation.");
   const existing = await proposalsFor(project);
-  const draft = existing.find((p) => p.status === "draft");
-  if (draft) return { ok: true, proposalId: draft.id };
   const design = await designsRepo.approvedForProject(projectId);
   if (!design) return fail("The design needs a technical lead's sign-off before a proposal can be drafted.");
+  const draft = existing.find((p) => p.status === "draft");
+  if (draft && draft.designId === design.id) return { ok: true, proposalId: draft.id };
+  if (draft) {
+    // Drafted on a design that's since been replaced: close it, and start again from the approved one.
+    await proposalsRepo.update({ ...draft, status: "superseded" });
+  }
   const settings = await getSettings();
   const { ctx } = await optionContext(project, design, settings, project.proposal.contractType ?? "supply-and-install");
   const today = londonToday();
@@ -464,7 +468,13 @@ export async function saveDraft(
 ): Promise<Result<{ revision: number; pricingErrors: Record<string, string>; proposal: ProposalRecord }>> {
   const stored = await proposalsRepo.get(proposalId);
   if (!stored || stored.projectId !== projectId) return fail("Proposal not found", 404);
-  if (stored.status !== "draft") return fail("This version has been issued, so it can't change. Revise it to make a new version.");
+  if (stored.status !== "draft") {
+    return fail(
+      stored.status === "superseded"
+        ? "This draft has been closed (the customer accepted, or a fresh draft replaced it). Reload to see where things stand."
+        : "This version has been issued, so it can't change. Revise it to make a new version.",
+    );
+  }
   if ((stored.draftRevision ?? 0) !== patch.revision) {
     return fail("Someone else saved this draft since you opened it. Reload to see their changes (yours weren't saved).", 409);
   }
