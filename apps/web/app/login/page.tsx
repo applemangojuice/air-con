@@ -7,6 +7,7 @@ import { DEMO_ROLE_KEYS, DEMO_ROLE_LABEL } from "@/lib/auth/demo-staff";
 import { currentStaff } from "@/lib/auth/server";
 import { appMode, isDemoLoginAllowed } from "@/lib/env-mode";
 import { demoSignIn } from "./actions";
+import { DemoSeedButton } from "./demo-seed";
 import { BreakGlassForm, MagicLinkForm } from "./forms";
 
 export const metadata: Metadata = {
@@ -46,6 +47,12 @@ export default async function LoginPage({ searchParams }: { searchParams: Search
   const demoAllowed = isDemoLoginAllowed();
   const breakGlass = breakGlassEnabled(process.env);
   const mode = appMode();
+  // "Load demo pilots": anyone in development; on a demo deployment, admins only
+  // (the route checks the same thing). Needs somewhere to put them.
+  const canSeed =
+    demoAllowed &&
+    mode.data !== "demo" &&
+    (process.env.NODE_ENV !== "production" || Boolean(staff?.roles.includes("admin")));
 
   return (
     <main className="min-h-dvh bg-cream px-4 py-10 sm:py-16">
@@ -125,6 +132,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Search
                 </form>
               ))}
             </div>
+            {canSeed && <DemoSeedButton />}
           </section>
         )}
 

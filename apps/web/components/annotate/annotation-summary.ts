@@ -32,7 +32,14 @@ const ROUTE_WORDS: Record<"pipe" | "condensate" | "cable", string> = {
   cable: "cable route",
 };
 
-const withDetail = (base: string, detail?: string) => (detail && detail.trim() ? `${base} (${detail.trim()})` : base);
+const lowerFirst = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
+
+/** "indoor unit" + "3.5 kW" → "indoor unit (3.5 kW)"; a label that already names the thing stands alone. */
+const withDetail = (base: string, detail?: string) => {
+  const d = detail?.trim();
+  if (!d) return base;
+  return d.toLowerCase().startsWith(base) ? lowerFirst(d) : `${base} (${d})`;
+};
 
 /** One shape in words, lower-case ("pipe route 4.2 m", "obstacle: downpipe"). */
 export function describeAnnotation(a: Annotation): string {
@@ -45,7 +52,9 @@ export function describeAnnotation(a: Annotation): string {
       return withDetail("core hole", a.label);
     case "route": {
       const base = ROUTE_WORDS[a.kind] ?? "route";
-      return a.label && a.label.trim() ? `${base} ${a.label.trim()}` : base;
+      const label = a.label?.trim();
+      if (!label) return base;
+      return label.toLowerCase().startsWith(base) ? lowerFirst(label) : `${base} ${label}`;
     }
     case "obstacle":
       return `obstacle: ${a.label}`;

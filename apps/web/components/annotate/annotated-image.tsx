@@ -107,15 +107,32 @@ interface Chip {
   text: string;
   colour: string;
   /** Where the chip sits relative to its point. */
-  anchor: "above-left" | "inside-left" | "centre" | "right";
+  anchor: "above-left" | "inside-left" | "centre" | "above" | "below" | "right" | "left";
 }
 
-const CHIP_TRANSFORM: Record<Chip["anchor"], string> = {
-  "above-left": "translate(0, calc(-100% - 3px))",
-  "inside-left": "translate(3px, 3px)",
-  centre: "translate(-50%, -50%)",
-  right: "translate(10px, -50%)",
-};
+/** Where a chip sits; centred chips near an edge shift inwards so they stay on the photo. */
+function chipTransform(chip: Chip): string {
+  const tx = chip.x > 0.82 ? "-100%" : chip.x < 0.18 ? "0%" : "-50%";
+  switch (chip.anchor) {
+    case "above-left":
+      return "translate(0, calc(-100% - 3px))";
+    case "inside-left":
+      return "translate(3px, 3px)";
+    case "centre":
+      return `translate(${tx}, -50%)`;
+    case "above":
+      return `translate(${tx}, calc(-100% - 8px))`;
+    case "below":
+      return `translate(${tx}, 8px)`;
+    case "right":
+      return "translate(10px, -50%)";
+    case "left":
+      return "translate(calc(-100% - 10px), -50%)";
+  }
+}
+
+/** Side labels near the right edge flip to the left, so they never run off the photo. */
+const side = (x: number): Chip["anchor"] => (x > 0.62 ? "left" : "right");
 
 function midpoint(points: Point[]): Point {
   if (points.length === 2) return { x: (points[0]!.x + points[1]!.x) / 2, y: (points[0]!.y + points[1]!.y) / 2 };
@@ -168,7 +185,7 @@ function render(a: Annotation, ay: number, noteNumber: number): { shape: ReactNo
             <Dot x={a.x} y={a.y} size={7} colour="rgba(20, 23, 30, 0.85)" />
           </g>
         ),
-        chips: a.label?.trim() ? [{ key: a.id, x: a.x, y: a.y, text: a.label.trim(), colour, anchor: "right" }] : [],
+        chips: a.label?.trim() ? [{ key: a.id, x: a.x, y: a.y, text: a.label.trim(), colour, anchor: side(a.x) }] : [],
       };
     }
     case "route": {
@@ -182,7 +199,8 @@ function render(a: Annotation, ay: number, noteNumber: number): { shape: ReactNo
             <Line points={points} colour={colour} width={a.kind === "cable" ? 3.5 : 3} dash={dash} />
           </g>
         ),
-        chips: a.label?.trim() ? [{ key: a.id, x: mid.x, y: mid.y, text: a.label.trim(), colour, anchor: "right" }] : [],
+        // By the line's middle, clear of the core hole at its end; below it near the top, where unit labels sit.
+        chips: a.label?.trim() ? [{ key: a.id, x: mid.x, y: mid.y, text: a.label.trim(), colour, anchor: mid.y < 0.3 ? "below" : "above" }] : [],
       };
     }
     case "obstacle": {
@@ -202,7 +220,9 @@ function render(a: Annotation, ay: number, noteNumber: number): { shape: ReactNo
             {cross(colour, 4)}
           </g>
         ),
-        chips: a.label?.trim() ? [{ key: a.id, x: a.x + dx, y: a.y, text: a.label.trim(), colour, anchor: "right" }] : [],
+        chips: a.label?.trim()
+          ? [{ key: a.id, x: side(a.x) === "left" ? a.x - dx : a.x + dx, y: a.y, text: a.label.trim(), colour, anchor: side(a.x) }]
+          : [],
       };
     }
     case "measure": {
@@ -222,7 +242,7 @@ function render(a: Annotation, ay: number, noteNumber: number): { shape: ReactNo
       return {
         shape: (
           <g key={a.id}>
-            <Line points={[a.from, a.to]} colour={colour} width={2} dash="6 4" />
+            <Line points={[a.from, a.to]} colour={colour} width={2} />
             <Line points={tick(a.from)} colour={colour} width={2.5} />
             <Line points={tick(a.to)} colour={colour} width={2.5} />
           </g>
@@ -317,7 +337,8 @@ export function AnnotatedImage({
 
   return (
     <figure className={["min-w-0", className].filter(Boolean).join(" ")}>
-      <div className="relative w-full overflow-hidden rounded-2xl bg-surface" style={boxStyle}>
+      {/* A size container: chip text scales with the photo (cqw), between 9 and 12 px. */}
+      <div className="relative w-full overflow-hidden rounded-2xl bg-surface" style={{ ...boxStyle, containerType: "inline-size" }}>
         {src ? (
           // eslint-disable-next-line @next/next/no-img-element -- signed, short-lived URLs: nothing for the optimiser to cache
           <img
@@ -354,13 +375,14 @@ export function AnnotatedImage({
                   key={`chip-${chip.key}`}
                   className={
                     pin
-                      ? "absolute text-[11px] font-bold leading-none text-white"
-                      : "absolute max-w-[45%] truncate whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold leading-tight shadow-sm"
+                      ? "absolute font-bold leading-none text-white"
+                      : "absolute max-w-[45%] truncate whitespace-nowrap rounded-full px-[0.6em] py-[0.15em] font-semibold leading-tight shadow-sm"
                   }
                   style={{
                     left: pct(chip.x),
                     top: pct(chip.y),
-                    transform: CHIP_TRANSFORM[chip.anchor],
+                    transform: chipTransform(chip),
+                    fontSize: "clamp(9px, 1.5cqw, 12px)",
                     ...(pin ? {} : { background: chip.colour, color: chipTextColour(chip.colour) }),
                   }}
                 >

@@ -52,8 +52,9 @@ const rect = (x: number, y: number, w: number, h: number, attrs: string) =>
 const line = (x1: number, y1: number, x2: number, y2: number, attrs: string) =>
   `<line x1="${X(x1)}" y1="${Y(y1)}" x2="${X(x2)}" y2="${Y(y2)}" ${attrs}/>`;
 
-const INK = `stroke="#5b5f68" stroke-width="4" fill="none"`;
-const THIN = `stroke="#7d818a" stroke-width="2" fill="none"`;
+// Stroke only: every shape that uses these sets its own fill (one fill attribute per element, or it isn't XML).
+const INK = `stroke="#5b5f68" stroke-width="4"`;
+const THIN = `stroke="#7d818a" stroke-width="2"`;
 
 function room(v: number): string {
   // Ceiling band, cornice, wall, skirting, floor; a window on the left.
@@ -183,7 +184,7 @@ function annotationsFor(spec: DemoPhotoSpec, v: number): Annotation[] {
         },
         { id: "cable", type: "route", kind: "cable", points: [{ x: 0.66, y: 0.76 }, { x: 0.66, y: 0.66 }, { x: 0.97, y: 0.66 }] },
         { id: "tank", type: "obstacle", x: 0.23, y: 0.57, label: "Cold water tank" },
-        { id: "span", type: "measure", from: { x: 0.4, y: 0.92 }, to: { x: 0.97, y: 0.92 }, label: "3.1 m across the loft" },
+        { id: "span", type: "measure", from: { x: 0.47, y: 0.94 }, to: { x: 0.97, y: 0.94 }, label: "3.1 m across the loft" },
         {
           id: "note",
           type: "note",

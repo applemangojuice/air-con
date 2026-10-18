@@ -117,23 +117,23 @@ const EXTENSION: Record<string, string> = {
  * digits, dot, dash and underscore, no leading dots, at most 80 characters
  * (the extension kept), and an extension matching the content type when
  * the name had none. "../../etc/passwd" → "passwd"; "Living room 1.JPG"
- * → "Living_room_1.JPG".
+ * → "Living_room_1.JPG"; ".jpg" → "file.jpg".
  */
 export function safeMediaName(fileName: string, contentType?: string): string {
   const base = String(fileName ?? "").split(/[\\/]/).pop() ?? "";
-  let name = base
+  const cleaned = base
     .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "") // accents off: "Café" → "Cafe"
     .replace(/[^a-zA-Z0-9._-]+/g, "_")
     .replace(/\.{2,}/g, ".")
     .replace(/_{2,}/g, "_")
-    .replace(/^[._-]+/, "")
     .replace(/\.+$/, "");
-  const ext = /\.[a-zA-Z0-9]{1,8}$/.exec(name)?.[0] ?? "";
-  if (name.length > 80) name = `${name.slice(0, 80 - ext.length).replace(/[._-]+$/, "")}${ext}`;
-  if (!name || !/[a-zA-Z0-9]/.test(name.replace(ext, ""))) name = `file${ext}`;
+  const ext = /\.[a-zA-Z0-9]{1,8}$/.exec(cleaned)?.[0] ?? "";
+  let stem = cleaned.slice(0, cleaned.length - ext.length).replace(/^[._-]+/, "").replace(/[._-]+$/, "");
+  if (!/[a-zA-Z0-9]/.test(stem)) stem = "file";
+  if (stem.length + ext.length > 80) stem = stem.slice(0, 80 - ext.length).replace(/[._-]+$/, "");
   const wanted = contentType ? EXTENSION[normaliseContentType(contentType)] : undefined;
-  if (!ext && wanted) name = `${name}${wanted}`;
-  return name;
+  return `${stem}${ext || wanted || ""}`;
 }
 
 /** `<projectId>/<mediaId>-<safeName>`, lower-case ids. Throws on ids that aren't uuids. */
