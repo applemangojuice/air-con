@@ -1,5 +1,7 @@
 import {
   COMMS_EVENTS,
+  ISSUE_KIND_LABEL,
+  defaultsForKind,
   depositPence,
   diffSelfSurvey,
   isOpen,
@@ -11,6 +13,7 @@ import {
   runsheetProgress,
   schedule2Missing,
   surveyCompleteness,
+  transitionIssue,
   type Blocker,
   type CommsEventId,
   type ComplianceItem,
@@ -18,6 +21,7 @@ import {
   type InstallJobV2,
   type Invoice,
   type Issue,
+  type IssueKind,
   type Learning,
   type MediaItem,
   type Payment,
@@ -177,6 +181,42 @@ export function stubbed(fn: () => unknown): boolean {
   } catch (err) {
     return err instanceof Error && err.message.startsWith("not implemented");
   }
+}
+
+const PROBE_ISSUE: Issue = {
+  id: "probe",
+  projectId: "probe",
+  number: 0,
+  kind: "clarification",
+  title: "probe",
+  severity: "low",
+  status: "open",
+  blocking: false,
+  ownerRole: "ops",
+  raisedBy: { kind: "system", name: "probe" },
+  raisedAt: "1970-01-01T00:00:00.000Z",
+  mediaIds: [],
+  customerVisible: false,
+  history: [],
+};
+
+/** Can issues change status yet? (transitionIssue is the field module's, F6.) */
+export function issueTransitionsReady(): boolean {
+  // INTEGRATION(f6): true once transitionIssue is implemented; the status buttons then appear.
+  return !stubbed(() => transitionIssue(PROBE_ISSUE, "in-progress", "probe", "", new Date().toISOString()));
+}
+
+/** The domain's defaults per issue kind, where F6 has built them ({} until then). */
+export function issueKindDefaults(): Partial<Record<IssueKind, ReturnType<typeof defaultsForKind>>> {
+  const out: Partial<Record<IssueKind, ReturnType<typeof defaultsForKind>>> = {};
+  for (const k of Object.keys(ISSUE_KIND_LABEL) as IssueKind[]) {
+    try {
+      out[k] = defaultsForKind(k);
+    } catch {
+      // INTEGRATION(f6): defaultsForKind prefills the raise-issue form once implemented.
+    }
+  }
+  return out;
 }
 
 function leadEngineer(project: Project): string {
@@ -923,6 +963,17 @@ export async function goLiveChecks(): Promise<GoLiveCheck[]> {
 /* ------------------------------------------------------------------ */
 
 export const COMMS_EVENT_IDS = Object.keys(COMMS_EVENTS) as CommsEventId[];
+
+/** Customer names (and pilot numbers) for a set of project ids, for lists that only hold the id. */
+export async function projectNames(ids: string[]): Promise<Map<string, { name: string; pilot?: number }>> {
+  const rows = await rowsWhereIn("projects", "id", ids, "id, customer_name, pilot_number");
+  return new Map(
+    rows.map((r) => [
+      String(r.id),
+      { name: String(r.customer_name ?? "") || "Unnamed customer", ...(typeof r.pilot_number === "number" ? { pilot: r.pilot_number } : {}) },
+    ]),
+  );
+}
 
 /* ------------------------------------------------------------------ */
 /* Staff media (profile photos, certificates)                          */
