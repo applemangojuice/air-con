@@ -232,7 +232,13 @@ function PricingControls({
           label="Pilot discount"
           value={inputs.discountCode ?? ""}
           onChange={(e) => setInputs({ discountCode: e.target.value || undefined, customDiscountPence: undefined })}
-          options={[{ value: "", label: "No discount" }, ...discounts.map((d) => ({ value: d.code, label: `${d.code}: ${d.label}` }))]}
+          options={[
+            { value: "", label: "No discount" },
+            ...discounts.map((d) => ({
+              value: d.code,
+              label: d.pct ? `${d.code} · ${d.pct}%` : d.amountPence ? `${d.code} · ${money(d.amountPence)}` : `${d.code} · set per job`,
+            })),
+          ]}
         />
         {inputs.discountCode && (
           <Input
@@ -264,7 +270,11 @@ function PricingControls({
         ) : (
           <p className="rounded-2xl bg-cream px-4 py-2.5 text-sm text-ink-700">
             {TAX_CODES[inputs.taxCode && settings.tax.vatRegistered ? inputs.taxCode : taxDefault].label}
-            <span className="block text-xs text-ink-500">From settings{settings.tax.accountantConfirmed ? ", confirmed by the accountant" : ", not yet confirmed by the accountant"}.</span>
+            <span className="block text-xs text-ink-500">
+              {settings.tax.vatRegistered
+                ? `From settings, ${settings.tax.accountantConfirmed ? "confirmed by the accountant" : "not yet confirmed by the accountant"}.`
+                : "From settings: no VAT is charged while we aren't registered."}
+            </span>
           </p>
         )}
       </div>

@@ -62,7 +62,7 @@ export function ProposalView({ data }: { data: ProposalPageData }) {
   const state = accepted ? "accepted" : data.state;
   const visibleOptions = accepted ? data.options.filter((o) => o.label === accepted.optionLabel).slice(0, 1) : data.options;
   const option = (accepted ? visibleOptions[0] : data.options.find((o) => o.id === optionId)) ?? data.options[0]!;
-  const canAccept = (state === "open" || state === "changes-requested") && !responded;
+  const canAccept = (state === "open" || state === "changes-requested") && responded !== "decline";
 
   // The phone's sticky "Accept" bar steps aside while the accept or respond section is on screen.
   useEffect(() => {
