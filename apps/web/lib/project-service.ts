@@ -297,7 +297,7 @@ export async function createProjectForQuote(
     entityId: project.id,
     detail: { quoteId, ...(opts.pilot ? { pilot: opts.pilot } : {}) },
   });
-  // INTEGRATION: no comms event for "project created" in v2; the first
+  // No comms event for "project created" in v2: the first
   // customer message is survey-booked (contract §H).
   return { id: project.id, created: true };
 }
@@ -546,7 +546,7 @@ export async function dispatch(projectId: string, action: ProjectAction, actorIn
 
 /**
  * Old name, new machine: dispatch as the system, with the legacy demo-mode
- * answer ({ error: "demo", status: 200 }) callers of projects-server expect.
+ * answer ({ error: "demo", status: 200 }) the old v1 callers expected.
  */
 export async function applyAndSave(
   id: string,

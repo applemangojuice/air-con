@@ -191,8 +191,8 @@ const KIT: Record<Project["kit"]["status"], { label: string; tone: JobCard["kitT
   inspected: { label: "Kit checked", tone: "success" },
 };
 
-// INTEGRATION(F5): p.kit is the project's own kit status; F5 keeps it in step with purchase orders. In this tree the
-// ready-to-install gate reads F5's kit summary (a stub), so the badge can say "Kit checked" while the gate still refuses.
+// p.kit is the project's own kit status. F5's purchasing (syncKitStatus) keeps it in step with the purchase orders,
+// and the ready-to-install gate reads the same orders through kitSummary, so the badge and the gate agree.
 export function kitBadge(p: Project): { label: string; tone: NonNullable<JobCard["kitTone"]> } {
   const k = KIT[p.kit.status] ?? KIT["not-ordered"];
   const short = p.kit.shortages > 0 ? `, ${p.kit.shortages} short` : "";
@@ -791,7 +791,6 @@ export async function loadJobPack(projectId: string, staff: StaffMember): Promis
   const documents = seesPrices(staff)
     ? (await listDocuments(projectId))
         .filter((d) => d.status === "final" && (d.kind === "proposal" || d.kind === "contract" || d.kind === "survey-report" || d.kind === "variation"))
-        // INTEGRATION(F1): documents render at /d/[id].
         .map((d) => ({ id: d.id, title: d.title, ref: d.ref, kind: d.kind, href: `/d/${d.id}` }))
     : [];
   const scope = rooms.map((r) => `${r.name}: ${r.unitLabel}${r.condensate === "pump" ? ", condensate pump" : ""}`);
@@ -985,7 +984,8 @@ async function raiseIssue(
     await alertTeam(project, saved.issue);
     if (saved.issue.variation) {
       try {
-        // INTEGRATION(F1/F5): the customer approves or declines in the portal's issue panel.
+        // The customer approves or declines in the portal (F1's /api/portal/variations); an accepted
+        // variation is billed on its own or picked up by the balance invoice (F5's planInvoices).
         await notify("variation-approval", {
           projectId: project.id,
           data: {
@@ -1399,8 +1399,9 @@ export async function commissioningHolds(projectId: string, staff: StaffMember):
         seen.add(b.code);
         return true;
       });
-  } catch {
-    // INTEGRATION(F5): the readiness context leans on F5's kit and compliance modules; without them the preview stays quiet and signing still checks.
+  } catch (err) {
+    // A preview only: signing re-checks every gate, so a failed preview mustn't stop the page.
+    console.error(`[field] commissioning preview for ${projectId} failed:`, err);
     return [];
   }
 }

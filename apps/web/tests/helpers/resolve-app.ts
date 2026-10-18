@@ -2,8 +2,10 @@ import * as nodeModule from "node:module";
 
 /**
  * Let `node --test` load app modules the way Next's bundler does: `@/x`
- * resolves from apps/web, and extensionless relative imports try `.ts`
- * then `/index.ts`. Call it before the dynamic imports of the modules
+ * resolves from apps/web, extensionless relative imports try `.ts`
+ * then `/index.ts`, and Next's `next/headers`-style entry points resolve to
+ * their `.js` files (so server modules load; calling `cookies()` outside a
+ * request still throws, as it should). Call it before the dynamic imports of the modules
  * under test (static imports are resolved before any code runs).
  */
 
@@ -46,6 +48,8 @@ export function registerAppResolver(): void {
         return next(specifier, context);
       } catch (err) {
         if (specifier.startsWith(".") && !HAS_EXT.test(specifier)) return firstResolvable(candidatesFor(specifier), context, next);
+        // Next's subpath entry points ("next/headers", "next/cache") are CommonJS files without an exports map.
+        if (/^next\/[a-z-]+$/.test(specifier)) return next(`${specifier}.js`, context);
         throw err;
       }
     },

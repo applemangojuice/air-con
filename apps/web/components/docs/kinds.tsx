@@ -258,20 +258,40 @@ export function ContractDoc({ snap, ctx }: { snap: ContractSnapshot; ctx: DocCon
         )}
       </DocSection>
       <DocSection title="Paying" legal={{ reviewed: ctx.legal.termsReviewed }}>
-        {/* INTEGRATION(F4): freeze the payment schedule (deposit %, timing, balance terms) into ContractSnapshot; until then
-            this section names no figures, so a later settings change can't contradict the contract. */}
-        <p>
-          You pay the total above, and nothing more unless you agree a change in writing first. Any deposit and the balance are each invoiced, with the amount and due date
-          on the invoice, and you can pay by {ctx.payments.methods.map((m) => (m === "card" ? "card" : "bank transfer")).join(" or ")}. Your invoices and receipts are in your
-          documents.
-        </p>
+        {snap.payments ? (
+          <>
+            {/* The schedule frozen at acceptance (F4): a later settings change can't contradict the contract. */}
+            <Bullets
+              items={[
+                ...(snap.payments.depositPct > 0
+                  ? [
+                      `A ${snap.payments.depositPct}% deposit${snap.payments.depositPence ? ` of ${money(snap.payments.depositPence)}` : ""}, ${snap.payments.depositTiming === "on-acceptance" ? "when you accept" : "before we order your equipment"}.`,
+                      `The balance${snap.payments.depositPence ? ` of ${money(snap.acceptance.totalPence - snap.payments.depositPence)}` : ""} once the installation is finished, due within ${snap.payments.balanceDueDays} day${snap.payments.balanceDueDays === 1 ? "" : "s"} of our invoice.`,
+                    ]
+                  : [`No deposit. The full price once the installation is finished, due within ${snap.payments.balanceDueDays} day${snap.payments.balanceDueDays === 1 ? "" : "s"} of our invoice.`]),
+                `You can pay by ${snap.payments.methods.map((m) => (m === "card" ? "card" : "bank transfer")).join(" or ") || "bank transfer"}.`,
+              ]}
+            />
+            <p>You pay the total above, and nothing more unless you agree a change in writing first. Each invoice shows its amount and due date; your invoices and receipts are in your documents.</p>
+          </>
+        ) : (
+          <p>
+            You pay the total above, and nothing more unless you agree a change in writing first. Any deposit and the balance are each invoiced, with the amount and due date
+            on the invoice, and you can pay by {ctx.payments.methods.map((m) => (m === "card" ? "card" : "bank transfer")).join(" or ")}. Your invoices and receipts are in your
+            documents.
+          </p>
+        )}
       </DocSection>
       <DocSection title="Guarantees, complaints and disputes" legal={{ reviewed: ctx.legal.termsReviewed }}>
         <p>{snap.warranty ?? "No manufacturer warranty is stated in this contract."}</p>
         {ctx.company.workmanshipGuarantee && <p>{ctx.company.workmanshipGuarantee}</p>}
-        {ctx.company.complaintsProcess ? <p>{ctx.company.complaintsProcess}</p> : <p className="text-amber-800">Our complaints process is to be added.</p>}
-        {ctx.company.adr && <p>{ctx.company.adr}</p>}
-        <p className="text-xs text-ink-500">Complaints and dispute details as currently published.</p>
+        {(snap.complaints?.process ?? ctx.company.complaintsProcess) ? (
+          <p>{snap.complaints?.process ?? ctx.company.complaintsProcess}</p>
+        ) : (
+          <p className="text-amber-800">Our complaints process is to be added.</p>
+        )}
+        {(snap.complaints ? snap.complaints.adr : ctx.company.adr) && <p>{snap.complaints ? snap.complaints.adr : ctx.company.adr}</p>}
+        <p className="text-xs text-ink-500">{snap.complaints ? "Complaints and dispute details as they stood when you accepted." : "Complaints and dispute details as currently published."}</p>
       </DocSection>
       <DocSection title="Your right to cancel" legal={legal}>
         <p className="text-[15px] font-semibold text-ink-900">{snap.cancellation.text}</p>

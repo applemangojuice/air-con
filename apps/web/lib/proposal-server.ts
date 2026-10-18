@@ -9,6 +9,7 @@ import {
   cancellationStatus,
   customerSafeProposal,
   defaultOptionFor,
+  depositPence,
   documentCompany,
   documentCustomer,
   draftProposal,
@@ -612,6 +613,15 @@ export async function issueDraft(projectId: string, proposalId: string, staff: S
   const project = await loadProject(projectId);
   if (!project) return fail("Project not found", 404);
   if (project.proposal.status === "accepted") return fail("The proposal is accepted. Changes now go through a variation.");
+  const approved = await designsRepo.approvedForProject(projectId);
+  if (!approved || approved.id !== record.designId) {
+    return fail(
+      approved
+        ? `This draft was built on an earlier design. Design version ${approved.version} is the approved one: start the draft again from it.`
+        : "The design needs a technical lead's sign-off before a proposal can be issued.",
+      409,
+    );
+  }
   const settings = await getSettings();
   const today = londonToday();
   const errors = proposalIssueErrors(record, settings, today);
@@ -674,6 +684,9 @@ export async function reviseFrom(projectId: string, proposalId: string, staff: S
   if (draft) return { ok: true, proposalId: draft.id };
   const source = all.find((p) => p.id === proposalId);
   if (!source) return fail("Proposal not found", 404);
+  // Issued from a design that's since been replaced: the revision starts from the approved design, not a copy of the old layout.
+  const approved = await designsRepo.approvedForProject(projectId);
+  if (approved && approved.id !== source.designId) return startDraft(projectId, staff);
   for (let attempt = 0; attempt < 3; attempt++) {
     const version = await proposalsRepo.nextVersion(projectId);
     const next = { ...reviseProposal(source, crypto.randomUUID(), new Date().toISOString()), version };
@@ -861,20 +874,22 @@ async function createContractDocument(project: Project, record: ProposalRecord, 
     warranty: record.warranty,
     termsVersion: record.termsVersion,
     cancellation: { text: cancellationCopy(project, { settings, today }), ...(cs.endsOn ? { endsOn: cs.endsOn } : {}), earlyStartRequested: a.earlyStartRequested },
-  };
-  // The Schedule 2 particulars and Schedule 3 wording as given, beside the contract type's fields.
-  const snapshot = {
-    ...base,
-    documentHash: a.documentHash,
-    guarantees: record.guarantees ?? guaranteeLines(settings, record.warranty),
-    increaseReason: record.increaseReason,
+    // The payment schedule as agreed: the deposit is exactly what the deposit invoice will charge (F5's depositPence).
     payments: {
       depositPct: settings.payments.depositPct,
+      depositPence: settings.payments.depositPct > 0 ? depositPence(a.totalPence, settings) : 0,
       depositTiming: settings.payments.depositTiming,
       balanceDueDays: settings.payments.balanceDueDays,
       methods: settings.payments.methods,
     },
     complaints: { process: company.complaintsProcess, ...(company.adr ? { adr: company.adr } : {}) },
+    guarantees: record.guarantees ?? guaranteeLines(settings, record.warranty),
+  };
+  // The Schedule 2 particulars and Schedule 3 wording as given, beside the contract type's fields.
+  const snapshot = {
+    ...base,
+    documentHash: a.documentHash,
+    increaseReason: record.increaseReason,
     cancellationNoticeVersion: a.cancellationNoticeVersion,
     cancellationInstructions: cancellationInstructions(trader, { contractType, days: settings.scheduling.cancellationDays }),
     cancellationForm: cancellationForm(trader),

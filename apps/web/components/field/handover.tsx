@@ -229,7 +229,7 @@ export function Handover({ data, pack, missing }: { data: FieldJob; pack: Handov
                 </Link>
               )}
               {published && (
-                // INTEGRATION(F1): /d/[id] is the customer document viewer; until it lands this link may 404.
+                // /d/[id] is the customer document viewer (F1).
                 <Link href={`/d/${header.packDocumentId}`} className={`${SECONDARY} flex items-center justify-center`}>
                   Open their handover pack
                 </Link>

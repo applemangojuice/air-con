@@ -15,7 +15,15 @@ import {
 import { NOISE_LIMIT_DB, designVerdict, estimateHeightDiffM, estimatePipeRunM, type DesignVerdict, type RuleResult, type RuleStatus } from "./design.ts";
 import { estimateRoomLoadWatts, selectCapacityKw } from "./heatload.ts";
 import type { PropertyIntel } from "./intelligence.ts";
-import { PD_CHECKS, type MeasuredRoom, type MeasuredSurvey, type OutdoorPosition, type PdCheckId } from "./survey-visit.ts";
+import {
+  PD_CHECKS,
+  emptyMeasuredSurvey,
+  measuredToEngineSurvey,
+  type MeasuredRoom,
+  type MeasuredSurvey,
+  type OutdoorPosition,
+  type PdCheckId,
+} from "./survey-visit.ts";
 import type { FloorLevel, PropertyType, RoomSize, RoomType, Survey, SurveyRoom } from "./types.ts";
 
 /**
@@ -279,28 +287,34 @@ const nonNegative = (n: number | undefined): n is number => typeof n === "number
  * The preliminary load for a measured room: the house rule of thumb
  * (heatload.ts) on the measured floor area, scaled for the measured ceiling
  * height, plus about two people's worth for a busy room. Labelled as a
- * rule of thumb wherever it's shown.
+ * rule of thumb wherever it's shown. The room is read through F2's
+ * measuredToEngineSurvey (`engineRoom`), the same conversion the proposal's
+ * engine reference uses, so the design and the price see the same room.
  */
-// INTEGRATION(F2): measuredToEngineSurvey (F2) maps measured rooms for the engines too; this stays local so drafting never depends on another feature's code.
-export function preliminaryLoadW(room: MeasuredRoom, base?: SurveyRoom): { loadW: number; areaM2?: number; estimatedArea: boolean } {
-  const measuredArea = positive(room.areaM2) ? room.areaM2 : positive(room.lengthM) && positive(room.widthM) ? room.lengthM * room.widthM : undefined;
+export function preliminaryLoadW(
+  room: MeasuredRoom,
+  base?: SurveyRoom,
+  engineRoom?: SurveyRoom,
+): { loadW: number; areaM2?: number; estimatedArea: boolean } {
+  const er = engineRoom ?? measuredToEngineSurvey({ ...emptyMeasuredSurvey(), rooms: [{ ...room, include: true }] }, { rooms: base ? [base] : [] } as unknown as Survey).rooms[0];
+  const measuredArea = positive(er?.areaM2) ? er.areaM2 : undefined;
   const ceiling = positive(room.ceilingHeightM) ? room.ceilingHeightM : 2.4;
-  const size: RoomSize = measuredArea ? bandFor(measuredArea) : (base?.size ?? "medium");
-  const engineRoom: SurveyRoom = {
+  const size: RoomSize = er?.size ?? (measuredArea ? bandFor(measuredArea) : (base?.size ?? "medium"));
+  const engine: SurveyRoom = {
     id: room.id,
     name: room.name,
-    type: room.type,
+    type: er?.type ?? room.type,
     size,
     ...(measuredArea ? { areaM2: (measuredArea * ceiling) / 2.4 } : {}),
-    floor: room.floor,
-    glazing: room.glazing,
-    orientation: room.orientation,
-    hasExternalWall: room.hasExternalWall,
+    floor: er?.floor ?? room.floor,
+    glazing: er?.glazing ?? room.glazing,
+    orientation: er?.orientation ?? room.orientation,
+    hasExternalWall: er?.hasExternalWall ?? room.hasExternalWall,
     photos: [],
   };
   const occupancy = room.occupancy === "high" ? 240 : 0;
   return {
-    loadW: estimateRoomLoadWatts(engineRoom) + occupancy,
+    loadW: estimateRoomLoadWatts(engine) + occupancy,
     ...(measuredArea ? { areaM2: round1(measuredArea) } : {}),
     estimatedArea: !measuredArea,
   };
@@ -308,11 +322,15 @@ export function preliminaryLoadW(room: MeasuredRoom, base?: SurveyRoom): { loadW
 
 /** One design input per included room: measured where the survey measured, estimated (and flagged) where it didn't. */
 export function roomInputsFromSurvey(measured: MeasuredSurvey, baseSurvey?: Survey): RoomDesignInput[] {
+  // F2's conversion, once for the whole survey: the engine's view of every measured room.
+  const engine = new Map(
+    measuredToEngineSurvey(measured, baseSurvey ?? ({ rooms: [] } as unknown as Survey)).rooms.map((r) => [r.id, r]),
+  );
   return measured.rooms
     .filter((r) => r.include)
     .map((room) => {
       const base = baseSurvey?.rooms.find((b) => b.id === room.selfSurveyRoomId || b.id === room.id);
-      const load = preliminaryLoadW(room, base);
+      const load = preliminaryLoadW(room, base, engine.get(room.id));
       const engineRoom = { floor: room.floor, hasExternalWall: room.hasExternalWall } as SurveyRoom;
       const estimated: RoomEstimate[] = [];
       if (load.estimatedArea) estimated.push("area");

@@ -17,6 +17,7 @@ import { audit } from "./audit";
 import { loadProject } from "./project-service";
 import { fail, mutateRow, projectMediaIds, type Outcome } from "./purchasing-server";
 import * as complianceRepo from "./repo/compliance";
+import * as designsRepo from "./repo/designs";
 import * as issuesRepo from "./repo/issues";
 
 /**
@@ -46,12 +47,17 @@ export async function ensureChecklist(projectId: string, staff: StaffMember | nu
 }
 
 /**
- * The checklist, with the automatic items brought up to date first. A sync
+ * The checklist, with the automatic items brought up to date first:
+ * design approval, commissioning and warranty from the project, and
+ * "equipment combination verified" from the approved design (F3). A sync
  * write that loses a race is simply left for the next read.
  */
 export async function loadChecklist(project: Project): Promise<ComplianceItem[]> {
-  const items = await complianceRepo.listForProject(project.id);
-  const changed = syncCompliance(items, project, new Date().toISOString());
+  const [items, design] = await Promise.all([
+    complianceRepo.listForProject(project.id),
+    project.design.status === "approved" ? designsRepo.approvedForProject(project.id).catch(() => null) : Promise.resolve(null),
+  ]);
+  const changed = syncCompliance(items, project, new Date().toISOString(), design);
   for (const c of changed) {
     try {
       await complianceRepo.update(c);

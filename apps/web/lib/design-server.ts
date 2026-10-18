@@ -28,6 +28,7 @@ import {
 import { z } from "zod";
 import { audit } from "./audit";
 import { withoutCosts } from "./catalogue-server";
+import { loadChecklist } from "./compliance-server";
 import { signedMediaUrls } from "./media-server";
 import { dispatch, loadProject, londonToday } from "./project-service";
 import { db, isUuid } from "./repo/base";
@@ -113,6 +114,8 @@ export interface StudioMedia {
   tag: MediaItem["tag"];
   roomId?: string;
   locked: boolean;
+  /** For the annotation editor's optimistic save (PATCH /api/media/<id>). */
+  annotationsVersion: number;
 }
 
 export interface DesignHistoryEntry {
@@ -242,6 +245,7 @@ export async function loadDesignPage(projectId: string, viewer: DesignViewer): P
     tag: m.tag,
     ...(m.roomId ? { roomId: m.roomId } : {}),
     locked: m.locked,
+    annotationsVersion: m.annotationsVersion ?? 0,
   }));
 
   let catalogueChanged = false;
@@ -497,7 +501,8 @@ export async function saveDesign(projectId: string, staff: StaffMember, input: u
     return fail("Someone saved a newer version at the same moment. Reload to see it; your changes are kept on this device.", 409, { conflict: true });
   }
   await supersedeOlder(projectId, saved.id);
-  // INTEGRATION(F4): a proposal already issued from the superseded version keeps pointing at it (designId/designVersion); the proposal builder should offer a revision once this version is approved.
+  // A proposal already issued from the superseded version keeps pointing at it (designId/designVersion): once this
+  // version is approved, F4's builder flags it and "Revise" drafts afresh from the approved design.
   await audit({ actor: staff, action: submit ? "design.submit" : "design.save", entity: "design", entityId: saved.id, detail: { projectId, version: saved.version, from: base.version } });
   const pointed = await pointProjectAt(projectId, saved, staff);
   if (!pointed.ok) return fail(`Version ${saved.version} is saved, but the project couldn't be updated: ${pointed.error}`, pointed.status);
@@ -588,7 +593,12 @@ export async function approveDesignRecord(projectId: string, staff: StaffMember,
     entityId: approved.id,
     detail: { projectId, version: approved.version, qualificationRef: viewer.qualificationRef, acknowledged: Boolean(approved.acknowledgements?.combinationTable), lockFailures },
   });
-  // INTEGRATION(F5): the compliance items "design-approval" and "equipment-compatibility" (auto: design-approved) are F5's to tick from this event.
+  // F5's checklist follows at once: "design-approval" from the project, "equipment-compatibility" from this design.
+  try {
+    await loadChecklist(result.project);
+  } catch (err) {
+    console.error(`[design] compliance sync after approving ${approved.id} failed (the compliance page retries):`, err);
+  }
   return { ok: true, value: { design: approved, lockFailures } };
 }
 

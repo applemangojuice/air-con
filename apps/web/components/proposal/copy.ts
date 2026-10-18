@@ -21,15 +21,8 @@ const METHOD: Record<PilotSettings["payments"]["methods"][number], string> = {
   card: "card",
 };
 
-/** The deposit F5's invoices will ask for; the same rule worked out here until money.ts is in. */
-function depositFor(totalPence: number, settings: PilotSettings): number {
-  try {
-    // INTEGRATION(F5): depositPence is F5's; when it lands the proposal quotes exactly what the deposit invoice charges.
-    return depositPence(totalPence, settings);
-  } catch {
-    return Math.round((totalPence * settings.payments.depositPct) / 100);
-  }
-}
+/** The deposit F5's invoices will ask for (money.ts depositPence), so the proposal quotes exactly what the deposit invoice charges. */
+const depositFor = (totalPence: number, settings: PilotSettings): number => depositPence(totalPence, settings);
 
 /** Deposit, balance and how to pay, for one option's total. */
 export function paymentTerms(totalPence: number, settings: PilotSettings): string[] {

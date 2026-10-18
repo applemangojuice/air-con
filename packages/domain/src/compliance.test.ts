@@ -14,6 +14,7 @@ import {
 import { GATE_IDS, blockersFor, createProject, type Project, type ReadinessContext } from "./project.ts";
 import { generateQuote } from "./pricing.ts";
 import { DEFAULT_SETTINGS } from "./settings.ts";
+import type { DesignRecord } from "./design-record.ts";
 import type { StaffMember, StaffRole } from "./staff.ts";
 import type { Survey } from "./types.ts";
 
@@ -253,6 +254,53 @@ test("sync approves the auto items from the project's records, and reopens them"
   const redraft = project((x) => (x.design = { status: "draft", designId: "d", version: 3 }));
   const reopened = syncCompliance(merged, redraft, NOW).find((c) => c.key === "design-approval");
   assert.equal(reopened?.status, "under-review");
+});
+
+test("equipment combination verified follows the approved design: compatibility clean, provisional rules confirmed", () => {
+  const p = project((x) => (x.design = { status: "approved", designId: "d", version: 2, approvedAt: NOW, approvedBy: "DEMO Tess" }));
+  const system = (over: Record<string, unknown> = {}) => ({
+    id: "s1",
+    topology: "multi",
+    outdoorItemId: "o",
+    roomIds: ["r1", "r2"],
+    compatibility: { ok: true, errors: [], warnings: [] },
+    electrical: { breaker: "16 A", cableMm2: 2.5, isolator: "20 A" },
+    refrigerant: { totalPipeM: 10, prechargedPipeM: 15, additionalChargeG: 0 },
+    ruleConfidence: "verified",
+    ...over,
+  });
+  const design = (systems: unknown[], extra: Partial<DesignRecord> = {}) =>
+    ({
+      id: "d",
+      projectId: "p-1",
+      version: 2,
+      status: "approved",
+      rooms: [],
+      variants: [{ id: "v-std", label: "Standard", systems }],
+      overrides: [],
+      approval: { staffId: "t", name: "DEMO Tess", qualificationRef: "DEMO-FG", at: NOW },
+      createdAt: NOW,
+      ...extra,
+    }) as unknown as DesignRecord;
+
+  const compat = (d: DesignRecord | null, items = checklist()) => syncCompliance(items, p, NOW, d).find((c) => c.key === "equipment-compatibility");
+  assert.equal(compat(design([system()]))?.status, "approved");
+  assert.equal(compat(design([system()]))?.reviewedBy, "DEMO Tess");
+  assert.equal(compat(design([system({ compatibility: { ok: false, errors: ["Too much pipe"], warnings: [] } })])), undefined, "an error leaves it for review");
+  assert.equal(compat(design([system({ ruleConfidence: "provisional" })])), undefined, "a provisional rule nobody confirmed");
+  assert.equal(
+    compat(design([system({ ruleConfidence: "provisional" })], { acknowledgements: { combinationTable: { by: "DEMO Tess", at: NOW } } }))?.status,
+    "approved",
+    "confirmed against the combination table at approval",
+  );
+  assert.equal(compat(design([system({ topology: "single", ruleConfidence: undefined })]))?.status, "approved", "a matched single split needs no rule");
+  assert.equal(syncCompliance(checklist(), p, NOW).find((c) => c.key === "equipment-compatibility"), undefined, "no design given: untouched");
+
+  // Approved from the design, then the design is no longer approved: reopened; a hand approval is left alone.
+  const approved = checklist().map((i) => (i.key === "equipment-compatibility" ? compat(design([system()]))! : i));
+  assert.equal(compat(null, approved)?.status, "under-review");
+  const byHand = checklist().map((i) => (i.key === "equipment-compatibility" ? { ...i, status: "approved" as const, history: [] } : i));
+  assert.equal(compat(null, byHand), undefined);
 });
 
 test("sync moves planning to review after the survey, and never approves it", () => {

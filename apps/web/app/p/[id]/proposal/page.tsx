@@ -74,7 +74,7 @@ export default async function CustomerProposalPage({
             </p>
           }
           action={
-            // INTEGRATION(F1): /portal is the customer sign-in (magic link) and honours ?next.
+            // /portal is the customer sign-in (magic link, F1) and honours ?next.
             <Link
               href={`/portal?next=${encodeURIComponent(`/p/${id}/proposal`)}`}
               className="inline-flex min-h-12 items-center rounded-full bg-accent-600 px-6 text-base font-semibold text-white hover:bg-accent-700"

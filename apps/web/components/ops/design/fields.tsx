@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useState } from "react";
 import { AnnotatedImage } from "@/components/annotate/annotated-image";
+import { MediaAnnotator } from "@/components/annotate/media-annotator";
 import { inputClass, textareaClass } from "@/components/kit";
 import type { StudioMedia } from "@/lib/design-server";
 
@@ -124,9 +125,13 @@ export function ReasonField({
   );
 }
 
-/** A photo with its drawing, and (when editing) a tick to make it part of the approved layout. */
+/**
+ * A photo with its drawing, and (when editing) a tick to make it part of the
+ * approved layout and F2's annotation editor to correct the drawing (unit
+ * positions, routes, core holes) before sign-off. Approval locks it.
+ */
 export function PhotoChoice({
-  media,
+  media: initial,
   chosen,
   editing,
   onToggle,
@@ -139,9 +144,34 @@ export function PhotoChoice({
   label: string;
 }) {
   const id = useId();
+  const [media, setMedia] = useState(initial);
+  const [annotating, setAnnotating] = useState(false);
+  // A newer copy from the page (another save, a reload) wins; an older one never undoes a drawing saved here.
+  useEffect(() => {
+    setMedia((m) => (initial.id !== m.id || initial.annotationsVersion > m.annotationsVersion || initial.locked !== m.locked ? initial : m));
+  }, [initial]);
   return (
     <div className={`overflow-hidden rounded-2xl border bg-white ${chosen ? "border-accent-500 ring-2 ring-accent-100" : "border-line"}`}>
       <AnnotatedImage src={media.url} annotations={media.annotations} width={media.width} height={media.height} alt={media.caption ?? label} labels={false} className="[&>div]:rounded-none" />
+      {editing && !media.locked && media.url && (
+        <button
+          type="button"
+          onClick={() => setAnnotating(true)}
+          className="flex min-h-11 w-full items-center justify-center border-t border-line px-3 text-sm font-semibold text-accent-700 hover:bg-accent-50"
+        >
+          {media.annotations.length ? "Edit the drawing" : "Draw the layout"}
+        </button>
+      )}
+      {annotating && (
+        <MediaAnnotator
+          media={media}
+          title={label}
+          onClose={() => setAnnotating(false)}
+          onSaved={(item) =>
+            setMedia((m) => ({ ...m, annotations: item.annotations, annotationsVersion: item.annotationsVersion, locked: item.locked, url: item.url ?? m.url }))
+          }
+        />
+      )}
       <div className="flex min-h-11 items-center gap-2 px-3 py-2 text-sm">
         {editing ? (
           <>

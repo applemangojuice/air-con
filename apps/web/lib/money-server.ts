@@ -11,6 +11,7 @@ import {
   invoiceOutstanding,
   invoiceTotals,
   moneySummary,
+  projectFees,
   settleInvoice,
   type DocumentRecord,
   type Invoice,
@@ -151,6 +152,10 @@ export function planInvoices(input: {
           changeFeesPence: p.money.changeFeesPence,
           alreadyInvoicedPence: alreadyInvoiced,
           taxCode,
+          // A paid survey fee counts off the price, as promised (contract §K19).
+          ...(projectFees(p).surveyPaidGbp > 0
+            ? { credits: [{ label: "Home survey fee, already paid", pence: Math.round(projectFees(p).surveyPaidGbp * 100) }] }
+            : {}),
         }),
         undefined,
       );

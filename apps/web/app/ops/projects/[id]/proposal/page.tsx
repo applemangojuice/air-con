@@ -78,7 +78,6 @@ export default async function ProposalBuilderPage({ params }: { params: Promise<
               : "There's no design yet. The technical lead designs from the measured survey and signs it off; the proposal is built from that."
         }
         action={
-          // INTEGRATION(F3): the design page lives at /ops/projects/[id]/design.
           <LinkButton href={designHref}>Go to the design</LinkButton>
         }
       />
@@ -151,9 +150,27 @@ export default async function ProposalBuilderPage({ params }: { params: Promise<
     );
   } else {
     const shown = canSeeMargins ? current : customerSafeProposal(current);
+    // Issued from a design that's since been replaced (F3 superseded it): the customer is looking at an old layout.
+    const staleDesign = !accepted && current.status !== "accepted" && current.designId !== design.id;
     body = (
       <div className="space-y-6">
-        {current.status !== "accepted" && !accepted && (
+        {staleDesign && (
+          <Card>
+            <div className="grid gap-6 md:grid-cols-[1fr_auto] md:items-end">
+              <div>
+                <h2 className="font-display text-2xl text-ink-900">The design has changed since this proposal</h2>
+                <p className="mt-1 text-base text-ink-700">
+                  Version {current.version} was issued from an earlier design. Design version {design.version} is now the approved one, so the customer is
+                  looking at an out-of-date layout and price. Revise it: the new draft is built from design v{design.version}, and issuing it replaces this one.
+                </p>
+              </div>
+              <ProposalActionButton kind="revise" projectId={id} proposalId={current.id}>
+                Revise from design v{design.version}
+              </ProposalActionButton>
+            </div>
+          </Card>
+        )}
+        {current.status !== "accepted" && !accepted && !staleDesign && (
           <Card>
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="max-w-xl">

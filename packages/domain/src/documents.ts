@@ -171,6 +171,23 @@ export interface ContractSnapshot extends DocumentHeader {
   warranty: string | null;
   termsVersion: string;
   cancellation: { text: string; endsOn?: string; earlyStartRequested: boolean };
+  /**
+   * The payment schedule as agreed, frozen at acceptance so a later settings
+   * change can't contradict the contract. `depositPence` is what the deposit
+   * invoice charges (0: no deposit). Absent on contracts frozen before this
+   * was recorded; the renderer then names no figures.
+   */
+  payments?: {
+    depositPct: number;
+    depositPence?: number;
+    depositTiming: PilotSettings["payments"]["depositTiming"];
+    balanceDueDays: number;
+    methods: PilotSettings["payments"]["methods"];
+  };
+  /** Our complaints process and ADR as published when the contract was made. */
+  complaints?: { process: string; adr?: string };
+  /** The guarantee lines as given at acceptance. */
+  guarantees?: string[];
 }
 
 /** The customer-facing part of a variation issue: never its internal history. */

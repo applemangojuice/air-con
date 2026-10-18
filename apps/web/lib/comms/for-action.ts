@@ -69,7 +69,7 @@ async function enrich(n: AnyNotice, action: ProjectAction): Promise<AnyNotice> {
   if (n.event === "proposal-issued" && action.type === "proposal-issued") {
     try {
       const record = await proposals.get(action.proposalId);
-      // INTEGRATION: F4 saves the issued proposal before dispatching proposal-issued.
+      // The record exists before proposal-issued is dispatched (F4's issueDraft marks it issued just after).
       if (!record) {
         console.error(`[comms] proposal ${action.proposalId} not found: the issue email goes without option prices`);
         return n;
@@ -85,7 +85,7 @@ async function enrich(n: AnyNotice, action: ProjectAction): Promise<AnyNotice> {
   try {
     const record = await proposals.get(action.proposalId);
     const a = record?.acceptance;
-    if (!a) return n; // INTEGRATION: F4 saves the acceptance on the proposal before dispatching proposal-accepted.
+    if (!a) return n; // F4's acceptProposal saves the acceptance on the record before dispatching proposal-accepted.
     const option = record.options.find((o) => o.id === a.optionId);
     return {
       ...n,

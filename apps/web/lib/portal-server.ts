@@ -3,6 +3,7 @@ import {
   customerNextAction,
   defaultsForKind,
   isOpen,
+  transitionIssue,
   outstandingPence,
   STAGE_INFO,
   type Blocker,
@@ -636,18 +637,17 @@ export async function decideVariation(
   const now = new Date().toISOString();
   const status = decision === "accept" ? "accepted" : "declined";
   const delta = money(issue.variation.totalDeltaPence);
-  const next: Issue = {
-    ...issue,
-    variation: { ...issue.variation, status, decidedAt: now, decidedBy: name },
-    history: [
-      ...issue.history,
-      {
-        at: now,
-        by: name,
-        note: decision === "accept" ? `Accepted on the portal (${issue.variation.totalDeltaPence >= 0 ? "+" : ""}${delta}).` : "Declined on the portal.",
-      },
-    ],
-  };
+  // The decision moves the issue on (F6's transitionIssue): accepted is work to do, declined is settled.
+  const moved = transitionIssue(
+    issue,
+    decision === "accept" ? "in-progress" : "resolved",
+    name,
+    decision === "accept"
+      ? `Accepted on the portal (${issue.variation.totalDeltaPence >= 0 ? "+" : ""}${delta}). Go ahead with the change.`
+      : "Declined on the portal. Carry on as agreed.",
+    now,
+  );
+  const next: Issue = { ...moved, variation: { ...issue.variation, status, decidedAt: now, decidedBy: name } };
   try {
     await issuesRepo.update(next);
   } catch (err) {

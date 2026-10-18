@@ -166,7 +166,7 @@ export function VersionHistory({ proposals, documents, projectId }: { proposals:
               </div>
               <div className="flex flex-wrap items-center gap-3">
                 {doc && (
-                  // INTEGRATION(F1): /d/[id] renders the frozen proposal document.
+                  // /d/[id] renders the frozen proposal document (F1).
                   <Link href={`/d/${doc.id}`} className="text-sm font-semibold text-accent-700 underline">
                     {doc.ref}
                   </Link>

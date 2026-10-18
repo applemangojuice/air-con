@@ -1,3 +1,4 @@
+import type { DesignRecord } from "./design-record.ts";
 import type { GateId, Project } from "./project.ts";
 import { can, type StaffMember, type StaffRole } from "./staff.ts";
 
@@ -632,7 +633,38 @@ const lastEventAt = (p: Project, type: string) => [...p.events].reverse().find((
  * changed. Never approves planning, and never approves anything the
  * project hasn't recorded.
  */
-export function syncCompliance(items: ComplianceItem[], project: Project, now: string): ComplianceItem[] {
+/** The note the design verdict leaves, so a later sync knows which approvals were its own. */
+const FROM_DESIGN = "From the approved design";
+
+/**
+ * "Equipment combination verified", read from the approved design (F3):
+ * every system in every option passes its compatibility check, and any
+ * combination the catalogue only has a provisional rule for was confirmed
+ * against the manufacturer's table when the design was approved. Null when
+ * the design doesn't settle it (not approved, an error, or a provisional
+ * rule nobody confirmed): then a technical lead reviews it by hand.
+ */
+export function designCompatibilityVerdict(design: DesignRecord | null | undefined): { by: string; at: string; note: string } | null {
+  if (!design || design.status !== "approved" || !design.approval) return null;
+  const systems = (design.variants ?? []).flatMap((v) => v.systems ?? []);
+  if (systems.length === 0) return null;
+  if (systems.some((s) => !s.compatibility?.ok || (s.compatibility.errors ?? []).length > 0)) return null;
+  const provisional = systems.some((s) => s.topology === "multi" && s.ruleConfidence !== "verified");
+  const ack = design.acknowledgements?.combinationTable;
+  if (provisional && !ack) return null;
+  const parts = [
+    `${FROM_DESIGN} (v${design.version}, signed off by ${design.approval.name}): every system passes the compatibility check`,
+    ...(provisional && ack ? [`${ack.by} confirmed the manufacturer's combination table`] : []),
+  ];
+  return { by: design.approval.name, at: design.approval.at, note: `${parts.join("; ")}.` };
+}
+
+/**
+ * The automatic items brought up to date from the project's own records,
+ * and "equipment combination verified" from the approved design when one is
+ * given (designCompatibilityVerdict). Returns only the items that changed.
+ */
+export function syncCompliance(items: ComplianceItem[], project: Project, now: string, design?: DesignRecord | null): ComplianceItem[] {
   const changed: ComplianceItem[] = [];
   const set = (item: ComplianceItem, to: ComplianceStatus, by: string, at: string, note: string) => {
     const next: ComplianceItem = {
@@ -673,6 +705,18 @@ export function syncCompliance(items: ComplianceItem[], project: Project, now: s
         set(item, "under-review", "System", now, `Reopened automatically: ${AUTO_REOPEN[auto]}.`);
       }
       continue;
+    }
+    if (item.key === "equipment-compatibility" && design !== undefined) {
+      const verdict = designCompatibilityVerdict(design);
+      const ours = (item.history ?? []).at(-1)?.note?.startsWith(FROM_DESIGN) ?? false;
+      if (verdict && (item.status === "not-started" || item.status === "evidence-required" || item.status === "under-review")) {
+        set(item, "approved", verdict.by, verdict.at, verdict.note);
+        continue;
+      }
+      if (!verdict && item.status === "approved" && ours) {
+        set(item, "under-review", "System", now, "Reopened automatically: the design is no longer the approved version, or its compatibility check changed.");
+        continue;
+      }
     }
     if (
       item.key === "planning-pd" &&

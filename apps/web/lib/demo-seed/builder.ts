@@ -17,6 +17,7 @@ import {
   handoverDeadlines,
   idempotencyKey,
   PROPOSAL_TURNAROUND_WORKING_DAYS,
+  depositPence as depositPenceOf,
   isPlaceholderPhone,
   mergeSettings,
   plausibleValue,
@@ -744,7 +745,7 @@ function variantFor(sc: Scenario, tier: "standard" | "premium", review: boolean)
     bomLine("demo-mat-isolator", sc.systems.length, "materials"),
     bomLine("demo-mat-condensate", sc.rooms.length, "materials"),
     bomLine("demo-mat-sleeve", sc.rooms.length, "materials"),
-    { sku: "DEMO-CONSUMABLES", label: "Sealant, fixings and tape (DEMO)", qty: 1, unit: "kit", category: "consumables" },
+    bomLine("demo-mat-fixings", 1, "consumables"),
   ];
   const ruleList = rules(sc, review);
   return {
@@ -1517,10 +1518,19 @@ function buildProject(sc: Scenario, today: string, settings: PilotSettings, invo
       text: `Because we're supplying your equipment, you can cancel without giving a reason until ${settings.scheduling.cancellationDays} days after the day it's delivered to you.`,
       earlyStartRequested: sc.earlyStart === true,
     },
+    // The payment schedule frozen at acceptance, as the real accept flow does.
+    payments: {
+      depositPct: settings.payments.depositPct,
+      depositPence: depositPenceOf(contractTotal, settings),
+      depositTiming: settings.payments.depositTiming,
+      balanceDueDays: settings.payments.balanceDueDays,
+      methods: settings.payments.methods,
+    },
+    complaints: { process: settings.company.complaintsProcess, ...(settings.company.adr ? { adr: settings.company.adr } : {}) },
   });
 
-  // Deposit: invoiced on acceptance, paid by bank transfer (DEMO: no real money).
-  const depositPence = Math.round((contractTotal * settings.payments.depositPct) / 100);
+  // Deposit: invoiced on acceptance, paid by bank transfer (DEMO: no real money). The same rule as F5's invoices.
+  const depositPence = depositPenceOf(contractTotal, settings);
   const depositNumber = `DEMO-${String(invoiceCounter.n++).padStart(4, "0")}`;
   const depositIssuedAt = at(cal.accepted!, "20:20");
   const depositPaidAt = at(cal.depositPaid!, "09:12");

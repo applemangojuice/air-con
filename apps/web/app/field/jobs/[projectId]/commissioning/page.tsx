@@ -25,7 +25,6 @@ export default async function CommissioningPage({ params }: { params: Promise<{ 
     return (
       <>
         <JobNav projectId={projectId} active="commissioning" days={data.header.totalDays} />
-        {/* INTEGRATION(F1): documents render at /d/[id]. */}
         <Commissioning data={data} holds={holds} {...(cert ? { certificateHref: `/d/${cert.id}` } : {})} />
       </>
     );

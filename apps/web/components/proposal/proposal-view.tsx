@@ -273,7 +273,7 @@ export function ProposalView({ data }: { data: ProposalPageData }) {
         <ul className="mt-3 space-y-2 text-sm">
           {data.documents.proposal && (
             <li>
-              {/* INTEGRATION(F1): /d/[id] renders the printable proposal. */}
+              {/* /d/[id] renders the printable proposal (F1). */}
               <a href={`/d/${data.documents.proposal.id}`} className="font-semibold text-accent-700 underline underline-offset-2">
                 Your proposal to print or save ({data.documents.proposal.ref})
               </a>

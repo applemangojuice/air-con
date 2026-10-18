@@ -119,7 +119,7 @@ export function AcceptedPanel({ view, projectId, firstName, phone, justNow }: { 
             Choose your install dates
           </LinkButton>
           {view.contractDocumentId && (
-            // INTEGRATION(F1): /d/[id] renders the contract document.
+            // /d/[id] renders the contract document (F1).
             <LinkButton href={`/d/${view.contractDocumentId}`} variant="secondary" size="lg">
               View your contract
             </LinkButton>
