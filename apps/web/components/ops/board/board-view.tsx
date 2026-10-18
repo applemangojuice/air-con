@@ -74,7 +74,7 @@ export function BoardView({
             type="search"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search name, address, postcode, project or invoice number"
+            placeholder="Search name, address, postcode or reference"
             className="min-h-11 w-full rounded-full border border-line bg-white px-4 text-sm text-ink-900 outline-none placeholder:text-ink-500 focus:border-accent-500 focus:ring-2 focus:ring-accent-100"
           />
         </div>
@@ -130,7 +130,11 @@ export function BoardView({
               const list = grouped[col.id];
               const value = list.reduce((s, c) => s + c.valuePence, 0);
               return (
-                <section key={col.id} aria-labelledby={`col-${col.id}`} className="w-[17rem] shrink-0 snap-start rounded-2xl bg-surface/70 p-2">
+                <section
+                  key={col.id}
+                  aria-labelledby={`col-${col.id}`}
+                  className={`${list.length ? "w-[17rem]" : "w-28"} shrink-0 snap-start rounded-2xl bg-surface/70 p-2`}
+                >
                   <div className="flex items-baseline justify-between gap-2 px-2 pb-2 pt-1">
                     <h2 id={`col-${col.id}`} className="text-sm font-semibold text-ink-900">
                       {col.label} <span className="font-normal text-ink-500">{list.length}</span>
@@ -222,7 +226,16 @@ function ListView({ cards, today }: { cards: BoardCard[]; today: string }) {
   const sorted = [...cards].sort((a, b) => (order.get(a.column) ?? 0) - (order.get(b.column) ?? 0) || (a.pilot?.number ?? 999) - (b.pilot?.number ?? 999));
   const label = Object.fromEntries(BOARD_COLUMNS.map((c) => [c.id, c.label]));
   return (
-    <div className="mt-4 overflow-x-auto rounded-2xl border border-line bg-white">
+    <>
+      <ul className="mt-4 space-y-2 md:hidden">
+        {sorted.map((c) => (
+          <li key={c.id}>
+            <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-ink-500">{label[c.column]}</div>
+            <Card card={c} today={today} />
+          </li>
+        ))}
+      </ul>
+    <div className="mt-4 hidden overflow-x-auto rounded-2xl border border-line bg-white md:block">
       <table className="w-full min-w-[56rem] text-left text-sm">
         <caption className="sr-only">Projects</caption>
         <thead className="border-b border-line bg-surface text-xs text-ink-500">
@@ -273,5 +286,6 @@ function ListView({ cards, today }: { cards: BoardCard[]; today: string }) {
         </tbody>
       </table>
     </div>
+    </>
   );
 }

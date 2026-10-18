@@ -485,7 +485,7 @@ export default async function CommandCentrePage({
               {p.proposal.status === "accepted" && (
                 <div className="space-y-2">
                   <p>
-                    <span className="font-semibold text-ink-900">Cancellation: </span>
+                    <span className="font-semibold text-ink-900">Cancellation (as the customer reads it): </span>
                     {cancellationCopy(p, { settings, today })}
                     {cs.earlyStartEvidenced && " Early start is on file, so work can start sooner."}
                   </p>

@@ -842,7 +842,7 @@ export async function goLiveChecks(): Promise<GoLiveCheck[]> {
   checks.push({
     id: "schedule2",
     label: "Pre-contract information (Schedule 2) complete",
-    level: s2.length ? "red" : demoCompany && !demoMode ? "red" : "green",
+    level: s2.length ? "red" : demoCompany ? (demoMode ? "amber" : "red") : "green",
     detail: s2.length
       ? `Missing: ${s2.join(", ")}. Proposals can't be issued until it's there.`
       : demoCompany
