@@ -14,6 +14,7 @@ import {
   effectiveTaxCode,
   fgasRecord,
   generateQuote,
+  guaranteeLines,
   handoverDeadlines,
   idempotencyKey,
   PROPOSAL_TURNAROUND_WORKING_DAYS,
@@ -1527,6 +1528,7 @@ function buildProject(sc: Scenario, today: string, settings: PilotSettings, invo
       methods: settings.payments.methods,
     },
     complaints: { process: settings.company.complaintsProcess, ...(settings.company.adr ? { adr: settings.company.adr } : {}) },
+    guarantees: guaranteeLines(settings, proposal.warranty),
   });
 
   // Deposit: invoiced on acceptance, paid by bank transfer (DEMO: no real money). The same rule as F5's invoices.

@@ -115,6 +115,10 @@ try {
   await page.click('button:has-text("Book my home survey")');
   await page.waitForURL("**/p/**", { timeout: 15000 });
   check("Book my home survey lands on the project page", page.url().includes("/p/"));
+  await page.waitForLoadState("networkidle");
+  const hub = (await page.locator("main").textContent()) ?? "";
+  check("the browser that saved the quote opens its project (no sign-in wall)", !/Sign in to see your project/.test(hub));
+  check("no placeholder phone number on the project page", !/0800 000 0000/.test(hub));
 
   // 9. Out of area: honest, with an optional heads-up.
   await page.goto(`${BASE}/quote?postcode=${encodeURIComponent("E8 1AA")}`, { waitUntil: "networkidle" });

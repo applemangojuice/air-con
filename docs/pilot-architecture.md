@@ -1257,7 +1257,9 @@ changelog and the reasons, so nobody "fixes" a deliberate choice back.
    `/api/projects/**`). It reads a v2 snapshot as "not found", so a v1 page
    never runs a v1 action over v2 data. The old names (`loadProject`,
    `applyAndSave`, …) for v2 callers live in `lib/project-service.ts`.
-   Delete the v1 modules once nothing imports them.
+   Integration deleted `lib/projects-server.ts` and `lib/project-notify.ts`
+   once every v1 page had been rebuilt; `project-v1.ts` stays in the domain
+   because `migrateProject` reads v1 snapshots through it.
 3. **`dispatch` errors carry `status`** (the HTTP code a route should
    answer) alongside `error` and `blockers`.
 4. **Local signed URLs sign the operation:** `?op=get|put|upsert&exp=…&sig=…`,
@@ -1383,3 +1385,48 @@ changelog and the reasons, so nobody "fixes" a deliberate choice back.
     on `/login`): five DEMO homes through the real reducer. In production
     (a demo deployment) only a signed-in admin can load them, so the button
     appears after "Try as… Admin", not before.
+27. **Integration (pilot/f1…f8 merged).** Cross-feature decisions made when
+    the eight features were joined:
+    - *Quote-owner grant* (`lib/auth/quote-owner.ts`). `/api/quotes` sets a
+      signed, httpOnly `dih_quote` cookie (7 days, newest 5 quotes, MAC
+      purpose-prefixed so it can't pass as a session). `requireProjectAccess`
+      with `allowCustomer` lets that browser open the project made from one
+      of those quotes, and nothing else: never the customer record's other
+      projects, because the email typed into the funnel is unverified (a
+      full session would let someone who typed another person's email see
+      that person's later projects). Sign-out clears it.
+    - *Consents*: `createProjectForQuote` copies the funnel's consents onto
+      `customers.ops_consent` / `marketing_consent`
+      (`repo/customers.consentsFromQuote`); the latest answer wins and
+      marketing is only ever a consent when it was ticked.
+    - *Settings caches*: every `saveSettings` caller then calls
+      `revalidateSettingsCaches()` (tag `settings` + the root layout).
+    - *Placeholder phone*: the shipped "0800 000 0000" is
+      `isPlaceholderPhone` and counts as missing Schedule 2 information, so
+      no proposal or contract can carry it; customer pages, emails and SMS
+      say "email us" instead until a real number is set.
+    - *One turnaround*: `PROPOSAL_TURNAROUND_WORKING_DAYS = 3` in
+      `project.ts`, used by the reducer, the timeline, comms, the hub and
+      the survey report.
+    - *Uploads*: the shared rules live in the domain (`media.ts`
+      `MEDIA_UPLOAD_CONTENT_TYPES`, `MEDIA_MAX_BYTES`, `mediaUploadProblem`)
+      and take iPhone video (`video/quicktime`, .mov) under 25 MB.
+    - *Frozen documents*: the contract snapshot carries the payment schedule
+      (`payments`, with the deposit F5 will invoice), complaints and the
+      guarantee lines; the handover pack carries its as-built photos
+      (`asBuilt`). The renderers prefer the frozen copy.
+    - *Compliance from the design*: `syncCompliance(items, project, now,
+      design)` approves "equipment combination verified" from the approved
+      design (`designCompatibilityVerdict`: every system passes, provisional
+      rules confirmed at approval) and reopens its own approval when the
+      design changes; design approval syncs the checklist at once.
+    - *Stale proposals*: a proposal issued from a superseded design is
+      flagged in the builder, Revise drafts afresh from the approved design,
+      and a draft built on an older design can't be issued.
+    - *Money*: an accepted variation (portal) moves its issue to in progress
+      and is billed by the balance invoice (or on its own); a paid survey
+      fee is credited on the balance (§K19).
+    - *Signer*: customer install updates are signed by the tech lead, else
+      whoever ended the day, else an employed installer (`comms/action-map
+      crewLead`), never an arbitrary subcontractor.
+

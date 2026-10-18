@@ -283,8 +283,15 @@ export function ContractDoc({ snap, ctx }: { snap: ContractSnapshot; ctx: DocCon
         )}
       </DocSection>
       <DocSection title="Guarantees, complaints and disputes" legal={{ reviewed: ctx.legal.termsReviewed }}>
-        <p>{snap.warranty ?? "No manufacturer warranty is stated in this contract."}</p>
-        {ctx.company.workmanshipGuarantee && <p>{ctx.company.workmanshipGuarantee}</p>}
+        {snap.guarantees?.length ? (
+          // The guarantee lines as given at acceptance (F4), not whatever settings say today.
+          <Bullets items={snap.guarantees} />
+        ) : (
+          <>
+            <p>{snap.warranty ?? "No manufacturer warranty is stated in this contract."}</p>
+            {ctx.company.workmanshipGuarantee && <p>{ctx.company.workmanshipGuarantee}</p>}
+          </>
+        )}
         {(snap.complaints?.process ?? ctx.company.complaintsProcess) ? (
           <p>{snap.complaints?.process ?? ctx.company.complaintsProcess}</p>
         ) : (

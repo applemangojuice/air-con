@@ -73,6 +73,7 @@ import type {
 import { audit } from "./audit";
 import { isAssigned, staffCanAccessProject } from "./auth/access";
 import { appUrl } from "./brand";
+import { crewLead } from "./comms/action-map";
 import { notify } from "./comms/outbox";
 import { renderMessage, templateContext } from "./comms/templates";
 import { createDocument, currentDocument, listDocuments } from "./documents-server";
@@ -1305,7 +1306,8 @@ export async function dayUpdatePreview(projectId: string, staff: StaffMember, n:
   const settings = await getSettings();
   const ctx = templateContext({ settings, portalUrl: `${appUrl()}/p/${projectId}#install`, project });
   const next = project.install.days.find((d) => d.n === n + 1)?.date ?? project.booking.dates[n];
-  const lead = project.booking.crew.find((c) => c.role === "installer") ?? project.booking.crew[0];
+  // The same signer the real email gets (comms crewLead): the tech lead, else whoever ends the day.
+  const lead = crewLead(project, { staffId: staff.id, name: staff.name });
   const r = renderMessage("install-day-update", ctx, {
     n,
     totalDays: project.booking.installDays || project.booking.dates.length || undefined,
