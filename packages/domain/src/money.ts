@@ -63,6 +63,10 @@ export interface Invoice {
   /** Drafts only: voided, and why. */
   voidedAt?: string;
   voidReason?: string;
+  /** The form submission that created it, so a double click can't issue it twice. */
+  requestId?: string;
+  /** When the project's own totals (money.invoicedPence) took this invoice in. */
+  recordedOnProjectAt?: string;
 }
 
 export interface Payment {
@@ -84,6 +88,8 @@ export interface Payment {
   note?: string;
   /** Stripe: the webhook event that recorded it. */
   eventId?: string;
+  /** When we stored the record (receivedAt is when the money arrived). */
+  recordedAt?: string;
   /** When the payment was applied to its invoice and the project (a retry finishes what a failure left). */
   appliedAt?: string;
 }

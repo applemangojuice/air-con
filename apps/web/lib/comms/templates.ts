@@ -127,6 +127,8 @@ export interface CommsData {
     totalPence: number;
     outstandingPence?: number;
     dueOn?: string;
+    /** Is card payment actually available (Stripe set up, or the demo simulator)? Absent: the settings' methods decide. */
+    cardPayments?: boolean;
   };
   "payment-received": {
     amountPence: number;
@@ -951,7 +953,8 @@ const TEMPLATES: { [E in CommsEventId]: Renderer<E> } = {
 
     const how: Block[] = [{ h: "How to pay" }];
     const ways: Para[] = [];
-    if (payments.methods.includes("card")) ways.push("By card, on your project page (the button below).");
+    const card = payments.methods.includes("card") && d.cardPayments !== false;
+    if (card) ways.push("By card, on your project page (the button below).");
     if (payments.methods.includes("bank-transfer")) {
       ways.push(
         company.bank
@@ -973,7 +976,7 @@ const TEMPLATES: { [E in CommsEventId]: Renderer<E> } = {
     return {
       subject: `Invoice ${d.invoiceNumber}: ${money(due)}${d.dueOn ? ` due ${shortDay(d.dueOn)}` : ""}`,
       body: [{ p: `Here's your ${INVOICE_KIND[d.kind]} invoice for ${place(ctx)}.` }, { facts }, ...how],
-      cta: payments.methods.includes("card") ? "View and pay your invoice" : "View your invoice",
+      cta: card ? "View and pay your invoice" : "View your invoice",
       after: [{ small: "We only ever mark an invoice paid once the payment has actually reached us." }],
     };
   },
