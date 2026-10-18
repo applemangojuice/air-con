@@ -470,7 +470,8 @@ export async function saveDesign(projectId: string, staff: StaffMember, input: u
   const changed = designContentKey(next) !== designContentKey(base);
   if (!changed) return finishSave(projectId, staff, base, Boolean(submit), true);
 
-  const toInsert: DesignRecord = { ...next, status: submit ? "in-review" : "draft" };
+  // A design already in review stays in review when it's corrected; a draft stays a draft until submitted.
+  const toInsert: DesignRecord = { ...next, status: submit || base.status === "in-review" ? "in-review" : "draft" };
   let saved: DesignRecord;
   try {
     saved = await designsRepo.insert(toInsert);

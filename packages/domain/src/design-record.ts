@@ -365,10 +365,13 @@ export function fitsCapacity(item: CatalogueItem, kw: number): boolean {
   return c !== null && c >= kw - CLASS_TOLERANCE_KW;
 }
 
-/** Better first: available before uncertain, verified before provisional, priced before unpriced, then the id. */
+/**
+ * Better first: available before uncertain, verified before provisional,
+ * then the id. Deliberately blind to cost, so the browser (which may get a
+ * catalogue without buy prices) suggests exactly what the server does.
+ */
 function preference(a: CatalogueItem, b: CatalogueItem): number {
-  const rank = (i: CatalogueItem) =>
-    (i.status === "available" ? 0 : 2) + (i.confidence === "verified" ? 0 : 1) + (i.costPence !== null ? 0 : 0.5);
+  const rank = (i: CatalogueItem) => (i.status === "available" ? 0 : 2) + (i.confidence === "verified" ? 0 : 1);
   return rank(a) - rank(b) || a.id.localeCompare(b.id);
 }
 
