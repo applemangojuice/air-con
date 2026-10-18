@@ -10,7 +10,7 @@ import {
   STAGE_INFO,
   TIME_KIND_LABEL,
   can,
-  extremes,
+  rowExtremes,
   type IssueKind,
   type Learning,
   type MetricRow,
@@ -91,12 +91,12 @@ export default async function PilotsPage({ searchParams }: { searchParams: Promi
             <h2 id="compare" className="sr-only">
               Comparison
             </h2>
-            <div className="overflow-x-auto rounded-2xl border border-line bg-white" tabIndex={0} aria-label="Pilot comparison table, scrolls sideways">
+            <div className="relative overflow-x-auto rounded-2xl border border-line bg-white" tabIndex={0} aria-label="Pilot comparison table, scrolls sideways">
               <table className="w-full min-w-[40rem] border-collapse text-sm">
                 <caption className="sr-only">Each pilot side by side. Best and worst per row are marked.</caption>
                 <thead>
                   <tr className="border-b border-line bg-surface">
-                    <th scope="col" className="sticky left-0 z-10 bg-surface px-4 py-3 text-left text-xs font-semibold text-ink-500">
+                    <th scope="col" className="sticky left-0 z-10 min-w-[11rem] bg-surface px-4 py-3 text-left text-xs font-semibold text-ink-500">
                       Measure
                     </th>
                     {rows.map((r) => (
@@ -159,7 +159,7 @@ export default async function PilotsPage({ searchParams }: { searchParams: Promi
               <li>
                 <span className="mr-1 inline-block rounded bg-emerald-100 px-1.5 font-semibold text-emerald-900">Best</span>
                 <span className="mr-1 inline-block rounded bg-amber-100 px-1.5 font-semibold text-amber-900">Worst</span>
-                per row, only where at least two pilots have a real number. A dash means nothing was recorded, never zero.
+                per row, only among pilots far enough along for the number to be final (costs and hours once installed, defects once handed over). A dash means nothing was recorded.
               </li>
               {showMoney && <li>* Some costs are expected (from the purchase order or proposal), not yet actual. Labour is costed at the rates in Settings.</li>}
               <li>Messages sent counts only messages a provider accepted; demo-mode messages aren&apos;t counted.</li>
@@ -216,7 +216,10 @@ function Shell({ children, canExport = false }: { children: ReactNode; canExport
 
 function MetricLine({ row, pilots }: { row: MetricRow; pilots: PilotRow[] }) {
   const values = pilots.map((p) => p.metrics[row.key] as number | null | undefined);
-  const { best, worst } = extremes(values, row.better);
+  const { best, worst } = rowExtremes(
+    row,
+    pilots.map((p) => p.metrics),
+  );
   const costRow = ["equipmentCostPence", "materialsCostPence", "actualCostPence", "grossProfitPence", "grossMarginPct"].includes(row.key);
   return (
     <tr className="border-b border-line last:border-0">

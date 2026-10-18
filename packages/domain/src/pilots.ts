@@ -1,6 +1,6 @@
 import type { CostCategory, CostLine } from "./costing.ts";
 import type { Issue, IssueKind } from "./issues.ts";
-import { currentStage, daysBetween, type Project, type ProjectStageId } from "./project.ts";
+import { PROJECT_STAGES, currentStage, daysBetween, type Project, type ProjectStageId } from "./project.ts";
 import type { ProposalOption, ProposalRecord } from "./proposal.ts";
 import type { PoLine, PurchaseOrder } from "./purchasing.ts";
 import { TAX_CODES, type PilotSettings } from "./settings.ts";
@@ -414,6 +414,12 @@ export interface MetricRow {
   /** Which way is better, for highlighting; null when neither is (prices). */
   better: "higher" | "lower" | null;
   group: "Price" | "Money" | "Labour" | "Timing" | "Quality";
+  /**
+   * The stage a pilot must have reached for this number to be final enough
+   * to call best or worst (a pilot that hasn't been installed yet hasn't
+   * "spent least on equipment"). Shown either way; only compared from here.
+   */
+  from?: ProjectStageId;
 }
 
 /** The comparison table, top to bottom. Record fields are shown as breakdowns, not compared. */
@@ -421,34 +427,48 @@ export const PILOT_METRIC_ROWS: MetricRow[] = [
   { key: "instantPricePence", label: "Instant price", format: "money", better: null, group: "Price" },
   { key: "listPricePence", label: "List price", format: "money", better: null, group: "Price" },
   { key: "contractPricePence", label: "Contract price", format: "money", better: null, group: "Price" },
-  { key: "revenuePence", label: "Revenue (net)", format: "money", better: "higher", group: "Money" },
-  { key: "equipmentCostPence", label: "Equipment cost", format: "money", better: "lower", group: "Money" },
-  { key: "materialsCostPence", label: "Materials and delivery", format: "money", better: "lower", group: "Money" },
-  { key: "subcontractCostPence", label: "Subcontract", format: "money", better: "lower", group: "Money" },
-  { key: "labourCostPence", label: "Labour (logged hours at rates)", format: "money", better: "lower", group: "Money" },
+  { key: "revenuePence", label: "Revenue (net)", format: "money", better: "higher", group: "Money", from: "handover" },
+  { key: "equipmentCostPence", label: "Equipment cost", format: "money", better: "lower", group: "Money", from: "handover" },
+  { key: "materialsCostPence", label: "Materials and delivery", format: "money", better: "lower", group: "Money", from: "handover" },
+  { key: "subcontractCostPence", label: "Subcontract", format: "money", better: "lower", group: "Money", from: "handover" },
+  { key: "labourCostPence", label: "Labour (logged hours at rates)", format: "money", better: "lower", group: "Money", from: "handover" },
   { key: "estimatedCostPence", label: "Estimated cost", format: "money", better: null, group: "Money" },
-  { key: "actualCostPence", label: "Cost so far", format: "money", better: "lower", group: "Money" },
-  { key: "grossProfitPence", label: "Gross profit", format: "money", better: "higher", group: "Money" },
-  { key: "grossMarginPct", label: "Gross margin", format: "pct", better: "higher", group: "Money" },
+  { key: "actualCostPence", label: "Cost so far", format: "money", better: "lower", group: "Money", from: "handover" },
+  { key: "grossProfitPence", label: "Gross profit", format: "money", better: "higher", group: "Money", from: "handover" },
+  { key: "grossMarginPct", label: "Gross margin", format: "pct", better: "higher", group: "Money", from: "handover" },
   { key: "estimatedLabourHours", label: "Install labour, estimated", format: "hours", better: null, group: "Labour" },
-  { key: "installLabourHours", label: "Install labour, logged", format: "hours", better: "lower", group: "Labour" },
-  { key: "actualLabourHours", label: "All logged hours", format: "hours", better: "lower", group: "Labour" },
-  { key: "travelHours", label: "Travel", format: "hours", better: "lower", group: "Labour" },
-  { key: "reworkHours", label: "Rework", format: "hours", better: "lower", group: "Labour" },
+  { key: "installLabourHours", label: "Install labour, logged", format: "hours", better: "lower", group: "Labour", from: "handover" },
+  { key: "actualLabourHours", label: "All logged hours", format: "hours", better: "lower", group: "Labour", from: "handover" },
+  { key: "travelHours", label: "Travel", format: "hours", better: "lower", group: "Labour", from: "handover" },
+  { key: "reworkHours", label: "Rework", format: "hours", better: "lower", group: "Labour", from: "handover" },
   { key: "plannedInstallDays", label: "Install days planned", format: "days", better: null, group: "Timing" },
-  { key: "actualInstallDays", label: "Install days worked", format: "days", better: "lower", group: "Timing" },
-  { key: "surveyMinutes", label: "Survey length", format: "minutes", better: "lower", group: "Timing" },
-  { key: "daysQuoteToSurvey", label: "Quote to survey", format: "days", better: "lower", group: "Timing" },
+  { key: "actualInstallDays", label: "Install days worked", format: "days", better: "lower", group: "Timing", from: "handover" },
+  { key: "surveyMinutes", label: "Survey length", format: "minutes", better: "lower", group: "Timing", from: "proposal" },
+  { key: "daysQuoteToSurvey", label: "Quote to survey", format: "days", better: "lower", group: "Timing", from: "proposal" },
   { key: "daysSurveyToProposal", label: "Survey to proposal", format: "days", better: "lower", group: "Timing" },
   { key: "daysAcceptanceToInstall", label: "Acceptance to install", format: "days", better: "lower", group: "Timing" },
-  { key: "unplannedMaterials", label: "Unplanned material lines", format: "count", better: "lower", group: "Quality" },
-  { key: "customerChanges", label: "Customer changes", format: "count", better: "lower", group: "Quality" },
+  { key: "unplannedMaterials", label: "Unplanned material lines", format: "count", better: "lower", group: "Quality", from: "handover" },
+  { key: "customerChanges", label: "Customer changes", format: "count", better: "lower", group: "Quality", from: "handover" },
   { key: "messagesSent", label: "Messages sent", format: "count", better: null, group: "Quality" },
   { key: "satisfaction", label: "Satisfaction (0 to 10)", format: "score", better: "higher", group: "Quality" },
-  { key: "defects7d", label: "Defects within 7 days", format: "count", better: "lower", group: "Quality" },
-  { key: "defects30d", label: "Defects within 30 days", format: "count", better: "lower", group: "Quality" },
+  { key: "defects7d", label: "Defects within 7 days", format: "count", better: "lower", group: "Quality", from: "aftercare" },
+  { key: "defects30d", label: "Defects within 30 days", format: "count", better: "lower", group: "Quality", from: "aftercare" },
   { key: "selfSurveyAccuracyPct", label: "Self-survey accuracy", format: "pct", better: "higher", group: "Quality" },
 ];
+
+/** Has this pilot reached the point where the row's number can be compared? */
+export function metricComparable(row: Pick<MetricRow, "from">, m: Pick<PilotMetrics, "stage">): boolean {
+  if (!row.from) return true;
+  return PROJECT_STAGES.indexOf(m.stage) >= PROJECT_STAGES.indexOf(row.from);
+}
+
+/** One row's best and worst columns, among the pilots far enough along to compare. */
+export function rowExtremes(row: MetricRow, metrics: PilotMetrics[]): { best: number[]; worst: number[] } {
+  return extremes(
+    metrics.map((m) => (metricComparable(row, m) ? (m[row.key] as number | null | undefined) : null)),
+    row.better,
+  );
+}
 
 /**
  * Which columns are best and worst on one row. Only real numbers compete;

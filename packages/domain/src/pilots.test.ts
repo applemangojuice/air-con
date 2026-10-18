@@ -10,8 +10,10 @@ import {
   csvCell,
   entryMinutes,
   extremes,
+  metricComparable,
   pilotMetrics,
   pilotsCsv,
+  rowExtremes,
   type PilotMetrics,
   type TimeEntry,
 } from "./pilots.ts";
@@ -425,6 +427,22 @@ test("extremes: best and worst only among real numbers, and only when they diffe
   assert.deepEqual(extremes([5, 5], "lower"), { best: [], worst: [] });
   assert.deepEqual(extremes([5, null], "lower"), { best: [], worst: [] }, "a lone pilot isn't best at anything");
   assert.deepEqual(extremes([1, 2], null), { best: [], worst: [] });
+});
+
+test("rows only compare pilots far enough along: no 'cheapest' pilot that hasn't been installed", () => {
+  const finished = pilotMetrics({ project: finishedProject(), proposal: proposal(), purchaseOrders: [PO], time: TIME, issues: ISSUES, messagesSent: 3 });
+  const fresh = pilotMetrics({ project: baseProject(), purchaseOrders: [], time: [], issues: [], messagesSent: 0 });
+  const other = { ...finished, projectId: "other", equipmentCostPence: finished.equipmentCostPence + 10_000 };
+  const equipment = PILOT_METRIC_ROWS.find((r) => r.key === "equipmentCostPence")!;
+  assert.equal(metricComparable(equipment, fresh), false, "£0 of equipment before install isn't a saving");
+  assert.equal(metricComparable(equipment, finished), true);
+  assert.deepEqual(rowExtremes(equipment, [fresh, finished]), { best: [], worst: [] }, "one comparable pilot: nothing to call");
+  assert.deepEqual(rowExtremes(equipment, [fresh, finished, other]), { best: [1], worst: [2] });
+  const instant = PILOT_METRIC_ROWS.find((r) => r.key === "instantPricePence")!;
+  assert.equal(metricComparable(instant, fresh), true, "rows without a stage always compare");
+  const defects = PILOT_METRIC_ROWS.find((r) => r.key === "defects7d")!;
+  assert.equal(metricComparable(defects, fresh), false);
+  assert.equal(metricComparable(defects, finished), true);
 });
 
 test("the comparison rows name real metrics", () => {

@@ -149,18 +149,23 @@ export async function createPilotAction(fd: FormData): Promise<ActionResult> {
   if (outside) notes.push(`${postcode} is outside the service area in settings.`);
 
   let detail: string | undefined;
+  let linkState: "sent" | "unsent" | "none" = "none";
   if (d.sendLink) {
+    linkState = "unsent";
     try {
       const link = await issueMagicLink({ email: d.email, kind: "customer", next: `/p/${id}`, ttlMinutes: CUSTOMER_EMAIL_LINK_TTL_DAYS * 24 * 60 });
-      if (link.sent) notes.push(`A link to their project went to ${d.email}.`);
-      else if (link.devLink) {
-        notes.push("Email isn't set up here, so no link was sent. Development link:");
+      if (link.sent) {
+        linkState = "sent";
+        notes.push(`A link to their project went to ${d.email}.`);
+      } else if (link.devLink) {
+        notes.push("Email isn't set up here, so no link was sent.");
         detail = link.devLink;
-      } else notes.push("The link couldn't be sent (email isn't set up). It's recorded in Messages; send it once email works.");
+      } else notes.push("The link couldn't be sent because email isn't set up.");
     } catch (err) {
       console.error("[new pilot] link failed:", err);
-      notes.push("The link couldn't be sent. Try again from the customer view later.");
+      notes.push("The link couldn't be sent.");
     }
   }
-  return done(["Pilot set up.", ...notes].join(" "), { href: `/ops/projects/${id}`, ...(detail ? { detail } : {}) });
+  const query = new URLSearchParams({ created: "1", ...(linkState !== "none" ? { link: linkState } : {}), ...(outside ? { area: "outside" } : {}) });
+  return done(["Pilot set up.", ...notes].join(" "), { href: `/ops/projects/${id}?${query}`, ...(detail ? { detail } : {}) });
 }

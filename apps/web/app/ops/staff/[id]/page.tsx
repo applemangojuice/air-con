@@ -38,7 +38,7 @@ export default async function StaffMemberPage({ params }: { params: Promise<{ id
       <PageHeader
         back={{ href: "/ops/staff", label: "Staff" }}
         title={person.name}
-        subtitle={person.demo ? "A DEMO account from the “Try as…” sign-in." : person.email}
+        subtitle={person.demo ? "A DEMO account: it stops working when demo sign-in is turned off." : person.email}
       />
       <StaffEditor action={saveStaffAction} person={person} today={londonToday()} photoUrl={photos.get(person.id) ?? null} evidenceUrls={evidenceUrls} self={person.id === admin.id} />
     </main>

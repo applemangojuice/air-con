@@ -30,6 +30,7 @@ export function ActionForm({
   confirm,
   onResult,
   quietSuccess = false,
+  refreshOnSuccess = true,
   id,
 }: {
   action: (formData: FormData) => Promise<ActionResult>;
@@ -41,6 +42,8 @@ export function ActionForm({
   onResult?: (result: ActionResult) => void;
   /** Don't show the success line (the page change says it). */
   quietSuccess?: boolean;
+  /** Re-render the page's server data after a success (off when the form navigates away instead). */
+  refreshOnSuccess?: boolean;
   id?: string;
 }) {
   const [pending, start] = useTransition();
@@ -67,7 +70,7 @@ export function ActionForm({
       onResult?.(r);
       if (r.ok) {
         if (resetOnSuccess) formRef.current?.reset();
-        router.refresh();
+        if (refreshOnSuccess) router.refresh();
       }
     });
   }

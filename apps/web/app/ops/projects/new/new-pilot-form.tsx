@@ -58,7 +58,7 @@ export function NewPilotForm({
   const [era, setEra] = useState<PropertyEra>("1930-1950");
   const [bedrooms, setBedrooms] = useState(3);
   const [layout, setLayout] = useState<KitchenLivingLayout>("separate");
-  const [devLink, setDevLink] = useState<{ href: string; link: string } | null>(null);
+  const [devLink, setDevLink] = useState<{ href: string; link: string; message: string } | null>(null);
 
   const preview = useMemo(() => {
     const config = buildDefaultConfig({ type, era, bedrooms, bathrooms: 1, layout });
@@ -84,12 +84,12 @@ export function NewPilotForm({
 
   function onResult(r: ActionResult) {
     if (!r.ok || !r.href) return;
-    if (r.detail) setDevLink({ href: r.href, link: r.detail });
-    else router.push(`${r.href}?created=1`);
+    if (r.detail) setDevLink({ href: r.href, link: r.detail, message: r.message ?? "Pilot set up." });
+    else router.push(r.href);
   }
 
   return (
-    <ActionForm action={action} onResult={onResult} quietSuccess={false}>
+    <ActionForm action={action} onResult={onResult} quietSuccess refreshOnSuccess={false}>
       <input type="hidden" name="requestId" value={requestId} />
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
         <div className="space-y-6">
@@ -199,8 +199,9 @@ export function NewPilotForm({
             </div>
           </div>
           {devLink && (
-            <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-              <p className="font-semibold">Development only: the customer&apos;s link</p>
+            <div role="status" className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+              <p>{devLink.message}</p>
+              <p className="mt-2 font-semibold">Development only: the customer&apos;s link</p>
               <p className="mt-1 break-all font-mono text-xs">{devLink.link}</p>
               <a href={devLink.href} className="mt-3 inline-flex min-h-10 items-center font-semibold text-accent-700 underline">
                 Open the project

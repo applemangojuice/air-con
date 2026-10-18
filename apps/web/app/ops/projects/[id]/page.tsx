@@ -114,7 +114,10 @@ export default async function CommandCentrePage({
 }) {
   const staff = await requireStaff("projects.view-all");
   const { id } = await params;
-  const justCreated = (await searchParams).created === "1";
+  const sp = await searchParams;
+  const justCreated = sp.created === "1";
+  const linkNote = sp.link === "sent" ? " A link to their project is on its way to them." : sp.link === "unsent" ? " No link was sent: email isn't set up, so check Messages before telling them to expect one." : "";
+  const areaNote = sp.area === "outside" ? " Their postcode is outside the service area in Settings." : "";
   if (!UUID_RE.test(id)) notFound();
   const project = await loadProject(id);
   if (!project) notFound();
@@ -247,7 +250,9 @@ export default async function CommandCentrePage({
 
       {justCreated && (
         <p role="status" className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-          <span className="font-semibold">Pilot set up.</span> Next: book their survey below, or let them pick a slot from their project page.
+          <span className="font-semibold">Pilot set up.</span>
+          {linkNote}
+          {areaNote} Next: book their survey below, or let them pick a slot from their project page.
         </p>
       )}
 
