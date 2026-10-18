@@ -292,15 +292,19 @@ export function DemoHub({ initialProject }: { initialProject: Project }) {
       // Delivered the day it was confirmed for, so the cancellation clock (14 days from delivery) runs from today.
       add("Your kit is delivered", () => chain([{ action: { type: "kit-updated", status: "delivered", shortages: 0 }, actor: office }]));
     }
-    if (p.kit.status === "delivered" || p.kit.status === "inspected") {
+    if ((p.kit.status === "delivered" || p.kit.status === "inspected") && !p.install.onMyWay) {
       add("Install day 1: the crew's on the way", () =>
         chain([
           ...(p.kit.status === "delivered"
             ? [{ action: { type: "kit-updated", status: "inspected", shortages: 0 } as ProjectAction, actor: crewLead, at: atLondon(start, "07:30") }]
             : []),
           { action: { type: "installer-on-my-way", etaMinutes: 20, by: crewLead.name }, actor: crewLead, at: atLondon(start, "07:40") },
-          { action: { type: "install-day-started", n: 1, by: crewLead.name }, actor: crewLead, at: atLondon(start, "08:05") },
         ]),
+      );
+    }
+    if (p.install.onMyWay) {
+      add("Install day 1 starts", () =>
+        chain([{ action: { type: "install-day-started", n: 1, by: crewLead.name }, actor: crewLead, at: atLondon(start, "08:05") }]),
       );
     }
   }

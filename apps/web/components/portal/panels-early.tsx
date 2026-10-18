@@ -340,7 +340,7 @@ export function SurveyPanel({ data, state, goTo }: PanelProps) {
     );
   }
 
-  const fresh = onMyWayFresh(s.onMyWay, data.nowIso) && s.onMyWay;
+  const fresh = onMyWayFresh(s.onMyWay, data.nowIso) && s.status === "booked" && s.onMyWay;
   return (
     <StageShell info={info} state={state}>
       {fresh && (

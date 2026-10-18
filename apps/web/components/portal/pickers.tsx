@@ -81,7 +81,7 @@ export function SlotPicker({
     <div className="space-y-5">
       <fieldset>
         <legend className="mb-2 text-sm font-semibold text-ink-900">{legend}</legend>
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
           {days.map((d) => (
             <Radio
               key={d.date}

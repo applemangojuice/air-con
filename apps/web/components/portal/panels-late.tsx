@@ -137,7 +137,9 @@ export function InstallPanel({ data, state }: PanelProps) {
   const variations = data.issues.filter((i) => i.kind === "variation" && i.variation);
   const waiting = variations.filter((i) => i.variation!.status === "proposed" && (i.status === "open" || i.status === "in-progress" || i.status === "awaiting-customer"));
   const decided = variations.filter((i) => i.variation!.status !== "proposed");
-  const omw = onMyWayFresh(p.install.onMyWay, data.nowIso) && p.install.status !== "complete" ? p.install.onMyWay : null;
+  // Fresh, and they haven't arrived yet (no day started since the message).
+  const arrived = p.install.days.some((d) => d.startedAt && p.install.onMyWay && d.startedAt >= p.install.onMyWay.at);
+  const omw = onMyWayFresh(p.install.onMyWay, data.nowIso) && !arrived && p.install.status !== "complete" ? p.install.onMyWay : null;
   const lead = data.crew[0];
 
   return (

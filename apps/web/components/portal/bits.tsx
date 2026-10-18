@@ -274,7 +274,7 @@ export function PersonCardView({ person }: { person: PersonCard }) {
         {person.qualifications.length > 0 && (
           <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Qualifications held">
             {person.qualifications.map((q) => (
-              <li key={q} className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-800">
+              <li key={q} className="rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-800">
                 {q}
               </li>
             ))}
