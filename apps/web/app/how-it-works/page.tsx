@@ -2,8 +2,8 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { SiteFooter } from "@/components/site/footer";
 import { SiteHeader } from "@/components/site/header";
-import { ProjectView } from "@/components/project/project-view";
-import { buildDemoProject } from "@/lib/projects-server";
+import { DemoHub } from "@/components/portal/demo-hub";
+import { buildDemoProject } from "@/lib/project-service";
 
 export const metadata: Metadata = {
   title: "Our process",
@@ -59,19 +59,20 @@ export default function OurProcessPage() {
         </section>
 
         {/* The example installation, playable, right at the top */}
-        <section className="mx-auto max-w-3xl px-4 pt-12 sm:px-6">
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h2 className="text-2xl font-display">An example installation</h2>
-            <span className="rounded-full bg-sage-100 px-3 py-1 text-xs font-semibold text-sage-700">
-              Live example · click anything
-            </span>
+        <section className="mx-auto max-w-6xl px-4 pt-12 sm:px-6">
+          <div className="mx-auto max-w-3xl">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <h2 className="text-2xl font-display">An example installation</h2>
+              <span className="rounded-full bg-ink-900 px-3 py-1 text-xs font-bold tracking-wide text-white">DEMO · playable</span>
+            </div>
+            <p className="mt-2 text-sm text-ink-500">
+              This is the project page every customer gets, running a fictional DEMO home. Book the
+              survey, accept the proposal, pick your dates; the &#9654; buttons play our side. Nothing
+              is saved.
+            </p>
           </div>
-          <p className="mt-2 text-sm text-ink-500">
-            This is the actual timeline every customer gets. Click any step, including the greyed
-            future ones, book dates, play the whole journey through. Nothing here is a mock-up.
-          </p>
-          <div className="mt-6 rounded-3xl border border-line bg-cream p-4 sm:p-6">
-            <ProjectView initialProject={demoProject} demo />
+          <div className="mt-6 rounded-3xl border border-line bg-cream p-4 sm:p-6 lg:p-8">
+            <DemoHub initialProject={demoProject} />
           </div>
         </section>
 
