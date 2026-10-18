@@ -1,0 +1,159 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { DEFAULT_SETTINGS, mergeSettings, type PilotSettings } from "@aircon/domain";
+import { registerAppResolver } from "./helpers/resolve-app.ts";
+
+registerAppResolver();
+const claims = await import("../components/site/claims.ts");
+const {
+  addDaysIso,
+  cancellationSummary,
+  coverageFor,
+  fgasClaim,
+  installDaysPhrase,
+  installDurationCopy,
+  listOutcodes,
+  outcodeOf,
+  paymentCopy,
+  quoteConsentRecord,
+  realPhone,
+  slaCommitments,
+  surveyPriceCopy,
+  toPublicSettings,
+  validUntil,
+  vatCopy,
+  warrantyCopy,
+} = claims;
+
+const TODAY = "2026-10-18";
+const settings = (patch: Record<string, unknown> = {}): PilotSettings => mergeSettings({ ...DEFAULT_SETTINGS, ...patch });
+const pub = (patch: Record<string, unknown> = {}) => toPublicSettings(settings(patch), TODAY);
+
+test("defaults make no warranty, F-gas, finance, SLA or VAT-rate claims", () => {
+  const ps = pub();
+  assert.equal(warrantyCopy(ps), null, "no warranty years until settings say so");
+  assert.equal(fgasClaim(ps), null, "no F-gas claim without a company certificate");
+  assert.equal(ps.finance.lenderConfigured, false);
+  assert.deepEqual(slaCommitments(ps), [], "no 'money off automatically' while SLAs are off");
+  assert.equal(vatCopy(ps).short, "No VAT to add", "not registered: no VAT line, the price is the price");
+  assert.doesNotMatch(vatCopy(ps).long, /0%|zero/i);
+  assert.equal(ps.company.phone, null, "the 0800 000 0000 placeholder is never printed");
+  assert.equal(ps.showPrototypeNav, false);
+});
+
+test("the public subset carries nothing private", () => {
+  const ps = pub({
+    company: {
+      ...DEFAULT_SETTINGS.company,
+      bank: { accountName: "X", sortCode: "00-00-00", accountNumber: "12345678" },
+      insurance: { provider: "Ins", policy: "P-1" },
+    },
+  });
+  const json = JSON.stringify(ps);
+  for (const secret of ["12345678", "P-1", "minMarginPct", "labourRates", "PILOT30", "overhead"]) {
+    assert.ok(!json.includes(secret), `public settings leak ${secret}`);
+  }
+});
+
+test("warranty copy comes only from settings", () => {
+  assert.equal(warrantyCopy(pub({ warranty: { workmanshipYears: 2, manufacturerSummary: null } }))?.headline, "2-year workmanship guarantee");
+  const maker = warrantyCopy(pub({ warranty: { workmanshipYears: null, manufacturerSummary: "Panasonic: 5 years when registered" } }));
+  assert.equal(maker?.headline, "Manufacturer's warranty");
+  assert.match(maker!.body, /registered/);
+  assert.equal(warrantyCopy(pub({ warranty: { workmanshipYears: 0, manufacturerSummary: null } })), null, "an explicit 'none' isn't advertised");
+});
+
+test("F-gas claim needs a complete, in-date company certificate", () => {
+  const cert = (c: unknown) => pub({ company: { ...DEFAULT_SETTINGS.company, fgasCompanyCert: c } });
+  assert.match(fgasClaim(cert({ body: "REFCOM", number: "F12345" }))!, /REFCOM F-gas company certificate \(no\. F12345\)/);
+  assert.equal(fgasClaim(cert({ body: "REFCOM", number: "" })), null);
+  assert.equal(fgasClaim(cert({ body: "REFCOM", number: "F1", expiresOn: "2026-10-17" })), null, "expired yesterday");
+  assert.ok(fgasClaim(cert({ body: "REFCOM", number: "F1", expiresOn: "2026-10-18" })), "valid through its expiry day");
+});
+
+test("VAT: nothing specific about 0% unless registered and confirmed", () => {
+  const unconfirmed = vatCopy(pub({ tax: { vatRegistered: true, defaultTaxCode: "zero-esm", accountantConfirmed: false, rationale: "" } }));
+  assert.equal(unconfirmed.short, null);
+  assert.doesNotMatch(unconfirmed.long, /0%/);
+  const zero = vatCopy(pub({ tax: { vatRegistered: true, defaultTaxCode: "zero-esm", accountantConfirmed: true, rationale: "" } }));
+  assert.equal(zero.short, "0% VAT");
+  const std = vatCopy(pub({ tax: { vatRegistered: true, defaultTaxCode: "standard-20", accountantConfirmed: true, rationale: "" } }));
+  assert.equal(std.short, "Includes VAT at 20%");
+  assert.equal(pub().company.vatNumber, null, "no VAT number shown while unregistered");
+});
+
+test("install duration is one message from settings, never 'a single day' by default", () => {
+  assert.equal(installDurationCopy(pub()), "Installed over up to three days");
+  assert.equal(installDaysPhrase(pub()), "up to three days");
+  const one = pub({ scheduling: { ...DEFAULT_SETTINGS.scheduling, installBlockDays: 1 } });
+  assert.equal(installDurationCopy(one), "Installed in one day");
+});
+
+test("price validity runs quoteValidityDays from the quote date", () => {
+  assert.equal(validUntil(pub(), "2026-10-18T09:00:00.000Z"), "2026-11-17");
+  assert.equal(addDaysIso("2026-12-25", 10), "2027-01-04");
+});
+
+test("coverage uses the configured outcodes, and an empty list covers nowhere", () => {
+  const ps = pub();
+  assert.deepEqual(coverageFor(ps.serviceArea, "sw16 2be"), { covered: true, outcode: "SW16" });
+  assert.deepEqual(coverageFor(ps.serviceArea, "SW162BE"), { covered: true, outcode: "SW16" });
+  assert.deepEqual(coverageFor(ps.serviceArea, "E8 1AA"), { covered: false, outcode: "E8" });
+  assert.equal(coverageFor([], "SW16 2BE").covered, false);
+  assert.equal(coverageFor(ps.serviceArea, "").covered, false);
+  assert.equal(outcodeOf("cr0 1aa"), "CR0");
+  assert.equal(listOutcodes(["SW17", "SW2", "CR0"]), "CR0, SW2 and SW17");
+});
+
+test("phone numbers: real ones print, placeholders don't", () => {
+  assert.equal(realPhone("0800 000 0000"), null);
+  assert.equal(realPhone("020 8123 4567"), "020 8123 4567");
+  assert.equal(realPhone("12"), null);
+  assert.equal(realPhone(undefined), null);
+});
+
+test("survey is 'Free' only when the fee is zero", () => {
+  assert.equal(surveyPriceCopy(pub()), "Free");
+  assert.equal(surveyPriceCopy(pub({ scheduling: { ...DEFAULT_SETTINGS.scheduling, surveyFeeGbp: 150 } })), "£150");
+});
+
+test("payment and cancellation copy follow settings", () => {
+  const none = paymentCopy(pub());
+  assert.equal(none.deposit, "No deposit.");
+  assert.match(none.balance, /within 7 days of handover/);
+  assert.match(none.methods, /bank transfer or card/);
+  const dep = paymentCopy(pub({ payments: { ...DEFAULT_SETTINGS.payments, depositPct: 20 } }));
+  assert.match(dep.deposit, /20% deposit is due when you accept/);
+  assert.match(cancellationSummary(pub()), /14 days after the day your equipment is delivered/);
+  assert.match(cancellationSummary(pub(), "install-only"), /within 14 days of the day you accept/);
+});
+
+test("SLA commitments appear only when switched on, without the outdated survey-fee promise", () => {
+  const on = slaCommitments(pub({ sla: { enabled: true } }));
+  assert.equal(on.length, 3);
+  assert.ok(on.every((c) => !/£150|site visit|final quote/i.test(`${c.promise} ${c.remedy}`)));
+});
+
+test("example homes say which rooms they include, and the anchor is the cheapest whole-home example", async () => {
+  const { exampleHomes, homeAnchor, roomsSummary } = await import("../components/site/examples.ts");
+  const homes = exampleHomes();
+  assert.equal(homes.length, 6);
+  assert.ok(homes.every((h) => h.price > 0 && h.rooms.length > 0));
+  const anchor = homeAnchor();
+  assert.equal(anchor.price, Math.min(...homes.slice(3).map((h) => h.price)));
+  assert.equal(roomsSummary(["Living room", "Kitchen", "Main bedroom"]), "3 rooms: Living room, kitchen and main bedroom");
+  assert.equal(roomsSummary(["Bedroom", "Living room"]), "Bedroom and living room");
+});
+
+test("consent record: operational and marketing are separate, versioned facts", () => {
+  const r = quoteConsentRecord({ marketing: false, hasPhone: true, at: "2026-10-18T10:00:00.000Z" });
+  assert.equal(r.operational.given, true);
+  assert.deepEqual(r.operational.channels, ["email", "sms"]);
+  assert.equal(r.marketing.given, false);
+  assert.deepEqual(r.marketing.channels, []);
+  assert.equal(r.operational.version, r.marketing.version);
+  assert.match(r.operational.text, /No sales calls and no marketing/);
+  const m = quoteConsentRecord({ marketing: true, hasPhone: false, at: "2026-10-18T10:00:00.000Z" });
+  assert.deepEqual(m.operational.channels, ["email"]);
+  assert.deepEqual(m.marketing.channels, ["email"]);
+});

@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { BRAND } from "@/lib/brand";
 import { PrototypeNav } from "@/components/site/prototype-nav";
 import { Analytics } from "@/components/site/analytics";
+import { prototypeNavVisible } from "@/lib/public-settings";
 import "./globals.css";
 
 /**
@@ -60,9 +61,11 @@ export const viewport: Viewport = {
   themeColor: "#201e1d",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  // Prototype nav: hidden in production unless settings switch it on.
+  const showPrototypeNav = await prototypeNavVisible();
   return (
     <html lang="en-GB">
       <body
@@ -79,7 +82,7 @@ export default function RootLayout({
         <div id="main-content" tabIndex={-1} className="contents">
           {children}
         </div>
-        <PrototypeNav />
+        {showPrototypeNav && <PrototypeNav />}
         <Suspense fallback={null}>
           <Analytics />
         </Suspense>

@@ -2,20 +2,22 @@
 
 import { useState } from "react";
 import { track } from "@/lib/analytics-client";
+import { secondaryBtn } from "./ui";
 
 /**
  * The referral seed: every saved quote is shareable, and neighbours are the
  * cheapest acquisition channel a street-by-street business has. Native share
- * sheet on mobile, copy-to-clipboard on desktop.
+ * sheet on mobile, copy-to-clipboard on desktop. The page shows the address,
+ * so the button says so before anyone shares it.
  */
 export function ShareQuoteButton({ quoteId }: { quoteId: string }) {
-  const [copied, setCopied] = useState(false);
+  const [status, setStatus] = useState<"idle" | "copied" | "failed">("idle");
 
   async function share() {
     const url = `${window.location.origin}/q/${quoteId}?utm_source=share&utm_medium=referral`;
     const payload = {
-      title: "My fixed air conditioning price",
-      text: "Got a guaranteed price for home air con in two minutes — no salesperson. Worth a look for your place:",
+      title: "My heating and cooling price",
+      text: "I got a price for heating and cooling our home in about two minutes, no salesperson. Worth a look for yours:",
       url,
     };
     const hasNativeShare = typeof navigator.share === "function";
@@ -26,24 +28,25 @@ export function ShareQuoteButton({ quoteId }: { quoteId: string }) {
         return;
       }
     } catch {
-      return; // user dismissed the sheet
+      return; // the share sheet was dismissed
     }
     try {
       await navigator.clipboard.writeText(url);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2500);
+      setStatus("copied");
+      setTimeout(() => setStatus("idle"), 2500);
     } catch {
-      /* clipboard unavailable: nothing sensible to do */
+      setStatus("failed");
     }
   }
 
   return (
-    <button
-      type="button"
-      onClick={share}
-      className="no-print mt-3 w-full rounded-full border border-line px-5 py-3 text-sm font-semibold text-ink-700 transition hover:bg-surface"
-    >
-      {copied ? "Link copied ✓" : "Share my quote (neighbours ask anyway)"}
-    </button>
+    <div>
+      <button type="button" onClick={share} className={`${secondaryBtn} w-full text-sm`}>
+        {status === "copied" ? "Link copied" : "Share my price"}
+      </button>
+      <p aria-live="polite" className="mt-1 text-center text-xs text-ink-500">
+        {status === "failed" ? "Couldn't copy: use your browser's share button instead." : "Anyone with the link sees this page, address included."}
+      </p>
+    </div>
   );
 }

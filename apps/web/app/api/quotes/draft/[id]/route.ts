@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { generateQuote, type Survey } from "@aircon/domain";
+import { coverageFor } from "@/components/site/claims";
+import { getPublicSettings } from "@/lib/public-settings";
+import { withUploadedPhotosOnly } from "@/lib/quote-draft";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { UUID_RE, surveySchema } from "@/lib/schemas";
 import { getServiceClient } from "@/lib/supabase-server";
@@ -8,14 +11,11 @@ import { getServiceClient } from "@/lib/supabase-server";
 const bodySchema = z.object({
   survey: surveySchema,
   /** A corrected email must reach the draft, or follow-ups go to the typo. */
-  email: z.string().email().max(200).optional(),
+  email: z.string().trim().email().max(200).optional(),
 });
 
 /** Update a draft in place as the customer moves through the funnel. */
-export async function PATCH(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
+export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   if (!UUID_RE.test(id)) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -27,7 +27,13 @@ export async function PATCH(
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid draft" }, { status: 400 });
   }
-  const survey = parsed.data.survey as Survey;
+  const survey = withUploadedPhotosOnly(parsed.data.survey as Survey);
+  // A draft never moves to a postcode we don't cover (the follow-up email
+  // would invite them to finish a quote they can't finish).
+  const coverage = coverageFor((await getPublicSettings()).serviceArea, survey.postcode);
+  if (!coverage.covered) {
+    return NextResponse.json({ error: "out-of-area", outcode: coverage.outcode }, { status: 422 });
+  }
   const quote = generateQuote(survey);
 
   const supabase = getServiceClient();

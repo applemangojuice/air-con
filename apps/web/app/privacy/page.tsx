@@ -1,163 +1,188 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { SiteFooter } from "@/components/site/footer";
 import { SiteHeader } from "@/components/site/header";
-import { BRAND } from "@/lib/brand";
+import { textLink } from "@/components/site/styles";
+import { getPublicSettings } from "@/lib/public-settings";
+
+export const revalidate = 60;
 
 export const metadata: Metadata = {
-  title: "Privacy policy",
-  description: `How ${BRAND.name} collects, uses and protects your personal data.`,
+  title: "Privacy notice",
+  description: "How Dang, It's Hot collects, uses and protects your personal data, how long we keep it, and your rights.",
 };
 
+const LAST_UPDATED = "18 Oct 2026";
+
 /**
- * Written to match what the platform actually does (first-party cookieless
- * analytics, Supabase storage, Resend email, public-records property data),
- * in the brand voice but structured the way the ICO expects: what we
- * collect, why, the lawful basis, retention, and your rights.
+ * Written to match what the platform actually does: the quote funnel and its
+ * consents, customer and staff sign-in, project photos, SMS, card payments,
+ * contractors, first-party analytics and the processors behind each. Laid out
+ * the way the ICO expects: what, why, lawful basis, who else, how long, rights.
  */
-export default function PrivacyPage() {
+export default async function PrivacyPage() {
+  const s = await getPublicSettings();
+  const email = s.company.email;
+  const mail = (
+    <a className={textLink} href={`mailto:${email}`}>
+      {email}
+    </a>
+  );
+
   return (
     <>
       <SiteHeader />
       <main className="mx-auto w-full max-w-3xl px-4 py-14 sm:px-6">
-        <h1 className="text-4xl font-display">Privacy policy</h1>
-        <p className="mt-3 text-sm text-ink-300">Last updated: 19 July 2026</p>
-        <p className="mt-5 text-ink-500">
-          Short version: we collect what we need to price and install your air
-          conditioning, we don&apos;t run third-party trackers, we never sell
-          your data, and you can ask us what we hold or ask us to delete it at
-          any time by emailing{" "}
-          <a className="font-semibold text-accent-700 hover:underline" href={`mailto:${BRAND.supportEmail}`}>
-            {BRAND.supportEmail}
-          </a>
-          . The long version follows.
+        <h1 className="text-4xl font-display">Privacy notice</h1>
+        <p className="mt-3 text-sm text-ink-500">Last updated {LAST_UPDATED}</p>
+        <p className="mt-5 text-ink-700">
+          Short version: we collect what we need to price, survey and install your heating and cooling, we don&apos;t
+          run third-party trackers, we never sell your data, and we only send marketing if you ticked the box for it.
+          You can ask what we hold, or ask us to correct or delete it, by emailing {mail}.
         </p>
 
         <Section title="Who we are">
           <p>
-            {BRAND.legalName} (&ldquo;we&rdquo;, &ldquo;us&rdquo;) is the data
-            controller for the personal data described here. Contact:{" "}
-            <a className="text-accent-700 hover:underline" href={`mailto:${BRAND.supportEmail}`}>
-              {BRAND.supportEmail}
-            </a>
-            .
+            {s.company.legalName} (&ldquo;we&rdquo;, &ldquo;us&rdquo;) is the controller of the personal data
+            described here.{s.company.registeredAddress ? ` Registered office: ${s.company.registeredAddress}.` : ""}{" "}
+            Contact: {mail}.
           </p>
         </Section>
 
         <Section title="What we collect, and why">
           <ul className="list-disc space-y-3 pl-5">
-            <li>
-              <strong>Quote details.</strong> When you use the quote funnel we
-              collect your name, email address, phone number (optional),
-              address, and the survey you complete: rooms, property details and
-              any photos you choose to add. We use this to calculate your
-              price, save your quote, and contact you about it.{" "}
-              <em>Lawful basis: taking steps at your request before entering a
-              contract.</em>
-            </li>
-            <li>
-              <strong>Saved progress.</strong> The funnel saves your enquiry
-              from the first step (address and email) so you can come back and
-              so we can follow up if you don&apos;t finish.{" "}
-              <em>Lawful basis: legitimate interests — completing the quote you
-              started.</em>
-            </li>
-            <li>
-              <strong>Installation records.</strong> If you book, we keep the
-              survey, design, price and installation documentation for your
-              project, warranty and our legal obligations.{" "}
-              <em>Lawful basis: performance of a contract.</em>
-            </li>
-            <li>
-              <strong>Usage analytics.</strong> We run our own first-party
-              analytics: pages viewed, approximate location (country and city,
-              derived from your IP by our hosting provider — we never store the
-              IP itself), device class, and how far you got through the quote.
-              A random identifier is stored in your browser; it is not linked
-              to your name unless you submit a quote.{" "}
-              <em>Lawful basis: legitimate interests — understanding and
-              improving the service.</em> There are no third-party trackers and
-              no advertising cookies.
-            </li>
-            <li>
-              <strong>Public property records.</strong> To design installations
-              and decide where to offer our service, we process publicly
-              available data about properties (not people): Energy Performance
-              Certificates, planning applications and conservation-area maps.
-              If we write to your address, that letter is addressed to the
-              property, not to a named person.{" "}
-              <em>Lawful basis: legitimate interests — offering a relevant
-              service using public records.</em> You can ask us to stop
-              contacting an address at any time.
-            </li>
+            <Item name="Your quote">
+              Your name, email, optional mobile number, address and the answers you give about your home, plus any
+              photos you add. We use them to work out your price, save your quote and contact you about it.{" "}
+              <Basis>taking steps at your request before a contract.</Basis>
+            </Item>
+            <Item name="Saved progress">
+              If you give your email early in the quote, we save your answers so you can come back, and we may send
+              one reminder if you don&apos;t finish. <Basis>legitimate interests: finishing the quote you started.</Basis>
+            </Item>
+            <Item name="Your consents">
+              We record what you agreed to, when, and the exact words you saw: keeping you posted about your quote,
+              and (only if you ticked it) news and offers. If you ask us to tell you when we reach your area, we
+              keep your email and postcode for that one message.{" "}
+              <Basis>consent for marketing; legal obligation to keep a record of it.</Basis>
+            </Item>
+            <Item name="Your project">
+              If you go ahead: survey measurements and notes, photos of your rooms, outside walls, fuse board and the
+              installation (some with drawings on them to show where things go), your design and proposal, your
+              acceptance (the name you typed, the time, and the IP address and browser details sent with it), install records,
+              commissioning results, certificates, invoices and payments, messages we&apos;ve sent you, and any
+              issues you report. <Basis>performing our contract with you, and legal obligations (for example
+              building regulations, F-gas and tax records).</Basis>
+            </Item>
+            <Item name="Texts">
+              If you give a mobile number we text you about appointments, such as &ldquo;your surveyor is on the
+              way&rdquo;. Operational texts never carry marketing. <Basis>performing our contract, or steps before
+              it.</Basis>
+            </Item>
+            <Item name="Signing in">
+              When you open a sign-in link from one of our emails, we set a cookie that keeps you signed in to your
+              project page. Our staff and contractors sign in the same way, and we record who did what on each
+              project. <Basis>legitimate interests: keeping your project secure.</Basis>
+            </Item>
+            <Item name="Usage analytics">
+              Our own first-party analytics: pages viewed, approximate location (country and city, worked out by our
+              hosting provider; we don&apos;t store your IP address), device type and how far you got through the
+              quote. A random identifier is kept in your browser; it isn&apos;t linked to your name unless you save a
+              quote. There are no third-party trackers and no advertising cookies.{" "}
+              <Basis>legitimate interests: understanding and improving the service.</Basis>
+            </Item>
+            <Item name="Public property records">
+              To design installations and decide where to offer our service, we use public data about properties
+              (not people): Energy Performance Certificates, planning records and conservation-area maps. If we write
+              to your address, the letter is addressed to the property, not a named person. You can ask us to stop.{" "}
+              <Basis>legitimate interests.</Basis>
+            </Item>
+            <Item name="Video walkthroughs">
+              Only if you use our capture app to send a narrated video of your home: the narration is transcribed and
+              turned into a draft room list by AI service providers (OpenAI for transcription, Anthropic for the room
+              list), who process it on our instructions. <Basis>taking steps at your request before a contract.</Basis>
+            </Item>
           </ul>
         </Section>
 
-        <Section title="Where your data lives">
+        <Section title="Marketing, and how to stop it">
           <p>
-            Data is stored with our infrastructure providers: Supabase
-            (database and photo storage) and Vercel (hosting). Emails are sent
-            through Resend. If you use address autofill, the postcode you type
-            is sent to our address-lookup provider to return the address list.
-            These providers process data on our instructions and don&apos;t use
-            it for their own purposes.
+            We only send news and offers by email if you ticked the box for them, and every one has an unsubscribe
+            link. You can also email {mail} at any time. We keep a note that you opted out so we don&apos;t contact
+            you again. Messages about your quote or project (appointments, your proposal, your contract, safety) are
+            not marketing; while you have a live quote or project we&apos;ll still send those, and they never include
+            sales content.
           </p>
+        </Section>
+
+        <Section title="Who else sees it">
+          <ul className="list-disc space-y-2 pl-5">
+            <li>
+              <strong>Our team and contractors.</strong> Surveyors, installers and electricians, including
+              subcontractors, see the details of the jobs they&apos;re assigned to (your name, address, contact
+              details, access notes, photos and design), and nothing about other customers or our costs.
+            </li>
+            <li>
+              <strong>Service providers</strong> who process data on our instructions: Supabase (database and photo
+              storage), Vercel (hosting), Resend (email), Twilio (texts), Stripe (card payments: Stripe handles your
+              card details and we never see the full number), getAddress.io (address lookup) and postcodes.io (your
+              browser checks the postcode you type there).
+            </li>
+            <li>
+              <strong>Where the law requires it</strong>: for example registering electrical work with a
+              competent-person scheme or building control, F-gas records, manufacturer warranty registration (in
+              your name), and HMRC.
+            </li>
+          </ul>
+          <p>Some of these providers may process data outside the UK, under the safeguards UK law requires.</p>
         </Section>
 
         <Section title="How long we keep it">
           <ul className="list-disc space-y-2 pl-5">
-            <li>Quotes you don&apos;t proceed with: up to 24 months, then deleted.</li>
+            <li>Quotes you don&apos;t go ahead with: up to 24 months, then deleted.</li>
+            <li>&ldquo;Tell me when you&apos;re in my area&rdquo; requests: until we&apos;ve sent that one email, or 24 months, whichever comes first.</li>
             <li>
-              Installations: for the life of the warranty plus the period we
-              are legally required to keep records.
+              Installations: for the life of the warranty and as long as the law requires us to keep records (for
+              example six years for tax records), then deleted.
             </li>
+            <li>Consent and opt-out records: as long as we hold your details, so we can show what you agreed to.</li>
             <li>Analytics events: up to 24 months.</li>
           </ul>
         </Section>
 
         <Section title="Your rights">
           <p>
-            You can ask us for a copy of your data, ask us to correct or delete
-            it, object to our use of it, or ask us to restrict processing.
-            Email{" "}
-            <a className="text-accent-700 hover:underline" href={`mailto:${BRAND.supportEmail}`}>
-              {BRAND.supportEmail}
-            </a>{" "}
-            and we&apos;ll respond within one month. If you&apos;re unhappy
-            with how we handle your data, you can complain to the Information
-            Commissioner&apos;s Office (
-            <a className="text-accent-700 hover:underline" href="https://ico.org.uk" rel="noopener noreferrer">
+            You can ask for a copy of your data, ask us to correct or delete it, object to how we use it, ask us to
+            restrict it, or withdraw consent at any time. Email {mail} and we&apos;ll reply within one month. If
+            you&apos;re unhappy with how we handle your data, you can complain to the Information Commissioner&apos;s
+            Office (
+            <a className={textLink} href="https://ico.org.uk" rel="noopener noreferrer">
               ico.org.uk
             </a>
             ).
           </p>
         </Section>
 
-        <Section title="Cookies">
+        <Section title="Cookies and storage">
           <p>
-            We don&apos;t use cookies for tracking. The site stores a small
-            amount of data in your browser&apos;s local storage: your
-            in-progress quote (so you don&apos;t lose your answers) and a
-            random analytics identifier. Clearing your browser data removes
-            both.
+            We use one cookie, and only when you sign in: it keeps you signed in to your project page (or, for our
+            team, the staff tools), and it&apos;s strictly necessary for that. The site also keeps a little data in
+            your browser&apos;s storage: your in-progress quote (so you don&apos;t lose your answers) and a random
+            analytics identifier. Clearing your browser data removes them.
           </p>
         </Section>
 
         <Section title="Changes">
           <p>
-            If this policy changes materially we&apos;ll update this page and
-            the date at the top. Questions?{" "}
-            <a className="text-accent-700 hover:underline" href={`mailto:${BRAND.supportEmail}`}>
-              {BRAND.supportEmail}
-            </a>
-            .
+            If this notice changes materially we&apos;ll update this page and the date at the top. Questions? {mail}.
           </p>
         </Section>
 
-        <p className="mt-10 text-sm text-ink-500">
+        <p className="mt-10 text-sm text-ink-700">
           See also our{" "}
-          <Link href="/terms" className="font-semibold text-accent-700 hover:underline">
-            terms of service
+          <Link href="/terms" className={textLink}>
+            terms
           </Link>
           .
         </p>
@@ -167,11 +192,23 @@ export default function PrivacyPage() {
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="mt-8">
       <h2 className="text-xl font-display">{title}</h2>
-      <div className="mt-3 space-y-3 text-ink-700 leading-relaxed">{children}</div>
+      <div className="mt-3 space-y-3 leading-relaxed text-ink-700">{children}</div>
     </section>
   );
+}
+
+function Item({ name, children }: { name: string; children: ReactNode }) {
+  return (
+    <li>
+      <strong className="text-ink-900">{name}.</strong> {children}
+    </li>
+  );
+}
+
+function Basis({ children }: { children: ReactNode }) {
+  return <em>Lawful basis: {children}</em>;
 }
