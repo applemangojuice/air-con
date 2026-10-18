@@ -14,6 +14,8 @@ import {
 } from "./media.ts";
 
 type Of<T extends Annotation["type"]> = Extract<Annotation, { type: T }>;
+/** The two unit boxes share one variant (type is a union), so Extract by shape. */
+type UnitBox = Extract<Annotation, { w: number }>;
 
 test("every tag has a label and every tool a style", () => {
   for (const tag of PHOTO_TAGS) assert.ok(PHOTO_TAG_LABEL[tag], tag);
@@ -45,7 +47,7 @@ test("validateAnnotations clamps to the photo and keeps boxes inside it", () => 
     { id: "d", type: "measure", from: { x: 0.5, y: -3 }, to: { x: 0.5, y: 4 }, label: "2 m" },
   ]);
   assert.deepEqual(out[0], { id: "a", type: "core-hole", x: 0, y: 1 });
-  const box = out[1] as Of<"indoor-unit">;
+  const box = out[1] as UnitBox;
   assert.equal(box.x, 0.8);
   assert.ok(Math.abs(box.w - 0.2) < 1e-9 && Math.abs(box.h - 0.1) < 1e-9, "cut to the photo's edge");
   assert.deepEqual((out[2] as Of<"route">).points, [{ x: 0, y: 0.5 }, { x: 1, y: 0.5 }]);
@@ -54,7 +56,7 @@ test("validateAnnotations clamps to the photo and keeps boxes inside it", () => 
 
 test("validateAnnotations normalises boxes dragged up or left, and drops slips", () => {
   const [box] = validateAnnotations([{ id: "a", type: "outdoor-unit", x: 0.6, y: 0.7, w: -0.2, h: -0.3 }]);
-  const b = box as Of<"outdoor-unit">;
+  const b = box as UnitBox;
   assert.ok(Math.abs(b.x - 0.4) < 1e-9 && Math.abs(b.y - 0.4) < 1e-9);
   assert.ok(Math.abs(b.w - 0.2) < 1e-9 && Math.abs(b.h - 0.3) < 1e-9);
   assert.deepEqual(validateAnnotations([{ id: "z", type: "indoor-unit", x: 0.5, y: 0.5, w: 0.001, h: 0.2 }]), []);
@@ -102,7 +104,7 @@ test("validateAnnotations trims and limits text, and strips control characters",
     { id: "d", type: "core-hole", x: 0.1, y: 0.1, label: "   " },
     { id: "e", type: "route", kind: "pipe", points: [{ x: 0, y: 0 }, { x: 1, y: 1 }], label: 42 },
   ]);
-  assert.equal((out[0] as Of<"indoor-unit">).label!.length, MAX_ANNOTATION_LABEL);
+  assert.equal((out[0] as UnitBox).label!.length, MAX_ANNOTATION_LABEL);
   assert.equal((out[1] as Of<"note">).text.length, MAX_ANNOTATION_NOTE);
   assert.equal((out[2] as Of<"obstacle">).label, "Gas meter box");
   assert.equal("label" in out[3]!, false, "a blank label is left off");
