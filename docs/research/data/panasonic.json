@@ -1,0 +1,1244 @@
+{
+  "manufacturer": "Panasonic",
+  "researchedAt": "2026-10-18",
+  "models": [
+    {
+      "kind": "indoor",
+      "manufacturer": "Panasonic",
+      "series": "Etherea Z (CKE, nanoe X, Pure White Matt)",
+      "model": "CS-Z25CKEW",
+      "label": "Panasonic Etherea 2.5 kW",
+      "tier": "premium",
+      "multiSplitCapable": true,
+      "ports": null,
+      "pairedWith": "CU-Z25CKE",
+      "specs": {
+        "coolingKw": 2.5,
+        "heatingKw": 3.4,
+        "seer": 9.5,
+        "scop": 5.2,
+        "energyClassCooling": "A+++",
+        "energyClassHeating": "A+++",
+        "soundPressureLowDb": 19,
+        "soundPressureHighDb": 39,
+        "soundPowerDb": null,
+        "dimensionsMm": {
+          "w": 870,
+          "h": 295,
+          "d": 229
+        },
+        "weightKg": 10,
+        "refrigerant": "R32",
+        "liquidPipeMm": 6.35,
+        "gasPipeMm": 9.52,
+        "maxPipeM": null,
+        "maxHeightDiffM": null,
+        "prechargedPipeM": null,
+        "additionalChargeGPerM": null,
+        "powerSupply": "230 V single-phase (Panasonic table lists 'Indoor power source 230 V' - single-split RAC is powered via the indoor unit)",
+        "recommendedBreakerA": 16,
+        "wifi": "Built-in Wi-Fi - Panasonic Comfort Cloud app; Alexa / Google Home voice control",
+        "operatingRangeCoolingC": "-10 to +43",
+        "operatingRangeHeatingC": "-20 to +24"
+      },
+      "warranty": "Panasonic UK: 3 years standard on RAC/PAC/VRF/A2W when installed by a qualified engineer; up to 5 years parts & labour when installed by a Panasonic Accredited Installer (completed Panasonic product training) who registers the unit on the PRO Club portal; PRO Partner / Elite PRO Partner tier advertised as up to 7 years (7-year scheme is publicised mainly for Aquarea; eligibility of residential air-to-air splits for 7 years NOT confirmed). Annual servicing records required. Sourced from 2021 warranty key facts and the UK PRO Partner page via search snippets - confirm current T&Cs (UK Warranty doc rev R2 eff. 1 Dec 2021; PHVAC UK T&Cs eff. 1 Dec 2023) before quoting customers.",
+      "sources": [
+        {
+          "url": "https://www.aircon.panasonic.eu/GB_en/model/kit-z25-cke-cs-z25ckew-cu-z25cke/",
+          "title": "Panasonic UK - KIT-Z25-CKE (CS-Z25CKEW + CU-Z25CKE) model page"
+        },
+        {
+          "url": "https://www.aircon.panasonic.eu/IT_it/model/kit-z25-cke-cs-z25ckew-cu-z25cke/",
+          "title": "Panasonic IT - KIT-Z25-CKE spec table"
+        },
+        {
+          "url": "https://www.aircon.panasonic.eu/ES_es/model/kit-z25-cke-cs-z25ckew-cu-z25cke/",
+          "title": "Panasonic ES - KIT-Z25-CKE spec table"
+        },
+        {
+          "url": "https://www.costco.co.uk/Appliances/Cooling-Air-Treatment-Heating/Air-Conditioners/Installed-Panasonic-Etherea-Single-Split-Air-Conditioning-Unit-for-Domestic-Use-Available-in-3-kW-3-Colours/p/PanasonicEthereaDomestic",
+          "title": "Costco UK - Installed Panasonic Etherea (operating range, secondary)"
+        },
+        {
+          "url": "https://www.aircon.panasonic.eu/AT_de/ranges/domestic/free-multi-split/",
+          "title": "Panasonic AT - Free Multi range page (lists CKEW wall units as Free Multi indoor units)"
+        }
+      ],
+      "confidence": "verified",
+      "notes": "Capacities/SEER/SCOP are for the single-split pair. Sound = cooling Q-Lo (quiet) and cooling Hi. Pipe run limits are on the paired outdoor record. Also sold as XZ silver (CS-XZ25CKEW) and graphite (CS-XZ25CKEW-H) with the same outdoor unit. Indoor sound pressure (JIS C 9612, 1 m in front): cool Q-Lo/Lo/Hi 19/25/39, heat 19/27/39 dB(A). Heating at -7 C: 2.8 kW. Annual consumption 92 kWh (cool) / 700 kWh (heat). Figures read from Panasonic's official EU/UK model pages (aircon.panasonic.eu) via search-engine extraction; direct page/PDF fetch was blocked in the research environment, so spot-check against the PDF datasheet before design sign-off."
+    },
+    {
+      "kind": "outdoor",
+      "manufacturer": "Panasonic",
+      "series": "Etherea Z (CKE) single-split outdoor",
+      "model": "CU-Z25CKE",
+      "label": "Panasonic Etherea 2.5 kW outdoor",
+      "tier": "premium",
+      "multiSplitCapable": false,
+      "ports": 1,
+      "pairedWith": "CS-Z25CKEW",
+      "specs": {
+        "coolingKw": 2.5,
+        "heatingKw": 3.4,
+        "seer": 9.5,
+        "scop": 5.2,
+        "energyClassCooling": "A+++",
+        "energyClassHeating": "A+++",
+        "soundPressureLowDb": null,
+        "soundPressureHighDb": 46,
+        "soundPowerDb": null,
+        "dimensionsMm": {
+          "w": 780,
+          "h": 542,
+          "d": 289
+        },
+        "weightKg": 27,
+        "refrigerant": "R32",
+        "liquidPipeMm": 6.35,
+        "gasPipeMm": 9.52,
+        "maxPipeM": 15,
+        "maxHeightDiffM": 15,
+        "prechargedPipeM": 7.5,
+        "additionalChargeGPerM": 10,
+        "powerSupply": "230 V single-phase (Panasonic table lists 'Indoor power source 230 V' - single-split RAC is powered via the indoor unit)",
+        "recommendedBreakerA": 16,
+        "wifi": null,
+        "operatingRangeCoolingC": "-10 to +43",
+        "operatingRangeHeatingC": "-20 to +24"
+      },
+      "warranty": "Panasonic UK: 3 years standard on RAC/PAC/VRF/A2W when installed by a qualified engineer; up to 5 years parts & labour when installed by a Panasonic Accredited Installer (completed Panasonic product training) who registers the unit on the PRO Club portal; PRO Partner / Elite PRO Partner tier advertised as up to 7 years (7-year scheme is publicised mainly for Aquarea; eligibility of residential air-to-air splits for 7 years NOT confirmed). Annual servicing records required. Sourced from 2021 warranty key facts and the UK PRO Partner page via search snippets - confirm current T&Cs (UK Warranty doc rev R2 eff. 1 Dec 2021; PHVAC UK T&Cs eff. 1 Dec 2023) before quoting customers.",
+      "sources": [
+        {
+          "url": "https://www.aircon.panasonic.eu/GB_en/model/kit-z25-cke-cs-z25ckew-cu-z25cke/",
+          "title": "Panasonic UK - KIT-Z25-CKE (CS-Z25CKEW + CU-Z25CKE) model page"
+        },
+        {
+          "url": "https://www.aircon.panasonic.eu/IT_it/model/kit-z25-cke-cs-z25ckew-cu-z25cke/",
+          "title": "Panasonic IT - KIT-Z25-CKE spec table"
+        },
+        {
+          "url": "https://www.aircon.panasonic.eu/ES_es/model/kit-z25-cke-cs-z25ckew-cu-z25cke/",
+          "title": "Panasonic ES - KIT-Z25-CKE spec table"
+        },
+        {
+          "url": "https://www.costco.co.uk/Appliances/Cooling-Air-Treatment-Heating/Air-Conditioners/Installed-Panasonic-Etherea-Single-Split-Air-Conditioning-Unit-for-Domestic-Use-Available-in-3-kW-3-Colours/p/PanasonicEthereaDomestic",
+          "title": "Costco UK - Installed Panasonic Etherea (operating range, secondary)"
+        }
+      ],
+      "confidence": "verified",
+      "notes": "soundPressureHighDb = outdoor sound pressure at cooling Hi (not sound power); outdoor sound power (LwA) not found for CKE - see openQuestions. Min pipe length 3 m. prechargedPipeM = Panasonic 'pipe length for additional gas'. Outdoor sound pressure Hi: cool 46 / heat 47 dB(A) (1 m front & rear). Factory charge 0.70 kg R32. Additional gas 10 g/m beyond 7.5 m. Some GB listings title KIT-Z25-CKE with the silver CS-XZ25CKEW indoor - same outdoor CU-Z25CKE. Figures read from Panasonic's official EU/UK model pages (aircon.panasonic.eu) via search-engine extraction; direct page/PDF fetch was blocked in the research environment, so spot-check against the PDF datasheet before design sign-off."
+    },
+    {
+      "kind": "indoor",
+      "manufacturer": "Panasonic",
+      "series": "Etherea Z (CKE, nanoe X, Pure White Matt)",
+      "model": "CS-Z35CKEW",
+      "label": "Panasonic Etherea 3.5 kW",
+      "tier": "premium",
+      "multiSplitCapable": true,
+      "ports": null,
+      "pairedWith": "CU-Z35CKE",
+      "specs": {
+        "coolingKw": 3.5,
+        "heatingKw": 4.0,
+        "seer": 9.5,
+        "scop": 5.2,
+        "energyClassCooling": "A+++",
+        "energyClassHeating": "A+++",
+        "soundPressureLowDb": 19,
+        "soundPressureHighDb": 42,
+        "soundPowerDb": null,
+        "dimensionsMm": {
+          "w": 870,
+          "h": 295,
+          "d": 229
+        },
+        "weightKg": 11,
+        "refrigerant": "R32",
+        "liquidPipeMm": 6.35,
+        "gasPipeMm": 9.52,
+        "maxPipeM": null,
+        "maxHeightDiffM": null,
+        "prechargedPipeM": null,
+        "additionalChargeGPerM": null,
+        "powerSupply": "230 V single-phase (Panasonic table lists 'Indoor power source 230 V' - single-split RAC is powered via the indoor unit)",
+        "recommendedBreakerA": 16,
+        "wifi": "Built-in Wi-Fi - Panasonic Comfort Cloud app; Alexa / Google Home voice control",
+        "operatingRangeCoolingC": "-10 to +43",
+        "operatingRangeHeatingC": "-20 to +24"
+      },
+      "warranty": "Panasonic UK: 3 years standard on RAC/PAC/VRF/A2W when installed by a qualified engineer; up to 5 years parts & labour when installed by a Panasonic Accredited Installer (completed Panasonic product training) who registers the unit on the PRO Club portal; PRO Partner / Elite PRO Partner tier advertised as up to 7 years (7-year scheme is publicised mainly for Aquarea; eligibility of residential air-to-air splits for 7 years NOT confirmed). Annual servicing records required. Sourced from 2021 warranty key facts and the UK PRO Partner page via search snippets - confirm current T&Cs (UK Warranty doc rev R2 eff. 1 Dec 2021; PHVAC UK T&Cs eff. 1 Dec 2023) before quoting customers.",
+      "sources": [
+        {
+          "url": "https://www.aircon.panasonic.eu/GB_en/model/kit-z35-cke-cs-z35ckew-cu-z35cke/",
+          "title": "Panasonic UK - KIT-Z35-CKE (CS-Z35CKEW + CU-Z35CKE) model page"
+        },
+        {
+          "url": "https://www.aircon.panasonic.eu/FR_fr/model/kit-z35-cke-cs-z35ckew-cu-z35cke/",
+          "title": "Panasonic FR - KIT-Z35-CKE spec table"
+        },
+        {
+          "url": "https://www.aircon.panasonic.eu/AT_de/ranges/domestic/free-multi-split/",
+          "title": "Panasonic AT - Free Multi range page (lists CKEW wall units as Free Multi indoor units)"
+        }
+      ],
+      "confidence": "verified",
+      "notes": "Capacities/SEER/SCOP are for the single-split pair. Sound = cooling Q-Lo (quiet) and cooling Hi. Pipe run limits are on the paired outdoor record. Also sold as XZ silver (CS-XZ35CKEW) and graphite (CS-XZ35CKEW-H) with the same outdoor unit. Indoor sound pressure: cool Q-Lo/Lo/Hi 19/28/42, heat 19/33/43 dB(A). Nominal EER 4.27, COP 4.55; heating at -7 C 3.2 kW; max 4.2 kW cool / 5.5 kW heat. Belgian CS-Z35CKEW(-1) page shows 4.5 kW heating - likely the multi-split rating; single-split pair is 4.0 kW. Figures read from Panasonic's official EU/UK model pages (aircon.panasonic.eu) via search-engine extraction; direct page/PDF fetch was blocked in the research environment, so spot-check against the PDF datasheet before design sign-off."
+    },
+    {
+      "kind": "outdoor",
+      "manufacturer": "Panasonic",
+      "series": "Etherea Z (CKE) single-split outdoor",
+      "model": "CU-Z35CKE",
+      "label": "Panasonic Etherea 3.5 kW outdoor",
+      "tier": "premium",
+      "multiSplitCapable": false,
+      "ports": 1,
+      "pairedWith": "CS-Z35CKEW",
+      "specs": {
+        "coolingKw": 3.5,
+        "heatingKw": 4.0,
+        "seer": 9.5,
+        "scop": 5.2,
+        "energyClassCooling": "A+++",
+        "energyClassHeating": "A+++",
+        "soundPressureLowDb": null,
+        "soundPressureHighDb": 48,
+        "soundPowerDb": null,
+        "dimensionsMm": {
+          "w": 780,
+          "h": 542,
+          "d": 289
+        },
+        "weightKg": 31,
+        "refrigerant": "R32",
+        "liquidPipeMm": 6.35,
+        "gasPipeMm": 9.52,
+        "maxPipeM": 15,
+        "maxHeightDiffM": 15,
+        "prechargedPipeM": 7.5,
+        "additionalChargeGPerM": 10,
+        "powerSupply": "230 V single-phase (Panasonic table lists 'Indoor power source 230 V' - single-split RAC is powered via the indoor unit)",
+        "recommendedBreakerA": 16,
+        "wifi": null,
+        "operatingRangeCoolingC": "-10 to +43",
+        "operatingRangeHeatingC": "-20 to +24"
+      },
+      "warranty": "Panasonic UK: 3 years standard on RAC/PAC/VRF/A2W when installed by a qualified engineer; up to 5 years parts & labour when installed by a Panasonic Accredited Installer (completed Panasonic product training) who registers the unit on the PRO Club portal; PRO Partner / Elite PRO Partner tier advertised as up to 7 years (7-year scheme is publicised mainly for Aquarea; eligibility of residential air-to-air splits for 7 years NOT confirmed). Annual servicing records required. Sourced from 2021 warranty key facts and the UK PRO Partner page via search snippets - confirm current T&Cs (UK Warranty doc rev R2 eff. 1 Dec 2021; PHVAC UK T&Cs eff. 1 Dec 2023) before quoting customers.",
+      "sources": [
+        {
+          "url": "https://www.aircon.panasonic.eu/GB_en/model/kit-z35-cke-cs-z35ckew-cu-z35cke/",
+          "title": "Panasonic UK - KIT-Z35-CKE (CS-Z35CKEW + CU-Z35CKE) model page"
+        },
+        {
+          "url": "https://www.aircon.panasonic.eu/FR_fr/model/kit-z35-cke-cs-z35ckew-cu-z35cke/",
+          "title": "Panasonic FR - KIT-Z35-CKE spec table"
+        }
+      ],
+      "confidence": "verified",
+      "notes": "soundPressureHighDb = outdoor sound pressure at cooling Hi (not sound power); outdoor sound power (LwA) not found for CKE - see openQuestions. Min pipe length 3 m. prechargedPipeM = Panasonic 'pipe length for additional gas'. Outdoor sound pressure Hi: cool 48 / heat 50 dB(A). Factory charge 0.81 kg R32 (0.55 t CO2e). Additional gas 10 g/m beyond 7.5 m. Figures read from Panasonic's official EU/UK model pages (aircon.panasonic.eu) via search-engine extraction; direct page/PDF fetch was blocked in the research environment, so spot-check against the PDF datasheet before design sign-off."
+    },
+    {
+      "kind": "indoor",
+      "manufacturer": "Panasonic",
+      "series": "Etherea Z (CKE, nanoe X, Pure White Matt)",
+      "model": "CS-Z50CKEW",
+      "label": "Panasonic Etherea 5.0 kW",
+      "tier": "premium",
+      "multiSplitCapable": true,
+      "ports": null,
+      "pairedWith": "CU-Z50CKE",
+      "specs": {
+        "coolingKw": 5.0,
+        "heatingKw": 5.8,
+        "seer": 8.5,
+        "scop": 4.8,
+        "energyClassCooling": "A+++",
+        "energyClassHeating": "A++",
+        "soundPressureLowDb": 30,
+        "soundPressureHighDb": 44,
+        "soundPowerDb": null,
+        "dimensionsMm": {
+          "w": 1040,
+          "h": 295,
+          "d": 244
+        },
+        "weightKg": 12,
+        "refrigerant": "R32",
+        "liquidPipeMm": 6.35,
+        "gasPipeMm": 12.7,
+        "maxPipeM": null,
+        "maxHeightDiffM": null,
+        "prechargedPipeM": null,
+        "additionalChargeGPerM": null,
+        "powerSupply": "230 V single-phase (Panasonic table lists 'Indoor power source 230 V' - single-split RAC is powered via the indoor unit)",
+        "recommendedBreakerA": 16,
+        "wifi": "Built-in Wi-Fi - Panasonic Comfort Cloud app; Alexa / Google Home voice control",
+        "operatingRangeCoolingC": "-10 to +43",
+        "operatingRangeHeatingC": "-20 to +24"
+      },
+      "warranty": "Panasonic UK: 3 years standard on RAC/PAC/VRF/A2W when installed by a qualified engineer; up to 5 years parts & labour when installed by a Panasonic Accredited Installer (completed Panasonic product training) who registers the unit on the PRO Club portal; PRO Partner / Elite PRO Partner tier advertised as up to 7 years (7-year scheme is publicised mainly for Aquarea; eligibility of residential air-to-air splits for 7 years NOT confirmed). Annual servicing records required. Sourced from 2021 warranty key facts and the UK PRO Partner page via search snippets - confirm current T&Cs (UK Warranty doc rev R2 eff. 1 Dec 2021; PHVAC UK T&Cs eff. 1 Dec 2023) before quoting customers.",
+      "sources": [
+        {
+          "url": "https://www.aircon.panasonic.eu/GB_en/model/kit-z50-cke-cs-z50ckew-cu-z50cke/",
+          "title": "Panasonic UK - KIT-Z50-CKE (CS-Z50CKEW + CU-Z50CKE) model page"
+        },
+        {
+          "url": "https://www.aircon.panasonic.eu/DE_de/model/Kit-z50-cke-cs-z50ckew-cu-z50cke/",
+          "title": "Panasonic DE - KIT-Z50-CKE spec table"
+        },
+        {
+          "url": "https://www.aircon.panasonic.eu/AT_de/ranges/domestic/free-multi-split/",
+          "title": "Panasonic AT - Free Multi range page (lists CKEW wall units as Free Multi indoor units)"
+        }
+      ],
+      "confidence": "verified",
+      "notes": "Capacities/SEER/SCOP are for the single-split pair. Sound = cooling Q-Lo (quiet) and cooling Hi. Pipe run limits are on the paired outdoor record. Also sold as XZ silver (CS-XZ50CKEW) and graphite (CS-XZ50CKEW-H) with the same outdoor unit. Indoor sound pressure Q-Lo/Lo/Hi 30/37/44 dB(A) (cool and heat) - the range-wide '19 dB(A)' marketing claim does NOT apply to the 5.0 kW size. Nominal EER 3.68, COP 4.14. Indoor/outdoor cable 4 x 2.5 mm2. Figures read from Panasonic's official EU/UK model pages (aircon.panasonic.eu) via search-engine extraction; direct page/PDF fetch was blocked in the research environment, so spot-check against the PDF datasheet before design sign-off."
+    },
+    {
+      "kind": "outdoor",
+      "manufacturer": "Panasonic",
+      "series": "Etherea Z (CKE) single-split outdoor",
+      "model": "CU-Z50CKE",
+      "label": "Panasonic Etherea 5.0 kW outdoor",
+      "tier": "premium",
+      "multiSplitCapable": false,
+      "ports": 1,
+      "pairedWith": "CS-Z50CKEW",
+      "specs": {
+        "coolingKw": 5.0,
+        "heatingKw": 5.8,
+        "seer": 8.5,
+        "scop": 4.8,
+        "energyClassCooling": "A+++",
+        "energyClassHeating": "A++",
+        "soundPressureLowDb": null,
+        "soundPressureHighDb": 47,
+        "soundPowerDb": null,
+        "dimensionsMm": {
+          "w": 875,
+          "h": 695,
+          "d": 320
+        },
+        "weightKg": 42,
+        "refrigerant": "R32",
+        "liquidPipeMm": 6.35,
+        "gasPipeMm": 12.7,
+        "maxPipeM": 30,
+        "maxHeightDiffM": 15,
+        "prechargedPipeM": 7.5,
+        "additionalChargeGPerM": 15,
+        "powerSupply": "230 V single-phase (Panasonic table lists 'Indoor power source 230 V' - single-split RAC is powered via the indoor unit)",
+        "recommendedBreakerA": 16,
+        "wifi": null,
+        "operatingRangeCoolingC": "-10 to +43",
+        "operatingRangeHeatingC": "-20 to +24"
+      },
+      "warranty": "Panasonic UK: 3 years standard on RAC/PAC/VRF/A2W when installed by a qualified engineer; up to 5 years parts & labour when installed by a Panasonic Accredited Installer (completed Panasonic product training) who registers the unit on the PRO Club portal; PRO Partner / Elite PRO Partner tier advertised as up to 7 years (7-year scheme is publicised mainly for Aquarea; eligibility of residential air-to-air splits for 7 years NOT confirmed). Annual servicing records required. Sourced from 2021 warranty key facts and the UK PRO Partner page via search snippets - confirm current T&Cs (UK Warranty doc rev R2 eff. 1 Dec 2021; PHVAC UK T&Cs eff. 1 Dec 2023) before quoting customers.",
+      "sources": [
+        {
+          "url": "https://www.aircon.panasonic.eu/GB_en/model/kit-z50-cke-cs-z50ckew-cu-z50cke/",
+          "title": "Panasonic UK - KIT-Z50-CKE (CS-Z50CKEW + CU-Z50CKE) model page"
+        },
+        {
+          "url": "https://www.aircon.panasonic.eu/DE_de/model/Kit-z50-cke-cs-z50ckew-cu-z50cke/",
+          "title": "Panasonic DE - KIT-Z50-CKE spec table"
+        }
+      ],
+      "confidence": "verified",
+      "notes": "soundPressureHighDb = outdoor sound pressure at cooling Hi (not sound power); outdoor sound power (LwA) not found for CKE - see openQuestions. Min pipe length 3 m. prechargedPipeM = Panasonic 'pipe length for additional gas'. Outdoor sound pressure Hi: cool 47 / heat 47 dB(A). Factory charge 1.13 kg R32 (0.76 t CO2e). Additional gas 15 g/m beyond 7.5 m. Add ~70 mm to depth for piping port. Figures read from Panasonic's official EU/UK model pages (aircon.panasonic.eu) via search-engine extraction; direct page/PDF fetch was blocked in the research environment, so spot-check against the PDF datasheet before design sign-off."
+    },
+    {
+      "kind": "indoor",
+      "manufacturer": "Panasonic",
+      "series": "Etherea Z (CKE, nanoe X, Pure White Matt)",
+      "model": "CS-Z71CKEW",
+      "label": "Panasonic Etherea 7.1 kW",
+      "tier": "premium",
+      "multiSplitCapable": true,
+      "ports": null,
+      "pairedWith": "CU-Z71CKE",
+      "specs": {
+        "coolingKw": 7.1,
+        "heatingKw": 8.2,
+        "seer": 6.5,
+        "scop": 4.2,
+        "energyClassCooling": "A++",
+        "energyClassHeating": "A+",
+        "soundPressureLowDb": 30,
+        "soundPressureHighDb": 47,
+        "soundPowerDb": null,
+        "dimensionsMm": {
+          "w": 1040,
+          "h": 295,
+          "d": 244
+        },
+        "weightKg": 13,
+        "refrigerant": "R32",
+        "liquidPipeMm": 6.35,
+        "gasPipeMm": 15.88,
+        "maxPipeM": null,
+        "maxHeightDiffM": null,
+        "prechargedPipeM": null,
+        "additionalChargeGPerM": null,
+        "powerSupply": "230 V single-phase (Panasonic table lists 'Indoor power source 230 V' - single-split RAC is powered via the indoor unit)",
+        "recommendedBreakerA": 20,
+        "wifi": "Built-in Wi-Fi - Panasonic Comfort Cloud app; Alexa / Google Home voice control",
+        "operatingRangeCoolingC": null,
+        "operatingRangeHeatingC": "-20 (min); max not confirmed"
+      },
+      "warranty": "Panasonic UK: 3 years standard on RAC/PAC/VRF/A2W when installed by a qualified engineer; up to 5 years parts & labour when installed by a Panasonic Accredited Installer (completed Panasonic product training) who registers the unit on the PRO Club portal; PRO Partner / Elite PRO Partner tier advertised as up to 7 years (7-year scheme is publicised mainly for Aquarea; eligibility of residential air-to-air splits for 7 years NOT confirmed). Annual servicing records required. Sourced from 2021 warranty key facts and the UK PRO Partner page via search snippets - confirm current T&Cs (UK Warranty doc rev R2 eff. 1 Dec 2021; PHVAC UK T&Cs eff. 1 Dec 2023) before quoting customers.",
+      "sources": [
+        {
+          "url": "https://www.aircon.panasonic.eu/GB_en/model/kit-z71-cke-cs-z71ckew-cu-z71cke/",
+          "title": "Panasonic UK - KIT-Z71-CKE (CS-Z71CKEW + CU-Z71CKE) model page"
+        },
+        {
+          "url": "https://www.aircon.panasonic.eu/DE_de/model/kit-z71-cke-cs-z71ckew-cu-z71cke/",
+          "title": "Panasonic DE - KIT-Z71-CKE spec table (sound figures)"
+        },
+        {
+          "url": "https://www.aircon.panasonic.eu/AT_de/ranges/domestic/free-multi-split/",
+          "title": "Panasonic AT - Free Multi range page (lists CKEW wall units as Free Multi indoor units)"
+        }
+      ],
+      "confidence": "verified",
+      "notes": "Capacities/SEER/SCOP are for the single-split pair. Sound = cooling Q-Lo (quiet) and cooling Hi. Pipe run limits are on the paired outdoor record. Also sold as XZ silver (CS-XZ71CKEW) and graphite (CS-XZ71CKEW-H) with the same outdoor unit. Indoor sound pressure (DE page): Q-Lo/Lo/Hi 30/38/47 dB(A). Nominal EER 3.24, COP 3.73; heating at -7 C 6.31 kW. Cooling operating range not captured. Figures read from Panasonic's official EU/UK model pages (aircon.panasonic.eu) via search-engine extraction; direct page/PDF fetch was blocked in the research environment, so spot-check against the PDF datasheet before design sign-off."
+    },
+    {
+      "kind": "outdoor",
+      "manufacturer": "Panasonic",
+      "series": "Etherea Z (CKE) single-split outdoor",
+      "model": "CU-Z71CKE",
+      "label": "Panasonic Etherea 7.1 kW outdoor",
+      "tier": "premium",
+      "multiSplitCapable": false,
+      "ports": 1,
+      "pairedWith": "CS-Z71CKEW",
+      "specs": {
+        "coolingKw": 7.1,
+        "heatingKw": 8.2,
+        "seer": 6.5,
+        "scop": 4.2,
+        "energyClassCooling": "A++",
+        "energyClassHeating": "A+",
+        "soundPressureLowDb": null,
+        "soundPressureHighDb": 52,
+        "soundPowerDb": null,
+        "dimensionsMm": {
+          "w": 875,
+          "h": 695,
+          "d": 320
+        },
+        "weightKg": 45,
+        "refrigerant": "R32",
+        "liquidPipeMm": 6.35,
+        "gasPipeMm": 15.88,
+        "maxPipeM": 30,
+        "maxHeightDiffM": 20,
+        "prechargedPipeM": 10,
+        "additionalChargeGPerM": 25,
+        "powerSupply": "230 V single-phase (Panasonic table lists 'Indoor power source 230 V' - single-split RAC is powered via the indoor unit)",
+        "recommendedBreakerA": 20,
+        "wifi": null,
+        "operatingRangeCoolingC": null,
+        "operatingRangeHeatingC": "-20 (min); max not confirmed"
+      },
+      "warranty": "Panasonic UK: 3 years standard on RAC/PAC/VRF/A2W when installed by a qualified engineer; up to 5 years parts & labour when installed by a Panasonic Accredited Installer (completed Panasonic product training) who registers the unit on the PRO Club portal; PRO Partner / Elite PRO Partner tier advertised as up to 7 years (7-year scheme is publicised mainly for Aquarea; eligibility of residential air-to-air splits for 7 years NOT confirmed). Annual servicing records required. Sourced from 2021 warranty key facts and the UK PRO Partner page via search snippets - confirm current T&Cs (UK Warranty doc rev R2 eff. 1 Dec 2021; PHVAC UK T&Cs eff. 1 Dec 2023) before quoting customers.",
+      "sources": [
+        {
+          "url": "https://www.aircon.panasonic.eu/GB_en/model/kit-z71-cke-cs-z71ckew-cu-z71cke/",
+          "title": "Panasonic UK - KIT-Z71-CKE (CS-Z71CKEW + CU-Z71CKE) model page"
+        },
+        {
+          "url": "https://www.aircon.panasonic.eu/DE_de/model/kit-z71-cke-cs-z71ckew-cu-z71cke/",
+          "title": "Panasonic DE - KIT-Z71-CKE spec table (sound figures)"
+        }
+      ],
+      "confidence": "verified",
+      "notes": "soundPressureHighDb = outdoor sound pressure at cooling Hi (not sound power); outdoor sound power (LwA) not found for CKE - see openQuestions. Min pipe length 3 m. prechargedPipeM = Panasonic 'pipe length for additional gas'. Outdoor sound pressure Hi: cool 52 / heat 54 dB(A) (DE page). Factory charge 1.35 kg R32 (0.91 t CO2e). Additional gas 25 g/m beyond 10 m. 45 kg outdoor weight read from a garbled DE table row and matches GB page summary. Figures read from Panasonic's official EU/UK model pages (aircon.panasonic.eu) via search-engine extraction; direct page/PDF fetch was blocked in the research environment, so spot-check against the PDF datasheet before design sign-off."
+    },
+    {
+      "kind": "indoor",
+      "manufacturer": "Panasonic",
+      "series": "Etherea XZ (CKE, nanoe X, Silver)",
+      "model": "CS-XZ35CKEW",
+      "label": "Panasonic Etherea 3.5 kW (Silver)",
+      "tier": "premium",
+      "multiSplitCapable": true,
+      "ports": null,
+      "pairedWith": "CU-Z35CKE",
+      "specs": {
+        "coolingKw": 3.5,
+        "heatingKw": 4.0,
+        "seer": 9.5,
+        "scop": 5.2,
+        "energyClassCooling": "A+++",
+        "energyClassHeating": "A+++",
+        "soundPressureLowDb": 19,
+        "soundPressureHighDb": 42,
+        "soundPowerDb": null,
+        "dimensionsMm": {
+          "w": 870,
+          "h": 295,
+          "d": 229
+        },
+        "weightKg": 11,
+        "refrigerant": "R32",
+        "liquidPipeMm": 6.35,
+        "gasPipeMm": 9.52,
+        "maxPipeM": null,
+        "maxHeightDiffM": null,
+        "prechargedPipeM": null,
+        "additionalChargeGPerM": null,
+        "powerSupply": "230 V single-phase (Panasonic table lists 'Indoor power source 230 V' - single-split RAC is powered via the indoor unit)",
+        "recommendedBreakerA": 16,
+        "wifi": "Built-in Wi-Fi - Panasonic Comfort Cloud app; Alexa / Google Home voice control",
+        "operatingRangeCoolingC": "-10 to +43",
+        "operatingRangeHeatingC": "-20 to +24"
+      },
+      "warranty": "Panasonic UK: 3 years standard on RAC/PAC/VRF/A2W when installed by a qualified engineer; up to 5 years parts & labour when installed by a Panasonic Accredited Installer (completed Panasonic product training) who registers the unit on the PRO Club portal; PRO Partner / Elite PRO Partner tier advertised as up to 7 years (7-year scheme is publicised mainly for Aquarea; eligibility of residential air-to-air splits for 7 years NOT confirmed). Annual servicing records required. Sourced from 2021 warranty key facts and the UK PRO Partner page via search snippets - confirm current T&Cs (UK Warranty doc rev R2 eff. 1 Dec 2021; PHVAC UK T&Cs eff. 1 Dec 2023) before quoting customers.",
+      "sources": [
+        {
+          "url": "https://www.aircon.panasonic.eu/GB_en/model/kit-z35-cke-cs-xz35ckew-cu-z35cke/",
+          "title": "Panasonic UK - KIT-Z35-CKE (CS-XZ35CKEW + CU-Z35CKE) model page"
+        },
+        {
+          "url": "https://www.aircon.panasonic.eu/GB_en/model/kit-z35-cke-cs-z35ckew-cu-z35cke/",
+          "title": "Panasonic UK - KIT-Z35-CKE (CS-Z35CKEW + CU-Z35CKE) model page"
+        }
+      ],
+      "confidence": "verified",
+      "notes": "Silver colour variant of CS-Z35CKEW; Panasonic GB page lists the same figures as the white unit and the same outdoor CU-Z35CKE. Graphite grey variant is CS-XZ35CKEW-H. Other XZ sizes (20/25/42/50) follow the same pattern (CS-XZ##CKEW, -H) - spec equivalence assumed, not individually checked. Figures read from Panasonic's official EU/UK model pages (aircon.panasonic.eu) via search-engine extraction; direct page/PDF fetch was blocked in the research environment, so spot-check against the PDF datasheet before design sign-off."
+    },
+    {
+      "kind": "indoor",
+      "manufacturer": "Panasonic",
+      "series": "TZ super-compact (CKE, nanoe X)",
+      "model": "CS-TZ25CKEW",
+      "label": "Panasonic TZ 2.5 kW",
+      "tier": "standard",
+      "multiSplitCapable": true,
+      "ports": null,
+      "pairedWith": "CU-TZ25CKE",
+      "specs": {
+        "coolingKw": 2.5,
+        "heatingKw": 3.3,
+        "seer": 7.3,
+        "scop": 4.6,
+        "energyClassCooling": "A++",
+        "energyClassHeating": "A++",
+        "soundPressureLowDb": 20,
+        "soundPressureHighDb": 40,
+        "soundPowerDb": null,
+        "dimensionsMm": {
+          "w": 765,
+          "h": 290,
+          "d": 214
+        },
+        "weightKg": 9,
+        "refrigerant": "R32",
+        "liquidPipeMm": 6.35,
+        "gasPipeMm": 9.52,
+        "maxPipeM": null,
+        "maxHeightDiffM": null,
+        "prechargedPipeM": null,
+        "additionalChargeGPerM": null,
+        "powerSupply": "230 V single-phase (Panasonic table lists 'Indoor power source 230 V' - single-split RAC is powered via the indoor unit)",
+        "recommendedBreakerA": 16,
+        "wifi": "Built-in Wi-Fi - Panasonic Comfort Cloud app; Alexa / Google Home voice control",
+        "operatingRangeCoolingC": "-10 to +43",
+        "operatingRangeHeatingC": "-15 to +24"
+      },
+      "warranty": "Panasonic UK: 3 years standard on RAC/PAC/VRF/A2W when installed by a qualified engineer; up to 5 years parts & labour when installed by a Panasonic Accredited Installer (completed Panasonic product training) who registers the unit on the PRO Club portal; PRO Partner / Elite PRO Partner tier advertised as up to 7 years (7-year scheme is publicised mainly for Aquarea; eligibility of residential air-to-air splits for 7 years NOT confirmed). Annual servicing records required. Sourced from 2021 warranty key facts and the UK PRO Partner page via search snippets - confirm current T&Cs (UK Warranty doc rev R2 eff. 1 Dec 2021; PHVAC UK T&Cs eff. 1 Dec 2023) before quoting customers.",
+      "sources": [
+        {
+          "url": "https://www.aircon.panasonic.eu/GB_en/model/kit-tz25-cke-cs-tz25ckew-cu-tz25cke/",
+          "title": "Panasonic UK - KIT-TZ25-CKE (CS-TZ25CKEW + CU-TZ25CKE) model page"
+        },
+        {
+          "url": "https://www.aircon.panasonic.eu/FR_fr/product/tz-super-compact-with-nanoe-x-r32/",
+          "title": "Panasonic FR - TZ super-compact with nanoe X product page (built-in Wi-Fi)"
+        },
+        {
+          "url": "https://www.aircon.panasonic.eu/AT_de/ranges/domestic/free-multi-split/",
+          "title": "Panasonic AT - Free Multi range page (lists CS-TZ..CKEW as Free Multi indoor units)"
+        }
+      ],
+      "confidence": "verified",
+      "notes": "Capacities/SEER/SCOP are for the single-split pair. Sound = cooling Q-Lo (quiet) and cooling Hi. Pipe run limits are on the paired outdoor record. Panasonic marketing copy quotes 779 mm width; spec tables give 765 mm (used here). Indoor sound pressure: cool Q-Lo/Lo/Hi 20/26/40, heat 21/27/40 dB(A). Nominal EER 3.85, COP 4.18; heating at -7 C 2.70 kW. Standalone CS-TZ25CKEW page shows 25 kg indoor weight - page error; kit table 9 kg used. Figures read from Panasonic's official EU/UK model pages (aircon.panasonic.eu) via search-engine extraction; direct page/PDF fetch was blocked in the research environment, so spot-check against the PDF datasheet before design sign-off."
+    },
+    {
+      "kind": "outdoor",
+      "manufacturer": "Panasonic",
+      "series": "TZ super-compact (CKE) single-split outdoor",
+      "model": "CU-TZ25CKE",
+      "label": "Panasonic TZ 2.5 kW outdoor",
+      "tier": "standard",
+      "multiSplitCapable": false,
+      "ports": 1,
+      "pairedWith": "CS-TZ25CKEW",
+      "specs": {
+        "coolingKw": 2.5,
+        "heatingKw": 3.3,
+        "seer": 7.3,
+        "scop": 4.6,
+        "energyClassCooling": "A++",
+        "energyClassHeating": "A++",
+        "soundPressureLowDb": null,
+        "soundPressureHighDb": 47,
+        "soundPowerDb": null,
+        "dimensionsMm": {
+          "w": 780,
+          "h": 542,
+          "d": 289
+        },
+        "weightKg": 25,
+        "refrigerant": "R32",
+        "liquidPipeMm": 6.35,
+        "gasPipeMm": 9.52,
+        "maxPipeM": 15,
+        "maxHeightDiffM": 15,
+        "prechargedPipeM": 7.5,
+        "additionalChargeGPerM": 10,
+        "powerSupply": "230 V single-phase (Panasonic table lists 'Indoor power source 230 V' - single-split RAC is powered via the indoor unit)",
+        "recommendedBreakerA": 16,
+        "wifi": null,
+        "operatingRangeCoolingC": "-10 to +43",
+        "operatingRangeHeatingC": "-15 to +24"
+      },
+      "warranty": "Panasonic UK: 3 years standard on RAC/PAC/VRF/A2W when installed by a qualified engineer; up to 5 years parts & labour when installed by a Panasonic Accredited Installer (completed Panasonic product training) who registers the unit on the PRO Club portal; PRO Partner / Elite PRO Partner tier advertised as up to 7 years (7-year scheme is publicised mainly for Aquarea; eligibility of residential air-to-air splits for 7 years NOT confirmed). Annual servicing records required. Sourced from 2021 warranty key facts and the UK PRO Partner page via search snippets - confirm current T&Cs (UK Warranty doc rev R2 eff. 1 Dec 2021; PHVAC UK T&Cs eff. 1 Dec 2023) before quoting customers.",
+      "sources": [
+        {
+          "url": "https://www.aircon.panasonic.eu/GB_en/model/kit-tz25-cke-cs-tz25ckew-cu-tz25cke/",
+          "title": "Panasonic UK - KIT-TZ25-CKE (CS-TZ25CKEW + CU-TZ25CKE) model page"
+        }
+      ],
+      "confidence": "verified",
+      "notes": "soundPressureHighDb = outdoor sound pressure at cooling Hi (not sound power); outdoor sound power (LwA) not found - see openQuestions. Min pipe length 3 m. prechargedPipeM = Panasonic 'pipe length for additional gas'. Outdoor sound pressure Hi: cool 47 / heat 48 dB(A). Factory charge 0.58 kg R32 (0.39 t CO2e). Additional gas 10 g/m beyond 7.5 m. Figures read from Panasonic's official EU/UK model pages (aircon.panasonic.eu) via search-engine extraction; direct page/PDF fetch was blocked in the research environment, so spot-check against the PDF datasheet before design sign-off."
+    },
+    {
+      "kind": "indoor",
+      "manufacturer": "Panasonic",
+      "series": "TZ super-compact (CKE, nanoe X)",
+      "model": "CS-TZ35CKEW",
+      "label": "Panasonic TZ 3.5 kW",
+      "tier": "standard",
+      "multiSplitCapable": true,
+      "ports": null,
+      "pairedWith": "CU-TZ35CKE",
+      "specs": {
+        "coolingKw": 3.5,
+        "heatingKw": 4.0,
+        "seer": 7.3,
+        "scop": 4.6,
+        "energyClassCooling": "A++",
+        "energyClassHeating": "A++",
+        "soundPressureLowDb": 20,
+        "soundPressureHighDb": 42,
+        "soundPowerDb": null,
+        "dimensionsMm": {
+          "w": 765,
+          "h": 290,
+          "d": 214
+        },
+        "weightKg": 9,
+        "refrigerant": "R32",
+        "liquidPipeMm": 6.35,
+        "gasPipeMm": 9.52,
+        "maxPipeM": null,
+        "maxHeightDiffM": null,
+        "prechargedPipeM": null,
+        "additionalChargeGPerM": null,
+        "powerSupply": "230 V single-phase (Panasonic table lists 'Indoor power source 230 V' - single-split RAC is powered via the indoor unit)",
+        "recommendedBreakerA": 16,
+        "wifi": "Built-in Wi-Fi - Panasonic Comfort Cloud app; Alexa / Google Home voice control",
+        "operatingRangeCoolingC": "-10 to +43",
+        "operatingRangeHeatingC": "-15 to +24"
+      },
+      "warranty": "Panasonic UK: 3 years standard on RAC/PAC/VRF/A2W when installed by a qualified engineer; up to 5 years parts & labour when installed by a Panasonic Accredited Installer (completed Panasonic product training) who registers the unit on the PRO Club portal; PRO Partner / Elite PRO Partner tier advertised as up to 7 years (7-year scheme is publicised mainly for Aquarea; eligibility of residential air-to-air splits for 7 years NOT confirmed). Annual servicing records required. Sourced from 2021 warranty key facts and the UK PRO Partner page via search snippets - confirm current T&Cs (UK Warranty doc rev R2 eff. 1 Dec 2021; PHVAC UK T&Cs eff. 1 Dec 2023) before quoting customers.",
+      "sources": [
+        {
+          "url": "https://www.aircon.panasonic.eu/GB_en/model/kit-tz35-cke-cs-tz35ckew-cu-tz35cke/",
+          "title": "Panasonic UK - KIT-TZ35-CKE (CS-TZ35CKEW + CU-TZ35CKE) model page"
+        },
+        {
+          "url": "https://www.aircon.panasonic.eu/FR_fr/model/kit-tz35-cke-cs-tz35ckew-cu-tz35cke/",
+          "title": "Panasonic FR - KIT-TZ35-CKE spec table"
+        },
+        {
+          "url": "https://www.aircon.panasonic.eu/FR_fr/product/tz-super-compact-with-nanoe-x-r32/",
+          "title": "Panasonic FR - TZ super-compact with nanoe X product page (built-in Wi-Fi)"
+        },
+        {
+          "url": "https://www.aircon.panasonic.eu/AT_de/ranges/domestic/free-multi-split/",
+          "title": "Panasonic AT - Free Multi range page (lists CS-TZ..CKEW as Free Multi indoor units)"
+        }
+      ],
+      "confidence": "verified",
+      "notes": "Capacities/SEER/SCOP are for the single-split pair. Sound = cooling Q-Lo (quiet) and cooling Hi. Pipe run limits are on the paired outdoor record. Panasonic marketing copy quotes 779 mm width; spec tables give 765 mm (used here). Indoor sound pressure: cool Q-Lo/Lo/Hi 20/30/42, heat 21/33/42 dB(A). Nominal EER 3.57, COP 4.04; max 4.0 kW cool / 5.1 kW heat. Annual consumption 168 kWh cool / 852 kWh heat. Standalone indoor page shows 30 kg - page error. Figures read from Panasonic's official EU/UK model pages (aircon.panasonic.eu) via search-engine extraction; direct page/PDF fetch was blocked in the research environment, so spot-check against the PDF datasheet before design sign-off."
+    },
+    {
+      "kind": "outdoor",
+      "manufacturer": "Panasonic",
+      "series": "TZ super-compact (CKE) single-split outdoor",
+      "model": "CU-TZ35CKE",
+      "label": "Panasonic TZ 3.5 kW outdoor",
+      "tier": "standard",
+      "multiSplitCapable": false,
+      "ports": 1,
+      "pairedWith": "CS-TZ35CKEW",
+      "specs": {
+        "coolingKw": 3.5,
+        "heatingKw": 4.0,
+        "seer": 7.3,
+        "scop": 4.6,
+        "energyClassCooling": "A++",
+        "energyClassHeating": "A++",
+        "soundPressureLowDb": null,
+        "soundPressureHighDb": 48,
+        "soundPowerDb": null,
+        "dimensionsMm": {
+          "w": 780,
+          "h": 542,
+          "d": 289
+        },
+        "weightKg": 30,
+        "refrigerant": "R32",
+        "liquidPipeMm": 6.35,
+        "gasPipeMm": 9.52,
+        "maxPipeM": 15,
+        "maxHeightDiffM": 15,
+        "prechargedPipeM": 7.5,
+        "additionalChargeGPerM": 10,
+        "powerSupply": "230 V single-phase (Panasonic table lists 'Indoor power source 230 V' - single-split RAC is powered via the indoor unit)",
+        "recommendedBreakerA": 16,
+        "wifi": null,
+        "operatingRangeCoolingC": "-10 to +43",
+        "operatingRangeHeatingC": "-15 to +24"
+      },
+      "warranty": "Panasonic UK: 3 years standard on RAC/PAC/VRF/A2W when installed by a qualified engineer; up to 5 years parts & labour when installed by a Panasonic Accredited Installer (completed Panasonic product training) who registers the unit on the PRO Club portal; PRO Partner / Elite PRO Partner tier advertised as up to 7 years (7-year scheme is publicised mainly for Aquarea; eligibility of residential air-to-air splits for 7 years NOT confirmed). Annual servicing records required. Sourced from 2021 warranty key facts and the UK PRO Partner page via search snippets - confirm current T&Cs (UK Warranty doc rev R2 eff. 1 Dec 2021; PHVAC UK T&Cs eff. 1 Dec 2023) before quoting customers.",
+      "sources": [
+        {
+          "url": "https://www.aircon.panasonic.eu/GB_en/model/kit-tz35-cke-cs-tz35ckew-cu-tz35cke/",
+          "title": "Panasonic UK - KIT-TZ35-CKE (CS-TZ35CKEW + CU-TZ35CKE) model page"
+        },
+        {
+          "url": "https://www.aircon.panasonic.eu/FR_fr/model/kit-tz35-cke-cs-tz35ckew-cu-tz35cke/",
+          "title": "Panasonic FR - KIT-TZ35-CKE spec table"
+        }
+      ],
+      "confidence": "verified",
+      "notes": "soundPressureHighDb = outdoor sound pressure at cooling Hi (not sound power); outdoor sound power (LwA) not found - see openQuestions. Min pipe length 3 m. prechargedPipeM = Panasonic 'pipe length for additional gas'. Outdoor sound pressure Hi: cool 48 / heat 50 dB(A). Factory charge 0.68 kg R32 (0.46 t CO2e). Additional gas 10 g/m beyond 7.5 m. Figures read from Panasonic's official EU/UK model pages (aircon.panasonic.eu) via search-engine extraction; direct page/PDF fetch was blocked in the research environment, so spot-check against the PDF datasheet before design sign-off."
+    },
+    {
+      "kind": "indoor",
+      "manufacturer": "Panasonic",
+      "series": "TZ super-compact (CKE, nanoe X)",
+      "model": "CS-TZ50CKEW",
+      "label": "Panasonic TZ 5.0 kW",
+      "tier": "standard",
+      "multiSplitCapable": true,
+      "ports": null,
+      "pairedWith": "CU-TZ50CKE",
+      "specs": {
+        "coolingKw": 5.0,
+        "heatingKw": 5.8,
+        "seer": 6.9,
+        "scop": 4.5,
+        "energyClassCooling": "A++",
+        "energyClassHeating": "A+",
+        "soundPressureLowDb": 33,
+        "soundPressureHighDb": 44,
+        "soundPowerDb": null,
+        "dimensionsMm": {
+          "w": 765,
+          "h": 290,
+          "d": 214
+        },
+        "weightKg": 9,
+        "refrigerant": "R32",
+        "liquidPipeMm": 6.35,
+        "gasPipeMm": 12.7,
+        "maxPipeM": null,
+        "maxHeightDiffM": null,
+        "prechargedPipeM": null,
+        "additionalChargeGPerM": null,
+        "powerSupply": "230 V single-phase (Panasonic table lists 'Indoor power source 230 V' - single-split RAC is powered via the indoor unit)",
+        "recommendedBreakerA": 16,
+        "wifi": "Built-in Wi-Fi - Panasonic Comfort Cloud app; Alexa / Google Home voice control",
+        "operatingRangeCoolingC": "-10 to +43",
+        "operatingRangeHeatingC": "-15 to +24"
+      },
+      "warranty": "Panasonic UK: 3 years standard on RAC/PAC/VRF/A2W when installed by a qualified engineer; up to 5 years parts & labour when installed by a Panasonic Accredited Installer (completed Panasonic product training) who registers the unit on the PRO Club portal; PRO Partner / Elite PRO Partner tier advertised as up to 7 years (7-year scheme is publicised mainly for Aquarea; eligibility of residential air-to-air splits for 7 years NOT confirmed). Annual servicing records required. Sourced from 2021 warranty key facts and the UK PRO Partner page via search snippets - confirm current T&Cs (UK Warranty doc rev R2 eff. 1 Dec 2021; PHVAC UK T&Cs eff. 1 Dec 2023) before quoting customers.",
+      "sources": [
+        {
+          "url": "https://www.aircon.panasonic.eu/GB_en/model/kit-tz50-cke-cs-tz50ckew-cu-tz50cke/",
+          "title": "Panasonic UK - KIT-TZ50-CKE (CS-TZ50CKEW + CU-TZ50CKE) model page"
+        },
+        {
+          "url": "https://www.aircon.panasonic.eu/FR_fr/product/tz-super-compact-with-nanoe-x-r32/",
+          "title": "Panasonic FR - TZ super-compact with nanoe X product page (built-in Wi-Fi)"
+        },
+        {
+          "url": "https://www.aircon.panasonic.eu/AT_de/ranges/domestic/free-multi-split/",
+          "title": "Panasonic AT - Free Multi range page (lists CS-TZ..CKEW as Free Multi indoor units)"
+        }
+      ],
+      "confidence": "verified",
+      "notes": "Capacities/SEER/SCOP are for the single-split pair. Sound = cooling Q-Lo (quiet) and cooling Hi. Pipe run limits are on the paired outdoor record. Panasonic marketing copy quotes 779 mm width; spec tables give 765 mm (used here). Indoor sound pressure Q-Lo/Lo/Hi 33/37/44 dB(A) (cool and heat) - the '20 dB(A)' marketing figure does not apply to this size. Nominal EER 3.13, COP 3.41. Figures read from Panasonic's official EU/UK model pages (aircon.panasonic.eu) via search-engine extraction; direct page/PDF fetch was blocked in the research environment, so spot-check against the PDF datasheet before design sign-off."
+    },
+    {
+      "kind": "outdoor",
+      "manufacturer": "Panasonic",
+      "series": "TZ super-compact (CKE) single-split outdoor",
+      "model": "CU-TZ50CKE",
+      "label": "Panasonic TZ 5.0 kW outdoor",
+      "tier": "standard",
+      "multiSplitCapable": false,
+      "ports": 1,
+      "pairedWith": "CS-TZ50CKEW",
+      "specs": {
+        "coolingKw": 5.0,
+        "heatingKw": 5.8,
+        "seer": 6.9,
+        "scop": 4.5,
+        "energyClassCooling": "A++",
+        "energyClassHeating": "A+",
+        "soundPressureLowDb": null,
+        "soundPressureHighDb": 48,
+        "soundPowerDb": null,
+        "dimensionsMm": {
+          "w": 824,
+          "h": 619,
+          "d": 299
+        },
+        "weightKg": 35,
+        "refrigerant": "R32",
+        "liquidPipeMm": 6.35,
+        "gasPipeMm": 12.7,
+        "maxPipeM": 20,
+        "maxHeightDiffM": 15,
+        "prechargedPipeM": 10,
+        "additionalChargeGPerM": 15,
+        "powerSupply": "230 V single-phase (Panasonic table lists 'Indoor power source 230 V' - single-split RAC is powered via the indoor unit)",
+        "recommendedBreakerA": 16,
+        "wifi": null,
+        "operatingRangeCoolingC": "-10 to +43",
+        "operatingRangeHeatingC": "-15 to +24"
+      },
+      "warranty": "Panasonic UK: 3 years standard on RAC/PAC/VRF/A2W when installed by a qualified engineer; up to 5 years parts & labour when installed by a Panasonic Accredited Installer (completed Panasonic product training) who registers the unit on the PRO Club portal; PRO Partner / Elite PRO Partner tier advertised as up to 7 years (7-year scheme is publicised mainly for Aquarea; eligibility of residential air-to-air splits for 7 years NOT confirmed). Annual servicing records required. Sourced from 2021 warranty key facts and the UK PRO Partner page via search snippets - confirm current T&Cs (UK Warranty doc rev R2 eff. 1 Dec 2021; PHVAC UK T&Cs eff. 1 Dec 2023) before quoting customers.",
+      "sources": [
+        {
+          "url": "https://www.aircon.panasonic.eu/GB_en/model/kit-tz50-cke-cs-tz50ckew-cu-tz50cke/",
+          "title": "Panasonic UK - KIT-TZ50-CKE (CS-TZ50CKEW + CU-TZ50CKE) model page"
+        }
+      ],
+      "confidence": "verified",
+      "notes": "soundPressureHighDb = outdoor sound pressure at cooling Hi (not sound power); outdoor sound power (LwA) not found - see openQuestions. Min pipe length 3 m. prechargedPipeM = Panasonic 'pipe length for additional gas'. Outdoor sound pressure Hi: cool 48 / heat 49 dB(A). Factory charge 1.03 kg R32 (0.70 t CO2e). Additional gas 15 g/m beyond 10 m. Add 70 mm for piping port. Figures read from Panasonic's official EU/UK model pages (aircon.panasonic.eu) via search-engine extraction; direct page/PDF fetch was blocked in the research environment, so spot-check against the PDF datasheet before design sign-off."
+    },
+    {
+      "kind": "indoor",
+      "manufacturer": "Panasonic",
+      "series": "TZ super-compact (CKE, nanoe X)",
+      "model": "CS-TZ71CKEW",
+      "label": "Panasonic TZ 7.1 kW",
+      "tier": "standard",
+      "multiSplitCapable": true,
+      "ports": null,
+      "pairedWith": "CU-TZ71CKE",
+      "specs": {
+        "coolingKw": 7.1,
+        "heatingKw": 8.2,
+        "seer": 6.3,
+        "scop": 4.1,
+        "energyClassCooling": "A++",
+        "energyClassHeating": "A+",
+        "soundPressureLowDb": 35,
+        "soundPressureHighDb": 47,
+        "soundPowerDb": null,
+        "dimensionsMm": {
+          "w": 1060,
+          "h": 295,
+          "d": 249
+        },
+        "weightKg": 15,
+        "refrigerant": "R32",
+        "liquidPipeMm": 6.35,
+        "gasPipeMm": 15.88,
+        "maxPipeM": null,
+        "maxHeightDiffM": null,
+        "prechargedPipeM": null,
+        "additionalChargeGPerM": null,
+        "powerSupply": "230 V single-phase (Panasonic table lists 'Indoor power source 230 V' - single-split RAC is powered via the indoor unit)",
+        "recommendedBreakerA": 20,
+        "wifi": "Built-in Wi-Fi - Panasonic Comfort Cloud app; Alexa / Google Home voice control",
+        "operatingRangeCoolingC": null,
+        "operatingRangeHeatingC": "-15 (min); max not confirmed"
+      },
+      "warranty": "Panasonic UK: 3 years standard on RAC/PAC/VRF/A2W when installed by a qualified engineer; up to 5 years parts & labour when installed by a Panasonic Accredited Installer (completed Panasonic product training) who registers the unit on the PRO Club portal; PRO Partner / Elite PRO Partner tier advertised as up to 7 years (7-year scheme is publicised mainly for Aquarea; eligibility of residential air-to-air splits for 7 years NOT confirmed). Annual servicing records required. Sourced from 2021 warranty key facts and the UK PRO Partner page via search snippets - confirm current T&Cs (UK Warranty doc rev R2 eff. 1 Dec 2021; PHVAC UK T&Cs eff. 1 Dec 2023) before quoting customers.",
+      "sources": [
+        {
+          "url": "https://www.aircon.panasonic.eu/GB_en/model/kit-tz71-cke-cs-tz71ckew-cu-tz71cke/",
+          "title": "Panasonic UK - KIT-TZ71-CKE (CS-TZ71CKEW + CU-TZ71CKE) model page"
+        },
+        {
+          "url": "https://www.aircon.panasonic.eu/FR_fr/product/tz-super-compact-with-nanoe-x-r32/",
+          "title": "Panasonic FR - TZ super-compact with nanoe X product page (built-in Wi-Fi)"
+        },
+        {
+          "url": "https://www.aircon.panasonic.eu/AT_de/ranges/domestic/free-multi-split/",
+          "title": "Panasonic AT - Free Multi range page (lists CS-TZ..CKEW as Free Multi indoor units)"
+        }
+      ],
+      "confidence": "verified",
+      "notes": "Capacities/SEER/SCOP are for the single-split pair. Sound = cooling Q-Lo (quiet) and cooling Hi. Pipe run limits are on the paired outdoor record. Panasonic marketing copy quotes 779 mm width; spec tables give 765 mm (used here). Indoor sound pressure Q-Lo 35 / Hi 47 dB(A). Nominal EER 3.23, COP 3.71. Indoor weight conflict: GB kit page 15 kg vs NL page 13 kg. Dutch page lists SEER 6.20 vs GB 6.30. Figures read from Panasonic's official EU/UK model pages (aircon.panasonic.eu) via search-engine extraction; direct page/PDF fetch was blocked in the research environment, so spot-check against the PDF datasheet before design sign-off."
+    },
+    {
+      "kind": "outdoor",
+      "manufacturer": "Panasonic",
+      "series": "TZ super-compact (CKE) single-split outdoor",
+      "model": "CU-TZ71CKE",
+      "label": "Panasonic TZ 7.1 kW outdoor",
+      "tier": "standard",
+      "multiSplitCapable": false,
+      "ports": 1,
+      "pairedWith": "CS-TZ71CKEW",
+      "specs": {
+        "coolingKw": 7.1,
+        "heatingKw": 8.2,
+        "seer": 6.3,
+        "scop": 4.1,
+        "energyClassCooling": "A++",
+        "energyClassHeating": "A+",
+        "soundPressureLowDb": null,
+        "soundPressureHighDb": 52,
+        "soundPowerDb": null,
+        "dimensionsMm": {
+          "w": 875,
+          "h": 695,
+          "d": 320
+        },
+        "weightKg": 45,
+        "refrigerant": "R32",
+        "liquidPipeMm": 6.35,
+        "gasPipeMm": 15.88,
+        "maxPipeM": 30,
+        "maxHeightDiffM": 20,
+        "prechargedPipeM": 10,
+        "additionalChargeGPerM": 25,
+        "powerSupply": "230 V single-phase (Panasonic table lists 'Indoor power source 230 V' - single-split RAC is powered via the indoor unit)",
+        "recommendedBreakerA": 20,
+        "wifi": null,
+        "operatingRangeCoolingC": null,
+        "operatingRangeHeatingC": "-15 (min); max not confirmed"
+      },
+      "warranty": "Panasonic UK: 3 years standard on RAC/PAC/VRF/A2W when installed by a qualified engineer; up to 5 years parts & labour when installed by a Panasonic Accredited Installer (completed Panasonic product training) who registers the unit on the PRO Club portal; PRO Partner / Elite PRO Partner tier advertised as up to 7 years (7-year scheme is publicised mainly for Aquarea; eligibility of residential air-to-air splits for 7 years NOT confirmed). Annual servicing records required. Sourced from 2021 warranty key facts and the UK PRO Partner page via search snippets - confirm current T&Cs (UK Warranty doc rev R2 eff. 1 Dec 2021; PHVAC UK T&Cs eff. 1 Dec 2023) before quoting customers.",
+      "sources": [
+        {
+          "url": "https://www.aircon.panasonic.eu/GB_en/model/kit-tz71-cke-cs-tz71ckew-cu-tz71cke/",
+          "title": "Panasonic UK - KIT-TZ71-CKE (CS-TZ71CKEW + CU-TZ71CKE) model page"
+        }
+      ],
+      "confidence": "verified",
+      "notes": "soundPressureHighDb = outdoor sound pressure at cooling Hi (not sound power); outdoor sound power (LwA) not found - see openQuestions. Min pipe length 3 m. prechargedPipeM = Panasonic 'pipe length for additional gas'. Outdoor sound pressure Hi: cool 52 / heat 54 dB(A). Factory charge 1.32 kg R32. Additional gas 25 g/m beyond 10 m. Indoor/outdoor cable 4 x 2.5 mm2. Figures read from Panasonic's official EU/UK model pages (aircon.panasonic.eu) via search-engine extraction; direct page/PDF fetch was blocked in the research environment, so spot-check against the PDF datasheet before design sign-off."
+    },
+    {
+      "kind": "outdoor",
+      "manufacturer": "Panasonic",
+      "series": "Free Multi System Z R32 (CBE)",
+      "model": "CU-2Z50CBE",
+      "label": "Panasonic Free Multi 5.0 kW (2 rooms)",
+      "tier": "standard",
+      "multiSplitCapable": true,
+      "ports": 2,
+      "pairedWith": null,
+      "specs": {
+        "coolingKw": 5.0,
+        "heatingKw": 5.6,
+        "seer": 8.7,
+        "scop": 4.6,
+        "energyClassCooling": "A+++",
+        "energyClassHeating": "A++",
+        "soundPressureLowDb": null,
+        "soundPressureHighDb": 50,
+        "soundPowerDb": null,
+        "dimensionsMm": {
+          "w": 824,
+          "h": 619,
+          "d": 299
+        },
+        "weightKg": 37,
+        "refrigerant": "R32",
+        "liquidPipeMm": 6.35,
+        "gasPipeMm": 9.52,
+        "maxPipeM": 30,
+        "maxHeightDiffM": 10,
+        "prechargedPipeM": 20,
+        "additionalChargeGPerM": 15,
+        "powerSupply": "230 V / 1-phase / 50 Hz, powered at the outdoor unit",
+        "recommendedBreakerA": 16,
+        "wifi": null,
+        "operatingRangeCoolingC": "-10 to +46",
+        "operatingRangeHeatingC": "-15 to +24"
+      },
+      "warranty": "Panasonic UK: 3 years standard on RAC/PAC/VRF/A2W when installed by a qualified engineer; up to 5 years parts & labour when installed by a Panasonic Accredited Installer (completed Panasonic product training) who registers the unit on the PRO Club portal; PRO Partner / Elite PRO Partner tier advertised as up to 7 years (7-year scheme is publicised mainly for Aquarea; eligibility of residential air-to-air splits for 7 years NOT confirmed). Annual servicing records required. Sourced from 2021 warranty key facts and the UK PRO Partner page via search snippets - confirm current T&Cs (UK Warranty doc rev R2 eff. 1 Dec 2021; PHVAC UK T&Cs eff. 1 Dec 2023) before quoting customers.",
+      "sources": [
+        {
+          "url": "https://www.aircon.panasonic.eu/GB_en/model/cu-2z50cbe/",
+          "title": "Panasonic UK - CU-2Z50CBE model page"
+        },
+        {
+          "url": "https://www.aircon.panasonic.eu/GB_en/product/free-multi-system-z-r32/",
+          "title": "Panasonic UK - Free Multi System Z R32 product page (family table)"
+        },
+        {
+          "url": "https://www.aircon.panasonic.eu/SI_sl/model/panasonic-free-multi-cu-2z50cbe/",
+          "title": "Panasonic SI - CU-2Z50CBE model page"
+        }
+      ],
+      "confidence": "verified",
+      "notes": "maxPipeM = max TOTAL pipe length; per-room limit is in compatibility. Pipe sizes are the outdoor port sizes (1/4\" liquid, 3/8\" gas per port). SEER/SCOP are the outdoor unit's published rating; actual seasonal efficiency depends on the indoor combination. soundPressureHighDb = outdoor sound pressure cool Hi (heat Hi 52 dB(A)); sound power not found. Min 3 m pipe per indoor unit; min 2 indoor units connected. Nominal cooling 5.00 kW / heating 5.60 kW; heating at -7 C 4.28 kW. Running current 5.40 A. Recommended power cable 2.5 mm2. Factory charge 1.18 kg R32 (0.797 t CO2e). Total pipe 6-30 m, 3-20 m per room. Figures read from Panasonic's official EU/UK model pages (aircon.panasonic.eu) via search-engine extraction; direct page/PDF fetch was blocked in the research environment, so spot-check against the PDF datasheet before design sign-off."
+    },
+    {
+      "kind": "outdoor",
+      "manufacturer": "Panasonic",
+      "series": "Free Multi System Z R32 (CBE)",
+      "model": "CU-3Z68CBE",
+      "label": "Panasonic Free Multi 6.8 kW (3 rooms)",
+      "tier": "standard",
+      "multiSplitCapable": true,
+      "ports": 3,
+      "pairedWith": null,
+      "specs": {
+        "coolingKw": 6.8,
+        "heatingKw": 8.5,
+        "seer": 8.2,
+        "scop": 4.6,
+        "energyClassCooling": "A++",
+        "energyClassHeating": "A++",
+        "soundPressureLowDb": null,
+        "soundPressureHighDb": 51,
+        "soundPowerDb": null,
+        "dimensionsMm": {
+          "w": 875,
+          "h": 795,
+          "d": 320
+        },
+        "weightKg": 64,
+        "refrigerant": "R32",
+        "liquidPipeMm": 6.35,
+        "gasPipeMm": 9.52,
+        "maxPipeM": 60,
+        "maxHeightDiffM": 15,
+        "prechargedPipeM": 30,
+        "additionalChargeGPerM": 20,
+        "powerSupply": "230 V / 1-phase / 50 Hz, powered at the outdoor unit",
+        "recommendedBreakerA": 20,
+        "wifi": null,
+        "operatingRangeCoolingC": "-10 to +46",
+        "operatingRangeHeatingC": "-15 to +24"
+      },
+      "warranty": "Panasonic UK: 3 years standard on RAC/PAC/VRF/A2W when installed by a qualified engineer; up to 5 years parts & labour when installed by a Panasonic Accredited Installer (completed Panasonic product training) who registers the unit on the PRO Club portal; PRO Partner / Elite PRO Partner tier advertised as up to 7 years (7-year scheme is publicised mainly for Aquarea; eligibility of residential air-to-air splits for 7 years NOT confirmed). Annual servicing records required. Sourced from 2021 warranty key facts and the UK PRO Partner page via search snippets - confirm current T&Cs (UK Warranty doc rev R2 eff. 1 Dec 2021; PHVAC UK T&Cs eff. 1 Dec 2023) before quoting customers.",
+      "sources": [
+        {
+          "url": "https://www.aircon.panasonic.eu/GB_en/model/cu-3z68cbe/",
+          "title": "Panasonic UK - CU-3Z68CBE model page"
+        },
+        {
+          "url": "https://www.aircon.panasonic.eu/GB_en/product/free-multi-system-z-r32/",
+          "title": "Panasonic UK - Free Multi System Z R32 product page (family table)"
+        }
+      ],
+      "confidence": "verified",
+      "notes": "maxPipeM = max TOTAL pipe length; per-room limit is in compatibility. Pipe sizes are the outdoor port sizes (1/4\" liquid, 3/8\" gas per port). SEER/SCOP are the outdoor unit's published rating; actual seasonal efficiency depends on the indoor combination. soundPressureHighDb = outdoor sound pressure cool Hi (heat Hi 53 dB(A)); sound power not found. Min 3 m pipe per indoor unit; min 2 indoor units connected. Cooling 6.80 kW (1.90-8.00), heating 8.50 kW (1.70-10.40); heating at -7 C 7.05 kW. Current 7.70 A cool / 8.80 A heat. Power cable 2.5 mm2. Factory charge 2.25 kg R32. Total pipe 6-60 m, 3-25 m per room. Add 70/95 mm depth for piping port. (Older TBE variant weighs 71 kg.) Figures read from Panasonic's official EU/UK model pages (aircon.panasonic.eu) via search-engine extraction; direct page/PDF fetch was blocked in the research environment, so spot-check against the PDF datasheet before design sign-off."
+    },
+    {
+      "kind": "outdoor",
+      "manufacturer": "Panasonic",
+      "series": "Free Multi System Z R32 (CBE)",
+      "model": "CU-4Z80CBE",
+      "label": "Panasonic Free Multi 8.0 kW (4 rooms)",
+      "tier": "standard",
+      "multiSplitCapable": true,
+      "ports": 4,
+      "pairedWith": null,
+      "specs": {
+        "coolingKw": 8.0,
+        "heatingKw": 9.4,
+        "seer": 8.5,
+        "scop": 4.7,
+        "energyClassCooling": "A+++",
+        "energyClassHeating": "A++",
+        "soundPressureLowDb": null,
+        "soundPressureHighDb": 51,
+        "soundPowerDb": null,
+        "dimensionsMm": {
+          "w": 940,
+          "h": 999,
+          "d": 340
+        },
+        "weightKg": 80,
+        "refrigerant": "R32",
+        "liquidPipeMm": 6.35,
+        "gasPipeMm": 9.52,
+        "maxPipeM": 70,
+        "maxHeightDiffM": 15,
+        "prechargedPipeM": 45,
+        "additionalChargeGPerM": 20,
+        "powerSupply": "230 V / 1-phase / 50 Hz, powered at the outdoor unit",
+        "recommendedBreakerA": 25,
+        "wifi": null,
+        "operatingRangeCoolingC": "-10 to +46",
+        "operatingRangeHeatingC": "-15 to +24"
+      },
+      "warranty": "Panasonic UK: 3 years standard on RAC/PAC/VRF/A2W when installed by a qualified engineer; up to 5 years parts & labour when installed by a Panasonic Accredited Installer (completed Panasonic product training) who registers the unit on the PRO Club portal; PRO Partner / Elite PRO Partner tier advertised as up to 7 years (7-year scheme is publicised mainly for Aquarea; eligibility of residential air-to-air splits for 7 years NOT confirmed). Annual servicing records required. Sourced from 2021 warranty key facts and the UK PRO Partner page via search snippets - confirm current T&Cs (UK Warranty doc rev R2 eff. 1 Dec 2021; PHVAC UK T&Cs eff. 1 Dec 2023) before quoting customers.",
+      "sources": [
+        {
+          "url": "https://www.aircon.panasonic.eu/GB_en/model/cu-4z80cbe/",
+          "title": "Panasonic UK - CU-4Z80CBE model page"
+        },
+        {
+          "url": "https://www.aircon.panasonic.eu/GB_en/product/free-multi-system-z-r32/",
+          "title": "Panasonic UK - Free Multi System Z R32 product page (family table)"
+        }
+      ],
+      "confidence": "verified",
+      "notes": "maxPipeM = max TOTAL pipe length; per-room limit is in compatibility. Pipe sizes are the outdoor port sizes (1/4\" liquid, 3/8\" gas per port). SEER/SCOP are the outdoor unit's published rating; actual seasonal efficiency depends on the indoor combination. soundPressureHighDb = outdoor sound pressure cool Hi (heat Hi 52 dB(A)); sound power not found. Min 3 m pipe per indoor unit; min 2 indoor units connected. Cooling 8.00 kW (3.00-9.20), heating 9.40 kW (2.48-10.60). Current 9.50 A. Recommended power cable 4.0 mm2. Factory charge 2.72 kg R32 (1.836 t CO2e). Total pipe 6-70 m, 3-25 m per room. Older CU-4Z80TBE was SEER 7.90 (A++) - do not mix datasheets. Figures read from Panasonic's official EU/UK model pages (aircon.panasonic.eu) via search-engine extraction; direct page/PDF fetch was blocked in the research environment, so spot-check against the PDF datasheet before design sign-off."
+    }
+  ],
+  "compatibility": [
+    {
+      "outdoorModel": "CU-2Z50CBE",
+      "maxIndoorUnits": 2,
+      "connectableIndoorSeries": [
+        "Etherea Z wall (CS-Z..CKEW, white)",
+        "Etherea XZ wall (CS-XZ..CKEW silver / CS-XZ..CKEW-H graphite)",
+        "TZ super-compact wall (CS-TZ..CKEW)",
+        "Floor console, 4-way 60x60 cassette, slim/low-static ducted (Panasonic Free Multi indoor types - not catalogued here)"
+      ],
+      "connectableIndoorModels": [
+        "CS-Z20CKEW",
+        "CS-Z25CKEW",
+        "CS-Z35CKEW",
+        "CS-Z42CKEW",
+        "CS-Z50CKEW",
+        "CS-XZ20CKEW",
+        "CS-XZ25CKEW",
+        "CS-XZ35CKEW",
+        "CS-XZ42CKEW",
+        "CS-XZ50CKEW",
+        "CS-TZ20CKEW",
+        "CS-TZ25CKEW",
+        "CS-TZ35CKEW",
+        "CS-TZ42CKEW",
+        "CS-TZ50CKEW"
+      ],
+      "minConnectedKw": 3.2,
+      "maxConnectedKw": 7.7,
+      "maxTotalPipeM": 30,
+      "maxPipePerRoomM": 20,
+      "source": {
+        "url": "https://www.aircon.panasonic.eu/GB_en/model/cu-2z50cbe/",
+        "title": "Panasonic UK - CU-2Z50CBE model page"
+      },
+      "confidence": "provisional",
+      "notes": "Capacity range = sum of connected indoor NOMINAL cooling capacities (Panasonic 'indoor nominal capacity range'); pipe limits verified from the GB model page (total 6-30 m, 3-20 m per room, max height diff 10 m, min 3 m per room, min 2 indoor units). Connectable SERIES are stated on the Panasonic UK Free Multi System Z page (Etherea, TZ wall, floor console, slim ducted, 4-way 60x60 cassette) and the AT Free Multi page lists CS-Z..CKEW / CS-XZ..CKEW / CS-TZ..CKEW (incl. 7.1 kW) as Free Multi indoor units. The per-outdoor MODEL list is DERIVED by us from the capacity range (smallest indoor is 2.0 kW, so a 7.1 kW indoor is only listed where 7.1 + 2.0 <= max range) and is NOT Panasonic's official combination table - confirm every combination in the Panasonic Free Multi combination table / installation manual. 5.0 kW wall units have a 1/2\" gas connection and 7.1 kW units 5/8\"; outdoor ports are 3/8\", so reducers (CZ-MA1PA 1/2->3/8; CZ-MA3PA 5/8->1/2) may be required - secondary source, confirm. Secondary guide (qualityheating.co.uk) states every TZ CKE/ZKE indoor is compatible with every Free Multi Z outdoor provided total capacity is in range."
+    },
+    {
+      "outdoorModel": "CU-3Z68CBE",
+      "maxIndoorUnits": 3,
+      "connectableIndoorSeries": [
+        "Etherea Z wall (CS-Z..CKEW, white)",
+        "Etherea XZ wall (CS-XZ..CKEW silver / CS-XZ..CKEW-H graphite)",
+        "TZ super-compact wall (CS-TZ..CKEW)",
+        "Floor console, 4-way 60x60 cassette, slim/low-static ducted (Panasonic Free Multi indoor types - not catalogued here)"
+      ],
+      "connectableIndoorModels": [
+        "CS-Z20CKEW",
+        "CS-Z25CKEW",
+        "CS-Z35CKEW",
+        "CS-Z42CKEW",
+        "CS-Z50CKEW",
+        "CS-Z71CKEW",
+        "CS-XZ20CKEW",
+        "CS-XZ25CKEW",
+        "CS-XZ35CKEW",
+        "CS-XZ42CKEW",
+        "CS-XZ50CKEW",
+        "CS-XZ71CKEW",
+        "CS-TZ20CKEW",
+        "CS-TZ25CKEW",
+        "CS-TZ35CKEW",
+        "CS-TZ42CKEW",
+        "CS-TZ50CKEW",
+        "CS-TZ60CKEW",
+        "CS-TZ71CKEW"
+      ],
+      "minConnectedKw": 4.5,
+      "maxConnectedKw": 11.2,
+      "maxTotalPipeM": 60,
+      "maxPipePerRoomM": 25,
+      "source": {
+        "url": "https://www.aircon.panasonic.eu/GB_en/model/cu-3z68cbe/",
+        "title": "Panasonic UK - CU-3Z68CBE model page"
+      },
+      "confidence": "provisional",
+      "notes": "Capacity range = sum of connected indoor NOMINAL cooling capacities (Panasonic 'indoor nominal capacity range'); pipe limits verified from the GB model page (total 6-60 m, 3-25 m per room, max height diff 15 m, min 3 m per room, min 2 indoor units). Connectable SERIES are stated on the Panasonic UK Free Multi System Z page (Etherea, TZ wall, floor console, slim ducted, 4-way 60x60 cassette) and the AT Free Multi page lists CS-Z..CKEW / CS-XZ..CKEW / CS-TZ..CKEW (incl. 7.1 kW) as Free Multi indoor units. The per-outdoor MODEL list is DERIVED by us from the capacity range (smallest indoor is 2.0 kW, so a 7.1 kW indoor is only listed where 7.1 + 2.0 <= max range) and is NOT Panasonic's official combination table - confirm every combination in the Panasonic Free Multi combination table / installation manual. 5.0 kW wall units have a 1/2\" gas connection and 7.1 kW units 5/8\"; outdoor ports are 3/8\", so reducers (CZ-MA1PA 1/2->3/8; CZ-MA3PA 5/8->1/2) may be required - secondary source, confirm. Secondary guide (qualityheating.co.uk) states every TZ CKE/ZKE indoor is compatible with every Free Multi Z outdoor provided total capacity is in range."
+    },
+    {
+      "outdoorModel": "CU-4Z80CBE",
+      "maxIndoorUnits": 4,
+      "connectableIndoorSeries": [
+        "Etherea Z wall (CS-Z..CKEW, white)",
+        "Etherea XZ wall (CS-XZ..CKEW silver / CS-XZ..CKEW-H graphite)",
+        "TZ super-compact wall (CS-TZ..CKEW)",
+        "Floor console, 4-way 60x60 cassette, slim/low-static ducted (Panasonic Free Multi indoor types - not catalogued here)"
+      ],
+      "connectableIndoorModels": [
+        "CS-Z20CKEW",
+        "CS-Z25CKEW",
+        "CS-Z35CKEW",
+        "CS-Z42CKEW",
+        "CS-Z50CKEW",
+        "CS-Z71CKEW",
+        "CS-XZ20CKEW",
+        "CS-XZ25CKEW",
+        "CS-XZ35CKEW",
+        "CS-XZ42CKEW",
+        "CS-XZ50CKEW",
+        "CS-XZ71CKEW",
+        "CS-TZ20CKEW",
+        "CS-TZ25CKEW",
+        "CS-TZ35CKEW",
+        "CS-TZ42CKEW",
+        "CS-TZ50CKEW",
+        "CS-TZ60CKEW",
+        "CS-TZ71CKEW"
+      ],
+      "minConnectedKw": 4.5,
+      "maxConnectedKw": 14.7,
+      "maxTotalPipeM": 70,
+      "maxPipePerRoomM": 25,
+      "source": {
+        "url": "https://www.aircon.panasonic.eu/GB_en/model/cu-4z80cbe/",
+        "title": "Panasonic UK - CU-4Z80CBE model page"
+      },
+      "confidence": "provisional",
+      "notes": "Capacity range = sum of connected indoor NOMINAL cooling capacities (Panasonic 'indoor nominal capacity range'); pipe limits verified from the GB model page (total 6-70 m, 3-25 m per room, max height diff 15 m, min 3 m per room, min 2 indoor units). Connectable SERIES are stated on the Panasonic UK Free Multi System Z page (Etherea, TZ wall, floor console, slim ducted, 4-way 60x60 cassette) and the AT Free Multi page lists CS-Z..CKEW / CS-XZ..CKEW / CS-TZ..CKEW (incl. 7.1 kW) as Free Multi indoor units. The per-outdoor MODEL list is DERIVED by us from the capacity range (smallest indoor is 2.0 kW, so a 7.1 kW indoor is only listed where 7.1 + 2.0 <= max range) and is NOT Panasonic's official combination table - confirm every combination in the Panasonic Free Multi combination table / installation manual. 5.0 kW wall units have a 1/2\" gas connection and 7.1 kW units 5/8\"; outdoor ports are 3/8\", so reducers (CZ-MA1PA 1/2->3/8; CZ-MA3PA 5/8->1/2) may be required - secondary source, confirm. Secondary guide (qualityheating.co.uk) states every TZ CKE/ZKE indoor is compatible with every Free Multi Z outdoor provided total capacity is in range."
+    }
+  ],
+  "openQuestions": [
+    "Outdoor SOUND POWER (LwA) for CU-Z..CKE, CU-TZ..CKE and CU-xZ..CBE was not found (Panasonic web tables give sound pressure only). Pull EPREL product fiches (EU energy label database) or the PDF datasheet; the older ZKE generation fiche showed 61/62 dB(A) for CU-Z25ZKE but that must not be reused for CKE.",
+    "Official Panasonic Free Multi combination table not retrieved: per-port maximum indoor size, whether 7.1 kW wall units are allowed on each outdoor, and which pipe reducers/expanders (CZ-MA1PA / CZ-MA2PA / CZ-MA3PA) are needed for 5.0 kW (1/2\" gas) and 7.1 kW (5/8\" gas) indoor units. connectableIndoorModels in compatibility[] is derived from capacity ranges and must be confirmed.",
+    "Warranty: does the up-to-7-year PRO Partner warranty apply to residential air-to-air (RAC) splits or only Aquarea? What does 'Dang, It's Hot' need (Accredited Installer training, PRO Club registration) to offer 5 years? Current UK warranty document (rev R2, 1 Dec 2021) and PHVAC UK T&Cs (1 Dec 2023) were not opened.",
+    "Generation/availability: Panasonic UK pages now list the CKE generation (Etherea CS-Z..CKEW, TZ CS-TZ..CKEW) and CBE Free Multi outdoors, but a 2025/2026 UK distributor price list still shows TBE Free Multi codes and some UK distributors still stock ZKE (2023) units. Confirm with the chosen UK distributor which suffixes are actually shippable for the pilot installs.",
+    "Some Panasonic GB listings title 'KIT-Z25-CKE' / 'KIT-Z50-CKE' with the silver CS-XZ indoor rather than white CS-Z; confirm the exact UK kit SKUs and colour codes when ordering.",
+    "Etherea 7.1 kW cooling operating range and maximum heating ambient, and TZ 7.1 kW operating range maximums, were not captured.",
+    "Indoor weight conflicts on Panasonic pages (TZ71 15 kg vs 13 kg; standalone TZ indoor pages showing outdoor weights). Kit-table values used; verify from installation manual for bracket/wall-fixing planning.",
+    "Recommended breaker values are Panasonic's 'recommended fuse' ratings; MCB curve type (the older French TZ datasheet specified curve D, 16 A) and cable sizing for UK BS 7671 installs should be confirmed from the UK installation manual.",
+    "Multi TZ outdoor range (CU-2TZ41TBE, CU-2TZ50TBE, CU-3TZ52TBE - a cheaper TZ-focused multi, e.g. CU-2TZ50TBE SEER 7.00 / SCOP 4.20, 3.2-7.7 kW) appears on the Panasonic multi-split selector but was not catalogued; check UK availability, CBE successor and price versus Free Multi Z.",
+    "Heating capacities above are nominal (+7 C outdoor). For UK heat-loss sizing use the -7 C / -2 C capacity tables from the technical databook (only some -7 C values captured in notes).",
+    "All figures were extracted from official Panasonic pages through a search engine because direct fetching of aircon.panasonic.eu / cdn PDFs was blocked in this environment; a human spot-check of each GB model page is recommended before quoting customers."
+  ]
+}
