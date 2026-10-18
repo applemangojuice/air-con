@@ -65,5 +65,10 @@ export default async function FieldSurveyPage({ params }: Props) {
     canOpenOps: visit.canOpenOps,
     staffName: staff.name,
   };
-  return <SurveyApp {...props} />;
+  // Navigation scrolls the page's first element into view: keep it clear of the sticky header.
+  return (
+    <div className="scroll-mt-[76px]">
+      <SurveyApp {...props} />
+    </div>
+  );
 }

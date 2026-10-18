@@ -26,7 +26,7 @@ export default async function FieldSurveysPage() {
   }
 
   return (
-    <>
+    <div className="scroll-mt-[76px]">
       <PageHeader eyebrow="Surveys" title="Home surveys" subtitle="Booked and under way. Tap one to open the visit." />
       {failed ? (
         <EmptyState title="Couldn't load the surveys" body="Check your signal and pull down to refresh. Nothing has been lost." />
@@ -66,6 +66,6 @@ export default async function FieldSurveysPage() {
           ))}
         </ul>
       )}
-    </>
+    </div>
   );
 }

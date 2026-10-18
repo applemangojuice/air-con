@@ -59,7 +59,7 @@ function saveChip(state: SaveState, storageOk: boolean): { tone: "ok" | "busy" |
   }
 }
 
-function SaveChip({ state, storageOk, uploading }: { state: SaveState; storageOk: boolean; uploading: number }) {
+function SaveChip({ state, storageOk }: { state: SaveState; storageOk: boolean }) {
   const chip = saveChip(state, storageOk);
   const tones = {
     ok: "border-emerald-200 bg-emerald-50 text-emerald-800",
@@ -69,12 +69,9 @@ function SaveChip({ state, storageOk, uploading }: { state: SaveState; storageOk
   };
   const dots = { ok: "bg-emerald-600", busy: "bg-sage-500 animate-pulse", warn: "bg-amber-500", bad: "bg-red-600" };
   return (
-    <span role="status" aria-live="polite" className={`inline-flex max-w-[11rem] items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${tones[chip.tone]}`}>
+    <span role="status" aria-live="polite" className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${tones[chip.tone]}`}>
       <span aria-hidden className={`h-2 w-2 shrink-0 rounded-full ${dots[chip.tone]}`} />
-      <span className="truncate">
-        {chip.text}
-        {uploading > 0 ? ` · ${uploading} photo${uploading === 1 ? "" : "s"} uploading` : ""}
-      </span>
+      {chip.text}
     </span>
   );
 }
@@ -105,9 +102,9 @@ function SurveyBar({
       <span className="sr-only">{back.label}</span>
     </>
   );
-  const backCls = "inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-ink-900 hover:bg-surface";
+  const backCls = "-ml-2 inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-ink-900 hover:bg-surface";
   return (
-    <div className="sticky top-14 z-30 -mx-4 mb-4 border-b border-line bg-cream/95 px-4 pb-3 pt-2 backdrop-blur">
+    <div className="sticky top-14 z-30 -mx-4 mb-4 border-b border-line bg-cream/95 px-4 pb-2.5 pt-1.5 backdrop-blur">
       <div className="flex items-center gap-1">
         {back.href ? (
           <Link href={back.href} className={backCls}>
@@ -119,9 +116,8 @@ function SurveyBar({
           </button>
         )}
         <h1 className="min-w-0 flex-1 truncate font-display text-xl text-ink-900">{title}</h1>
-        <SaveChip state={state} storageOk={storageOk} uploading={uploading} />
       </div>
-      <div className="mt-2 flex items-center gap-3">
+      <div className="flex items-center gap-3">
         <div
           role="progressbar"
           aria-label="Survey completeness"
@@ -133,6 +129,17 @@ function SurveyBar({
           <div className={`h-full rounded-full transition-all ${pct === 100 ? "bg-emerald-600" : "bg-accent-500"}`} style={{ width: `${pct}%` }} />
         </div>
         <span className="shrink-0 text-sm font-semibold tabular-nums text-ink-700">{pct === 100 ? "All done" : `${pct}% · ${left} to do`}</span>
+      </div>
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <SaveChip state={state} storageOk={storageOk} />
+        {uploading > 0 && (
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-sage-200 bg-sage-50 px-2.5 py-1 text-xs font-semibold text-sage-700">
+            <svg aria-hidden viewBox="0 0 16 16" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M8 13V3M4 7l4-4 4 4" />
+            </svg>
+            {uploading} photo{uploading === 1 ? "" : "s"} uploading
+          </span>
+        )}
       </div>
     </div>
   );
@@ -167,7 +174,7 @@ function Overview({
       <button type="button" onClick={() => go({ s })} className="flex min-h-16 w-full items-center gap-3 rounded-2xl border border-line bg-white px-4 py-3 text-left hover:border-ink-300">
         <span className="min-w-0 flex-1">
           <span className="block text-lg font-semibold text-ink-900">{title}</span>
-          <span className="block truncate text-sm text-ink-500">{blurb}</span>
+          <span className="block text-sm text-ink-500">{blurb}</span>
         </span>
         {badge}
         <span aria-hidden className="text-xl text-ink-500">
@@ -222,15 +229,18 @@ function Overview({
 function SectionTodo({ section, missing, roomId, positionId }: { section: SurveySectionId; missing: ReturnType<typeof surveyCompleteness>["missing"]; roomId?: string; positionId?: string }) {
   const mine = missing.filter((m) => m.sectionId === section && (roomId ? m.roomId === roomId : positionId ? m.positionId === positionId : true));
   if (mine.length === 0) {
-    return <p className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-800">Nothing left to do here.</p>;
+    return <p className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">Nothing left to do here.</p>;
   }
   return (
-    <details className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-2 text-amber-950" open={mine.length <= 3}>
-      <summary className="min-h-10 cursor-pointer py-1 text-sm font-semibold">
+    <details className="group mb-4 rounded-2xl border border-amber-200 bg-amber-50 text-amber-950" open={mine.length <= 3}>
+      <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 text-sm font-semibold [&::-webkit-details-marker]:hidden">
         {mine.length} thing{mine.length === 1 ? "" : "s"} to do here
+        <span aria-hidden className="text-base transition group-open:rotate-180">
+          ▾
+        </span>
       </summary>
-      <div className="pb-2 pt-1">
-        <MissingList missing={mine} />
+      <div className="px-3 pb-3">
+        <MissingList missing={mine} headings={false} />
       </div>
     </details>
   );
@@ -498,7 +508,7 @@ function SurveyFlow({
 
   const room = nav.s === "rooms" && nav.r ? draft.data.rooms.find((r) => r.id === nav.r) : undefined;
   const position = nav.s === "outdoor" && nav.o ? draft.data.outdoor.positions.find((p) => p.id === nav.o) : undefined;
-  const title = room ? room.name : position ? position.label || "Outdoor position" : nav.s === "overview" ? project.customer.name || "Survey" : SCREEN_LABEL[nav.s];
+  const title = room ? room.name : position ? position.label || "Outdoor position" : nav.s === "overview" ? "Home survey" : SCREEN_LABEL[nav.s];
   const back =
     nav.s === "overview"
       ? { label: "Back to surveys", href: "/field/survey" }

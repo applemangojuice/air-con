@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ANNOTATION_STYLE, estimateLabel, validateAnnotations, type Annotation, type Point } from "@aircon/domain";
 import { annotationColour, chipTextColour, legendEntries } from "./annotation-summary";
+import { ModalPortal } from "./modal-portal";
 import {
   clampView,
   defaultBox,
@@ -147,7 +148,16 @@ function writeDraft(key: string | undefined, annotations: Annotation[] | null): 
 
 const same = (a: Annotation[], b: Annotation[]) => JSON.stringify(a) === JSON.stringify(b);
 
-export function Annotator({ src, width, height, initial, title, locked = false, defaultTool, draftKey, onSave, onClose }: AnnotatorProps) {
+/** The editor as a true modal: everything behind it is inert until it closes. */
+export function Annotator(props: AnnotatorProps) {
+  return (
+    <ModalPortal>
+      <AnnotatorDialog {...props} />
+    </ModalPortal>
+  );
+}
+
+function AnnotatorDialog({ src, width, height, initial, title, locked = false, defaultTool, draftKey, onSave, onClose }: AnnotatorProps) {
   const dialogId = useId();
   const startList = useMemo(() => validateAnnotations(initial), [initial]);
   const [restored] = useState(() => {
@@ -178,7 +188,6 @@ export function Annotator({ src, width, height, initial, title, locked = false, 
   const closeRef = useRef<HTMLButtonElement | null>(null);
   const pointers = useRef(new Map<number, { x: number; y: number }>());
   const drag = useRef<Drag | null>(null);
-  const restoreFocus = useRef<Element | null>(null);
 
   const aspect = natural ? natural.w / natural.h : 4 / 3;
   const base = useMemo(() => fitBox(area, aspect), [area, aspect]);
@@ -211,15 +220,9 @@ export function Annotator({ src, width, height, initial, title, locked = false, 
 
   /* ---------------- dialog behaviour ---------------- */
 
+  // The portal handles inertness, scrolling and returning focus; start focus on Close.
   useEffect(() => {
-    restoreFocus.current = document.activeElement;
     closeRef.current?.focus();
-    const { overflow } = document.body.style;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = overflow;
-      if (restoreFocus.current instanceof HTMLElement) restoreFocus.current.focus();
-    };
   }, []);
 
   // Unsaved work survives a dropped signal, a closed tab or a crash.
@@ -602,7 +605,7 @@ export function Annotator({ src, width, height, initial, title, locked = false, 
             type="button"
             onClick={save}
             disabled={saving || (!dirty && routeDraft.length < 2)}
-            className="inline-flex min-h-12 items-center justify-center rounded-full bg-accent-600 px-5 text-base font-semibold text-white shadow-sm hover:bg-accent-700 disabled:opacity-40"
+            className="inline-flex min-h-12 items-center justify-center rounded-full bg-accent-600 px-5 text-base font-semibold text-white shadow-sm hover:bg-accent-700 disabled:bg-white/10 disabled:text-white/50 disabled:shadow-none"
           >
             {saving ? "Saving…" : "Save"}
           </button>
@@ -687,7 +690,7 @@ export function Annotator({ src, width, height, initial, title, locked = false, 
       {/* Bottom panel */}
       <div className="border-t border-white/10 bg-ink-900 pb-[env(safe-area-inset-bottom)]">
         {entries.length > 0 && (
-          <ul aria-label="Key" className="flex gap-3 overflow-x-auto px-3 pt-2 text-xs text-white/85">
+          <ul aria-label="Key" className="flex flex-wrap gap-x-3 gap-y-1 px-3 pt-2 text-xs text-white/85">
             {entries.map((e) => (
               <li key={e.key} className="inline-flex shrink-0 items-center gap-1.5">
                 <span aria-hidden className="inline-block h-2.5 w-2.5 rounded-full ring-1 ring-white/40" style={{ background: e.colour }} />

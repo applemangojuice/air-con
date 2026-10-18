@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { PD_CHECKS, RISK_QUESTIONS, SURVEY_LABELS, type MeasuredSurvey, type RiskQuestionId } from "@aircon/domain";
-import { Callout, ChoiceGroup, FieldCard, MultiChoice, NumberField, TextArea, TextField, Tick, choices, type Choice } from "./controls";
+import { Callout, ChoiceGroup, FieldCard, MultiChoice, NumberField, TextArea, TextField, Tick, SelectField, choices, type Choice } from "./controls";
 import { setOpt, useSurvey } from "./context";
 import { SCREEN_LABEL, nextScreen, type ScreenId } from "./nav";
 import { PhotoStrip } from "./photo-strip";
@@ -228,10 +228,10 @@ export function HouseSection() {
       <FieldCard>
         <ChoiceGroup field="houseType" legend="Type of home" value={h.type} options={choices(SURVEY_LABELS.propertyType)} onChange={(type) => set({ type })} />
         <ChoiceGroup field="era" legend="When was it built?" value={h.era} options={choices(SURVEY_LABELS.era)} onChange={(era) => set({ era })} />
-        <ChoiceGroup
+        <SelectField
           field="wallConstruction"
-          legend="Main wall construction"
-          hint="Check at a window reveal or the meter box. Solid brick walls are usually 9 in (23 cm) or so; cavity walls are thicker."
+          label="Main wall construction"
+          hint="Check at a window reveal or the meter box. Solid brick walls are usually about 23 cm (9 in) thick; cavity walls are thicker."
           value={h.wallConstruction}
           options={choices(SURVEY_LABELS.wallConstruction)}
           onChange={(wallConstruction) => set({ wallConstruction })}

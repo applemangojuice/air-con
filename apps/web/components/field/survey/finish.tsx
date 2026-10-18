@@ -137,7 +137,7 @@ export function ConsentSection({
 /* Check and submit                                                    */
 /* ------------------------------------------------------------------ */
 
-export function MissingList({ missing, limit }: { missing: SurveyCompleteness["missing"]; limit?: number }) {
+export function MissingList({ missing, limit, headings = true }: { missing: SurveyCompleteness["missing"]; limit?: number; headings?: boolean }) {
   const { go } = useSurvey();
   const groups = SURVEY_SECTIONS.map((s) => ({ ...s, items: missing.filter((m) => m.sectionId === s.id) })).filter((g) => g.items.length > 0);
   let shown = 0;
@@ -149,7 +149,7 @@ export function MissingList({ missing, limit }: { missing: SurveyCompleteness["m
         shown += items.length;
         return (
           <div key={g.id}>
-            <p className="mb-1 text-sm font-semibold uppercase tracking-wide text-ink-500">{g.label}</p>
+            {headings && <p className="mb-1 text-sm font-semibold uppercase tracking-wide text-ink-500">{g.label}</p>}
             <ul className="space-y-1.5">
               {items.map((m, i) => (
                 <li key={`${m.item}-${i}`}>

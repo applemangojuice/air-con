@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { SURVEY_LABELS, roomSizeLabel, type Survey } from "@aircon/domain";
+import { ModalPortal } from "@/components/annotate/modal-portal";
 import { fmtDate, fmtDayTime } from "@/lib/format";
 import { londonClock } from "./nav";
 import type { OnMyWayState, TextStatus, VisitProject } from "./types";
@@ -180,19 +181,23 @@ export function VisitCard({
 }
 
 /** The ETA sheet: pick, preview the exact text, send. Honest about what happened. */
-export function OnMyWaySheet({
-  projectId,
-  phone,
-  smsMode,
-  onClose,
-  onSent,
-}: {
+interface OnMyWayProps {
   projectId: string;
   phone?: string;
   smsMode: "live" | "demo";
   onClose: () => void;
   onSent: (state: OnMyWayState) => void;
-}) {
+}
+
+export function OnMyWaySheet(props: OnMyWayProps) {
+  return (
+    <ModalPortal>
+      <OnMyWayDialog {...props} />
+    </ModalPortal>
+  );
+}
+
+function OnMyWayDialog({ projectId, phone, smsMode, onClose, onSent }: OnMyWayProps) {
   const id = useId();
   const [eta, setEta] = useState<number>(20);
   const [custom, setCustom] = useState("");

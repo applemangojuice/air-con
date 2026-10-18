@@ -72,6 +72,58 @@ export function ChoiceGroup<T extends string>({
   );
 }
 
+/** A long list the person rarely changes (room type, wall construction): the phone's own picker. */
+export function SelectField<T extends string>({
+  label,
+  hint,
+  field,
+  value,
+  options,
+  onChange,
+  placeholder,
+}: {
+  label: ReactNode;
+  hint?: ReactNode;
+  field: string;
+  value: T | undefined;
+  options: Choice<T>[];
+  onChange: (v: T) => void;
+  placeholder?: string;
+}) {
+  const id = fieldId(field);
+  return (
+    <div className="min-w-0 scroll-mt-40">
+      <label htmlFor={id} className="mb-1 block text-base font-semibold text-ink-900">
+        {label}
+      </label>
+      {hint && (
+        <p id={`${id}-hint`} className="mb-2 text-sm text-ink-500">
+          {hint}
+        </p>
+      )}
+      <div className="relative">
+        <select
+          id={id}
+          value={value ?? ""}
+          onChange={(e) => e.target.value && onChange(e.target.value as T)}
+          aria-describedby={hint ? `${id}-hint` : undefined}
+          className="min-h-12 w-full appearance-none rounded-full border border-line bg-white px-4 pr-10 text-base text-ink-900 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-100"
+        >
+          {value === undefined && <option value="">{placeholder ?? "Choose…"}</option>}
+          {options.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+        <svg aria-hidden viewBox="0 0 20 20" className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-500" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          <path d="M5 8l5 5 5-5" />
+        </svg>
+      </div>
+    </div>
+  );
+}
+
 /** Several at once (checkbox pills). */
 export function MultiChoice<T extends string>({
   legend,

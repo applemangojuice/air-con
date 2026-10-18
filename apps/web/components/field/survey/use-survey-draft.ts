@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { MeasuredSurvey, SurveyRecord } from "@aircon/domain";
-import { decideResume, readLocalDraft, retryDelayMs, sameSurvey, writeLocalDraft, type LocalDraft } from "./draft-store";
+import { SENT_MEMORY, decideResume, hashSurvey, readLocalDraft, retryDelayMs, sameSurvey, writeLocalDraft, type LocalDraft } from "./draft-store";
 
 /**
  * The survey's autosave: every change goes to the phone at once and to the
@@ -34,11 +34,12 @@ const DEBOUNCE_MS = 1000;
 
 export function useSurveyDraft(projectId: string, initial: ServerDraft) {
   const recordId = initial.record.id;
-  const [resume] = useState(() =>
-    typeof window === "undefined"
-      ? ({ use: "server" } as const)
-      : decideResume(readLocalDraft(projectId), { recordId, token: initial.updatedAt, data: initial.record.data }),
-  );
+  const [boot] = useState(() => {
+    const local = typeof window === "undefined" ? null : readLocalDraft(projectId);
+    const resume = decideResume(local, { recordId, token: initial.updatedAt, data: initial.record.data });
+    return { resume, sent: local && local.recordId === recordId ? (local.sent ?? []) : [] };
+  });
+  const resume = boot.resume;
   const [data, setData] = useState<MeasuredSurvey>(() => (resume.use === "server" ? initial.record.data : resume.use === "phone" ? resume.data : resume.phone));
   const [state, setState] = useState<SaveState>(
     resume.use === "server" ? { kind: "saved", at: initial.updatedAt } : resume.use === "phone" ? { kind: "pending" } : { kind: "conflict" },
@@ -56,10 +57,25 @@ export function useSurveyDraft(projectId: string, initial: ServerDraft) {
   const attempts = useRef(0);
   const conflictRef = useRef(resume.use === "conflict");
   const frozenRef = useRef(false);
+  /** Fingerprints of copies this phone has sent (or held unsaved), oldest first. */
+  const sentRef = useRef<string[]>(resume.use === "server" ? boot.sent : [...boot.sent, hashSurvey(data)].slice(-SENT_MEMORY));
+  const remember = (copy: MeasuredSurvey) => {
+    const h = hashSurvey(copy);
+    if (!sentRef.current.includes(h)) sentRef.current = [...sentRef.current, h].slice(-SENT_MEMORY);
+  };
+  /** Is this server copy one this phone sent itself (not someone else's change)? */
+  const isOwn = (copy: MeasuredSurvey) => sentRef.current.includes(hashSurvey(copy)) || sameSurvey(copy, dataRef.current);
 
   const persistLocal = useCallback(
     (next: MeasuredSurvey, dirty: boolean) => {
-      const draft: LocalDraft = { recordId, baseToken: tokenRef.current, data: next, dirty, savedAt: new Date().toISOString() };
+      const draft: LocalDraft = {
+        recordId,
+        baseToken: tokenRef.current,
+        data: next,
+        dirty,
+        savedAt: new Date().toISOString(),
+        sent: sentRef.current,
+      };
       setStorageOk(writeLocalDraft(projectId, draft));
     },
     [projectId, recordId],
@@ -85,6 +101,9 @@ export function useSurveyDraft(projectId: string, initial: ServerDraft) {
     if (!dirtyRef.current) return true;
     const sending = dataRef.current;
     lastSent.current = sending;
+    // Remembered before it goes: if the answer is lost, the next load knows the server's copy is ours.
+    remember(sending);
+    persistLocal(sending, true);
     setState({ kind: "saving" });
     const run = (async (): Promise<boolean> => {
       let res: Response;
@@ -119,8 +138,8 @@ export function useSurveyDraft(projectId: string, initial: ServerDraft) {
         return !changedSince;
       }
       if (res.status === 409 && body.conflict && body.current) {
-        if (sameSurvey(body.current.record.data, sending) || sameSurvey(body.current.record.data, dataRef.current)) {
-          // Our own earlier save landed but its answer was lost: carry on from it.
+        if (isOwn(body.current.record.data)) {
+          // Our own earlier save landed (its answer lost, or sent as a page closed): carry on from it.
           tokenRef.current = body.current.updatedAt;
           const changedSince = !sameSurvey(body.current.record.data, dataRef.current);
           dirtyRef.current = changedSince;

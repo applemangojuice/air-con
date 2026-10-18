@@ -11,7 +11,7 @@ import {
   type MeasuredRoom,
   type RoomType,
 } from "@aircon/domain";
-import { Callout, ChoiceGroup, FieldCard, NumberField, TextArea, TextField, YesNo, CompassPicker, choices } from "./controls";
+import { Callout, ChoiceGroup, FieldCard, NumberField, TextArea, TextField, YesNo, CompassPicker, SelectField, choices } from "./controls";
 import { setOpt, useSurvey, withRoom } from "./context";
 import { NextButton } from "./sections";
 import { PhotoStrip } from "./photo-strip";
@@ -116,7 +116,7 @@ export function RoomsSection() {
       {adding ? (
         <FieldCard title="Add a room">
           <TextField field="newRoomName" label="Name" placeholder="e.g. Back bedroom" value={name} onChange={setName} maxLength={80} />
-          <ChoiceGroup field="newRoomType" legend="Type" value={type} options={choices(SURVEY_LABELS.roomType)} onChange={setType} />
+          <SelectField field="newRoomType" label="Type" value={type} options={choices(SURVEY_LABELS.roomType)} onChange={setType} />
           <div className="grid grid-cols-2 gap-2">
             <button type="button" onClick={() => setAdding(false)} className="min-h-12 rounded-full border border-line bg-white font-semibold text-ink-900">
               Cancel
@@ -185,7 +185,7 @@ export function RoomEditor({ roomId }: { roomId: string }) {
 
       <FieldCard>
         <TextField field="roomName" label="Room name" value={room.name} onChange={(v) => set((r) => ({ ...r, name: v.slice(0, 80) }))} maxLength={80} />
-        <ChoiceGroup field="roomType" legend="Type" value={room.type} options={choices(SURVEY_LABELS.roomType)} onChange={(type) => set((r) => ({ ...r, type }))} />
+        <SelectField field="roomType" label="Type" value={room.type} options={choices(SURVEY_LABELS.roomType)} onChange={(type) => set((r) => ({ ...r, type }))} />
         <ChoiceGroup
           field="floor"
           legend="Floor"
@@ -322,9 +322,9 @@ export function RoomEditor({ roomId }: { roomId: string }) {
           value={room.hasExternalWall}
           onChange={(hasExternalWall) => set((r) => ({ ...r, hasExternalWall }))}
         />
-        <ChoiceGroup
+        <SelectField
           field="roomWall"
-          legend="Wall the unit fixes to"
+          label="Wall the unit fixes to"
           value={room.wallConstruction}
           options={choices(SURVEY_LABELS.wallConstruction)}
           onChange={(wallConstruction) => set((r) => ({ ...r, wallConstruction }))}

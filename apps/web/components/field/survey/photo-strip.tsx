@@ -170,13 +170,13 @@ export function PhotoStrip({
               <button
                 type="button"
                 onClick={() => onAnnotate(m.id)}
-                className="block w-full overflow-hidden rounded-2xl text-left ring-accent-500 focus-visible:ring-2"
+                className="block w-full rounded-2xl text-left outline-none focus-visible:ring-2 focus-visible:ring-accent-500"
                 aria-label={`${PHOTO_TAG_LABEL[m.tag] ?? "Photo"}: ${m.locked ? "view the approved drawing" : "mark it up"}`}
               >
                 <Thumb item={m} />
-                <span className="mt-1 flex items-center justify-between gap-1 text-xs text-ink-700">
-                  <span className="truncate">{PHOTO_TAG_LABEL[m.tag]}</span>
-                  <span className="shrink-0 font-semibold text-accent-700">{m.locked ? "Locked" : m.annotations.length ? "Edit" : "Mark up"}</span>
+                <span className="mt-1 block truncate px-0.5 text-xs text-ink-700">{PHOTO_TAG_LABEL[m.tag]}</span>
+                <span className="block px-0.5 text-sm font-semibold text-accent-700">
+                  {m.locked ? "Locked" : m.annotations.length ? `Edit drawing (${m.annotations.length})` : "Mark up"}
                 </span>
               </button>
               {!m.locked && (
@@ -184,11 +184,13 @@ export function PhotoStrip({
                   type="button"
                   onClick={() => setConfirmRemove(m.id)}
                   aria-label="Remove this photo from the survey"
-                  className="absolute right-1 top-1 inline-flex h-11 w-11 items-center justify-center rounded-full bg-ink-950/70 text-white"
+                  className="absolute right-0 top-0 inline-flex h-11 w-11 items-start justify-end p-1.5"
                 >
-                  <svg aria-hidden viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round">
-                    <path d="M6 6l12 12M18 6 6 18" />
-                  </svg>
+                  <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-ink-950/75 text-white shadow">
+                    <svg aria-hidden viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round">
+                      <path d="M6 6l12 12M18 6 6 18" />
+                    </svg>
+                  </span>
                 </button>
               )}
             </li>
