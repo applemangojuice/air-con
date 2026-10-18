@@ -702,7 +702,9 @@ export function surveyChecks(m: MeasuredSurvey): SurveyCheck[] {
       field: q.id,
     });
   }
-  if (risks.structuralConcern || risks.concealedServicesConcern) {
+  // Records made before the question list existed are taken as complete, the
+  // same as the questions above: only ask for the note on new-style records.
+  if (answered !== undefined && (risks.structuralConcern || risks.concealedServicesConcern)) {
     add("risks", "Say what the concern is", filled(risks.notes), { field: "riskNotes" });
   }
   return out;

@@ -287,6 +287,18 @@ test("documents consent in person, and stop-work issues raised once", async () =
   assert.equal(open.structural, undefined);
 });
 
+test("every submitted DEMO survey passes the completeness check (the seed and the rules agree)", async () => {
+  const { buildDemoDataset } = await import("../lib/demo-seed/builder.ts");
+  const { surveyCompleteness } = await import("@aircon/domain");
+  const data = buildDemoDataset({ now: "2026-10-18T10:00:00.000Z" });
+  const surveyed = data.projects.filter((p) => p.survey);
+  assert.ok(surveyed.length >= 3);
+  for (const p of surveyed) {
+    const c = surveyCompleteness(p.survey!.data);
+    assert.deepEqual(c.missing, [], `${p.project.pilot?.label ?? p.project.id}: ${c.missing.map((m) => m.item).join("; ")}`);
+  }
+});
+
 test("the surveyor's list shows booked and in-progress surveys they can work on", async () => {
   const projectId = await newProject();
   const list = await survey.listSurveysFor(surveyor);

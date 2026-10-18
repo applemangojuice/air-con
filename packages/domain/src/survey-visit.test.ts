@@ -390,6 +390,7 @@ test("risks: each question must be asked; older records without the list count a
   ]);
   const legacy = { ...m, risks: { workingAtHeight: false, structuralConcern: false, concealedServicesConcern: false } };
   assert.equal(surveyCompleteness(legacy).pct, 100);
+  assert.equal(surveyCompleteness({ ...legacy, risks: { ...legacy.risks, concealedServicesConcern: true } }).pct, 100);
   assert.deepEqual(missingItems({ ...m, risks: { ...m.risks, structuralConcern: true } }), ["Say what the concern is"]);
   assert.equal(RISK_QUESTIONS.length, 3);
 });
