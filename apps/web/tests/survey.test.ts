@@ -12,6 +12,7 @@ const { createProjectForQuote, dispatch, loadProject } = await import("../lib/pr
 const { requireDb } = await import("../lib/supabase-server.ts");
 const mediaRepo = await import("../lib/repo/media.ts");
 const timeRepo = await import("../lib/repo/time.ts");
+const { listDocuments } = await import("../lib/documents-server.ts");
 
 /** DEMO people and a fictional DEMO home only. */
 const surveyor: StaffMember = {
@@ -253,6 +254,10 @@ test("start → autosave with an optimistic check → submit, end to end", async
   assert.equal(project.electrics.status, "validated", "the surveyor's board finding replaces the funnel's guess");
   assert.equal(project.customer.accessNotes, "Side gate (DEMO)", "access notes reach the crew");
   assert.equal(await timeRepo.openForStaff(surveyor.id), null, "the survey clock stopped");
+  const docs = await listDocuments(projectId);
+  const report = docs.find((d) => d.kind === "survey-report");
+  assert.ok(report, "the customer's survey report is issued");
+  assert.equal(report!.customerVisible, true);
   const entries = await timeRepo.listForProject(projectId);
   assert.ok(entries.some((e) => e.kind === "survey" && e.endedAt));
 

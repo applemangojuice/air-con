@@ -14,7 +14,8 @@ import { PhotoStrip } from "./photo-strip";
  */
 
 /** "Next: Wishes →" at the bottom of every screen. */
-export function NextButton({ from }: { from: ScreenId }) {
+/** `quiet` when the screen has its own main action, so there's only ever one orange button. */
+export function NextButton({ from, quiet = false }: { from: ScreenId; quiet?: boolean }) {
   const { go } = useSurvey();
   const next = nextScreen(from);
   return (
@@ -23,7 +24,7 @@ export function NextButton({ from }: { from: ScreenId }) {
         <button
           type="button"
           onClick={() => go({ s: next })}
-          className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-accent-600 px-6 text-base font-semibold text-white shadow-sm hover:bg-accent-700 sm:w-auto"
+          className={`inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full px-6 text-base font-semibold sm:w-auto ${quiet ? "border border-line bg-white text-ink-900 hover:bg-surface" : "bg-accent-600 text-white shadow-sm hover:bg-accent-700"}`}
         >
           Next: {SCREEN_LABEL[next]} <span aria-hidden>→</span>
         </button>

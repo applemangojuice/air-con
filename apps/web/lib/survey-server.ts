@@ -3,6 +3,8 @@ import {
   PD_CHECKS,
   can,
   diffSelfSurvey,
+  documentCompany,
+  documentCustomer,
   electricsFinding,
   emptyMeasuredSurvey,
   idempotencyKey,
@@ -25,7 +27,10 @@ import {
 } from "@aircon/domain";
 import { staffCanAccessProject, type AssignmentView } from "./auth/access";
 import { audit } from "./audit";
+import { PROPOSAL_TURNAROUND_WORKING_DAYS } from "./comms/action-map";
 import { notify } from "./comms/outbox";
+import { createDocument } from "./documents-server";
+import { fmtDate } from "./format";
 import { renderMessage, templateContext } from "./comms/templates";
 import { appMode } from "./env-mode";
 import { listProjectMedia, type MediaWithUrl } from "./media-server";
@@ -704,9 +709,52 @@ export async function submitSurvey(projectId: string, input: unknown, expectedUp
       surveyor: record.surveyor ?? { staffId: staff.id, name: staff.name },
     });
     await audit({ actor: staff, action: "survey.submit", entity: "survey", entityId: record.id, detail: { projectId, minutes: record.minutes } });
+    await issueSurveyReport(latest, record, staff, now);
   }
   await stopSurveyClock(projectId, staff, now);
   return { ok: true, project: latest, record };
+}
+
+/** Working days on from a date (weekends skipped), yyyy-mm-dd. */
+export function addWorkingDays(dateIso: string, n: number): string {
+  const d = new Date(`${dateIso.slice(0, 10)}T12:00:00Z`);
+  for (let left = n; left > 0; ) {
+    d.setUTCDate(d.getUTCDate() + 1);
+    const dow = d.getUTCDay();
+    if (dow !== 0 && dow !== 6) left--;
+  }
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * The customer's record of the visit (plan P5: what was surveyed, and what
+ * we said happens next), frozen as a survey-report document their portal
+ * lists. Best-effort: the survey is already submitted, so a failure here
+ * is logged, never shown as a failed submit.
+ */
+async function issueSurveyReport(project: Project, record: SurveyRecord, staff: StaffMember, now: string): Promise<void> {
+  try {
+    const settings = await getSettings();
+    const proposalBy = addWorkingDays(now.slice(0, 10), PROPOSAL_TURNAROUND_WORKING_DAYS);
+    await createDocument(
+      project.id,
+      "survey-report",
+      {
+        company: documentCompany(settings),
+        customer: documentCustomer(project),
+        issuedAt: now,
+        survey: record,
+        promises: [
+          `Your design and proposal arrive by ${fmtDate(proposalBy)}.`,
+          "A qualified engineer checks and signs off the design before any price is fixed.",
+          "If anything we found changes the price from your online estimate, the proposal says exactly what and why.",
+        ],
+      },
+      { title: "Your survey report", customerVisible: true, createdBy: staff.name, createdAt: now },
+    );
+  } catch (err) {
+    console.error(`[survey] survey report for ${project.id} not created:`, err);
+  }
 }
 
 /* ------------------------------------------------------------------ */

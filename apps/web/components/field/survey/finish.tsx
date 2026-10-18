@@ -128,7 +128,7 @@ export function ConsentSection({
           </button>
         </FieldCard>
       )}
-      <NextButton from="consent" />
+      <NextButton from="consent" quiet={!consent} />
     </div>
   );
 }

@@ -256,8 +256,12 @@ export function SurveyApp(props: VisitProps) {
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState<{ at?: string; minutes?: number | null; diff: VisitProps["diff"] } | null>(
-    initialProject.survey.status === "submitted" ? { at: initialProject.survey.submittedAt, minutes: null, diff: props.diff } : null,
+    initialProject.survey.status === "submitted"
+      ? { at: initialProject.survey.submittedAt, minutes: props.draft?.record.minutes ?? null, diff: props.diff }
+      : null,
   );
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   const start = async () => {
     setStarting(true);
@@ -316,6 +320,19 @@ export function SurveyApp(props: VisitProps) {
         />
         {sheet && <OnMyWaySheet projectId={projectId} phone={project.customer.phone} smsMode={smsMode} onClose={() => setSheet(false)} onSent={setOnMyWay} />}
       </>
+    );
+  }
+
+  // The flow reads this phone's saved copy as it starts, so it only ever renders in the browser.
+  if (!mounted) {
+    return (
+      <div aria-busy className="space-y-3">
+        <HeaderTitle>{project.customer.name || "Survey"}</HeaderTitle>
+        <div className="h-24 animate-pulse rounded-2xl bg-surface" />
+        <div className="h-16 animate-pulse rounded-2xl bg-surface" />
+        <div className="h-16 animate-pulse rounded-2xl bg-surface" />
+        <p className="sr-only">Opening the survey…</p>
+      </div>
     );
   }
 

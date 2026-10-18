@@ -69,6 +69,7 @@ test("save retries back off, then settle at 20 s", () => {
 /* Annotation editor geometry                                          */
 /* ------------------------------------------------------------------ */
 
+type UnitShape = Extract<Annotation, { w: number }>;
 const box = { w: 400, h: 300 };
 const unit: Annotation = { id: "u", type: "indoor-unit", x: 0.2, y: 0.2, w: 0.3, h: 0.1 };
 const route: Annotation = { id: "r", type: "route", kind: "pipe", points: [{ x: 0.1, y: 0.5 }, { x: 0.9, y: 0.5 }] };
@@ -87,15 +88,15 @@ test("hit tests find the topmost shape within a finger's reach", () => {
 });
 
 test("moving keeps the whole shape on the photo; handles reshape", () => {
-  const moved = moveShape(unit, 0.9, 0) as Extract<Annotation, { type: "indoor-unit" }>;
+  const moved = moveShape(unit, 0.9, 0) as UnitShape;
   assert.equal(moved.x + moved.w <= 1 + 1e-9, true);
-  assert.equal(moved.w, unit.type === "indoor-unit" ? unit.w : 0, "never squashed");
+  assert.equal(moved.w, (unit as UnitShape).w, "never squashed");
   const r = moveShape(route, 0, -0.9) as Extract<Annotation, { type: "route" }>;
   assert.deepEqual(r.points.map((p) => p.y), [0, 0]);
-  const resized = dragHandle(unit, 2, { x: 0.6, y: 0.5 }) as Extract<Annotation, { type: "indoor-unit" }>;
+  const resized = dragHandle(unit, 2, { x: 0.6, y: 0.5 }) as UnitShape;
   assert.deepEqual([resized.x, resized.y], [0.2, 0.2], "the opposite corner stays put");
   assert.ok(Math.abs(resized.w - 0.4) < 1e-9 && Math.abs(resized.h - 0.3) < 1e-9);
-  const flipped = dragHandle(unit, 2, { x: 0.1, y: 0.1 }) as Extract<Annotation, { type: "indoor-unit" }>;
+  const flipped = dragHandle(unit, 2, { x: 0.1, y: 0.1 }) as UnitShape;
   assert.ok(flipped.w > 0 && flipped.h > 0, "dragging past the corner flips, never negative");
   const vertex = dragHandle(route, 1, { x: 2, y: 0.4 }) as Extract<Annotation, { type: "route" }>;
   assert.deepEqual(vertex.points[1], { x: 1, y: 0.4 });

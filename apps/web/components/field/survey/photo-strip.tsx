@@ -147,7 +147,11 @@ export function PhotoStrip({
       {hint && <p className="mb-2 text-sm text-ink-500">{hint}</p>}
 
       {tags.length > 1 && (
-        <div role="radiogroup" aria-label="Kind of photo" className="mb-2 flex gap-2 overflow-x-auto pb-1">
+        <div
+          role="radiogroup"
+          aria-label="Kind of photo"
+          className="-mr-4 mb-2 flex snap-x gap-2 overflow-x-auto pb-1 pr-4 [mask-image:linear-gradient(to_right,black_85%,transparent)]"
+        >
           {tags.map((t) => (
             <button
               key={t}
@@ -175,9 +179,7 @@ export function PhotoStrip({
               >
                 <Thumb item={m} />
                 <span className="mt-1 block truncate px-0.5 text-xs text-ink-700">{PHOTO_TAG_LABEL[m.tag]}</span>
-                <span className="block px-0.5 text-sm font-semibold text-accent-700">
-                  {m.locked ? "Locked" : m.annotations.length ? `Edit drawing (${m.annotations.length})` : "Mark up"}
-                </span>
+                <span className="block px-0.5 text-sm font-semibold text-accent-700">{m.locked ? "Locked" : m.annotations.length ? "Edit drawing" : "Mark up"}</span>
               </button>
               {!m.locked && (
                 <button
@@ -228,16 +230,16 @@ export function PhotoStrip({
         </div>
       )}
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="grid grid-cols-2 gap-2">
         <label
           htmlFor={`${id}-camera`}
-          className="inline-flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-full bg-ink-900 px-5 text-base font-semibold text-white shadow-sm hover:bg-ink-950 focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent-500"
+          className="inline-flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-full bg-ink-900 px-4 text-base font-semibold text-white shadow-sm hover:bg-ink-950 focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent-500"
         >
           <svg aria-hidden viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
             <path d="M4 8h3l2-3h6l2 3h3v11H4z" />
             <circle cx="12" cy="13" r="3.5" />
           </svg>
-          {single && (attached.length > 0 || pending.length > 0) ? "Retake photo" : attached.length || pending.length ? "Take another" : "Take photo"}
+          {single && (attached.length > 0 || pending.length > 0) ? "Retake" : attached.length || pending.length ? "Take another" : "Take photo"}
           <input
             ref={cameraRef}
             id={`${id}-camera`}
@@ -253,7 +255,7 @@ export function PhotoStrip({
           htmlFor={`${id}-library`}
           className="inline-flex min-h-12 cursor-pointer items-center justify-center rounded-full border border-line bg-white px-4 text-base font-semibold text-ink-900 hover:bg-surface focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent-500"
         >
-          From the phone
+          Choose photo
           <input
             ref={libraryRef}
             id={`${id}-library`}
@@ -264,8 +266,8 @@ export function PhotoStrip({
             onChange={(e) => pick(e.target.files)}
           />
         </label>
-        {busy && <span className="text-sm text-ink-500">Uploading in the background; carry on.</span>}
       </div>
+      {busy && <p className="mt-2 text-sm text-ink-500">Uploading in the background; carry on.</p>}
     </section>
   );
 }
