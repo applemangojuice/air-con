@@ -134,6 +134,17 @@ test("SLA commitments appear only when switched on, without the outdated survey-
   assert.ok(on.every((c) => !/£150|site visit|final quote/i.test(`${c.promise} ${c.remedy}`)));
 });
 
+test("example homes say which rooms they include, and the anchor is the cheapest whole-home example", async () => {
+  const { exampleHomes, homeAnchor, roomsSummary } = await import("../components/site/examples.ts");
+  const homes = exampleHomes();
+  assert.equal(homes.length, 6);
+  assert.ok(homes.every((h) => h.price > 0 && h.rooms.length > 0));
+  const anchor = homeAnchor();
+  assert.equal(anchor.price, Math.min(...homes.slice(3).map((h) => h.price)));
+  assert.equal(roomsSummary(["Living room", "Kitchen", "Main bedroom"]), "3 rooms: Living room, kitchen and main bedroom");
+  assert.equal(roomsSummary(["Bedroom", "Living room"]), "Bedroom and living room");
+});
+
 test("consent record: operational and marketing are separate, versioned facts", () => {
   const r = quoteConsentRecord({ marketing: false, hasPhone: true, at: "2026-10-18T10:00:00.000Z" });
   assert.equal(r.operational.given, true);

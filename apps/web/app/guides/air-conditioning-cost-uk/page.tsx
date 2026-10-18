@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { SiteFooter } from "@/components/site/footer";
 import { SiteHeader } from "@/components/site/header";
-import { installDurationCopy, vatCopy, warrantyCopy } from "@/components/site/claims";
+import { installDurationCopy, numberWord, vatCopy, warrantyCopy } from "@/components/site/claims";
+import { exampleHomes, homeAnchor, roomsSummary } from "@/components/site/examples";
 import { primaryBtn, textLink } from "@/components/site/styles";
 import { examplePrices } from "@/lib/example-prices";
 import { gbp } from "@/lib/format";
@@ -28,14 +29,17 @@ export default async function CostGuidePage() {
   const vat = vatCopy(settings);
   const warranty = warrantyCopy(settings);
 
-  const table = [
-    { config: "One bedroom", price: p.oneBedroom, note: "One wall-mounted unit, typical first-floor bedroom" },
-    { config: "One living room", price: p.livingRoom, note: "A larger unit for a bigger, busier room" },
-    { config: "Two rooms (bedroom and living room)", price: p.twoRooms, note: "Multi-split: two indoor units, one outdoor unit" },
-    { config: "Whole 3-bed terrace", price: p.threeBedTerrace, note: "Every main room" },
-    { config: "Whole 3-bed semi", price: p.threeBedSemi, note: "Semi-detached routes are often simpler" },
-    { config: "Whole 4-bed home", price: p.fourBedHome, note: "A larger multi-split system" },
+  const anchor = homeAnchor();
+  const notes = [
+    "One wall-mounted unit in a typical first-floor bedroom",
+    "A larger unit for a bigger, busier room",
+    "Multi-split: two indoor units, one outdoor unit",
   ];
+  const table = exampleHomes().map((h, i) => ({
+    config: h.label,
+    price: h.price,
+    note: notes[i] ?? roomsSummary(h.rooms),
+  }));
 
   const included = [
     "The indoor and outdoor units",
@@ -48,7 +52,7 @@ export default async function CostGuidePage() {
   const faqs = [
     {
       q: "How much does air conditioning cost to install in the UK?",
-      a: `With us, one room starts from about ${gbp(Math.min(p.oneBedroom, p.livingRoom))} installed, and a whole three-bed home is typically ${gbp(Math.min(p.threeBedTerrace, p.threeBedSemi))} to ${gbp(Math.max(p.threeBedSemi, p.fourBedHome))}, depending on rooms and layout. ${vat.long} Your exact price takes about two minutes online, and your home survey confirms it.`,
+      a: `With us, one room starts from about ${gbp(Math.min(p.oneBedroom, p.livingRoom))} installed, and ${numberWord(anchor.rooms)} rooms in a typical three-bed home from about ${gbp(anchor.price)}, depending on rooms and layout. ${vat.long} Your exact price takes about two minutes online, and your home survey confirms it.`,
     },
     {
       q: "What's included in the price?",

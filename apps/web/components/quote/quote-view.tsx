@@ -156,7 +156,7 @@ export function QuoteView({
       {warranty && (
         <section className="mt-4 rounded-2xl border border-line bg-white p-4">
           <h2 className="text-sm font-bold">{warranty.headline}</h2>
-          <p className="mt-1 text-sm text-ink-700">{warranty.body}</p>
+          <p className="mt-1 text-sm text-ink-700">{warranty.body} All on top of your statutory rights.</p>
         </section>
       )}
 

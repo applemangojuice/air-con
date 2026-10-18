@@ -210,8 +210,8 @@ export function warrantyCopy(ps: PublicSettings): { headline: string; body: stri
     return {
       headline: `${years}-year workmanship guarantee`,
       body: maker
-        ? `On our installation work, on top of your statutory rights. Equipment: ${maker}`
-        : "On our installation work, on top of your statutory rights. Equipment warranty terms are in your proposal.",
+        ? `For our installation work. Equipment: ${maker}`
+        : "For our installation work. Equipment warranty terms are in your proposal.",
     };
   }
   if (maker) return { headline: "Manufacturer's warranty", body: maker };

@@ -9,6 +9,7 @@ import {
   cancellationSummary,
   fgasClaim,
   installDurationCopy,
+  numberWord,
   slaCommitments,
   surveyDurationCopy,
   surveyPriceCopy,
@@ -18,7 +19,8 @@ import {
 import { onDarkBtn, primaryBtn, textLink } from "@/components/site/styles";
 import { AREA_PAGES } from "@/app/areas/area-data";
 import { appUrl } from "@/lib/brand";
-import { examplePrices, fromPrice } from "@/lib/example-prices";
+import { fromPrice } from "@/lib/example-prices";
+import { homeAnchor } from "@/components/site/examples";
 import { gbp } from "@/lib/format";
 import { getPublicSettings } from "@/lib/public-settings";
 
@@ -33,7 +35,7 @@ export default async function HomePage() {
   const settings = await getPublicSettings();
   // Price anchors from the real engine, never hand-typed.
   const from = fromPrice();
-  const prices = examplePrices();
+  const anchor = homeAnchor();
   const vat = vatCopy(settings);
   const warranty = warrantyCopy(settings);
   const fgas = fgasClaim(settings);
@@ -78,7 +80,7 @@ export default async function HomePage() {
       body: `Before your install you'll see who's coming and the qualifications they actually hold.${fgas ? ` ${fgas}` : ""}`,
     },
     warranty
-      ? { title: warranty.headline, body: warranty.body }
+      ? { title: warranty.headline, body: `${warranty.body} All on top of your statutory rights.` }
       : {
           title: "Guarantees, spelled out",
           body: "Your proposal sets out the manufacturer's warranty and our workmanship guarantee in writing, before you agree to anything.",
@@ -131,8 +133,8 @@ export default async function HomePage() {
                 Free and no obligation. No email needed to see your price.
               </p>
               <p className="mt-4 text-sm font-semibold text-ink-700">
-                One room from {gbp(from)} installed · a whole 3-bed home from{" "}
-                {gbp(Math.min(prices.threeBedTerrace, prices.threeBedSemi))}
+                One room from {gbp(from)} installed · {numberWord(anchor.rooms)} rooms in a 3-bed home from{" "}
+                {gbp(anchor.price)}
                 {vat.short ? ` · ${vat.short}` : ""} ·{" "}
                 <Link href="/guides/air-conditioning-cost-uk" className={`whitespace-nowrap ${textLink}`}>
                   cost guide

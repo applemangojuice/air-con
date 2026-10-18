@@ -5,6 +5,7 @@ import { buildDefaultConfig, generateQuote } from "@aircon/domain";
 import { SiteFooter } from "@/components/site/footer";
 import { SiteHeader } from "@/components/site/header";
 import { installDurationCopy, vatCopy } from "@/components/site/claims";
+import { roomsSummary } from "@/components/site/examples";
 import { primaryBtn, textLink } from "@/components/site/styles";
 import { gbp } from "@/lib/format";
 import { getPublicSettings } from "@/lib/public-settings";
@@ -33,9 +34,9 @@ export async function generateMetadata({ params }: { params: Promise<{ outcode: 
 }
 
 /** Guide price for a typical local home, from the real engine. */
-function examplePrice(ex: AreaPage["examples"][number]): number {
+function examplePrice(ex: AreaPage["examples"][number]): { price: number; rooms: string[] } {
   const config = buildDefaultConfig({ type: ex.type, era: ex.era, bedrooms: ex.bedrooms, bathrooms: 1, layout: "separate" });
-  return generateQuote({
+  const price = generateQuote({
     postcode: "SW16 1AA",
     addressLine: "Example",
     archetypeId: config.archetypeId,
@@ -45,6 +46,7 @@ function examplePrice(ex: AreaPage["examples"][number]): number {
     outdoor: { location: config.outdoorDefault, photos: [] },
     electrics: { condition: "unsure", photos: [] },
   }).totalGbp;
+  return { price, rooms: config.rooms.map((r) => r.name) };
 }
 
 export default async function AreaPageView({ params }: { params: Promise<{ outcode: string }> }) {
@@ -55,7 +57,7 @@ export default async function AreaPageView({ params }: { params: Promise<{ outco
   const settings = await getPublicSettings();
   const covered = settings.serviceArea.includes(area.outcode);
   const vat = vatCopy(settings);
-  const examples = area.examples.map((ex) => ({ ...ex, price: examplePrice(ex) }));
+  const examples = area.examples.map((ex) => ({ ...ex, ...examplePrice(ex) }));
 
   const serviceJsonLd = {
     "@context": "https://schema.org",
@@ -119,7 +121,7 @@ export default async function AreaPageView({ params }: { params: Promise<{ outco
           <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6">
             <h2 className="text-2xl font-display">What it typically costs here</h2>
             <p className="mt-2 text-ink-700">
-              Guide prices from the same engine that prices your quote: every main room, heating and cooling,
+              Guide prices from the same engine that prices your quote: the main rooms, heating and cooling,
               installed. {vat.long} Fewer rooms cost less.
             </p>
             <div className="mt-6 grid gap-4 sm:grid-cols-2">
@@ -127,6 +129,7 @@ export default async function AreaPageView({ params }: { params: Promise<{ outco
                 <div key={ex.label} className="rounded-2xl border border-line bg-white p-5">
                   <p className="font-semibold">{ex.label}</p>
                   <p className="mt-2 text-3xl font-display">{gbp(ex.price)}</p>
+                  <p className="mt-1 text-sm text-ink-700">{roomsSummary(ex.rooms)}</p>
                   <p className="mt-1 text-xs text-ink-500">A guide for a typical home. Yours is confirmed at your survey.</p>
                 </div>
               ))}

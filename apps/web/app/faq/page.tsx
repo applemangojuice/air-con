@@ -7,6 +7,7 @@ import {
   fgasClaim,
   installDaysPhrase,
   listOutcodes,
+  numberWord,
   paymentCopy,
   surveyDurationCopy,
   surveyPriceCopy,
@@ -15,7 +16,8 @@ import {
   type PublicSettings,
 } from "@/components/site/claims";
 import { primaryBtn, textLink } from "@/components/site/styles";
-import { examplePrices, fromPrice } from "@/lib/example-prices";
+import { fromPrice } from "@/lib/example-prices";
+import { homeAnchor } from "@/components/site/examples";
 import { gbp } from "@/lib/format";
 import { getPublicSettings } from "@/lib/public-settings";
 
@@ -35,7 +37,7 @@ export const metadata: Metadata = {
  * facts. Rendered with FAQPage structured data from the same text.
  */
 function faqsFor(s: PublicSettings): { q: string; a: string }[] {
-  const p = examplePrices();
+  const anchor = homeAnchor();
   const from = fromPrice();
   const warranty = warrantyCopy(s);
   const fgas = fgasClaim(s);
@@ -54,7 +56,7 @@ function faqsFor(s: PublicSettings): { q: string; a: string }[] {
     },
     {
       q: "How much does it cost?",
-      a: `One room starts from about ${gbp(from)} installed, and a whole three-bed home from about ${gbp(Math.min(p.threeBedTerrace, p.threeBedSemi))}, depending on rooms and pipe routes. ${vatCopy(s).long} Your online price is for your home, and it's confirmed at your survey.`,
+      a: `One room starts from about ${gbp(from)} installed, and ${numberWord(anchor.rooms)} rooms in a typical three-bed home from about ${gbp(anchor.price)}, depending on rooms and pipe routes. ${vatCopy(s).long} Your online price is for your home, and it's confirmed at your survey.`,
     },
     {
       q: "How accurate is the online price?",

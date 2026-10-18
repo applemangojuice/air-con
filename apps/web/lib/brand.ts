@@ -12,7 +12,14 @@ export const BRAND = {
   tagline: "Cooling technologies for the UK. Keeping London cool.",
   strap: "Keeping London cool",
   supportEmail: "hello@dang.ac",
+  /**
+   * A placeholder, not a number anyone answers. Customer-facing pages print
+   * settings.company.phone through realPhone() (components/site/claims.ts),
+   * which also refuses this placeholder; kept only so older imports compile.
+   */
   phoneDisplay: "0800 000 0000",
+  /** The heating-and-cooling promise, for marketing copy. */
+  promise: "Cool in summer, warm in winter",
 } as const;
 
 /**
