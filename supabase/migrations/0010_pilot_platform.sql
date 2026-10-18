@@ -506,7 +506,7 @@ create table if not exists public.documents (
   project_id uuid not null references public.projects (id) on delete cascade,
   kind text not null, -- DocumentKind
   version int not null default 1 check (version >= 1),
-  ref text not null unique, -- e.g. DIH-PR-7F3A-v2
+  ref text not null unique, -- e.g. DIH-PR-7F3A91C2-v2, DIH-IN-7F3A91C2-0002-v1 (documentRef)
   status text not null default 'draft', -- draft | final | superseded
   customer_visible boolean not null default false,
 

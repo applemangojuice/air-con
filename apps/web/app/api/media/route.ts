@@ -4,7 +4,7 @@ import { requireProjectAccess, requireStaffApi } from "@/lib/auth/server";
 import { MEDIA_SOURCES, MediaError, canWriteMedia, createMediaUpload, listProjectMedia } from "@/lib/media-server";
 
 /**
- * Project media (contract §F, F2's API; shared by survey, install and ops).
+ * Project media (contract §F; foundation-owned, shared by survey, install, handover and ops).
  *
  *   POST /api/media                 staff: start an upload → { mediaId, signedUrl, path, ticket }
  *                                   then PUT the bytes to signedUrl and confirm with
