@@ -663,6 +663,20 @@ test("early-start-evidenced: an accepted early-start request, a reference, a sig
   refuses(done, evidence, T.dates, { actor: ADMIN }, /already on file/);
 });
 
+test("early-start-requested: a later request (after accepting without one), before the install starts", () => {
+  const p = walk("install-dates-set", { early: false });
+  refuses(walk("proposal-viewed"), { type: "early-start-requested", channel: "portal" }, T.dates, {}, /no accepted contract/);
+  refuses(p, { type: "early-start-requested", channel: "sms" } as never, T.dates, {}, /How did the customer ask/);
+  const asked = step(p, { type: "early-start-requested", channel: "email" }, "2026-10-29T09:00:00.000Z", { actor: ADMIN });
+  assert.deepEqual(asked.proposal.earlyStart, { requested: true, requestedAt: "2026-10-29T09:00:00.000Z", channel: "email", wordingVersion: EARLY_START_WORDING_VERSION });
+  assert.equal(asked.proposal.earlyStartRequested, true);
+  assert.equal(step(asked, { type: "early-start-requested", channel: "portal" }, T.dates).events.length, asked.events.length);
+  // Then the evidence, as for a request made at acceptance; and dates inside the period are allowed.
+  const evidenced = step(asked, { type: "early-start-evidenced", channel: "email", evidenceRef: "inbound-9", by: "" }, "2026-10-29T10:00:00.000Z", { actor: ADMIN });
+  assert.equal(evidenced.proposal.earlyStart?.evidencedAt, "2026-10-29T10:00:00.000Z");
+  refuses(walk("day-1", { early: false, contractType: "install-only" }), { type: "early-start-requested", channel: "portal" }, T.day1, {}, /already started/);
+});
+
 /* ------------------------------------------------------------------ */
 /* Booking guards + the booking gate                                   */
 /* ------------------------------------------------------------------ */

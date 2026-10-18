@@ -1591,6 +1591,8 @@ export type ProjectAction =
   | { type: "proposal-expired" }
   /** System: the acceptance confirmation email (the contract copy) went out. Idempotent. */
   | { type: "contract-confirmation-sent"; messageId?: string; demo?: boolean }
+  /** The customer asks to start early after accepting (on the portal, or by email or form, recorded by ops). */
+  | { type: "early-start-requested"; channel: "email" | "paper" | "portal" }
   /** Ops: the customer's early-start request on a durable medium (their email reply, or a signed form) is on file. */
   | { type: "early-start-evidenced"; channel: "email" | "paper"; evidenceRef: string; by: string }
   // booking
@@ -1998,6 +2000,22 @@ export function applyProjectAction(project: Project, action: ProjectAction, now:
         "system",
         { internal: true },
       );
+      return ok();
+    }
+
+    case "early-start-requested": {
+      if (p.proposal.status !== "accepted") return err("There's no accepted contract.");
+      if (!["email", "paper", "portal"].includes(action.channel)) return err("How did the customer ask?");
+      if (p.install.status !== "not-started") return err("The install has already started.");
+      if (earlyStartRequestedOf(p)) return ok(); // asking twice changes nothing
+      p.proposal.earlyStart = {
+        ...(p.proposal.earlyStart ?? { wordingVersion: EARLY_START_WORDING_VERSION }),
+        requested: true,
+        requestedAt: now,
+        channel: action.channel,
+      };
+      p.proposal.earlyStartRequested = true;
+      log("early-start-requested", "You asked us to start before your cancellation period ends.", "customer");
       return ok();
     }
 
@@ -2648,16 +2666,32 @@ const fmtDateFull = (iso: string) => {
  */
 export function cancellationCopy(project: Project, opts: { settings?: PilotSettings; today?: string } = {}): string {
   const settings = opts.settings ?? DEFAULT_SETTINGS;
-  const days = settings.scheduling.cancellationDays;
-  const supply = project.proposal.contractType !== "install-only";
-  if (project.proposal.status !== "accepted") {
+  const accepted = project.proposal.status === "accepted";
+  const cs = cancellationStatus(project, opts.today ?? "", settings);
+  return cancellationSentence(
+    { accepted, contractType: project.proposal.contractType, ...(cs.endsOn ? { endsOn: cs.endsOn } : {}), ended: cs.ended },
+    settings.scheduling.cancellationDays,
+  );
+}
+
+/**
+ * The sentence behind cancellationCopy, from the facts alone, for callers
+ * that hold a message's data rather than the project (email templates).
+ * LEGAL REVIEW REQUIRED, as cancellationCopy.
+ */
+export function cancellationSentence(
+  input: { accepted: boolean; contractType?: ContractType; endsOn?: string; ended?: boolean },
+  cancellationDays: number,
+): string {
+  const days = cancellationDays;
+  const supply = input.contractType !== "install-only";
+  if (!input.accepted) {
     return supply
       ? `If you accept, you can cancel without giving a reason until ${days} days after the day your equipment is delivered to you.`
       : `If you accept, you can cancel without giving a reason within ${days} days of the day you accept.`;
   }
-  const cs = cancellationStatus(project, opts.today ?? "", settings);
-  if (cs.endsOn && cs.ended) return `Your cancellation period ended on ${fmtDateFull(cs.endsOn)}.`;
-  if (cs.endsOn) return `You can cancel without giving a reason until the end of ${fmtDateFull(cs.endsOn)}.`;
+  if (input.endsOn && input.ended) return `Your cancellation period ended on ${fmtDateFull(input.endsOn)}.`;
+  if (input.endsOn) return `You can cancel without giving a reason until the end of ${fmtDateFull(input.endsOn)}.`;
   return supply
     ? `Because we're supplying your equipment, you can cancel without giving a reason until ${days} days after the day it's delivered to you. We'll tell you the exact date when it arrives.`
     : `You can cancel without giving a reason within ${days} days of the day you accepted.`;
