@@ -17,6 +17,7 @@ import {
   guaranteeLines,
   hasCurrentQualification,
   measuredToEngineSurvey,
+  pricingInputsOf,
   proposalIssueErrors,
   recomputeOption,
   reviseProposal,
@@ -54,6 +55,7 @@ import * as staffRepo from "./repo/staff";
 import * as surveysRepo from "./repo/surveys";
 import { getSettings } from "./settings-server";
 import { buildAcceptanceRecord, proposalDocumentHash, withoutAt, type AcceptanceForm } from "@/components/proposal/model";
+import { formFromRecord } from "@/components/ops/proposal/model";
 
 /**
  * Proposals on the server (contract §G, F4): drafting from the approved
@@ -505,7 +507,7 @@ export async function saveDraft(
       roomCards: cards,
       installDays: o.installDays,
       labour: canPrice ? o.labour : (before?.labour ?? base.labour),
-      pricingInputs: canPrice ? o.pricingInputs : (before?.pricingInputs ?? base.pricingInputs),
+      pricingInputs: canPrice ? o.pricingInputs : before ? pricingInputsOf(before) : base.pricingInputs,
     };
     try {
       return recomputeOption(ctx, option);
@@ -663,13 +665,23 @@ export async function reviseFrom(projectId: string, proposalId: string, staff: S
   for (let attempt = 0; attempt < 3; attempt++) {
     const version = await proposalsRepo.nextVersion(projectId);
     const next = { ...reviseProposal(source, crypto.randomUUID(), new Date().toISOString()), version };
+    let saved: ProposalRecord;
     try {
-      const saved = await proposalsRepo.insert(next);
-      await audit({ actor: staff, action: "proposal.revise", entity: "proposal", entityId: saved.id, detail: { projectId, from: source.id, version } });
-      return { ok: true, proposalId: saved.id };
+      saved = await proposalsRepo.insert(next);
     } catch (err) {
       if (attempt === 2) throw err;
+      continue; // a concurrent revision took the version: try the next one
     }
+    // The copy goes through the same rebuild a save does, so the new draft is
+    // on today's settings, catalogue and wording rules from the start.
+    try {
+      const rebuilt = await saveDraft(projectId, saved.id, formFromRecord(saved), staff);
+      if (!rebuilt.ok) console.warn(`[proposal] revision ${saved.id} kept as copied:`, rebuilt.error);
+    } catch (err) {
+      console.error(`[proposal] rebuilding revision ${saved.id} failed (kept as copied):`, err);
+    }
+    await audit({ actor: staff, action: "proposal.revise", entity: "proposal", entityId: saved.id, detail: { projectId, from: source.id, version } });
+    return { ok: true, proposalId: saved.id };
   }
   return fail("Couldn't start the revision. Please try again.", 502);
 }

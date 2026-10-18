@@ -54,6 +54,76 @@ export function LinesField({
   );
 }
 
+/**
+ * A list of sentences, one box each: long items stay readable (no wrapped
+ * lines running into each other), each with its own remove, plus an add.
+ */
+export function ListEditor({
+  label,
+  hint,
+  value,
+  onChange,
+  max = 20,
+  addLabel = "Add a line",
+}: {
+  label: string;
+  hint?: string;
+  value: string[];
+  onChange: (next: string[]) => void;
+  max?: number;
+  addLabel?: string;
+}) {
+  const id = useId();
+  const [items, setItems] = useState<string[]>(value);
+  useEffect(() => {
+    if (value.join("\n") !== items.filter((l) => l.trim()).join("\n")) setItems(value);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+  const commit = (next: string[]) => {
+    setItems(next);
+    onChange(next.map((l) => l.trim()).filter(Boolean));
+  };
+  return (
+    <fieldset aria-describedby={hint ? `${id}-hint` : undefined} className="min-w-0">
+      <legend className="mb-1.5 text-sm font-semibold text-ink-900">{label}</legend>
+      {hint && (
+        <p id={`${id}-hint`} className="mb-2 text-xs text-ink-500">
+          {hint}
+        </p>
+      )}
+      <ol className="space-y-2">
+        {items.map((item, i) => (
+          <li key={i} className="flex items-start gap-2">
+            <span aria-hidden className="mt-2.5 w-5 shrink-0 text-right text-xs tabular-nums text-ink-500">
+              {i + 1}
+            </span>
+            <textarea
+              aria-label={`${label}, item ${i + 1}`}
+              rows={Math.min(4, Math.max(1, Math.ceil(item.length / 70)))}
+              value={item}
+              onChange={(e) => commit(items.map((x, j) => (j === i ? e.target.value.replace(/\n/g, " ") : x)))}
+              className="min-h-10 w-full resize-y rounded-2xl border border-line bg-white px-3.5 py-2 text-sm leading-relaxed text-ink-900 outline-none focus:border-accent-500 focus:ring-2 focus:ring-accent-100"
+            />
+            <button
+              type="button"
+              onClick={() => commit(items.filter((_, j) => j !== i))}
+              className="mt-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-ink-500 hover:bg-surface hover:text-red-700"
+              aria-label={`Remove ${label.toLowerCase()} item ${i + 1}`}
+            >
+              ×
+            </button>
+          </li>
+        ))}
+      </ol>
+      {items.length < max && (
+        <button type="button" onClick={() => setItems([...items, ""])} className="mt-2 ml-7 inline-flex min-h-9 items-center text-sm font-semibold text-accent-700 hover:underline">
+          + {addLabel}
+        </button>
+      )}
+    </fieldset>
+  );
+}
+
 /** "1,234.50" → 123450; "" → undefined; junk → NaN (the caller says so). */
 export function parsePounds(raw: string): number | undefined {
   const clean = raw.replace(/[£,\s]/g, "");

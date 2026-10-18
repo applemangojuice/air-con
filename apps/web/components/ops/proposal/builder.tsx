@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { defaultOptionFor, proposalIssueErrors, type Blocker, type OptionContext, type ProposalRecord } from "@aircon/domain";
+import { defaultOptionFor, guaranteeLines, proposalIssueErrors, type Blocker, type OptionContext, type ProposalRecord } from "@aircon/domain";
 import { BlockerList, Button, Card, Fieldset, Input, Textarea } from "@/components/kit";
 import { fmtDate, money } from "@/lib/format";
 import type { EngineReference, ProposalMedia } from "@/lib/proposal-server";
@@ -15,7 +15,7 @@ import {
   saveDraftAction,
   type ActionResult,
 } from "@/app/ops/projects/[id]/proposal/actions";
-import { LinesField } from "./fields";
+import { ListEditor } from "./fields";
 import { formFromRecord, optionFormFrom, previewOption, recordFromForm, type OptionForm } from "./model";
 import { OptionEditor } from "./option-editor";
 
@@ -255,23 +255,27 @@ export function ProposalBuilder(props: BuilderProps) {
         {/* Wording */}
         <Card>
           <h3 className="font-display text-xl text-ink-900">What&apos;s included, excluded and assumed</h3>
-          <p className="mt-1 text-sm text-ink-500">Shared by every option. One item per line. The defaults are honest starting points: edit them to fit this home.</p>
-          <div className="mt-4 grid gap-4 xl:grid-cols-2">
-            <LinesField label="Included" value={form.inclusions} onChange={(v) => setForm((f) => ({ ...f, inclusions: v }))} rows={9} />
-            <LinesField label="Not included" value={form.exclusions} onChange={(v) => setForm((f) => ({ ...f, exclusions: v }))} rows={9} />
+          <p className="mt-1 text-sm text-ink-500">Shared by every option. The defaults are honest starting points: edit them to fit this home.</p>
+          <div className="mt-4 space-y-6">
+            <ListEditor label="Included" value={form.inclusions} onChange={(v) => setForm((f) => ({ ...f, inclusions: v }))} max={20} />
+            <ListEditor label="Not included" value={form.exclusions} onChange={(v) => setForm((f) => ({ ...f, exclusions: v }))} max={20} />
           </div>
           <div className="mt-4">
-            <LinesField label="What the price assumes" value={form.assumptions} onChange={(v) => setForm((f) => ({ ...f, assumptions: v }))} rows={6} />
+            <ListEditor label="What the price assumes" value={form.assumptions} onChange={(v) => setForm((f) => ({ ...f, assumptions: v }))} max={20} />
           </div>
           <div className="mt-5 rounded-2xl bg-cream p-4">
             <p className="text-sm font-semibold text-ink-900">Guarantees (from settings)</p>
             <ul className="mt-2 space-y-1 text-sm text-ink-700">
-              {(proposal.guarantees ?? []).map((g) => (
+              {guaranteeLines(ctx.settings).map((g) => (
                 <li key={g}>{g}</li>
               ))}
             </ul>
             <p className="mt-2 text-xs text-ink-500">
-              Change these in <Link href="/ops/settings" className="font-semibold text-accent-700 underline">settings</Link>; the draft picks them up when it next saves.
+              From the warranty settings, and frozen into the proposal when it&apos;s issued. Change them in{" "}
+              <Link href="/ops/settings" className="font-semibold text-accent-700 underline">
+                settings
+              </Link>
+              .
             </p>
           </div>
           <div className="mt-5">

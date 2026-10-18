@@ -16,7 +16,7 @@ import { AnnotatedImage } from "@/components/annotate/annotated-image";
 import { Badge, Button, Card, Fieldset, Input, Select, Textarea } from "@/components/kit";
 import { money } from "@/lib/format";
 import type { EngineReference, ProposalMedia } from "@/lib/proposal-server";
-import { LinesField, NumberField, PoundsInput } from "./fields";
+import { ListEditor, NumberField, PoundsInput } from "./fields";
 import type { OptionForm, OptionPreview } from "./model";
 
 /**
@@ -77,7 +77,7 @@ export function OptionEditor({
         </div>
         <div className="mt-4 space-y-4">
           <Textarea label="Summary" rows={2} maxLength={600} value={form.summary} onChange={(e) => set("summary", e.target.value)} />
-          <LinesField label="Highlights" hint="One per line. Up to 8. Only what's true of this option." value={form.highlights} onChange={(v) => set("highlights", v.slice(0, 8))} rows={3} />
+          <ListEditor label="Highlights" hint="Up to 8. Only what's true of this option." value={form.highlights} onChange={(v) => set("highlights", v.slice(0, 8))} max={8} addLabel="Add a highlight" />
         </div>
 
         <h4 className="mt-6 text-sm font-semibold uppercase tracking-wide text-ink-500">Rooms</h4>
@@ -104,8 +104,8 @@ export function OptionEditor({
                   <div className="space-y-3">
                     <Input label="Unit, in plain English" value={edit.unitName} maxLength={120} onChange={(e) => update({ unitName: e.target.value })} />
                     <Textarea label="Why this size" rows={3} maxLength={1000} value={edit.why} onChange={(e) => update({ why: e.target.value })} />
-                    <LinesField label="Highlights" value={edit.highlights} onChange={(v) => update({ highlights: v.slice(0, 8) })} rows={3} />
-                    <Textarea label="How the pipes run" rows={2} maxLength={600} value={edit.pipeNote ?? ""} onChange={(e) => update({ pipeNote: e.target.value })} />
+                    <ListEditor label="Highlights" value={edit.highlights} onChange={(v) => update({ highlights: v.slice(0, 8) })} max={8} addLabel="Add a highlight" />
+                    <Textarea label="How the pipes run" rows={2} maxLength={600} value={edit.pipeNote ?? card.pipeNote ?? ""} onChange={(e) => update({ pipeNote: e.target.value })} />
                   </div>
                 </div>
               </li>
@@ -133,7 +133,7 @@ export function OptionEditor({
         ) : (
           <p className="text-sm text-ink-500">Pricing and costs are set by someone who can see margins.</p>
         )}
-        <div className="mt-5 rounded-2xl border border-line">
+        <div className="mt-5 overflow-hidden rounded-2xl border border-line">
           <p className="border-b border-line px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-ink-500">What the customer sees</p>
           {o.priceLines.length ? (
             <dl className="divide-y divide-line text-sm">
@@ -325,6 +325,12 @@ function Figure({ label, value, hint, valueClass = "text-ink-900" }: { label: st
   );
 }
 
+/** "3 day" → "3 days"; "11 m" and "2 each" stay as they are. */
+function unitWord(unit: string, qty: number): string {
+  if (qty === 1 || ["m", "each", "kg", "g"].includes(unit) || unit.endsWith("s")) return unit;
+  return `${unit}s`;
+}
+
 const CATEGORY_LABEL: Record<CostLine["category"], string> = {
   equipment: "Equipment",
   materials: "Materials",
@@ -422,8 +428,8 @@ function CostTable({
                     <span className="block font-medium text-ink-900">{l.label}</span>
                     <span className="text-xs text-ink-500">{CATEGORY_LABEL[l.category]}</span>
                   </td>
-                  <td className="px-3 py-2.5 text-right tabular-nums text-ink-700">
-                    {l.qty} {l.unit}
+                  <td className="whitespace-nowrap px-3 py-2.5 text-right tabular-nums text-ink-700">
+                    {l.qty} {unitWord(l.unit, l.qty)}
                   </td>
                   <td className="px-3 py-2.5">
                     <div className="flex justify-end">
@@ -485,9 +491,9 @@ function CostTable({
           <NumberField label="Qty" value={adding.qty} min={0} max={1000} step={0.5} onChange={(n) => setAdding({ ...adding, qty: n })} />
           <div>
             <p className="mb-1.5 text-sm font-semibold text-ink-900">Unit cost</p>
-            <PoundsInput compact value={adding.unitCostPence} onChange={(p) => setAdding({ ...adding, unitCostPence: p })} ariaLabel="Unit cost of the new line" placeholder="0" />
+            <PoundsInput value={adding.unitCostPence} onChange={(p) => setAdding({ ...adding, unitCostPence: p })} ariaLabel="Unit cost of the new line, ex VAT" placeholder="0" />
           </div>
-          <Button variant="secondary" onClick={addExtra} disabled={!adding.label.trim() || adding.unitCostPence === undefined}>
+          <Button variant="secondary" className="min-h-12" onClick={addExtra} disabled={!adding.label.trim() || adding.unitCostPence === undefined}>
             Add
           </Button>
         </div>

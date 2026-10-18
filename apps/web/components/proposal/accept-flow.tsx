@@ -231,25 +231,6 @@ export function AcceptFlow({
 
         {step === 4 && (
           <div className="mt-5 space-y-5">
-            <div className="rounded-2xl border border-accent-100 bg-accent-50/60 p-5">
-              <p className="text-sm font-semibold uppercase tracking-wide text-accent-700">What you&apos;re agreeing to</p>
-              <dl className="mt-3 space-y-3 text-sm leading-relaxed text-ink-900">
-                <Fact label="What you get">
-                  {option.label}: {option.roomCards.map((c) => `${c.unitName} in the ${c.roomName.toLowerCase()}`).join(", ")}.{" "}
-                  {contractTypeLabel(data.contractType)}, connected, tested, commissioned and handed over.
-                </Fact>
-                <Fact label="Total price">
-                  <span className="font-semibold">{money(total)}</span> ({data.vatNotes[option.id]?.replace(/^./, (c) => c.toLowerCase())})
-                </Fact>
-                <Fact label="Extra charges">{data.extraCharges}</Fact>
-                <Fact label="How long">
-                  {option.installDays} working day{option.installDays === 1 ? "" : "s"} at your home, on dates you choose after accepting.
-                </Fact>
-                <Fact label="What you commit to">{(data.paymentTerms[option.id] ?? []).slice(0, 2).join(" ")}</Fact>
-                <Fact label="Starting early">{earlyStart ? "Yes, you've asked us to start within your cancellation period." : "No, we'll wait until your cancellation period ends."}</Fact>
-              </dl>
-            </div>
-
             <CancellationDetails data={data} summaryLabel="Your cancellation information and model form" />
             <Checkbox
               label="I've read the cancellation information, including the model cancellation form"
@@ -272,6 +253,25 @@ export function AcceptFlow({
               {...(touched && !nameOk ? { error: "Type your first name and surname." } : {})}
               required
             />
+
+            <div className="rounded-2xl border border-accent-100 bg-accent-50/60 p-5">
+              <p className="text-sm font-semibold uppercase tracking-wide text-accent-700">What you&apos;re agreeing to</p>
+              <dl className="mt-3 space-y-3 text-sm leading-relaxed text-ink-900">
+                <Fact label="What you get">
+                  {option.label}: {option.roomCards.map((c) => `${c.unitName} in the ${c.roomName.toLowerCase()}`).join(", ")}.{" "}
+                  {contractTypeLabel(data.contractType)}, connected, tested, commissioned and handed over.
+                </Fact>
+                <Fact label="Total price">
+                  <span className="font-semibold">{money(total)}</span> ({data.vatNotes[option.id]?.replace(/^./, (c) => c.toLowerCase())})
+                </Fact>
+                <Fact label="Extra charges">{data.extraCharges}</Fact>
+                <Fact label="How long">
+                  {option.installDays} working day{option.installDays === 1 ? "" : "s"} at your home, on dates you choose after accepting.
+                </Fact>
+                <Fact label="What you commit to">{(data.paymentTerms[option.id] ?? []).slice(0, 2).join(" ")}</Fact>
+                <Fact label="Starting early">{earlyStart ? "Yes, you've asked us to start within your cancellation period." : "No, we'll wait until your cancellation period ends."}</Fact>
+              </dl>
+            </div>
 
             <div aria-live="polite" role="status" className="min-h-0">
               {error && (

@@ -2,6 +2,7 @@ import {
   PricingError,
   buildCostLines,
   defaultOptionFor,
+  pricingInputsOf,
   recomputeOption,
   type OptionContext,
   type ProposalOption,
@@ -46,7 +47,7 @@ export function optionFormFrom(o: ProposalOption): OptionForm {
     })),
     installDays: o.installDays,
     labour: { ...o.labour },
-    pricingInputs: o.pricingInputs ? JSON.parse(JSON.stringify(o.pricingInputs)) : { basis: "engine" },
+    pricingInputs: pricingInputsOf(o),
   };
 }
 

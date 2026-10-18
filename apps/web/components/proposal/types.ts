@@ -62,6 +62,7 @@ export interface ProposalPageData {
     earlyStartRequested: boolean;
     earlyStartEvidenced: boolean;
     cancellation: string;
+    confirmationSentAt?: string;
   };
   changeRequest?: string;
   declineReason?: string;

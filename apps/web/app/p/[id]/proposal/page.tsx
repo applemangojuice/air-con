@@ -138,6 +138,7 @@ export default async function CustomerProposalPage({
           earlyStartRequested: a.earlyStartRequested,
           earlyStartEvidenced: Boolean(pp.earlyStart?.evidencedAt),
           cancellation: cancellationCopy(project, { settings, today }),
+          ...(pp.confirmationSentAt ? { confirmationSentAt: pp.confirmationSentAt } : {}),
         }
       : undefined;
 

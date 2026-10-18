@@ -34,6 +34,7 @@ export function ProposalView({ data }: { data: ProposalPageData }) {
   const [optionId, setOptionId] = useState(initial);
   const [justAccepted, setJustAccepted] = useState<AcceptedSummary | null>(null);
   const [responded, setResponded] = useState<"changes" | "decline" | null>(null);
+  const [inFlow, setInFlow] = useState(false);
   const acceptedRef = useRef<HTMLDivElement>(null);
 
   const accepted: AcceptedView | null = justAccepted
@@ -63,6 +64,25 @@ export function ProposalView({ data }: { data: ProposalPageData }) {
   const option = (accepted ? visibleOptions[0] : data.options.find((o) => o.id === optionId)) ?? data.options[0]!;
   const canAccept = (state === "open" || state === "changes-requested") && !responded;
 
+  // The phone's sticky "Accept" bar steps aside while the accept or respond section is on screen.
+  useEffect(() => {
+    const targets = ["accept", "respond"].map((id) => document.getElementById(id)).filter((el): el is HTMLElement => Boolean(el));
+    if (!targets.length || typeof IntersectionObserver === "undefined") return;
+    const visible = new Set<Element>();
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (e.isIntersecting) visible.add(e.target);
+          else visible.delete(e.target);
+        }
+        setInFlow(visible.size > 0);
+      },
+      { rootMargin: "0px 0px -15% 0px" },
+    );
+    targets.forEach((t) => io.observe(t));
+    return () => io.disconnect();
+  }, [data.state, responded, justAccepted]);
+
   // The first customer view, once per browser (the server also only records it once).
   useEffect(() => {
     if (data.viewer !== "customer" || (data.state !== "open" && data.state !== "changes-requested")) return;
@@ -86,12 +106,15 @@ export function ProposalView({ data }: { data: ProposalPageData }) {
 
   function onAccepted(summary: AcceptedSummary) {
     setJustAccepted(summary);
-    requestAnimationFrame(() => {
-      acceptedRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-      acceptedRef.current?.querySelector<HTMLElement>("#accepted-h")?.focus();
-    });
     router.refresh();
   }
+
+  // Once the confirmation is on screen, take them (and their screen reader) to it.
+  useEffect(() => {
+    if (!justAccepted) return;
+    acceptedRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    acceptedRef.current?.querySelector<HTMLElement>("#accepted-h")?.focus({ preventScroll: true });
+  }, [justAccepted]);
 
   const total = option.pricing.totalPence;
   const aboveInstant = data.instantPricePence > 0 && total > data.instantPricePence && data.increaseReason;
@@ -111,11 +134,11 @@ export function ProposalView({ data }: { data: ProposalPageData }) {
         </p>
       )}
 
-      <div ref={acceptedRef} className="scroll-mt-6">
-        {accepted && (
+      {accepted && (
+        <div ref={acceptedRef} className="scroll-mt-6">
           <AcceptedPanel view={accepted} projectId={data.projectId} firstName={data.firstName} phone={data.company.phone} justNow={Boolean(justAccepted)} />
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Summary */}
       <section aria-labelledby="summary-h" className="warm-gradient overflow-hidden rounded-3xl border border-line">
@@ -140,7 +163,7 @@ export function ProposalView({ data }: { data: ProposalPageData }) {
                   return (
                     <label
                       key={o.id}
-                      className={`cursor-pointer rounded-2xl border px-4 py-3 transition ${
+                      className={`cursor-pointer rounded-2xl border px-4 py-3 transition focus-within:ring-2 focus-within:ring-accent-500 ${
                         on ? "border-ink-900 bg-white shadow-sm ring-1 ring-ink-900" : "border-line bg-white/70 hover:bg-white"
                       }`}
                     >
@@ -280,7 +303,7 @@ export function ProposalView({ data }: { data: ProposalPageData }) {
       </section>
 
       {/* The one next action, always in reach on a phone. */}
-      {canAccept && (
+      {canAccept && !inFlow && (
         <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-white/95 px-4 py-3 backdrop-blur sm:hidden" style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}>
           <div className="mx-auto flex max-w-3xl items-center justify-between gap-3">
             <div className="min-w-0">

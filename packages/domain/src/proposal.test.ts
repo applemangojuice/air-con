@@ -16,6 +16,7 @@ import {
   isFullName,
   isProposalExpired,
   pipeNoteFor,
+  pricingInputsOf,
   proposalDocumentContent,
   proposalIssueErrors,
   recomputeOption,
@@ -451,4 +452,36 @@ test("withoutDiscountLine: an older record's discount line is folded in, so the 
   assert.deepEqual(withoutDiscountLine(plain, 100), plain);
   const safe = customerSafeProposal({ ...issued(), options: [{ ...issued().options[0]!, priceLines: lines, pricing: { ...issued().options[0]!.pricing, netPence: 645_150, totalPence: 774_180, taxPence: 129_030 } }] });
   assert.equal(safe.options[0]!.priceLines.reduce((a, l) => a + l.amountPence, 0), 774_180);
+});
+
+test("pricingInputsOf: stored inputs win; older records read back to the same basis and discount", () => {
+  const p = healthy();
+  assert.deepEqual(pricingInputsOf(p.options[0]!), { basis: "cost-plus", targetMarginPct: 40 });
+  const old = recomputeOption(CTX, { ...p.options[0]!, pricingInputs: { basis: "cost-plus", targetMarginPct: 30, discountCode: "PILOT15" } });
+  const { pricingInputs: _gone, ...legacy } = old;
+  const derived = pricingInputsOf(legacy);
+  assert.equal(derived.basis, "cost-plus");
+  assert.equal(derived.discountCode, "PILOT15");
+  assert.ok(derived.targetMarginPct! >= 29 && derived.targetMarginPct! <= 30);
+  const again = recomputeOption(CTX, { ...legacy, pricingInputs: derived });
+  assert.ok(Math.abs(again.pricing.netPence - old.pricing.netPence) <= 2_000, "reprices to about the same figure");
+  const manual = pricingInputsOf({ pricing: { ...old.pricing, pricingBasis: "manual", listNetPence: 400_000, manualReason: "DEMO", discount: undefined } });
+  assert.deepEqual(manual, { basis: "manual", manualNetPence: 400_000, manualReason: "DEMO" });
+  const custom = pricingInputsOf({ pricing: { ...old.pricing, discount: { code: "PILOTCUSTOM", label: "x", reason: "Neighbour (DEMO)", amountPence: 10_000 } } });
+  assert.equal(custom.customDiscountPence, 10_000);
+  assert.equal(custom.discountReason, "Neighbour (DEMO)");
+  const revised = reviseProposal({ ...p, options: [legacy] }, "prop-9", NOW);
+  assert.equal(revised.options[0]!.pricingInputs?.basis, "cost-plus", "a revision keeps how it was priced");
+});
+
+test("price lines: whole pounds for every system but the last, which takes the rounding", () => {
+  const twoSystems: DesignRecord = {
+    ...DESIGN,
+    variants: [{ ...variant("standard"), systems: [system("sys1", "single", ["bed"]), system("sys2", "single", ["living"])] }],
+  };
+  const o = defaultOptionFor({ ...CTX, design: twoSystems }, twoSystems.variants[0]!);
+  const systems = o.priceLines.filter((l) => l.kind === "system");
+  assert.equal(systems.length, 2);
+  assert.equal(systems[0]!.amountPence % 100, 0);
+  assert.equal(systems.reduce((a, l) => a + l.amountPence, 0), o.pricing.netPence);
 });

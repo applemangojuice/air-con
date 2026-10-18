@@ -2,6 +2,7 @@ import type { CatalogueItem } from "./catalogue.ts";
 import {
   PricingError,
   buildCostLines,
+  roundToPound,
   defaultLabourPlan,
   priceOption,
   type AccessEquipment,
@@ -369,7 +370,7 @@ export function priceLinesFor(ctx: OptionContext, variant: DesignVariant, pricin
   const total = share.reduce((a, b) => a + b, 0) || 1;
   let left = pricing.netPence;
   const lines: PriceLine[] = systems.map((s, i) => {
-    const amount = i === systems.length - 1 ? left : Math.round((pricing.netPence * share[i]!) / total);
+    const amount = i === systems.length - 1 ? left : roundToPound((pricing.netPence * share[i]!) / total);
     left -= amount;
     const names = s.roomIds.map((id) => roomName.get(id) ?? "Room");
     const outdoor = byId.get(s.outdoorItemId);
@@ -703,7 +704,42 @@ export function reviseProposal(p: ProposalRecord, newId: string, now: string): P
     taxOverride: _tax,
     ...rest
   } = src;
-  return { ...rest, id: newId, version: p.version + 1, status: "draft", createdAt: now, draftRevision: 0 };
+  return {
+    ...rest,
+    options: rest.options.map((o) => ({ ...o, pricingInputs: pricingInputsOf(o) })),
+    id: newId,
+    version: p.version + 1,
+    status: "draft",
+    createdAt: now,
+    draftRevision: 0,
+  };
+}
+
+/**
+ * The inputs an option was priced with: stored ones, or (for records made
+ * before inputs were kept) the nearest equivalent read back from its
+ * pricing, so a revision reprices to the same figures rather than jumping
+ * to another basis.
+ */
+export function pricingInputsOf(o: Pick<ProposalOption, "pricing" | "pricingInputs">): PricingInputs {
+  if (o.pricingInputs) return clone(o.pricingInputs);
+  const pr = o.pricing;
+  const out: PricingInputs = { basis: pr.pricingBasis };
+  if (pr.pricingBasis === "manual") {
+    out.manualNetPence = pr.listNetPence;
+    if (pr.manualReason) out.manualReason = pr.manualReason;
+  }
+  if (pr.pricingBasis === "cost-plus" && pr.listNetPence > 0 && pr.costPence > 0) {
+    // The margin the list price gives on these costs, rounded down so the price doesn't creep up.
+    out.targetMarginPct = Math.max(0, Math.floor(((pr.listNetPence - pr.costPence) / pr.listNetPence) * 100));
+  }
+  if (pr.discount) {
+    out.discountCode = pr.discount.code === "CUSTOM" ? undefined : pr.discount.code;
+    out.discountReason = pr.discount.reason;
+    if (pr.discount.code === "CUSTOM" || pr.discount.code.toUpperCase() === "PILOTCUSTOM") out.customDiscountPence = pr.discount.amountPence;
+    if (out.discountCode === undefined) delete out.discountCode;
+  }
+  return out;
 }
 
 /**

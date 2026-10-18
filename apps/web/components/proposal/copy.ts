@@ -1,4 +1,4 @@
-import { RESCHEDULE_FEES, TAX_CODES, type ContractType, type OptionPricing, type PilotSettings } from "@aircon/domain";
+import { RESCHEDULE_FEES, TAX_CODES, depositPence, type ContractType, type OptionPricing, type PilotSettings } from "@aircon/domain";
 import { fmtDate, money } from "../../lib/format.ts";
 
 /**
@@ -21,12 +21,22 @@ const METHOD: Record<PilotSettings["payments"]["methods"][number], string> = {
   card: "card",
 };
 
+/** The deposit F5's invoices will ask for; the same rule worked out here until money.ts is in. */
+function depositFor(totalPence: number, settings: PilotSettings): number {
+  try {
+    // INTEGRATION(F5): depositPence is F5's; when it lands the proposal quotes exactly what the deposit invoice charges.
+    return depositPence(totalPence, settings);
+  } catch {
+    return Math.round((totalPence * settings.payments.depositPct) / 100);
+  }
+}
+
 /** Deposit, balance and how to pay, for one option's total. */
 export function paymentTerms(totalPence: number, settings: PilotSettings): string[] {
   const p = settings.payments;
   const out: string[] = [];
   if (p.depositPct > 0) {
-    const deposit = Math.round((totalPence * p.depositPct) / 100);
+    const deposit = depositFor(totalPence, settings);
     out.push(
       `A ${p.depositPct}% deposit of ${money(deposit)}, ${p.depositTiming === "on-acceptance" ? "when you accept" : "before we order your equipment"}.`,
     );
