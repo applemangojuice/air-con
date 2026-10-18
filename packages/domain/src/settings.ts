@@ -60,8 +60,29 @@ export interface PilotSettings {
     tradingName: string;
     companyNumber?: string;
     registeredAddress?: string;
+    /**
+     * Where we're established, for the pre-contract information (CCR Sch 2(c))
+     * and the cancellation instructions. A real street address, not a PO box,
+     * and not necessarily the registered office. "" until set: proposals can't
+     * be issued without it (schedule2Missing).
+     */
+    geographicAddress: string;
     phone: string;
     email: string;
+    /** How a customer complains and what we do then (CCR Sch 2(k)). "" until set. */
+    complaintsProcess: string;
+    /**
+     * The out-of-court dispute scheme we're bound to use, and how to reach it
+     * (CCR Sch 2(x), DMCC s308). Absent when there isn't one.
+     */
+    adr?: string;
+    /** Our workmanship guarantee's conditions and how to claim (CCR Sch 2(q)), in plain words. */
+    workmanshipGuarantee?: string;
+    /**
+     * Our page on an independent review platform (https only). The review
+     * request is only ever sent while this is set.
+     */
+    reviewUrl?: string;
     vatNumber?: string;
     fgasCompanyCert?: { body: string; number: string; expiresOn?: string };
     insurance?: { provider: string; policy: string; expiresOn?: string };
@@ -116,8 +137,11 @@ export const DEFAULT_SETTINGS: PilotSettings = {
   company: {
     legalName: "Dang It's Hot Ltd",
     tradingName: "Dang, It's Hot",
+    // Business decisions, never guessed: proposals stay blocked until set.
+    geographicAddress: "",
     phone: "0800 000 0000",
     email: "hello@dang.ac",
+    complaintsProcess: "",
   },
   tax: {
     vatRegistered: false,
@@ -263,6 +287,17 @@ function sanitise(s: PilotSettings): PilotSettings {
   if (s.warranty.manufacturerSummary !== null && typeof s.warranty.manufacturerSummary !== "string") {
     s.warranty.manufacturerSummary = null;
   }
+  // Optional text the defaults leave out passes through mergeValue unchecked:
+  // keep a real, non-blank string or nothing (a stored null means "not set").
+  const company = s.company as unknown as Record<string, unknown>;
+  for (const key of ["adr", "workmanshipGuarantee", "reviewUrl"] as const) {
+    const v = company[key];
+    if (typeof v !== "string" || !v.trim()) delete company[key];
+  }
+  // The review link goes in a customer email button: http(s) only.
+  if (s.company.reviewUrl !== undefined && !/^https?:\/\/[^\s/]+\.[^\s]+$/i.test(s.company.reviewUrl.trim())) {
+    delete s.company.reviewUrl;
+  }
   return s;
 }
 
@@ -299,4 +334,30 @@ export function isInServiceArea(settings: PilotSettings, postcode: string): bool
 export function effectiveTaxCode(settings: PilotSettings): TaxCodeId {
   if (!settings.tax.vatRegistered) return "outside-scope";
   return settings.tax.defaultTaxCode === "outside-scope" ? "standard-20" : settings.tax.defaultTaxCode;
+}
+
+/**
+ * What the pre-contract information (CCR 2013 Schedule 2) still lacks from
+ * settings, in plain words, or [] when it's all there. Proposal issue is
+ * blocked until it's empty: the issue email is the durable medium that
+ * carries this information, so it can't go out with gaps.
+ *
+ * A guarantee statement may honestly say "none offered", but it has to say
+ * something: no workmanship years (0 counts as an explicit "none") and no
+ * manufacturer summary is missing. The ADR line is "where applicable", so
+ * it's never required here.
+ */
+export function schedule2Missing(settings: PilotSettings): string[] {
+  const c = settings.company;
+  const blank = (v: string | null | undefined) => !v || !v.trim();
+  const missing: string[] = [];
+  if (blank(c.tradingName)) missing.push("trading name");
+  if (blank(c.geographicAddress)) missing.push("geographic address");
+  if (blank(c.phone)) missing.push("phone");
+  if (blank(c.email)) missing.push("email");
+  if (blank(c.complaintsProcess)) missing.push("complaints process");
+  if (settings.warranty.workmanshipYears === null && blank(settings.warranty.manufacturerSummary)) {
+    missing.push("guarantee statement (or explicit 'none')");
+  }
+  return missing;
 }

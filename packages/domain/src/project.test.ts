@@ -2,13 +2,19 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { generateQuote } from "./pricing.ts";
 import {
+  CANCELLATION_RULE_STATUS,
+  EARLY_START_WORDING_VERSION,
+  REVIEW_REQUEST_DAYS,
   applyProjectAction,
   blockersFor,
+  cancellationCopy,
+  cancellationStatus,
   createProject,
   currentStage,
   customerNextAction,
   daysBetween,
   earliestInstallStart,
+  earlyStartWording,
   isLegacySnapshot,
   isGatePassed,
   isStageComplete,
@@ -18,18 +24,22 @@ import {
   projectTimeline,
   readiness,
   rescheduleFeeGbp,
+  reviewRequestDue,
+  seasonalCheck,
+  seasonalCheckDue,
   stageInfo,
   stageState,
   PROJECT_STAGES,
   STAGE_INFO,
   type Blocker,
+  type ContractType,
   type GateId,
   type Project,
   type ProjectAction,
   type ReadinessContext,
 } from "./project.ts";
 import { applyProjectActionV1, createProjectV1, type ProjectActionV1, type ProjectV1 } from "./project-v1.ts";
-import { DEFAULT_SETTINGS, mergeSettings } from "./settings.ts";
+import { DEFAULT_SETTINGS, mergeSettings, type PilotSettings } from "./settings.ts";
 import type { StaffMember } from "./staff.ts";
 import type { Survey } from "./types.ts";
 
@@ -97,10 +107,27 @@ const SPARKY = staff({
   qualifications: [{ kind: "part-p", reference: "SCHEME-123", expiresOn: "2027-06-30" }],
 });
 
+/** A business that has filled in everything the pre-contract information needs (DEMO details). */
+const READY_COMPANY = {
+  geographicAddress: "DEMO, 1 Example Street, London SW16 2BE",
+  complaintsProcess: "DEMO: tell us by phone or email; we reply within two working days.",
+};
+const READY_WARRANTY = { workmanshipYears: 0, manufacturerSummary: "DEMO: the manufacturer's warranty, registered by us." };
+
+/** Settings for a business ready to issue proposals, with `over` on top (company and warranty merged, not replaced). */
+function ready(over: { company?: Record<string, unknown>; warranty?: Record<string, unknown>; [k: string]: unknown } = {}): PilotSettings {
+  return mergeSettings({
+    ...over,
+    company: { ...READY_COMPANY, ...(over.company ?? {}) },
+    warranty: { ...READY_WARRANTY, ...(over.warranty ?? {}) },
+  });
+}
+const READY = ready();
+
 function ctx(today: string, over: Partial<ReadinessContext> = {}): ReadinessContext {
   return {
     today: today.slice(0, 10),
-    settings: DEFAULT_SETTINGS,
+    settings: READY,
     surveyCompleteness: { pct: 100, missing: [] },
     design: { status: "approved", compatibilityErrors: [] },
     proposalCheck: { belowMinMargin: false, marginOverride: false, taxConfirmed: true, taxOverride: false, expired: false },
@@ -134,6 +161,16 @@ function fresh(overrides: Partial<Survey> = {}, extra: { surveyFeeGbp?: number }
 
 type Step = [name: string, action: ProjectAction, now: string, over?: Partial<ReadinessContext>];
 
+/** Accepting the proposal without an early start; the journey asks for one (supply-and-install needs it). */
+const ACCEPT: ProjectAction = {
+  type: "proposal-accepted",
+  proposalId: "pr-1",
+  version: 1,
+  optionLabel: "Standard",
+  contractTotalPence: 645_000,
+  earlyStartRequested: false,
+};
+
 const JOURNEY: Step[] = [
   ["book-survey", { type: "book-survey", scheduledFor: T.slot, mode: "in-person" }, T.book],
   ["assign-surveyor", { type: "assign-surveyor", staffId: "s-sv", name: "Sam Survey" }, T.book, { actor: ADMIN }],
@@ -142,14 +179,18 @@ const JOURNEY: Step[] = [
   ["survey-submitted", { type: "survey-submitted", surveyRecordId: "sr-1" }, T.surveyDone, { actor: SURVEYOR }],
   ["design-updated", { type: "design-updated", designId: "d-1", version: 1, status: "in-review" }, T.design, { actor: SURVEYOR }],
   ["design-approved", { type: "design-approved", designId: "d-1", version: 1, by: "Tess Lead" }, T.design, { actor: TECH_LEAD }],
+  ["documents-consent-recorded", { type: "documents-consent-recorded", channel: "portal" }, "2026-10-24T10:00:00.000Z"],
   ["proposal-issued", { type: "proposal-issued", proposalId: "pr-1", version: 1, validUntil: "2026-11-25", optionCount: 2 }, T.issue, { actor: ADMIN }],
   ["proposal-viewed", { type: "proposal-viewed", proposalId: "pr-1" }, "2026-10-26T19:00:00.000Z"],
-  [
-    "proposal-accepted",
-    { type: "proposal-accepted", proposalId: "pr-1", version: 1, optionLabel: "Standard", contractTotalPence: 645_000, earlyStartRequested: false },
-    T.accept,
-  ],
+  ["proposal-accepted", { ...ACCEPT, earlyStartRequested: true } as ProjectAction, T.accept],
+  ["contract-confirmation-sent", { type: "contract-confirmation-sent", messageId: "msg-1" }, "2026-10-27T18:01:00.000Z"],
   ["install-dates-set", { type: "install-dates-set", startDate: INSTALL_DATES[0]!, dates: INSTALL_DATES }, T.dates],
+  [
+    "early-start-evidenced",
+    { type: "early-start-evidenced", channel: "email", evidenceRef: "inbound-msg-7", by: "Ada Admin" },
+    "2026-10-28T11:00:00.000Z",
+    { actor: ADMIN },
+  ],
   [
     "crew-assigned",
     {
@@ -203,11 +244,32 @@ function step(p: Project, action: ProjectAction, now: string, over: Partial<Read
   return r.project;
 }
 
-/** The project just after the named journey step (or the whole journey). */
-function walk(until?: string): Project {
+interface WalkOptions {
+  contractType?: ContractType;
+  /** Tick "start early" at acceptance (and record the email evidence later). Default true. */
+  early?: boolean;
+}
+
+/** An install-only contract with no early start: the period runs 14 days from acceptance (to Tue 10 Nov). */
+const INSTALL_ONLY: WalkOptions = { contractType: "install-only", early: false };
+
+/**
+ * The project just after the named journey step (or the whole journey). The
+ * default is the realistic supply-and-install job with an evidenced early
+ * start; `opts` changes the contract type and the early-start choice.
+ */
+function walk(until?: string, opts: WalkOptions = {}): Project {
+  const early = opts.early ?? true;
   let p = fresh();
   for (const [name, action, now, over] of JOURNEY) {
-    p = step(p, action, now, over);
+    let a = action;
+    if (a.type === "proposal-issued" && opts.contractType) a = { ...a, contractType: opts.contractType };
+    if (a.type === "proposal-accepted") a = { ...a, earlyStartRequested: early };
+    if (a.type === "early-start-evidenced" && !early) {
+      if (name === until) return p;
+      continue;
+    }
+    p = step(p, a, now, over);
     if (name === until) return p;
   }
   assert.ok(!until, `unknown step ${until}`);
@@ -233,7 +295,24 @@ test("the whole pilot journey runs price → aftercare and closes", () => {
   assert.equal(p.schemaVersion, 2);
   for (const stage of PROJECT_STAGES) assert.equal(stageState(p, stage), "complete", stage);
   assert.equal(nextGate(p), null);
-  assert.equal(p.proposal.cancellationEndsOn, "2026-11-10"); // accepted 27 Oct + 14 days
+  // Supply-and-install: the period ran from delivery (13 Nov + 14 days), and
+  // the install started inside it on the customer's emailed request.
+  assert.equal(p.proposal.contractType, "supply-and-install");
+  assert.equal(p.proposal.goodsReceivedOn, "2026-11-13");
+  assert.equal(p.proposal.cancellationEndsOn, "2026-11-27");
+  assert.deepEqual(p.proposal.documentsByEmailConsent, { at: "2026-10-24T10:00:00.000Z", channel: "portal" });
+  assert.equal(p.proposal.preContractInfoSentAt, T.issue);
+  assert.equal(p.proposal.confirmationSentAt, "2026-10-27T18:01:00.000Z");
+  assert.deepEqual(p.proposal.earlyStart, {
+    requested: true,
+    requestedAt: T.accept,
+    channel: "email",
+    evidenceRef: "inbound-msg-7",
+    evidencedAt: "2026-10-28T11:00:00.000Z",
+    recordedBy: "Ada Admin",
+    wordingVersion: EARLY_START_WORDING_VERSION,
+  });
+  assert.equal(p.proposal.earlyStartRequested, true);
   assert.equal(p.money.contractTotalPence, 645_000);
   assert.equal(p.money.paidPence, 645_000);
   assert.equal(p.handover.warrantyDueOn, "2026-12-19"); // handover + 30 days
@@ -287,7 +366,7 @@ test("money labels format pence by hand, the same in every runtime", () => {
 test("reducer never mutates its input", () => {
   const p = walk("proposal-issued");
   const before = JSON.stringify(p);
-  apply(p, JOURNEY[9]![1], T.accept);
+  apply(p, ACCEPT, T.accept);
   apply(p, { type: "note", text: "hello" }, T.accept);
   assert.equal(JSON.stringify(p), before);
 });
@@ -395,23 +474,23 @@ test("design-approved needs a qualified, permitted tech lead", () => {
 /* ------------------------------------------------------------------ */
 
 test("proposal-issue gate: design sign-off, compatibility, tax, margin; terms only warn", () => {
-  const p = walk("design-updated");
+  const p = step(walk("design-updated"), { type: "documents-consent-recorded", channel: "portal" }, T.design);
   const c = (over: Partial<ReadinessContext>) => ctx(T.issue, over);
   assert.deepEqual(codes(blockersFor(p, c({ design: { status: "in-review", compatibilityErrors: [] } }), "proposal-issue")), [
     "design-not-approved",
     "terms-unreviewed",
   ]);
-  const unsigned = mergeSettings({ pricing: { requireEngineerSignoff: false } });
+  const unsigned = ready({ pricing: { requireEngineerSignoff: false } });
   assert.ok(!codes(blockersFor(p, c({ settings: unsigned, design: { status: "draft", compatibilityErrors: [] } }), "proposal-issue")).includes("design-not-approved"));
 
   const compat = blockersFor(p, c({ design: { status: "approved", compatibilityErrors: ["Outdoor unit can't take three heads"] } }), "proposal-issue");
   assert.equal(severityOf(compat, "design-compatibility:1"), "block");
 
-  const vat = mergeSettings({ tax: { vatRegistered: true, defaultTaxCode: "zero-esm" } });
+  const vat = ready({ tax: { vatRegistered: true, defaultTaxCode: "zero-esm" } });
   const noTax = { belowMinMargin: false, marginOverride: false, taxConfirmed: false, taxOverride: false, expired: false };
   assert.equal(severityOf(blockersFor(p, c({ settings: vat, proposalCheck: noTax }), "proposal-issue"), "tax-unconfirmed"), "block");
   assert.equal(severityOf(blockersFor(p, c({ settings: vat, proposalCheck: { ...noTax, taxOverride: true } }), "proposal-issue"), "tax-unconfirmed"), undefined);
-  const confirmed = mergeSettings({ tax: { vatRegistered: true, accountantConfirmed: true } });
+  const confirmed = ready({ tax: { vatRegistered: true, accountantConfirmed: true } });
   assert.equal(severityOf(blockersFor(p, c({ settings: confirmed, proposalCheck: noTax }), "proposal-issue"), "tax-unconfirmed"), undefined);
 
   const low = { ...noTax, taxConfirmed: true, belowMinMargin: true };
@@ -419,13 +498,62 @@ test("proposal-issue gate: design sign-off, compatibility, tax, margin; terms on
   assert.equal(severityOf(blockersFor(p, c({ proposalCheck: { ...low, marginOverride: true } }), "proposal-issue"), "margin-below-minimum"), undefined);
   assert.equal(severityOf(blockersFor(p, c({ proposalCheck: undefined }), "proposal-issue"), "proposal-not-drafted"), "block");
 
-  const reviewed = mergeSettings({ legal: { termsReviewed: true, cancellationReviewed: true } });
-  assert.deepEqual(blockersFor(walk("design-approved"), c({ settings: reviewed }), "proposal-issue"), []);
+  const reviewed = ready({ legal: { termsReviewed: true, cancellationReviewed: true } });
+  assert.deepEqual(blockersFor(walk("documents-consent-recorded"), c({ settings: reviewed }), "proposal-issue"), []);
   assert.equal(severityOf(blockersFor(walk("survey-started"), c({}), "proposal-issue"), "survey-not-submitted"), "block");
 });
 
+test("proposal-issue gate: email consent, an email address, and every Schedule 2 item in settings", () => {
+  const c = (over: Partial<ReadinessContext>) => ctx(T.issue, over);
+  const noConsent = blockersFor(walk("design-approved"), c({}), "proposal-issue").find((b) => b.code === "documents-consent-missing");
+  assert.deepEqual(
+    noConsent && { severity: noConsent.severity, owner: noConsent.owner, action: noConsent.action },
+    { severity: "block", owner: "customer", action: "Ask the customer to confirm they're happy to get documents by email" },
+  );
+  const consented = walk("documents-consent-recorded");
+  assert.ok(!codes(blockersFor(consented, c({}), "proposal-issue")).includes("documents-consent-missing"));
+
+  // The defaults hold no address, complaints process or guarantee statement: issue is blocked until they're set.
+  const defaults = blockersFor(consented, c({ settings: DEFAULT_SETTINGS }), "proposal-issue").find((b) => b.code === "schedule2-incomplete");
+  assert.equal(defaults?.severity, "block");
+  assert.equal(defaults?.owner, "admin");
+  assert.match(defaults!.message, /geographic address, complaints process, guarantee statement \(or explicit 'none'\)/);
+  const noPhone = blockersFor(consented, c({ settings: ready({ company: { phone: " " } }) }), "proposal-issue");
+  assert.match(noPhone.find((b) => b.code === "schedule2-incomplete")!.message, /: phone\.$/);
+
+  const noEmail = step(consented, { type: "set-customer-contact", email: "" }, T.design, { actor: ADMIN });
+  assert.equal(severityOf(blockersFor(noEmail, c({}), "proposal-issue"), "no-customer-email"), "block");
+  const r = refuses(walk("design-approved"), JOURNEY.find(([n]) => n === "proposal-issued")![1], T.issue, { actor: ADMIN }, /agreed to get the contract documents by email/);
+  assert.ok(!r.ok && r.blockers!.some((b) => b.code === "documents-consent-missing"));
+});
+
+test("documents-consent-recorded: once, by the customer or ops, before acceptance", () => {
+  const p = walk("documents-consent-recorded");
+  const ev = p.events.at(-1)!;
+  assert.equal(ev.type, "documents-consent-recorded");
+  assert.equal(ev.actor, "customer");
+  assert.equal(ev.internal, undefined);
+  const again = step(p, { type: "documents-consent-recorded", channel: "in-person" }, T.issue, { actor: ADMIN });
+  assert.deepEqual(again.proposal.documentsByEmailConsent, p.proposal.documentsByEmailConsent); // the first agreement stands
+  assert.equal(again.events.length, p.events.length);
+  const byOps = step(walk("design-approved"), { type: "documents-consent-recorded", channel: "in-person" }, T.design, { actor: ADMIN });
+  assert.deepEqual(byOps.proposal.documentsByEmailConsent, { at: T.design, channel: "in-person" });
+  assert.equal(byOps.events.at(-1)!.actor, "ops");
+  refuses(walk("design-approved"), { type: "documents-consent-recorded", channel: "fax" } as never, T.design, {}, /How did the customer agree/);
+  refuses(walk("proposal-accepted"), { type: "documents-consent-recorded", channel: "portal" }, T.dates, {}, /already in place/);
+  // It survives a re-issue: consent is the customer's, not the version's.
+  const revised = step(
+    step(walk("proposal-viewed"), { type: "proposal-changes-requested", text: "Other wall" }, T.accept),
+    { type: "proposal-issued", proposalId: "pr-2", version: 2, validUntil: "2026-11-30", optionCount: 1 },
+    T.accept,
+    { actor: ADMIN },
+  );
+  assert.deepEqual(revised.proposal.documentsByEmailConsent, p.proposal.documentsByEmailConsent);
+  assert.equal(revised.proposal.preContractInfoSentAt, T.accept);
+});
+
 test("proposal-issued: gate clear, valid date, not after acceptance; warnings don't block", () => {
-  const p = walk("design-approved");
+  const p = walk("documents-consent-recorded");
   const issue: ProjectAction = { type: "proposal-issued", proposalId: "pr-1", version: 1, validUntil: "2026-11-25", optionCount: 2 };
   const r = refuses(p, issue, T.issue, { proposalCheck: { belowMinMargin: true, marginOverride: false, taxConfirmed: true, taxOverride: false, expired: false } }, /minimum/);
   assert.ok(!r.ok && r.blockers?.some((b) => b.code === "terms-unreviewed" && b.severity === "warn"));
@@ -433,6 +561,10 @@ test("proposal-issued: gate clear, valid date, not after acceptance; warnings do
   refuses(p, { ...issue, optionCount: 0 }, T.issue, {}, /at least one option/);
   const issued = step(p, issue, T.issue, { actor: ADMIN }); // terms unreviewed: warn only
   assert.equal(issued.proposal.status, "issued");
+  assert.equal(issued.proposal.contractType, "supply-and-install"); // the default
+  assert.equal(issued.proposal.preContractInfoSentAt, T.issue); // the issue email is the durable medium
+  assert.equal(step(p, { ...issue, contractType: "install-only" }, T.issue, { actor: ADMIN }).proposal.contractType, "install-only");
+  refuses(p, { ...issue, contractType: "loan" } as never, T.issue, {}, /Unknown contract type/);
   refuses(walk("proposal-accepted"), { ...issue, proposalId: "pr-2", version: 2 }, T.dates, {}, /variation/);
 });
 
@@ -470,7 +602,7 @@ test("changes requested, declined and expired all need an issued proposal", () =
 });
 
 test("proposal-accepted: issued, in date, current version; starts the cancellation clock", () => {
-  const accept = JOURNEY[9]![1];
+  const accept = ACCEPT;
   refuses(walk("design-approved"), accept, T.accept, {}, /no issued proposal/);
   const issued = walk("proposal-viewed");
   const late = refuses(issued, accept, "2026-11-26T10:00:00.000Z", {}, /valid until Wed 25 Nov/);
@@ -482,9 +614,53 @@ test("proposal-accepted: issued, in date, current version; starts the cancellati
   const accepted = step(changes, accept, T.accept);
   assert.equal(accepted.proposal.status, "accepted");
   assert.equal(accepted.proposal.changeRequest, undefined);
-  const longer = step(issued, accept, T.accept, { settings: mergeSettings({ scheduling: { cancellationDays: 21 } }) });
-  assert.equal(longer.proposal.cancellationEndsOn, "2026-11-17");
   refuses(accepted, accept, T.accept, {}, /already accepted/);
+
+  // Supply-and-install: a sales contract, so no end date until the goods arrive.
+  assert.equal(accepted.proposal.cancellationEndsOn, undefined);
+  assert.deepEqual(accepted.proposal.earlyStart, { requested: false, wordingVersion: EARLY_START_WORDING_VERSION });
+  assert.equal(accepted.proposal.earlyStartRequested, false);
+  assert.deepEqual(cancellationStatus(accepted, "2026-12-31", READY), { ended: false, basis: "goods-delivery", earlyStartEvidenced: false });
+
+  // Install-only: a service contract, 14 days from acceptance.
+  const serviceIssued = walk("proposal-viewed", INSTALL_ONLY);
+  assert.equal(step(serviceIssued, accept, T.accept).proposal.cancellationEndsOn, "2026-11-10");
+  const longer = step(serviceIssued, accept, T.accept, { settings: mergeSettings({ scheduling: { cancellationDays: 21 } }) });
+  assert.equal(longer.proposal.cancellationEndsOn, "2026-11-17");
+
+  const early = step(issued, { ...accept, earlyStartRequested: true, earlyStartWordingVersion: "early-start-v0" } as ProjectAction, T.accept);
+  assert.deepEqual(early.proposal.earlyStart, { requested: true, requestedAt: T.accept, channel: "portal", wordingVersion: "early-start-v0" });
+  assert.equal(early.proposal.earlyStartRequested, true);
+});
+
+test("contract-confirmation-sent: accepted only, the first send counts, allowed after close", () => {
+  refuses(walk("proposal-viewed"), { type: "contract-confirmation-sent" }, T.accept, {}, /no accepted contract/);
+  const p = walk("contract-confirmation-sent");
+  const ev = p.events.at(-1)!;
+  assert.deepEqual([ev.type, ev.actor, ev.internal], ["contract-confirmation-sent", "system", true]);
+  const again = step(p, { type: "contract-confirmation-sent" }, "2026-10-29T10:00:00.000Z");
+  assert.equal(again.proposal.confirmationSentAt, "2026-10-27T18:01:00.000Z");
+  assert.equal(again.events.length, p.events.length);
+  const demo = step(walk("proposal-accepted"), { type: "contract-confirmation-sent", demo: true }, T.accept);
+  assert.match(demo.events.at(-1)!.label, /demo mode \(stored, not delivered\)/);
+  const closed = step(walk("proposal-accepted"), { type: "project-closed", reason: "cancelled" }, T.accept, { actor: ADMIN });
+  assert.ok(step(closed, { type: "contract-confirmation-sent" }, T.accept).proposal.confirmationSentAt);
+});
+
+test("early-start-evidenced: an accepted early-start request, a reference, a signed-in staff member, once", () => {
+  const p = walk("install-dates-set");
+  const evidence: ProjectAction = { type: "early-start-evidenced", channel: "paper", evidenceRef: "media-form-1", by: "typed name" };
+  refuses(walk("proposal-viewed"), evidence, T.dates, { actor: ADMIN }, /no accepted contract/);
+  refuses(walk("install-dates-set", { early: false }), evidence, T.dates, { actor: ADMIN }, /didn't ask to start early/);
+  refuses(p, { ...evidence, evidenceRef: "  " } as ProjectAction, T.dates, { actor: ADMIN }, /reference/);
+  refuses(p, { ...evidence, channel: "portal" } as never, T.dates, { actor: ADMIN }, /email or a signed form/);
+  refuses(p, evidence, T.dates, {}, /signed-in staff member/);
+  const done = step(p, evidence, T.dates, { actor: ADMIN });
+  assert.equal(done.proposal.earlyStart?.recordedBy, "Ada Admin"); // the verified person, not the typed name
+  assert.equal(done.proposal.earlyStart?.channel, "paper");
+  assert.equal(done.proposal.earlyStart?.requestedAt, T.accept); // when they first asked
+  assert.match(done.events.at(-1)!.label, /signed form asking us to start early/);
+  refuses(done, evidence, T.dates, { actor: ADMIN }, /already on file/);
 });
 
 /* ------------------------------------------------------------------ */
@@ -494,7 +670,7 @@ test("proposal-accepted: issued, in date, current version; starts the cancellati
 test("install-dates-set: accepted, working days, right length, lead time, after cancellation", () => {
   const set = (dates: string[]): ProjectAction => ({ type: "install-dates-set", startDate: dates[0]!, dates });
   refuses(walk("proposal-viewed"), set(INSTALL_DATES), T.dates, {}, /Accept your proposal/);
-  const p = walk("proposal-accepted");
+  const p = walk("proposal-accepted", INSTALL_ONLY); // the period runs to Tue 10 Nov
   refuses(p, set(["2026-11-17", "2026-11-18"]), T.dates, {}, /Pick 3 install days/);
   refuses(p, set(["2026-11-20", "2026-11-21", "2026-11-23"]), T.dates, {}, /working days/); // Sat
   refuses(p, set(["2026-11-18", "2026-11-17", "2026-11-19"]), T.dates, {}, /in order/);
@@ -503,7 +679,7 @@ test("install-dates-set: accepted, working days, right length, lead time, after 
   assert.ok(apply(p, set(["2026-11-11", "2026-11-12", "2026-11-13"]), T.dates).ok); // the day after is fine
   refuses(p, set(["2026-11-17", "2026-11-18", "2026-11-19"]), "2026-11-13T10:00:00.000Z", {}, /5 days' notice/);
 
-  const early = step(walk("proposal-viewed"), { ...JOURNEY[9]![1], earlyStartRequested: true } as ProjectAction, T.accept);
+  const early = step(walk("proposal-viewed", INSTALL_ONLY), { ...ACCEPT, earlyStartRequested: true } as ProjectAction, T.accept);
   const soon = step(early, set(["2026-11-03", "2026-11-04", "2026-11-05"]), T.dates);
   assert.deepEqual(soon.booking.dates, ["2026-11-03", "2026-11-04", "2026-11-05"]);
 
@@ -519,6 +695,15 @@ test("install-dates-set: accepted, working days, right length, lead time, after 
   assert.equal(earliestInstallStart(early, "2026-11-02T10:00:00.000Z"), "2026-11-09"); // Sat 7 → Mon 9
   assert.ok(apply(early, set(["2026-11-02", "2026-11-03", "2026-11-04"]), T.dates).ok);
   refuses(early, set(["2026-10-30", "2026-11-02", "2026-11-03"]), T.dates, {}, /5 days' notice/);
+
+  // Supply-and-install with no early start: the end isn't known until the kit
+  // arrives, so dates aren't refused here (ready-to-install holds the start).
+  const goods = walk("proposal-accepted", { early: false });
+  assert.ok(apply(goods, set(["2026-11-03", "2026-11-04", "2026-11-05"]), T.dates).ok);
+  assert.equal(earliestInstallStart(goods, T.dates), "2026-11-02"); // lead time only
+  const delivered = { ...goods, proposal: { ...goods.proposal, goodsReceivedOn: "2026-11-02", cancellationEndsOn: "2026-11-16" } };
+  refuses(delivered, set(["2026-11-16", "2026-11-17", "2026-11-18"]), T.dates, {}, /runs until Mon 16 Nov/);
+  assert.equal(earliestInstallStart(delivered, T.dates), "2026-11-17");
 
   const chosen = walk("install-dates-set");
   assert.equal(chosen.booking.status, "not-booked"); // chosen, not yet confirmed
@@ -565,6 +750,17 @@ test("booking gate: F-gas, a Part P electrician, deposit, dates", () => {
   const beforeKit = mergeSettings({ payments: { depositPct: 20, depositTiming: "before-kit-order" } });
   assert.equal(severityOf(blockersFor(p, c({ settings: beforeKit }), "booking"), "deposit-unpaid"), undefined);
 
+  // No early start on supply-and-install: the kit has to land 15+ days before day 1.
+  const noEarly = walk("crew-assigned", { early: false });
+  const late = blockersFor(noEarly, c({}), "booking").find((b) => b.code === "no-early-start");
+  assert.equal(late?.severity, "warn");
+  assert.match(late!.message, /needs to arrive by Mon 2 Nov/); // 17 Nov − 15 days
+  // Install-only dates inside the known period block (the guard normally stops them first).
+  const service = walk("crew-assigned", INSTALL_ONLY);
+  const inside = { ...service, booking: { ...service.booking, startDate: "2026-11-09", dates: ["2026-11-09", "2026-11-10", "2026-11-11"] } };
+  assert.equal(severityOf(blockersFor(inside, c({}), "booking"), "dates-inside-cancellation"), "block");
+  assert.deepEqual(blockersFor(service, c({}), "booking"), []);
+
   const noDates = walk("proposal-accepted");
   assert.equal(severityOf(blockersFor(noDates, c({}), "booking"), "dates-not-chosen"), "block");
   assert.equal(severityOf(blockersFor(walk("proposal-viewed"), c({}), "booking"), "proposal-not-accepted"), "block");
@@ -607,14 +803,27 @@ test("kit-updated needs a confirmed booking and keeps customer wording conservat
   assert.deepEqual(kitLabels, [
     "Your kit is ordered.",
     "The supplier has confirmed your kit for Fri 13 Nov.",
-    "Your kit has been delivered.",
-    "Your kit has been checked by your installer.",
+    "Your kit has been delivered. Your cancellation period now runs until the end of Fri 27 Nov.",
+    "Your kit has been checked by your installer.", // the clock started at delivery and doesn't move
   ]);
   assert.equal(p.kit.deliveredAt, T.kit);
   const dispatched = step(walk("kit-confirmed"), { type: "kit-updated", status: "dispatched", shortages: 0 }, T.kit, { actor: ADMIN });
   assert.equal(dispatched.events.at(-1)!.internal, true);
   const short = step(walk("kit-confirmed"), { type: "kit-updated", status: "delivered", shortages: 2 }, T.kit, { actor: ADMIN });
   assert.match(short.events.at(-1)!.label, /2 items are still to come/);
+  // Part-delivered: the period runs from the LAST of the goods (reg 30(4)), so no date yet.
+  assert.equal(short.proposal.goodsReceivedOn, undefined);
+  assert.doesNotMatch(short.events.at(-1)!.label, /cancellation/);
+  const rest = step(short, { type: "kit-updated", status: "inspected", shortages: 0 }, "2026-11-16T15:00:00.000Z", { actor: INSTALLER });
+  assert.equal(rest.proposal.goodsReceivedOn, "2026-11-16");
+  assert.equal(rest.proposal.cancellationEndsOn, "2026-11-30");
+  assert.equal(rest.kit.deliveredAt, T.kit); // first delivery, unchanged
+  // Delivered the day after acceptance: 14 days from delivery. Install-only contracts don't move at all.
+  const fast = step(walk("booking-confirmed"), { type: "kit-updated", status: "delivered", shortages: 0 }, "2026-10-28T12:00:00.000Z", { actor: ADMIN });
+  assert.equal(fast.proposal.cancellationEndsOn, "2026-11-11");
+  const service = walk("kit-delivered", INSTALL_ONLY);
+  assert.equal(service.proposal.goodsReceivedOn, undefined);
+  assert.equal(service.proposal.cancellationEndsOn, "2026-11-10");
   refuses(walk("booking-confirmed"), { type: "kit-updated", status: "ordered", shortages: -1 }, T.dates, {}, /whole number/);
 });
 
@@ -658,15 +867,99 @@ test("ready-to-install gate: kit, compliance, issues, cancellation period", () =
   }), "ready-to-install");
   assert.deepEqual(codes(issues), ["issue:i1"]);
 
-  // Inside the cancellation period (ends Tue 10 Nov, inclusive) without an early start.
-  assert.equal(severityOf(blockersFor(p, ctx("2026-11-10"), "ready-to-install"), "cancellation-period"), "block");
-  assert.equal(severityOf(blockersFor(p, ctx("2026-11-11"), "ready-to-install"), "cancellation-period"), undefined);
-  const early = { ...p, proposal: { ...p.proposal, earlyStartRequested: true } };
-  assert.equal(severityOf(blockersFor(early, ctx("2026-11-05"), "ready-to-install"), "cancellation-period"), undefined);
-  const unknown = { ...p, proposal: { ...p.proposal, cancellationEndsOn: undefined } };
-  assert.equal(severityOf(blockersFor(unknown, c({}), "ready-to-install"), "cancellation-unknown"), "block");
   const unbooked = walk("install-dates-set");
   assert.equal(severityOf(blockersFor(unbooked, c({}), "ready-to-install"), "booking-not-confirmed"), "block");
+});
+
+test("ready-to-install gate: the contract confirmation, then the cancellation period or an evidenced early start", () => {
+  const p = walk("kit-delivered"); // supply-and-install: delivered 13 Nov, period to Fri 27 Nov
+  const at = (today: string, project: Project = p) => blockersFor(project, ctx(today), "ready-to-install");
+  const without = (field: "confirmationSentAt") => ({ ...p, proposal: { ...p.proposal, [field]: undefined } });
+  const confirmation = at(T.day1, without("confirmationSentAt")).find((b) => b.code === "confirmation-not-sent");
+  assert.equal(confirmation?.severity, "block");
+  assert.equal(confirmation?.owner, "ops");
+
+  // Requested on the portal but not yet on a durable medium: says exactly what's missing.
+  const unevidenced = { ...p, proposal: { ...p.proposal, earlyStart: { requested: true, requestedAt: T.accept, channel: "portal" as const, wordingVersion: EARLY_START_WORDING_VERSION } } };
+  const pending = at(T.day1, unevidenced).find((b) => b.code === "early-start-unevidenced");
+  assert.equal(pending?.severity, "block");
+  assert.match(pending!.message, /runs until the end of Fri 27 Nov/);
+  assert.match(pending!.message, /isn't on a durable medium yet: record their email reply/);
+  assert.equal(pending?.action, "Record the customer's early-start email or signed form");
+  assert.deepEqual(codes(at("2026-11-28", unevidenced)), [], "the period has ended: no evidence needed");
+
+  // No early start at all: wait for the end (inclusive), then go.
+  const none = walk("kit-delivered", { early: false });
+  assert.equal(severityOf(at("2026-11-27", none), "cancellation-period"), "block");
+  assert.match(at("2026-11-27", none).find((b) => b.code === "cancellation-period")!.message, /hasn't asked to start early/);
+  assert.equal(severityOf(at("2026-11-28", none), "cancellation-period"), undefined);
+  // Before delivery the end isn't known, and the message says what it waits on.
+  const notYet = { ...none, proposal: { ...none.proposal, goodsReceivedOn: undefined, cancellationEndsOn: undefined } };
+  assert.match(at("2026-12-31", notYet).find((b) => b.code === "cancellation-period")!.message, /runs until 14 days after the kit is delivered/);
+
+  // Install-only: 14 days from acceptance (Tue 10 Nov).
+  const service = walk("kit-delivered", INSTALL_ONLY);
+  assert.equal(severityOf(at("2026-11-10", service), "cancellation-period"), "block");
+  assert.equal(severityOf(at("2026-11-11", service), "cancellation-period"), undefined);
+
+  const unknown = { ...none, proposal: { ...none.proposal, acceptedAt: undefined } };
+  assert.equal(severityOf(at(T.day1, unknown), "cancellation-unknown"), "block");
+
+  // Day 1 refuses with these blockers.
+  const r = refuses(walk("kit-inspected", { early: false }), { type: "install-day-started", n: 1, by: "Ian Stall" }, T.day1, { actor: INSTALLER }, /cancellation period runs until the end of Fri 27 Nov/);
+  assert.ok(!r.ok && r.blockers!.some((b) => b.code === "cancellation-period"));
+});
+
+test("cancellationStatus: basis per contract type, evidence, and reg 31 when the information came late", () => {
+  const goods = walk("kit-delivered");
+  assert.deepEqual(cancellationStatus(goods, "2026-11-27", READY), { ended: false, endsOn: "2026-11-27", basis: "goods-delivery", earlyStartEvidenced: true });
+  assert.equal(cancellationStatus(goods, "2026-11-28T00:30:00.000Z", READY).ended, true);
+  assert.deepEqual(cancellationStatus(walk("proposal-viewed"), "2027-01-01"), { ended: false, basis: "unknown", earlyStartEvidenced: false });
+  const service = walk("proposal-accepted", INSTALL_ONLY);
+  assert.deepEqual(cancellationStatus(service, "2026-11-11"), { ended: true, endsOn: "2026-11-10", basis: "acceptance", earlyStartEvidenced: false });
+  // An older snapshot with an acceptance-based date on a supply-and-install contract: ignored until the goods arrive.
+  const stale = walk("proposal-accepted", { early: false });
+  stale.proposal.cancellationEndsOn = "2026-11-10";
+  assert.equal(cancellationStatus(stale, "2026-12-01").endsOn, undefined);
+  // An old snapshot with only the boolean still counts as a request (not as evidence).
+  const legacyFlag = { ...service, proposal: { ...service.proposal, earlyStart: undefined, earlyStartRequested: true } };
+  assert.equal(earliestInstallStart(legacyFlag, T.dates), "2026-11-02");
+  assert.equal(cancellationStatus(legacyFlag, T.dates).earlyStartEvidenced, false);
+
+  // Reg 31: no pre-contract information before acceptance. Given later by the confirmation: 14 days from then.
+  const late = { ...service, proposal: { ...service.proposal, preContractInfoSentAt: undefined, confirmationSentAt: "2026-11-02T09:00:00.000Z" } };
+  assert.equal(cancellationStatus(late, T.dates).endsOn, "2026-11-16");
+  // Never given: 12 months after the normal end.
+  const never = { ...late, proposal: { ...late.proposal, confirmationSentAt: undefined } };
+  assert.equal(cancellationStatus(never, T.dates).endsOn, "2027-11-10");
+  assert.match(CANCELLATION_RULE_STATUS, /^Legal review required/);
+});
+
+test("cancellationCopy: one plain sentence per contract type and state, never '14 days of accepting'", () => {
+  const all: string[] = [];
+  const say = (p: Project, today?: string) => {
+    const text = cancellationCopy(p, { settings: READY, ...(today ? { today } : {}) });
+    all.push(text);
+    return text;
+  };
+  assert.equal(say(fresh()), "If you accept, you can cancel without giving a reason until 14 days after the day your equipment is delivered to you.");
+  assert.equal(say(walk("proposal-viewed", INSTALL_ONLY)), "If you accept, you can cancel without giving a reason within 14 days of the day you accept.");
+  assert.equal(
+    say(walk("proposal-accepted")),
+    "Because we're supplying your equipment, you can cancel without giving a reason until 14 days after the day it's delivered to you. We'll tell you the exact date when it arrives.",
+  );
+  assert.equal(say(walk("kit-delivered")), "You can cancel without giving a reason until the end of Friday 27 November 2026.");
+  assert.equal(say(walk("proposal-accepted", INSTALL_ONLY)), "You can cancel without giving a reason until the end of Tuesday 10 November 2026.");
+  assert.equal(say(walk("kit-delivered"), "2026-11-28"), "Your cancellation period ended on Friday 27 November 2026.");
+  assert.match(cancellationCopy(walk("proposal-accepted"), { settings: mergeSettings({ scheduling: { cancellationDays: 21 } }) }), /until 21 days after/);
+  for (const text of all) assert.doesNotMatch(text, /of accepting/);
+});
+
+test("early-start wording: the loss-of-right sentence only on install-only", () => {
+  assert.doesNotMatch(earlyStartWording("supply-and-install"), /lose my right/);
+  assert.match(earlyStartWording("install-only"), /lose my right to cancel once the work has been fully completed/);
+  assert.match(earlyStartWording("supply-and-install"), /^Please start my installation before my cancellation period ends\./);
+  for (const t of ["supply-and-install", "install-only"] as const) assert.match(earlyStartWording(t), /^[\x20-\x7e]+$/, "plain ASCII, easy to type");
 });
 
 test("install-day-started: day 1 needs ready-to-install; later days need the day before", () => {
@@ -870,6 +1163,65 @@ test("aftercare: check-in and feedback request once each, feedback scored 0–10
   assert.ok(apply(asked, { type: "feedback-submitted", score: 0 }, T.close).ok);
 });
 
+test("review request: everyone, at the same point, never on the score; once; only with a review link", () => {
+  const withLink = ready({ company: { reviewUrl: "https://reviews.example/dang-its-hot" } });
+  const handed = walk(); // handed over 19 Nov, paperwork done, feedback 9/10
+  const day = (n: number) => new Date(Date.parse("2026-11-19T12:00:00.000Z") + n * 86_400_000).toISOString();
+  assert.equal(reviewRequestDue(handed, day(REVIEW_REQUEST_DAYS - 1), withLink), false);
+  assert.equal(reviewRequestDue(handed, day(REVIEW_REQUEST_DAYS), withLink), true);
+  assert.equal(reviewRequestDue(handed, day(REVIEW_REQUEST_DAYS), READY), false, "no review link in settings: never");
+  // The score makes no difference at all (no review gating).
+  for (const score of [0, 3, 10]) {
+    const scored = { ...handed, aftercare: { ...handed.aftercare, feedback: { at: T.close, score } } };
+    assert.equal(reviewRequestDue(scored, day(REVIEW_REQUEST_DAYS), withLink), true, `score ${score}`);
+  }
+  const noFeedback = { ...handed, aftercare: { ...handed.aftercare, feedback: undefined, feedbackRequestedAt: undefined } };
+  assert.equal(reviewRequestDue(noFeedback, day(REVIEW_REQUEST_DAYS), withLink), true);
+  // Not while the paperwork is incomplete, not after an opt-out, not twice.
+  const certPending = { ...handed, handover: { ...handed.handover, electricalCert: "pending" as const } };
+  assert.equal(reviewRequestDue(certPending, day(60), withLink), false);
+  const asked = step(handed, { type: "review-requested" }, day(REVIEW_REQUEST_DAYS));
+  assert.equal(asked.events.at(-1)!.internal, true);
+  assert.equal(reviewRequestDue(asked, day(60), withLink), false);
+  refuses(asked, { type: "review-requested" }, day(60), {}, /already/);
+  const optedOut = step(handed, { type: "aftercare-opt-out", optedOut: true }, day(10));
+  assert.equal(reviewRequestDue(optedOut, day(60), withLink), false);
+  assert.equal(reviewRequestDue(walk("handover-pack-published"), day(60), withLink), false);
+});
+
+test("change-of-season check: the first turn of the season after handover, once", () => {
+  const at = (handedOverAt: string) => {
+    const p = walk();
+    return { ...p, handover: { ...p.handover, handedOverAt } };
+  };
+  assert.deepEqual(seasonalCheck(at("2026-11-19T16:00:00.000Z")), { on: "2027-06-01", mode: "cooling" }); // winter install
+  assert.deepEqual(seasonalCheck(at("2026-02-10T16:00:00.000Z")), { on: "2026-06-01", mode: "cooling" });
+  assert.deepEqual(seasonalCheck(at("2026-07-14T16:00:00.000Z")), { on: "2026-10-01", mode: "heating" }); // summer install
+  assert.deepEqual(seasonalCheck(at("2026-09-20T16:00:00.000Z")), { on: "2026-10-18", mode: "heating" }); // never within 28 days
+  assert.equal(seasonalCheck(walk("handover-pack-published")), null);
+
+  const p = walk();
+  assert.equal(seasonalCheckDue(p, "2027-05-31"), false);
+  assert.equal(seasonalCheckDue(p, "2027-06-01"), true);
+  const sent = step(p, { type: "seasonal-check-sent" }, "2027-06-01T09:00:00.000Z");
+  assert.equal(seasonalCheckDue(sent, "2027-06-02"), false);
+  refuses(sent, { type: "seasonal-check-sent" }, "2027-06-02T09:00:00.000Z", {}, /already/);
+  assert.equal(seasonalCheckDue(step(p, { type: "aftercare-opt-out", optedOut: true }, T.close), "2027-06-01"), false);
+});
+
+test("aftercare-opt-out: the customer can stop follow-ups (and start them again), even after close", () => {
+  const p = walk(); // closed
+  const off = step(p, { type: "aftercare-opt-out", optedOut: true }, "2026-12-21T09:00:00.000Z");
+  assert.equal(off.aftercare.followUpsOptedOutAt, "2026-12-21T09:00:00.000Z");
+  assert.equal(off.events.at(-1)!.actor, "customer");
+  assert.match(off.events.at(-1)!.label, /No more follow-up emails/);
+  refuses(off, { type: "aftercare-opt-out", optedOut: true }, T.close, {}, /already off/);
+  const on = step(off, { type: "aftercare-opt-out", optedOut: false }, "2026-12-22T09:00:00.000Z", { actor: ADMIN });
+  assert.equal(on.aftercare.followUpsOptedOutAt, undefined);
+  assert.equal(on.events.at(-1)!.actor, "ops");
+  refuses(on, { type: "aftercare-opt-out", optedOut: false }, T.close, {}, /already on/);
+});
+
 test("next action, pilot tag, contact details and notes are internal records", () => {
   let p = step(fresh(), { type: "set-next-action", text: "Call about parking", dueOn: "2026-10-21", ownerRole: "surveyor" }, T.book, { actor: ADMIN });
   assert.deepEqual(p.nextAction, { text: "Call about parking", dueOn: "2026-10-21", ownerRole: "surveyor" });
@@ -987,12 +1339,18 @@ test("customerNextAction: one clear label per state", () => {
   assert.deepEqual(customerNextAction(fresh()), { label: "Book your home survey", href: "/p/proj-1#survey" });
   assert.equal(label(walk("book-survey")), "Get ready for your survey");
   assert.equal(label(walk("survey-started")), null);
-  assert.equal(label(walk("survey-submitted")), null); // we're designing
+  // While we design, the one thing they can do: agree to email delivery (the proposal can't go without it).
+  assert.deepEqual(customerNextAction(walk("survey-submitted")), { label: "Agree to get your documents by email", href: "/p/proj-1#proposal" });
+  assert.equal(label(walk("documents-consent-recorded")), null); // we're designing
   assert.deepEqual(customerNextAction(walk("proposal-issued")), { label: "Review your proposal", href: "/p/proj-1/proposal" });
   assert.equal(label(step(walk("proposal-viewed"), { type: "proposal-changes-requested", text: "Left a bit" }, T.accept)), null);
   assert.equal(label(step(walk("proposal-viewed"), { type: "proposal-expired" }, "2026-11-26T10:00:00.000Z")), "Ask us for an updated proposal");
   assert.equal(label(walk("proposal-accepted")), "Choose your install dates");
-  assert.equal(label(walk("install-dates-set")), null); // we confirm
+  assert.equal(label(walk("contract-confirmation-sent")), "Choose your install dates"); // dates first
+  // They ticked "start early": the confirmation email asks them to reply with the wording.
+  assert.deepEqual(customerNextAction(walk("install-dates-set")), { label: "Reply to confirm your early start", href: "/p/proj-1#booking" });
+  assert.equal(label(walk("early-start-evidenced")), null); // we confirm
+  assert.equal(label(walk("install-dates-set", { early: false })), null);
   const deposit = step(walk("proposal-accepted"), { type: "deposit-requested", amountPence: 129_000 }, T.dates, { actor: ADMIN });
   assert.deepEqual(customerNextAction(deposit), { label: "Pay your deposit", href: "/p/proj-1/pay" });
   assert.equal(label(walk("booking-confirmed")), "Get your home ready");
@@ -1061,15 +1419,19 @@ test("stage copy never hard-codes what settings control; stageInfo fills it in",
   assert.doesNotMatch(generic, /14 days|three-day|Three days|day three|90 minutes/);
 
   const defaults = (stage: (typeof PROJECT_STAGES)[number]) => stageInfo(stage, DEFAULT_SETTINGS);
+  assert.doesNotMatch(generic, /of accepting/);
   assert.match(defaults("booking").explainer[0]!, /three-day block/);
-  assert.match(defaults("booking").explainer[2]!, /within 14 days of accepting/);
+  assert.match(defaults("booking").explainer[2]!, /until 14 days after your equipment is delivered \(or 14 days after you accept, if you're supplying the equipment yourself\)/);
+  assert.doesNotMatch(defaults("booking").explainer[2]!, /of accepting/);
+  // With the project, its own contract's sentence.
+  assert.match(stageInfo("booking", READY, walk("kit-delivered")).explainer[2]!, /^You can cancel without giving a reason until the end of Friday 27 November 2026\. We start after it ends/);
   assert.match(defaults("install").strap, /^Three days,/);
   assert.match(defaults("install").explainer[0]!, /day three is pipes/);
   assert.match(defaults("survey").strap, /about 90 minutes/);
 
   const other = mergeSettings({ scheduling: { installBlockDays: 2, cancellationDays: 21, surveyDurationMinutes: 60 } });
   assert.match(stageInfo("booking", other).explainer[0]!, /two-day block/);
-  assert.match(stageInfo("booking", other).explainer[2]!, /within 21 days/);
+  assert.match(stageInfo("booking", other).explainer[2]!, /until 21 days after/);
   assert.match(stageInfo("install", other).strap, /^Two days,/);
   assert.equal(stageInfo("install", other).explainer[0], STAGE_INFO.install.explainer[0]); // no day-by-day for two days
   assert.match(stageInfo("survey", other).strap, /about 60 minutes/);
@@ -1149,7 +1511,11 @@ test("migrateProject: accepted, and site visit completed", () => {
   assert.equal(accepted.proposal.status, "accepted");
   assert.equal(accepted.proposal.contractTotalPence, accepted.quoteSummary.totalGbp * 100);
   assert.equal(accepted.money.contractTotalPence, accepted.quoteSummary.totalGbp * 100);
-  assert.equal(accepted.proposal.cancellationEndsOn, "2026-07-15");
+  // v1 always supplied the kit: supply-and-install, so no end date before delivery,
+  // and no pre-contract information was ever sent (reg 31 applies once it is).
+  assert.equal(accepted.proposal.contractType, "supply-and-install");
+  assert.equal(accepted.proposal.cancellationEndsOn, undefined);
+  assert.equal(cancellationStatus(accepted, "2026-08-01").basis, "goods-delivery");
 
   const visited = migrateProject(v1(V1_VISITED));
   assert.equal(visited.survey.status, "submitted");
@@ -1194,6 +1560,9 @@ test("migrateProject: installed", () => {
   assert.equal(p.kit.status, "delivered");
   assert.equal(p.kit.expectedDate, "2026-07-18");
   assert.equal(p.kit.summary, "DPD, tracking DPD-123");
+  // Delivered in v1: the supply-and-install period runs from that day.
+  assert.equal(p.proposal.goodsReceivedOn, p.kit.deliveredAt!.slice(0, 10));
+  assert.equal(p.proposal.cancellationEndsOn, "2026-07-15");
   assert.equal(p.install.status, "complete");
   assert.equal(p.handover.status, "pending");
   assert.equal(currentStage(p), "handover");
@@ -1224,6 +1593,12 @@ test("migrateProject is idempotent on v2 and tolerant of missing fields", () => 
   assert.equal(sparse.survey.status, "not-booked"); // booked with no slot isn't a booking
   assert.equal(sparse.booking.prep.length, 6);
   assert.deepEqual(sparse.events, []);
+
+  const junkType = migrateProject({ schemaVersion: 2, id: "z", proposal: { status: "not-issued", contractType: "lease" } });
+  assert.equal(junkType.proposal.contractType, "supply-and-install");
+  const olderV2 = migrateProject({ schemaVersion: 2, id: "z2", proposal: { status: "accepted", acceptedAt: T.accept, earlyStartRequested: true } });
+  assert.equal(olderV2.proposal.contractType, "supply-and-install");
+  assert.equal(olderV2.proposal.earlyStart, undefined); // nothing invented; the boolean still reads as a request
 
   const partialV2 = migrateProject({ schemaVersion: 2, id: "y", survey: { status: "booked", scheduledFor: T.slot } });
   assert.equal(partialV2.survey.status, "booked");

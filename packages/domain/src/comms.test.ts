@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { COMMS_EVENTS, idempotencyKey, type CommsEventId } from "./comms.ts";
+import { COMMS_EVENTS, FOLLOW_UP_EVENTS, idempotencyKey, type CommsEventId } from "./comms.ts";
 
 const ALL: CommsEventId[] = [
   "magic-link",
@@ -23,8 +23,11 @@ const ALL: CommsEventId[] = [
   "variation-approval",
   "issue-update",
   "handover-ready",
+  "certificate-issued",
   "check-in-7d",
   "feedback-30d",
+  "review-request",
+  "seasonal-check",
   "service-reminder",
   "team-alert",
 ];
@@ -53,10 +56,32 @@ test("on-my-way messages are SMS; team events go to the team; cron events are th
     "install-day-before",
     "install-prep",
     "proposal-reminder",
+    "review-request",
+    "seasonal-check",
     "service-reminder",
     "survey-reminder",
   ]);
   assert.equal(COMMS_EVENTS["issue-update"].trigger, "manual");
+  assert.equal(COMMS_EVENTS["certificate-issued"].trigger, "auto");
+  assert.equal(COMMS_EVENTS["certificate-issued"].audience, "customer");
+});
+
+test("follow-ups are customer emails with an opt-out; the review request is never tied to the score", () => {
+  assert.deepEqual([...FOLLOW_UP_EVENTS].sort(), ["check-in-7d", "feedback-30d", "review-request", "seasonal-check", "service-reminder"]);
+  for (const id of FOLLOW_UP_EVENTS) {
+    assert.equal(COMMS_EVENTS[id].audience, "customer", id);
+    assert.equal(COMMS_EVENTS[id].trigger, "cron", id);
+    assert.deepEqual(COMMS_EVENTS[id].channels, ["email"], id);
+    assert.match(COMMS_EVENTS[id].description, /Opt-out line/, id);
+  }
+  assert.doesNotMatch(COMMS_EVENTS["feedback-30d"].description, /only if they're happy/);
+  assert.match(COMMS_EVENTS["feedback-30d"].description, /everyone/);
+  assert.match(COMMS_EVENTS["feedback-30d"].description, /never tied to the review request/);
+  assert.match(COMMS_EVENTS["review-request"].description, /no incentive/);
+  assert.match(COMMS_EVENTS["review-request"].description, /never depends on the feedback score/);
+  for (const id of ALL) {
+    if (!FOLLOW_UP_EVENTS.has(id)) assert.doesNotMatch(COMMS_EVENTS[id].description, /Opt-out line/, id);
+  }
 });
 
 test("idempotency keys are deterministic and distinct per event, project, occurrence and channel", () => {

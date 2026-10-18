@@ -9,6 +9,9 @@
  *
  * SMS is one-way (an alphanumeric sender), so every SMS gives our phone
  * number rather than pretending replies arrive.
+ *
+ * Follow-ups (FOLLOW_UP_EVENTS) aren't about work in progress, so each one
+ * carries an opt-out line, and a customer who opts out never gets another.
  */
 
 export type CommsEventId =
@@ -32,8 +35,11 @@ export type CommsEventId =
   | "variation-approval"
   | "issue-update"
   | "handover-ready"
+  | "certificate-issued"
   | "check-in-7d"
   | "feedback-30d"
+  | "review-request"
+  | "seasonal-check"
   | "service-reminder"
   | "team-alert";
 
@@ -98,8 +104,9 @@ export const COMMS_EVENTS: Record<CommsEventId, CommsEventDef> = {
     channels: ["email"],
     audience: "customer",
     trigger: "auto",
-    description: "Your proposal is ready: link to review it, valid-until date.",
-    templateVersion: 1,
+    description:
+      "Your proposal is ready: link to review it, valid-until date. The durable copy of the pre-contract information: the Schedule 2 details, the cancellation instructions and the model form.",
+    templateVersion: 2,
   },
   "proposal-reminder": {
     id: "proposal-reminder",
@@ -115,8 +122,8 @@ export const COMMS_EVENTS: Record<CommsEventId, CommsEventDef> = {
     audience: "customer",
     trigger: "auto",
     description:
-      "Acceptance confirmation: the contract, cancellation information and model form (the durable copy), and how to choose install dates.",
-    templateVersion: 1,
+      "Acceptance confirmation (the contract copy): the acceptance record, the cancellation position, the cancellation information and model form, how to confirm an early start by replying, and how to choose install dates.",
+    templateVersion: 2,
   },
   "proposal-changes-requested": {
     id: "proposal-changes-requested",
@@ -214,20 +221,47 @@ export const COMMS_EVENTS: Record<CommsEventId, CommsEventDef> = {
     description: "The handover pack is published: equipment, certificates, warranty, care guide.",
     templateVersion: 1,
   },
+  "certificate-issued": {
+    id: "certificate-issued",
+    channels: ["email"],
+    audience: "customer",
+    trigger: "auto",
+    description: "A document that arrives after handover is in the pack: the electrical installation certificate, or the manufacturer's warranty registration.",
+    templateVersion: 1,
+  },
   "check-in-7d": {
     id: "check-in-7d",
     channels: ["email"],
     audience: "customer",
     trigger: "cron",
-    description: "A week after handover: how's it running? Link to report a problem.",
-    templateVersion: 1,
+    description: "A week after handover: how's it running? Link to report a problem. Opt-out line.",
+    templateVersion: 2,
   },
   "feedback-30d": {
     id: "feedback-30d",
     channels: ["email"],
     audience: "customer",
     trigger: "cron",
-    description: "A month after handover: a 0 to 10 score and three questions. Review request only if they're happy.",
+    description:
+      "A month after handover, to everyone: an internal 0 to 10 score and three questions, for us only. Never gated, and never tied to the review request. Opt-out line.",
+    templateVersion: 2,
+  },
+  "review-request": {
+    id: "review-request",
+    channels: ["email"],
+    audience: "customer",
+    trigger: "cron",
+    description:
+      "Everyone at the same point after handover, in the same words, with no incentive: a link to our page on an independent review platform. Only while settings have a review link; never depends on the feedback score. Opt-out line.",
+    templateVersion: 1,
+  },
+  "seasonal-check": {
+    id: "seasonal-check",
+    channels: ["email"],
+    audience: "customer",
+    trigger: "cron",
+    description:
+      "The first change of season after handover: tips for the mode they're about to use for the first time, and how to report a problem. Opt-out line.",
     templateVersion: 1,
   },
   "service-reminder": {
@@ -235,8 +269,8 @@ export const COMMS_EVENTS: Record<CommsEventId, CommsEventDef> = {
     channels: ["email"],
     audience: "customer",
     trigger: "cron",
-    description: "The yearly service is due soon.",
-    templateVersion: 1,
+    description: "The yearly service is due soon. Opt-out line.",
+    templateVersion: 2,
   },
   "team-alert": {
     id: "team-alert",
@@ -247,6 +281,20 @@ export const COMMS_EVENTS: Record<CommsEventId, CommsEventDef> = {
     templateVersion: 1,
   },
 };
+
+/**
+ * Messages that aren't about work in progress, a problem or money: each
+ * carries an opt-out line (PECR reg 22(3)-style, though they're service
+ * messages), and none goes to a customer who has opted out
+ * (`project.aftercare.followUpsOptedOutAt`).
+ */
+export const FOLLOW_UP_EVENTS: ReadonlySet<CommsEventId> = new Set<CommsEventId>([
+  "check-in-7d",
+  "feedback-30d",
+  "review-request",
+  "seasonal-check",
+  "service-reminder",
+]);
 
 /**
  * One key per (event, project, occurrence, channel). The discriminator names

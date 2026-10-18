@@ -6,6 +6,7 @@ import {
   effectiveTaxCode,
   isInServiceArea,
   mergeSettings,
+  schedule2Missing,
   type PilotSettings,
 } from "./settings.ts";
 
@@ -49,6 +50,53 @@ test("defaults are the conservative pilot set", () => {
   assert.equal(s.comms.smsSenderId.length <= 11, true); // alphanumeric sender id limit
   assert.equal(s.finance.lenderConfigured, false);
   assert.equal(s.features.showPrototypeNav, false);
+  // Schedule 2 details are business facts, never guessed: blank until set.
+  assert.equal(s.company.geographicAddress, "");
+  assert.equal(s.company.complaintsProcess, "");
+  for (const key of ["adr", "workmanshipGuarantee", "reviewUrl"] as const) assert.equal(key in s.company, false, key);
+});
+
+test("schedule2Missing lists what the pre-contract information still needs, in plain words", () => {
+  assert.deepEqual(schedule2Missing(DEFAULT_SETTINGS), ["geographic address", "complaints process", "guarantee statement (or explicit 'none')"]);
+  const complete = mergeSettings({
+    company: { geographicAddress: "DEMO, 1 Example Street, London SW16 2BE", complaintsProcess: "DEMO: call or email us; we reply within two working days." },
+    warranty: { workmanshipYears: 2, manufacturerSummary: null },
+  });
+  assert.deepEqual(schedule2Missing(complete), []);
+  // "None offered" is fine, as long as it's said: 0 years, or a manufacturer summary.
+  assert.deepEqual(schedule2Missing(mergeSettings({ ...complete, warranty: { workmanshipYears: 0, manufacturerSummary: null } })), []);
+  assert.deepEqual(schedule2Missing(mergeSettings({ ...complete, warranty: { workmanshipYears: null, manufacturerSummary: "None offered." } })), []);
+  assert.deepEqual(
+    schedule2Missing(mergeSettings({ ...complete, warranty: { workmanshipYears: null, manufacturerSummary: "   " } })),
+    ["guarantee statement (or explicit 'none')"],
+  );
+  const blanks = mergeSettings({ ...complete, company: { ...complete.company, tradingName: " ", phone: "", email: "", geographicAddress: "  " } });
+  assert.deepEqual(schedule2Missing(blanks), ["trading name", "geographic address", "phone", "email"]);
+  // ADR is "where applicable": never required.
+  assert.equal(complete.company.adr, undefined);
+});
+
+test("optional company text: kept when it's real text, dropped when blank, null or junk; review links are http(s)", () => {
+  const s = mergeSettings({
+    company: {
+      adr: "DEMO dispute scheme, demo.example/disputes",
+      workmanshipGuarantee: "DEMO: two years on our workmanship; call us to claim.",
+      reviewUrl: "https://reviews.example/dang-its-hot",
+      geographicAddress: 12,
+      complaintsProcess: null,
+    },
+  });
+  assert.equal(s.company.adr, "DEMO dispute scheme, demo.example/disputes");
+  assert.match(s.company.workmanshipGuarantee!, /two years/);
+  assert.equal(s.company.reviewUrl, "https://reviews.example/dang-its-hot");
+  assert.equal(s.company.geographicAddress, ""); // wrong type: the default
+  assert.equal(s.company.complaintsProcess, "");
+  const junk = mergeSettings({ company: { adr: null, workmanshipGuarantee: "  ", reviewUrl: "javascript:alert(1)" } });
+  for (const key of ["adr", "workmanshipGuarantee", "reviewUrl"] as const) assert.equal(key in junk.company, false, key);
+  assert.equal(mergeSettings({ company: { reviewUrl: 5 } }).company.reviewUrl, undefined);
+  assert.equal(mergeSettings({ company: { reviewUrl: "reviews.example/x" } }).company.reviewUrl, undefined);
+  assert.equal(mergeSettings({ company: { reviewUrl: "http://reviews.example/x" } }).company.reviewUrl, "http://reviews.example/x");
+  assert.deepEqual(mergeSettings(s), s, "idempotent");
 });
 
 test("every tax code has a label, a rate and a note", () => {

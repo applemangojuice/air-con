@@ -10,7 +10,7 @@ import {
   type PrepItem,
   type TimelineDateKind,
 } from "./project-v1.ts";
-import { DEFAULT_SETTINGS, type PilotSettings } from "./settings.ts";
+import { DEFAULT_SETTINGS, schedule2Missing, type PilotSettings } from "./settings.ts";
 import { ROLE_LABEL, can, meetsRequirement, type StaffMember, type StaffRole } from "./staff.ts";
 
 // Unchanged from v1: one declaration, shared by both machines.
@@ -110,7 +110,7 @@ export const STAGE_INFO: Record<ProjectStageId, StageInfo> = {
     explainer: [
       "Choose install dates that suit you. We only offer dates we can actually do.",
       "You'll see who's coming: names, roles and the qualifications they actually hold.",
-      "You can cancel within the cancellation period after accepting. We start after it ends, or sooner if you ask us to in writing.",
+      "You can cancel without giving a reason during your cancellation period. We start after it ends, or sooner if you ask us to by email or on a signed form.",
     ],
   },
   kit: {
@@ -152,7 +152,7 @@ export const STAGE_INFO: Record<ProjectStageId, StageInfo> = {
     title: "Aftercare",
     strap: "We don't vanish when the van leaves.",
     explainer: [
-      "We check in after a week to see how it's running, and ask what you think after a month.",
+      "We check in after a week to see how it's running, ask what you think after a month, and check again when the season first turns.",
       "Something not right? Report it here and we'll arrange a callback.",
       "We'll remind you when the yearly service is due.",
     ],
@@ -166,9 +166,10 @@ const capitalise = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 /**
  * A stage's copy with the numbers settings control filled in: the survey
  * length, the install block and the cancellation period. Customer screens
- * use this; STAGE_INFO is the generic fallback.
+ * use this; STAGE_INFO is the generic fallback. With the project, the
+ * cancellation sentence is that contract's own (cancellationCopy).
  */
-export function stageInfo(stage: ProjectStageId, settings: PilotSettings): StageInfo {
+export function stageInfo(stage: ProjectStageId, settings: PilotSettings, project?: Project): StageInfo {
   const base = STAGE_INFO[stage];
   const info: StageInfo = { ...base, explainer: [...base.explainer] };
   const { surveyDurationMinutes, installBlockDays, cancellationDays } = settings.scheduling;
@@ -184,8 +185,10 @@ export function stageInfo(stage: ProjectStageId, settings: PilotSettings): Stage
         days === 1
           ? "Choose an install day that suits you. We only offer dates we can actually do."
           : `Choose a ${numberWord(days)}-day block that suits you. We only offer dates we can actually do.`;
-      if (cancellationDays > 0) {
-        info.explainer[2] = `You can cancel within ${cancellationDays} days of accepting. We start after that, or sooner if you ask us to in writing.`;
+      if (project) {
+        info.explainer[2] = `${cancellationCopy(project, { settings })} We start after it ends, or sooner if you ask us to by email or on a signed form.`;
+      } else if (cancellationDays > 0) {
+        info.explainer[2] = `You can cancel without giving a reason until ${cancellationDays} days after your equipment is delivered (or ${cancellationDays} days after you accept, if you're supplying the equipment yourself). We start after that, or sooner if you ask us to by email or on a signed form.`;
       }
       break;
     case "install":
@@ -225,6 +228,40 @@ export interface CrewMember {
   name: string;
   role: StaffRole;
   external: boolean;
+}
+
+/**
+ * Who supplies the kit, which decides the cancellation clock (CCR 2013 reg 5,
+ * 30): `supply-and-install` has goods and services as its object, so it's a
+ * sales contract and the period runs from delivery of the goods;
+ * `install-only` (the customer bought the kit) is a service contract and the
+ * period runs from acceptance. Legal review required: see cancellationStatus.
+ */
+export type ContractType = "supply-and-install" | "install-only";
+export const CONTRACT_TYPES: readonly ContractType[] = ["supply-and-install", "install-only"];
+
+/** How the customer agreed to get contract documents by email instead of on paper (CCR reg 10(2)). */
+export type DocumentsConsentChannel = "portal" | "in-person" | "email";
+
+/**
+ * The customer's request to start inside the cancellation period (CCR reg
+ * 36(1)): an express request, made by the customer on a durable medium for
+ * an off-premises contract. The portal tick records the request; it only
+ * counts once `evidencedAt` records the durable copy (their email reply with
+ * the early-start wording, or a signed form).
+ */
+export interface EarlyStartRecord {
+  requested: boolean;
+  requestedAt?: string;
+  /** Where the request was made: the portal tick, then the durable copy's medium once evidenced. */
+  channel?: "email" | "paper" | "portal";
+  /** The stored email's id, or the signed form's document or media id. */
+  evidenceRef?: string;
+  evidencedAt?: string;
+  /** The signed-in staff member who recorded the evidence. */
+  recordedBy?: string;
+  /** EARLY_START_WORDING_VERSION of the words the customer was asked to use. */
+  wordingVersion: string;
 }
 
 export interface InstallDay {
@@ -297,7 +334,27 @@ export interface Project {
     acceptedAt?: string;
     acceptedOptionLabel?: string;
     contractTotalPence?: number;
+    /** Set at issue; supply-and-install until then. */
+    contractType: ContractType;
+    /** Agreement to get the contract documents by email (else they must be on paper). Proposal issue needs it. */
+    documentsByEmailConsent?: { at: string; channel: DocumentsConsentChannel };
+    /**
+     * When the issue email went out carrying the Schedule 2 information, the
+     * cancellation instructions and the model form (the durable medium).
+     */
+    preContractInfoSentAt?: string;
+    /** When the acceptance confirmation (the contract copy) was sent. Needed before work starts (reg 12(4)). */
+    confirmationSentAt?: string;
+    /** Kept in step with `earlyStart.requested` for older readers. */
     earlyStartRequested?: boolean;
+    earlyStart?: EarlyStartRecord;
+    /** supply-and-install: the day the last of the goods arrived (reg 30(3)–(4)), which starts the countdown. */
+    goodsReceivedOn?: string;
+    /**
+     * The reg 30 end date, inclusive: install-only from acceptance,
+     * supply-and-install from `goodsReceivedOn` (unset until then). Read it
+     * through cancellationStatus, which also applies reg 31.
+     */
     cancellationEndsOn?: string;
     changeRequest?: string;
     declineReason?: string;
@@ -343,6 +400,10 @@ export interface Project {
     checkIn7dSentAt?: string;
     feedbackRequestedAt?: string;
     feedback?: { at: string; score: number; comments?: string };
+    reviewRequestedAt?: string;
+    seasonalCheckSentAt?: string;
+    /** The customer asked for no more follow-ups (check-ins, feedback, review, seasonal, service reminders). */
+    followUpsOptedOutAt?: string;
     serviceDueOn?: string;
   };
   money: { contractTotalPence?: number; invoicedPence: number; paidPence: number; changeFeesPence: number };
@@ -550,7 +611,7 @@ function blankProject(id: string, quoteId: string, createdAt: string): Project {
     },
     electrics: { ...ELECTRICS_ASSESSMENT.unsure, surveyCondition: "unsure" },
     design: { status: "not-started" },
-    proposal: { status: "not-issued" },
+    proposal: { status: "not-issued", contractType: "supply-and-install" },
     booking: {
       status: "not-booked",
       dates: [],
@@ -856,6 +917,34 @@ export function blockersFor(project: Project, ctx: ReadinessContext, gate: GateI
           "Confirm the tax code, or record an admin override with a reason",
         );
       }
+      // The issue email is the durable medium for the pre-contract information
+      // (CCR reg 10): by email only with the customer's agreement, and only
+      // when every Schedule 2 item from settings is there to put in it.
+      if (!p.proposal.documentsByEmailConsent) {
+        block(
+          "documents-consent-missing",
+          "The customer hasn't agreed to get the contract documents by email (without that, they must be given on paper).",
+          "customer",
+          "Ask the customer to confirm they're happy to get documents by email",
+        );
+      }
+      if (!p.customer.email?.trim()) {
+        block(
+          "no-customer-email",
+          "There's no email address for the customer, so the pre-contract information can't be sent.",
+          "ops",
+          "Add the customer's email address",
+        );
+      }
+      const missing = schedule2Missing(s);
+      if (missing.length) {
+        block(
+          "schedule2-incomplete",
+          `The pre-contract information is missing from settings: ${missing.join(", ")}.`,
+          "admin",
+          "Fill in the company details in settings",
+        );
+      }
       if (!pc) {
         block("proposal-not-drafted", "There's no proposal draft to issue yet.", "ops", "Build the proposal");
       } else {
@@ -928,13 +1017,24 @@ export function blockersFor(project: Project, ctx: ReadinessContext, gate: GateI
       const start = p.booking.startDate;
       if (!start || p.booking.dates.length !== p.booking.installDays) {
         block("dates-not-chosen", "Install dates haven't been chosen yet.", "customer", "Choose your install dates");
-      } else if (!p.proposal.earlyStartRequested && p.proposal.cancellationEndsOn && start <= p.proposal.cancellationEndsOn) {
-        block(
-          "dates-inside-cancellation",
-          `Install would start ${fmtDate(start)}, inside the cancellation period (ends ${fmtDate(p.proposal.cancellationEndsOn)}), and no early start was requested.`,
-          "ops",
-          "Move the dates",
-        );
+      } else if (!earlyStartRequestedOf(p)) {
+        const cs = cancellationStatus(p, today, s);
+        const days = s.scheduling.cancellationDays;
+        if (cs.endsOn && start <= cs.endsOn) {
+          block(
+            "dates-inside-cancellation",
+            `Install would start ${fmtDate(start)}, inside the cancellation period (ends ${fmtDate(cs.endsOn)}), and no early start was requested.`,
+            "ops",
+            "Move the dates",
+          );
+        } else if (!cs.endsOn && cs.basis === "goods-delivery") {
+          warn(
+            "no-early-start",
+            `No early start was requested, so the install can only start once ${days} days have passed after the kit is delivered: it needs to arrive by ${fmtDate(addDays(start, -(days + 1)))}.`,
+            "ops",
+            "Get the kit delivered early enough, or ask the customer whether they want to start sooner",
+          );
+        }
       }
       break;
     }
@@ -960,14 +1060,38 @@ export function blockersFor(project: Project, ctx: ReadinessContext, gate: GateI
         block("compliance-missing", "The compliance checklist hasn't been set up.", "ops", "Create the compliance checklist");
       }
       complianceFor(true);
-      // The cancellation period includes its last day: work starts the day after.
-      if (!p.proposal.earlyStartRequested) {
-        if (!p.proposal.cancellationEndsOn) {
-          block("cancellation-unknown", "The end of the cancellation period isn't recorded.", "ops", "Check the acceptance record");
-        } else if (today <= p.proposal.cancellationEndsOn) {
+      // The customer's copy of the contract must reach them before work
+      // begins (reg 12(4)); the outbox records it once the email has gone.
+      if (!p.proposal.confirmationSentAt) {
+        block(
+          "confirmation-not-sent",
+          "The contract confirmation (the customer's durable copy) hasn't been sent. It must reach them before work starts.",
+          "ops",
+          "Check the confirmation email in messages and resend it",
+        );
+      }
+      // The cancellation period includes its last day: work starts the day
+      // after, or inside it only on an express request on a durable medium
+      // (reg 36(1)). Legal review required: see cancellationStatus.
+      const cs = cancellationStatus(p, today, s);
+      if (!cs.ended && !cs.earlyStartEvidenced) {
+        const days = s.scheduling.cancellationDays;
+        const runs = cs.endsOn
+          ? `runs until the end of ${fmtDate(cs.endsOn)}`
+          : `runs until ${days} days after the kit is delivered`;
+        if (cs.basis === "unknown") {
+          block("cancellation-unknown", "The cancellation period can't be worked out: there's no accepted contract on record.", "ops", "Check the acceptance record");
+        } else if (earlyStartRequestedOf(p)) {
+          block(
+            "early-start-unevidenced",
+            `The cancellation period ${runs}. The customer ticked "start early", but that request isn't on a durable medium yet: record their email reply with the early-start wording, or a signed form.`,
+            "ops",
+            "Record the customer's early-start email or signed form",
+          );
+        } else {
           block(
             "cancellation-period",
-            `The cancellation period runs until ${fmtDate(p.proposal.cancellationEndsOn)}. Work can start the day after, or sooner only on the customer's written request.`,
+            `The cancellation period ${runs}, and the customer hasn't asked to start early. Work can start the day after it ends, or sooner only on their request by email or signed form.`,
             "ops",
             "Wait for the period to end",
           );
@@ -1123,11 +1247,14 @@ export function projectTimeline(project: Project, todayIso: string): TimelineEnt
   }
 
   // Install: booked dates, else after the cancellation period (or a week on
-  // an early-start request), never inside the crew lead time.
+  // an early-start request), never inside the crew lead time. Before the
+  // period's end is known (supply-and-install before delivery), assume it
+  // runs from acceptance: an estimate, never a promise.
   let installStart = p.booking.startDate;
   if (!installStart) {
-    const coolingOffEnds = p.proposal.cancellationEndsOn ?? addDays(acceptance, DEFAULT_SETTINGS.scheduling.cancellationDays);
-    const earliest = p.proposal.earlyStartRequested
+    const coolingOffEnds =
+      cancellationStatus(p, today).endsOn ?? addDays(acceptance, DEFAULT_SETTINGS.scheduling.cancellationDays);
+    const earliest = earlyStartRequestedOf(p)
       ? addDays(acceptance, 7)
       : laterOf(addDays(acceptance, 7), addDays(coolingOffEnds, 1));
     installStart = nextWorkingDay(laterOf(est(earliest), addDays(today, INSTALL_LEAD_DAYS)));
@@ -1233,6 +1360,7 @@ function normaliseV2(raw: Rec): Project {
   p.booking.crew = list(p.booking.crew);
   p.booking.prep = Array.isArray(rec(raw.booking).prep) ? list(p.booking.prep) : blank.booking.prep;
   p.install.days = list(p.install.days);
+  p.proposal.contractType = oneOf(p.proposal.contractType, CONTRACT_TYPES, "supply-and-install");
   p.events = validEvents(raw.events);
   return p;
 }
@@ -1306,16 +1434,19 @@ function fromV1(raw: Rec): Project {
   const fqStatus = oneOf(fq.status, ["pending", "issued", "accepted"], "pending");
   const issuedAt = optStr(fq.issuedAt);
   const acceptedAt = optStr(fq.acceptedAt);
+  // v1 always supplied the kit, so every v1 contract is supply-and-install:
+  // its cancellation period runs from delivery (set below with the kit), and
+  // v1 never sent pre-contract information on a durable medium, so
+  // cancellationStatus applies reg 31 to it.
   if (fqStatus === "issued") {
-    p.proposal = { status: "issued", ...(issuedAt ? { issuedAt } : {}) };
+    p.proposal = { status: "issued", contractType: "supply-and-install", ...(issuedAt ? { issuedAt } : {}) };
   } else if (fqStatus === "accepted") {
     const contractTotalPence = Math.round(num(fq.totalGbp, p.quoteSummary.totalGbp) * 100);
     p.proposal = {
       status: "accepted",
+      contractType: "supply-and-install",
       ...(issuedAt ? { issuedAt } : {}),
-      ...(acceptedAt
-        ? { acceptedAt, cancellationEndsOn: addDays(acceptedAt, DEFAULT_SETTINGS.scheduling.cancellationDays) }
-        : {}),
+      ...(acceptedAt ? { acceptedAt } : {}),
       contractTotalPence,
     };
     p.money.contractTotalPence = contractTotalPence;
@@ -1356,6 +1487,11 @@ function fromV1(raw: Rec): Project {
     ...(optStr(dl.deliveredAt) ? { deliveredAt: str(dl.deliveredAt) } : {}),
     ...(courier ? { summary: trackingRef ? `${courier}, tracking ${trackingRef}` : courier } : {}),
   };
+  if (p.proposal.status === "accepted" && p.proposal.acceptedAt && p.kit.status === "delivered" && p.kit.deliveredAt) {
+    const days = DEFAULT_SETTINGS.scheduling.cancellationDays;
+    p.proposal.goodsReceivedOn = dateOf(p.kit.deliveredAt);
+    p.proposal.cancellationEndsOn = laterOf(addDays(p.kit.deliveredAt, days), addDays(p.proposal.acceptedAt, days));
+  }
 
   p.money.changeFeesPence = (p.survey.rescheduleFeesGbp + p.booking.rescheduleFeesGbp) * 100;
   p.events = events;
@@ -1428,7 +1564,17 @@ export type ProjectAction =
   | { type: "design-updated"; designId: string; version: number; status: "draft" | "in-review" }
   | { type: "design-approved"; designId: string; version: number; by: string }
   // proposal
-  | { type: "proposal-issued"; proposalId: string; version: number; validUntil: string; optionCount: number }
+  /** The customer agreed to get contract documents by email (customer on the portal, or ops recording it). */
+  | { type: "documents-consent-recorded"; channel: DocumentsConsentChannel }
+  | {
+      type: "proposal-issued";
+      proposalId: string;
+      version: number;
+      validUntil: string;
+      optionCount: number;
+      /** Who supplies the kit; keeps the project's current type (supply-and-install by default) when left out. */
+      contractType?: ContractType;
+    }
   | { type: "proposal-viewed"; proposalId: string }
   | { type: "proposal-changes-requested"; text: string }
   | { type: "proposal-declined"; reason: string }
@@ -1439,8 +1585,14 @@ export type ProjectAction =
       optionLabel: string;
       contractTotalPence: number;
       earlyStartRequested: boolean;
+      /** The early-start wording version the customer was shown; EARLY_START_WORDING_VERSION when left out. */
+      earlyStartWordingVersion?: string;
     }
   | { type: "proposal-expired" }
+  /** System: the acceptance confirmation email (the contract copy) went out. Idempotent. */
+  | { type: "contract-confirmation-sent"; messageId?: string; demo?: boolean }
+  /** Ops: the customer's early-start request on a durable medium (their email reply, or a signed form) is on file. */
+  | { type: "early-start-evidenced"; channel: "email" | "paper"; evidenceRef: string; by: string }
   // booking
   | { type: "install-dates-set"; startDate: string; dates: string[] }
   | { type: "crew-assigned"; crew: CrewMember[] }
@@ -1469,6 +1621,10 @@ export type ProjectAction =
   | { type: "aftercare-checkin-sent" }
   | { type: "feedback-requested" }
   | { type: "feedback-submitted"; score: number; comments?: string }
+  | { type: "review-requested" }
+  | { type: "seasonal-check-sent" }
+  /** The customer asked for no more follow-ups (or, with false, for them again). */
+  | { type: "aftercare-opt-out"; optedOut: boolean }
   // admin
   | { type: "set-next-action"; text: string; dueOn?: string; ownerRole?: StaffRole | "customer" }
   | { type: "set-pilot"; number: number; label: string }
@@ -1495,6 +1651,10 @@ const AFTER_CLOSE: ReadonlySet<ProjectAction["type"]> = new Set<ProjectAction["t
   "aftercare-checkin-sent",
   "feedback-requested",
   "feedback-submitted",
+  "review-requested",
+  "seasonal-check-sent",
+  "aftercare-opt-out",
+  "contract-confirmation-sent",
 ]);
 
 const KIT_STATUSES: readonly KitStatus[] = ["not-ordered", "ordered", "confirmed", "dispatched", "delivered", "inspected"];
@@ -1707,15 +1867,35 @@ export function applyProjectAction(project: Project, action: ProjectAction, now:
 
     /* ---------------- proposal ---------------- */
 
+    case "documents-consent-recorded": {
+      if (!["portal", "in-person", "email"].includes(action.channel)) return err("How did the customer agree?");
+      if (p.proposal.status === "accepted") return err("The contract is already in place.");
+      // The first agreement stands; asking again changes nothing.
+      if (p.proposal.documentsByEmailConsent) return ok();
+      p.proposal.documentsByEmailConsent = { at: now, channel: action.channel };
+      log(
+        "documents-consent-recorded",
+        "You agreed to get your proposal, contract and cancellation information by email.",
+        "customer",
+      );
+      return ok();
+    }
+
     case "proposal-issued": {
       if (p.proposal.status === "accepted") return err("The proposal is accepted. Changes now go through a variation.");
       if (!action.proposalId) return err("Which proposal?");
+      const contractType = action.contractType ?? p.proposal.contractType ?? "supply-and-install";
+      if (!CONTRACT_TYPES.includes(contractType)) return err("Unknown contract type.");
       if (!/^\d{4}-\d{2}-\d{2}/.test(action.validUntil) || dateOf(action.validUntil) < today) {
         return err("The valid-until date must be today or later.");
       }
       if (!Number.isInteger(action.optionCount) || action.optionCount < 1) return err("A proposal needs at least one option.");
       const refusal = gate("proposal-issue");
       if (refusal) return refusal;
+      // A fresh version starts clean, except the customer's standing
+      // agreement to email delivery. Its issue email carries the Schedule 2
+      // information, the cancellation instructions and the model form.
+      const consent = p.proposal.documentsByEmailConsent;
       p.proposal = {
         status: "issued",
         proposalId: action.proposalId,
@@ -1723,6 +1903,9 @@ export function applyProjectAction(project: Project, action: ProjectAction, now:
         issuedAt: now,
         validUntil: dateOf(action.validUntil),
         optionCount: action.optionCount,
+        contractType,
+        ...(consent ? { documentsByEmailConsent: consent } : {}),
+        preContractInfoSentAt: now,
       };
       log(
         "proposal-issued",
@@ -1777,14 +1960,71 @@ export function applyProjectAction(project: Project, action: ProjectAction, now:
       p.proposal.acceptedAt = now;
       p.proposal.acceptedOptionLabel = action.optionLabel;
       p.proposal.contractTotalPence = action.contractTotalPence;
-      p.proposal.earlyStartRequested = action.earlyStartRequested;
-      p.proposal.cancellationEndsOn = addDays(dateOf(now), settings.scheduling.cancellationDays);
+      const early = action.earlyStartRequested === true;
+      p.proposal.earlyStartRequested = early;
+      p.proposal.earlyStart = {
+        requested: early,
+        ...(early ? { requestedAt: now, channel: "portal" as const } : {}),
+        wordingVersion: action.earlyStartWordingVersion?.trim() || EARLY_START_WORDING_VERSION,
+      };
+      // install-only: 14 days from today (London), the contract day. A
+      // supply-and-install period starts counting when the goods arrive
+      // (kit-updated). Legal review required: see cancellationStatus.
+      delete p.proposal.goodsReceivedOn;
+      if (p.proposal.contractType === "install-only") {
+        p.proposal.cancellationEndsOn = addDays(today, settings.scheduling.cancellationDays);
+      } else {
+        delete p.proposal.cancellationEndsOn;
+      }
       delete p.proposal.changeRequest;
       p.money.contractTotalPence = action.contractTotalPence;
       log(
         "proposal-accepted",
         `You accepted your proposal (${action.optionLabel}, ${fmtPence(action.contractTotalPence)}). Your contract and cancellation form are in your documents. Next: choose your install dates.`,
         "customer",
+      );
+      return ok();
+    }
+
+    case "contract-confirmation-sent": {
+      if (p.proposal.status !== "accepted") return err("There's no accepted contract to confirm.");
+      if (p.proposal.confirmationSentAt) return ok(); // the first send is the one that counts
+      p.proposal.confirmationSentAt = now;
+      log(
+        "contract-confirmation-sent",
+        action.demo
+          ? "Contract confirmation email recorded in demo mode (stored, not delivered)."
+          : "Contract confirmation email sent: the customer's durable copy.",
+        "system",
+        { internal: true },
+      );
+      return ok();
+    }
+
+    case "early-start-evidenced": {
+      if (p.proposal.status !== "accepted") return err("There's no accepted contract.");
+      if (!earlyStartRequestedOf(p)) return err("The customer didn't ask to start early when they accepted.");
+      if (action.channel !== "email" && action.channel !== "paper") return err("Evidence is the customer's email or a signed form.");
+      const evidenceRef = action.evidenceRef.trim();
+      if (!evidenceRef) return err("Which email or form? Give its reference.");
+      // As with approvals: the verified person signed in, never a typed name.
+      if (!staff) return err("Recording early-start evidence needs a signed-in staff member.");
+      if (p.proposal.earlyStart?.evidencedAt) return err("The early-start request is already on file.");
+      p.proposal.earlyStart = {
+        ...(p.proposal.earlyStart ?? { requested: true, wordingVersion: EARLY_START_WORDING_VERSION }),
+        requested: true,
+        channel: action.channel,
+        evidenceRef,
+        evidencedAt: now,
+        recordedBy: staff.name,
+      };
+      p.proposal.earlyStartRequested = true;
+      log(
+        "early-start-evidenced",
+        action.channel === "email"
+          ? "We've got your email asking us to start early, and saved it with your contract."
+          : "We've got your signed form asking us to start early, and saved it with your contract.",
+        "ops",
       );
       return ok();
     }
@@ -1812,8 +2052,11 @@ export function applyProjectAction(project: Project, action: ProjectAction, now:
       if (daysBetween(today, start) < INSTALL_LEAD_DAYS) {
         return err(`Install dates need at least ${INSTALL_LEAD_DAYS} days' notice.`);
       }
-      const coolingOff = p.proposal.cancellationEndsOn;
-      if (!p.proposal.earlyStartRequested && coolingOff && start <= coolingOff) {
+      // Inside the period only on an early-start request (the evidence is
+      // checked at ready-to-install). A supply-and-install period with no end
+      // yet (kit not delivered) can't be checked here: that gate holds it.
+      const coolingOff = cancellationStatus(p, today, settings).endsOn;
+      if (!earlyStartRequestedOf(p) && coolingOff && start <= coolingOff) {
         return err(`Your cancellation period runs until ${fmtDate(coolingOff)}. Pick a start after that, or ask us about starting sooner.`);
       }
       if (p.booking.dates.join() === dates.join()) return err("Those are already your install dates.");
@@ -1889,6 +2132,26 @@ export function applyProjectAction(project: Project, action: ProjectAction, now:
       if (action.summary !== undefined) p.kit.summary = action.summary;
       if ((action.status === "delivered" || action.status === "inspected") && !p.kit.deliveredAt) p.kit.deliveredAt = now;
       if (action.status === "inspected") p.kit.inspectedAt = now;
+      // supply-and-install: the cancellation period runs to the end of 14
+      // days after the LAST of the goods arrives (reg 30(3)–(4)), so the clock
+      // starts on the first update with everything here, and never moves after.
+      // Never earlier than 14 days from acceptance. Assumes delivery to the
+      // customer's home; legal review required (see cancellationStatus).
+      let periodNote = "";
+      const arrived = action.status === "delivered" || action.status === "inspected";
+      if (
+        arrived &&
+        action.shortages === 0 &&
+        p.proposal.status === "accepted" &&
+        p.proposal.contractType === "supply-and-install" &&
+        !p.proposal.goodsReceivedOn
+      ) {
+        const days = settings.scheduling.cancellationDays;
+        const acceptedOn = dateOf(p.proposal.acceptedAt ?? today);
+        p.proposal.goodsReceivedOn = today;
+        p.proposal.cancellationEndsOn = laterOf(addDays(today, days), addDays(acceptedOn, days));
+        periodNote = ` Your cancellation period now runs until the end of ${fmtDate(p.proposal.cancellationEndsOn)}.`;
+      }
       const toCome = action.shortages
         ? ` ${action.shortages} item${action.shortages === 1 ? " is" : "s are"} still to come; we're on it.`
         : "";
@@ -1913,10 +2176,10 @@ export function applyProjectAction(project: Project, action: ProjectAction, now:
           log("kit-updated", "Kit dispatched by the supplier.", "ops", { internal: true });
           break;
         case "delivered":
-          log("kit-updated", `Your kit has been delivered.${toCome}`, "ops");
+          log("kit-updated", `Your kit has been delivered.${toCome}${periodNote}`, "ops");
           break;
         case "inspected":
-          log("kit-updated", `Your kit has been checked by your installer.${toCome}`, "field");
+          log("kit-updated", `Your kit has been checked by your installer.${toCome}${periodNote}`, "field");
           break;
       }
       return ok();
@@ -2148,6 +2411,36 @@ export function applyProjectAction(project: Project, action: ProjectAction, now:
       return ok();
     }
 
+    case "review-requested": {
+      if (p.aftercare.reviewRequestedAt) return err("The review request has already gone.");
+      p.aftercare.reviewRequestedAt = now;
+      log("review-requested", "Review request sent (the same one everyone gets).", "system", { internal: true });
+      return ok();
+    }
+
+    case "seasonal-check-sent": {
+      if (p.aftercare.seasonalCheckSentAt) return err("The change-of-season check has already gone.");
+      p.aftercare.seasonalCheckSentAt = now;
+      log("seasonal-check-sent", "Change-of-season check sent.", "system", { internal: true });
+      return ok();
+    }
+
+    case "aftercare-opt-out": {
+      if (action.optedOut === Boolean(p.aftercare.followUpsOptedOutAt)) {
+        return err(action.optedOut ? "Follow-ups are already off." : "Follow-ups are already on.");
+      }
+      if (action.optedOut) p.aftercare.followUpsOptedOutAt = now;
+      else delete p.aftercare.followUpsOptedOutAt;
+      log(
+        "aftercare-opt-out",
+        action.optedOut
+          ? "No more follow-up emails: we'll only contact you about open work, problems or payments."
+          : "Follow-up emails are back on.",
+        "customer",
+      );
+      return ok();
+    }
+
     case "feedback-submitted": {
       if (!Number.isInteger(action.score) || action.score < 0 || action.score > 10) return err("Pick a score from 0 to 10.");
       const comments = action.comments?.trim();
@@ -2245,9 +2538,213 @@ export function applyProjectAction(project: Project, action: ProjectAction, now:
  */
 export function earliestInstallStart(project: Project, todayIso: string, settings: PilotSettings = DEFAULT_SETTINGS): string {
   let earliest = addDays(dateOf(todayIso), INSTALL_LEAD_DAYS);
-  const ends = project.proposal.cancellationEndsOn;
-  if (ends && !project.proposal.earlyStartRequested) earliest = laterOf(earliest, addDays(ends, 1));
+  const ends = cancellationStatus(project, todayIso, settings).endsOn;
+  if (ends && !earlyStartRequestedOf(project)) earliest = laterOf(earliest, addDays(ends, 1));
   return nextWorkingDay(earliest, settings.scheduling.workingDays);
+}
+
+/* ------------------------------------------------------------------ */
+/* Cancellation period + early start                                  */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Shown to ops beside anything that relies on the cancellation rules below,
+ * until a solicitor has confirmed them.
+ */
+export const CANCELLATION_RULE_STATUS =
+  "Legal review required: supply-and-install is treated as a sales contract (cancellation period from delivery of the goods), install-only as a service contract (from acceptance).";
+
+/** Did the customer ask to start inside the cancellation period? (Older snapshots only have the boolean.) */
+export function earlyStartRequestedOf(project: Project): boolean {
+  return project.proposal.earlyStart?.requested ?? project.proposal.earlyStartRequested ?? false;
+}
+
+export interface CancellationStatus {
+  /** True only once the last day of the period has passed. Unknown is never ended. */
+  ended: boolean;
+  /** The last day of the period (inclusive), once it can be known. */
+  endsOn?: string;
+  basis: "acceptance" | "goods-delivery" | "unknown";
+  /** An early-start request that's on a durable medium (reg 36(1)(b)). */
+  earlyStartEvidenced: boolean;
+}
+
+/**
+ * Where the customer's cancellation period stands (CCR 2013 regs 29–31).
+ *
+ * LEGAL REVIEW REQUIRED. Our reading of the research (docs/research/
+ * uk-consumer-legal.md §1.2, §1.5), not legal advice:
+ *  * install-only is a service contract: the period ends at the end of
+ *    `cancellationDays` days after the day of acceptance (reg 30(2)).
+ *  * supply-and-install "has both goods and services as its object", so it's
+ *    a sales contract: the period ends `cancellationDays` days after the last
+ *    of the goods comes into the customer's possession (reg 30(3)–(4)). Until
+ *    the kit is recorded as fully delivered, the end isn't known and the
+ *    period has NOT ended. We assume delivery to the customer's home; kit
+ *    delivered to us first comes into their possession at install.
+ *  * Reg 31: if the cancellation information wasn't given before the
+ *    contract (the proposal issue email), the period runs until 14 days after
+ *    it was given (the confirmation email), or 12 months past the normal end
+ *    if it never was. We take the later date, the conservative reading.
+ * Day 0 is the contract (or delivery) day; the end date itself is inside the
+ * period, so `ended` turns true the day after.
+ */
+export function cancellationStatus(
+  project: Project,
+  todayIso: string,
+  settings: PilotSettings = DEFAULT_SETTINGS,
+): CancellationStatus {
+  const pr = project.proposal;
+  const earlyStartEvidenced = Boolean(earlyStartRequestedOf(project) && pr.earlyStart?.evidencedAt);
+  if (pr.status !== "accepted" || !pr.acceptedAt) return { ended: false, basis: "unknown", earlyStartEvidenced };
+
+  const days = settings.scheduling.cancellationDays;
+  const acceptedOn = dateOf(pr.acceptedAt);
+  const basis: CancellationStatus["basis"] = pr.contractType === "install-only" ? "acceptance" : "goods-delivery";
+  // A supply-and-install end date only counts once it came from the goods
+  // (an older snapshot may hold an acceptance-based one).
+  let endsOn: string | undefined =
+    basis === "acceptance"
+      ? (pr.cancellationEndsOn ?? addDays(acceptedOn, days))
+      : pr.goodsReceivedOn
+        ? (pr.cancellationEndsOn ?? laterOf(addDays(pr.goodsReceivedOn, days), addDays(acceptedOn, days)))
+        : undefined;
+
+  const infoBeforeContract = Boolean(pr.preContractInfoSentAt && pr.preContractInfoSentAt <= pr.acceptedAt);
+  if (endsOn && !infoBeforeContract) {
+    endsOn = pr.confirmationSentAt
+      ? laterOf(endsOn, addDays(dateOf(pr.confirmationSentAt), days))
+      : addMonths(endsOn, 12);
+  }
+
+  const today = dateOf(todayIso);
+  return {
+    ended: Boolean(endsOn && today && today > endsOn),
+    ...(endsOn ? { endsOn } : {}),
+    basis,
+    earlyStartEvidenced,
+  };
+}
+
+const DAY_FULL = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const MONTH_FULL = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+/** "Tuesday 10 November 2026": contract dates carry the year. */
+const fmtDateFull = (iso: string) => {
+  const d = new Date(`${dateOf(iso)}T12:00:00Z`);
+  return `${DAY_FULL[d.getUTCDay()]} ${d.getUTCDate()} ${MONTH_FULL[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+};
+
+/**
+ * The customer's cancellation position in one plain-English sentence, for
+ * the portal, the stage copy and the contract emails. Never hard-codes the
+ * day count or the start point: both come from settings and the contract type.
+ *
+ * LEGAL REVIEW REQUIRED: the wording follows the rule in cancellationStatus,
+ * which a solicitor hasn't confirmed yet. With `today`, an ended period says so.
+ */
+export function cancellationCopy(project: Project, opts: { settings?: PilotSettings; today?: string } = {}): string {
+  const settings = opts.settings ?? DEFAULT_SETTINGS;
+  const days = settings.scheduling.cancellationDays;
+  const supply = project.proposal.contractType !== "install-only";
+  if (project.proposal.status !== "accepted") {
+    return supply
+      ? `If you accept, you can cancel without giving a reason until ${days} days after the day your equipment is delivered to you.`
+      : `If you accept, you can cancel without giving a reason within ${days} days of the day you accept.`;
+  }
+  const cs = cancellationStatus(project, opts.today ?? "", settings);
+  if (cs.endsOn && cs.ended) return `Your cancellation period ended on ${fmtDateFull(cs.endsOn)}.`;
+  if (cs.endsOn) return `You can cancel without giving a reason until the end of ${fmtDateFull(cs.endsOn)}.`;
+  return supply
+    ? `Because we're supplying your equipment, you can cancel without giving a reason until ${days} days after the day it's delivered to you. We'll tell you the exact date when it arrives.`
+    : `You can cancel without giving a reason within ${days} days of the day you accepted.`;
+}
+
+/** Bump whenever earlyStartWording changes: the project records the version the customer was asked to use. */
+export const EARLY_START_WORDING_VERSION = "early-start-v1";
+
+/**
+ * The words a customer sends (replying to the confirmation email, or on a
+ * signed form) to make the express early-start request on a durable medium
+ * (CCR reg 36(1)). NEEDS SOLICITOR REVIEW.
+ *
+ * The loss-of-right sentence is only for install-only: reg 36(2) ends the
+ * right to cancel only for a service contract fully performed, so saying it
+ * on a supply-and-install (sales) contract would mislead.
+ */
+export function earlyStartWording(contractType: ContractType): string {
+  const base =
+    "Please start my installation before my cancellation period ends. I understand that if I then cancel, I will pay for the work done up to the time I tell you.";
+  return contractType === "install-only"
+    ? `${base} I understand that I will lose my right to cancel once the work has been fully completed.`
+    : base;
+}
+
+/** Waiting on the customer's durable early-start request, while it still matters. */
+function earlyStartReplyNeeded(project: Project): boolean {
+  const pr = project.proposal;
+  return (
+    pr.status === "accepted" &&
+    earlyStartRequestedOf(project) &&
+    !pr.earlyStart?.evidencedAt &&
+    Boolean(pr.confirmationSentAt) &&
+    project.install.status === "not-started"
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Aftercare timing (the daily-ops cron asks these)                   */
+/* ------------------------------------------------------------------ */
+
+/** The review request: a week after the 30-day feedback, so the two never travel together. */
+export const REVIEW_REQUEST_DAYS = 37;
+/** A change-of-season check never lands within this many days of handover. */
+export const SEASONAL_CHECK_MIN_DAYS = 28;
+
+const handoverDay = (p: Project) => (p.handover.handedOverAt ? dateOf(p.handover.handedOverAt) : null);
+const followUpsAllowed = (p: Project) => p.closure.reason !== "cancelled" && !p.aftercare.followUpsOptedOutAt;
+
+/**
+ * Is the review request due? The same rule for everyone (DMCC Act 2024
+ * Sch 20 para 13): handed over at least REVIEW_REQUEST_DAYS ago, with the
+ * paperwork done (electrical certificate and warranty registration), a
+ * review link in settings, follow-ups not refused, and not already asked.
+ * It never looks at the feedback score: no review gating.
+ */
+export function reviewRequestDue(project: Project, todayIso: string, settings: PilotSettings): boolean {
+  const p = project;
+  const handed = handoverDay(p);
+  if (!settings.company.reviewUrl || !handed || p.handover.status !== "handed-over") return false;
+  if (!followUpsAllowed(p) || p.aftercare.reviewRequestedAt) return false;
+  if (p.handover.electricalCert === "pending" || !p.handover.warrantyRegistered) return false;
+  return daysBetween(handed, todayIso) >= REVIEW_REQUEST_DAYS;
+}
+
+/**
+ * The first change of season after handover, and the mode the customer is
+ * about to use for the first time: after a spring or summer handover (April
+ * to September), heating from 1 October; after an autumn or winter one,
+ * cooling from 1 June. Never within SEASONAL_CHECK_MIN_DAYS of handover.
+ * A calendar rule, not a weather feed: ops can send it by hand sooner.
+ */
+export function seasonalCheck(project: Project): { on: string; mode: "heating" | "cooling" } | null {
+  const handed = handoverDay(project);
+  if (!handed) return null;
+  const [y, m] = handed.split("-").map(Number) as [number, number];
+  const warmHalf = m >= 4 && m <= 9;
+  const boundary = warmHalf ? `${y}-10-01` : `${m >= 10 ? y + 1 : y}-06-01`;
+  return { on: laterOf(boundary, addDays(handed, SEASONAL_CHECK_MIN_DAYS)), mode: warmHalf ? "heating" : "cooling" };
+}
+
+/** Is the change-of-season check due today? Once, after handover, unless follow-ups were refused. */
+export function seasonalCheckDue(project: Project, todayIso: string): boolean {
+  const check = seasonalCheck(project);
+  if (!check || project.handover.status !== "handed-over") return false;
+  if (!followUpsAllowed(project) || project.aftercare.seasonalCheckSentAt) return false;
+  return dateOf(todayIso) >= check.on;
 }
 
 /** Date-change fees accrued so far, plus the survey fee state, for the balance strip. */
@@ -2292,11 +2789,17 @@ export function customerNextAction(project: Project): { label: string; href?: st
       if (p.proposal.status === "expired" || p.proposal.status === "declined") {
         return { label: "Ask us for an updated proposal", href: `${base}/proposal` };
       }
+      // The proposal can't be sent until they've agreed to email delivery.
+      if (p.survey.status === "submitted" && !p.proposal.documentsByEmailConsent) {
+        return { label: "Agree to get your documents by email", href: `${base}#proposal` };
+      }
       return null; // designing, or revising after a change request
     case "booking":
-      return p.booking.dates.length === 0 ? { label: "Choose your install dates", href: `${base}#booking` } : null;
+      if (p.booking.dates.length === 0) return { label: "Choose your install dates", href: `${base}#booking` };
+      return earlyStartReplyNeeded(p) ? { label: "Reply to confirm your early start", href: `${base}#booking` } : null;
     case "kit":
     case "install":
+      if (earlyStartReplyNeeded(p)) return { label: "Reply to confirm your early start", href: `${base}#booking` };
       if (p.install.status === "not-started" && p.booking.prep.some((i) => i.confirmable && !i.done)) {
         return { label: "Get your home ready", href: `${base}#booking` };
       }
