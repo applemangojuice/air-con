@@ -7,6 +7,7 @@ import type {
   IssueStatus,
   Project,
   Severity,
+  StaffMember,
   StaffRole,
 } from "@aircon/domain";
 
@@ -80,6 +81,8 @@ export interface FieldMe {
   canSign: boolean;
   /** Ops can open the command centre (board-wide view). */
   canViewAll: boolean;
+  /** The same person for the domain's client-side checks (canRecord): roles and qualification kinds and expiry, no certificate numbers. */
+  staff: StaffMember;
 }
 
 export interface FieldIssue {

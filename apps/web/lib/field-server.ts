@@ -150,6 +150,19 @@ function meOf(staff: StaffMember, today: string): FieldMe {
     canReview: canReviewExceptions(staff, today).ok,
     canSign: can(staff, "commissioning.sign") && meetsRequirement(staff, "tech-lead", today),
     canViewAll: can(staff, "projects.view-all"),
+    staff: {
+      id: staff.id,
+      email: "",
+      name: staff.name,
+      roles: staff.roles,
+      external: staff.external,
+      active: staff.active,
+      qualifications: staff.qualifications.map((q) => ({
+        kind: q.kind,
+        reference: q.reference.trim() ? "on file" : "",
+        ...(q.expiresOn ? { expiresOn: q.expiresOn } : {}),
+      })),
+    },
   };
 }
 
@@ -814,7 +827,9 @@ function captureTime(at: string): string {
 
 /** Why recording on this step isn't possible right now, or null. */
 export function recordingRefusal(project: Project, step: InstallStep): string | null {
-  if (project.install.status === "not-started") return "Day 1 hasn't started yet. Tap Arrived to start it, then capture again.";
+  // The RAMS are read before anyone sets off: that acknowledgement may come in before day 1.
+  const preStart = step.evidence.some((e) => e.role === "rams");
+  if (project.install.status === "not-started" && !preStart) return "Day 1 hasn't started yet. Tap Arrived to start it, then capture again.";
   if (project.handover.status === "handed-over") return "This job is handed over, so the runsheet is closed. Raise an issue instead.";
   if (step.stage !== "handover" && project.handover.status !== "pending") {
     return "Commissioning is signed, so the install runsheet is closed. Raise an issue instead.";
@@ -1237,23 +1252,7 @@ export async function endDay(
       staff,
     ),
   );
-  const answers = input.learnings
-    .filter((a) => LEARNING_PROMPTS.some((p) => p.id === a.promptId) && a.answer.trim())
-    .map((a) => ({ promptId: a.promptId, answer: a.answer.trim().slice(0, 2000) }));
-  if (answers.length) {
-    const learning: Learning = {
-      id: crypto.randomUUID(),
-      projectId,
-      dayN: input.n,
-      stage: "install",
-      author: { staffId: staff.id, name: staff.name },
-      answers,
-      tags: [],
-      status: "open",
-      createdAt: nowIso(),
-    };
-    await learningsRepo.insert(learning);
-  }
+  const learningsSaved = input.learnings.length ? await insertLearnings(projectId, staff, input.n, input.learnings) : 0;
   if (input.clockEntryId && isUuid(input.clockEntryId)) {
     const entry = await timeRepo.get(input.clockEntryId);
     if (entry && entry.staffId === staff.id && !entry.endedAt) {
@@ -1262,7 +1261,34 @@ export async function endDay(
     }
   }
   const email = text ? await messageStatus("install-day-update", projectId, `day-${input.n}`, "email") : { status: "not-sent" as SendStatus };
-  return { project, email, learningsSaved: answers.length };
+  return { project, email, learningsSaved };
+}
+
+async function insertLearnings(projectId: string, staff: StaffMember, dayN: number, raw: { promptId: string; answer: string }[]): Promise<number> {
+  const answers = raw
+    .filter((a) => LEARNING_PROMPTS.some((p) => p.id === a.promptId) && a.answer.trim())
+    .map((a) => ({ promptId: a.promptId, answer: a.answer.trim().slice(0, 2000) }));
+  if (!answers.length) return 0;
+  const learning: Learning = {
+    id: crypto.randomUUID(),
+    projectId,
+    dayN,
+    stage: "install",
+    author: { staffId: staff.id, name: staff.name },
+    answers,
+    tags: [],
+    status: "open",
+    createdAt: nowIso(),
+  };
+  await learningsRepo.insert(learning);
+  return answers.length;
+}
+
+/** The two-minute learning prompts at the end of a day, saved for the pilot review. */
+export async function saveLearnings(projectId: string, staff: StaffMember, dayN: number, answers: { promptId: string; answer: string }[]) {
+  if (!can(staff, "install.work")) throw new FieldError("You don't have install permissions.", 403);
+  await projectForStaff(projectId, staff);
+  return { saved: await insertLearnings(projectId, staff, dayN, answers) };
 }
 
 /** The end-of-day email the customer would get (the template, with today's words). */

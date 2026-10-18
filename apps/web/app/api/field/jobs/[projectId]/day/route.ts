@@ -1,7 +1,7 @@
 import { LEARNING_PROMPTS } from "@aircon/domain";
 import { z } from "zod";
 import { requireProjectAccess, requireStaffApi } from "@/lib/auth/server";
-import { dayUpdatePreview, endDay, startDay } from "@/lib/field-server";
+import { dayUpdatePreview, endDay, saveLearnings, startDay } from "@/lib/field-server";
 import { answer, json, notFound, projectIdSchema, readJson } from "../../../_lib/http";
 
 /**
@@ -33,6 +33,11 @@ const bodySchema = z.discriminatedUnion("action", [
     learnings: z.array(z.object({ promptId: z.enum(promptIds), answer: z.string().max(2000) })).max(LEARNING_PROMPTS.length),
     clockEntryId: z.string().uuid().optional(),
   }),
+  z.object({
+    action: z.literal("learnings"),
+    n,
+    answers: z.array(z.object({ promptId: z.enum(promptIds), answer: z.string().max(2000) })).max(LEARNING_PROMPTS.length),
+  }),
 ]);
 
 export async function POST(request: Request, { params }: Params): Promise<Response> {
@@ -51,6 +56,7 @@ export async function POST(request: Request, { params }: Params): Promise<Respon
     });
   }
   if (b.action === "preview") return answer(() => dayUpdatePreview(projectId, staff, b.n, b.text, b.photoCount));
+  if (b.action === "learnings") return answer(() => saveLearnings(projectId, staff, b.n, b.answers));
   return answer(async () => {
     const result = await endDay(projectId, staff, b);
     return { ok: true, email: result.email, learningsSaved: result.learningsSaved };
