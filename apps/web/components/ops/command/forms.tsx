@@ -220,10 +220,17 @@ export function BookSurveyForm({
 /* ------------------------------------------------------------------ */
 
 export function ConsentForm({ action }: { action: Action }) {
+  const id = useId();
   return (
     <ActionForm action={action}>
       <fieldset>
         <legend className={LABEL}>The customer agreed to get documents by email</legend>
+        <div className="mb-2">
+          <L htmlFor={`${id}-ev`} hint="Kept with the agreement, so it can be shown later: for an email, its date and subject.">
+            How and when they agreed
+          </L>
+          <input id={`${id}-ev`} name="evidence" required minLength={5} maxLength={500} placeholder="e.g. their email of 19 Oct, “Re: your proposal”" className={compactInput} />
+        </div>
         <div className="flex flex-wrap gap-2">
           <SubmitButton name="channel" value="in-person" variant="secondary">
             They told us in person

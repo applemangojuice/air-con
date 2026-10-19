@@ -177,6 +177,37 @@ export async function retrieveCheckoutSession(id: string): Promise<StripeResult<
   return stripeRequest<CheckoutSession>("GET", `/checkout/sessions/${encodeURIComponent(id)}`);
 }
 
+/**
+ * Close an open session so it can't be paid any more: before a new one is
+ * made for the same invoice, so two pages for one bill can't both be paid.
+ * Stripe refuses this for a session that's already complete (paid) or
+ * expired; the caller reads it back to see which.
+ */
+export async function expireCheckoutSession(id: string): Promise<StripeResult<CheckoutSession>> {
+  if (!/^cs_[A-Za-z0-9_]+$/.test(id)) return { ok: false, error: "Not a Checkout Session id" };
+  return stripeRequest<CheckoutSession>("POST", `/checkout/sessions/${encodeURIComponent(id)}/expire`, new URLSearchParams());
+}
+
+/** The subset of a Refund we read. */
+export interface StripeRefund {
+  id: string;
+  amount: number;
+  currency: string;
+  status: string | null;
+  created: number;
+  reason: string | null;
+  charge: string | { id: string } | null;
+  payment_intent: string | { id: string } | null;
+}
+
+/** Every refund on one charge (newer API versions leave them off the charge.refunded event). */
+export async function listRefundsForCharge(chargeId: string): Promise<StripeResult<StripeRefund[]>> {
+  if (!/^ch_[A-Za-z0-9_]+$/.test(chargeId)) return { ok: false, error: "Not a charge id" };
+  const res = await stripeRequest<{ data?: StripeRefund[] }>("GET", `/refunds?charge=${encodeURIComponent(chargeId)}&limit=100`);
+  if (!res.ok) return res;
+  return { ok: true, value: Array.isArray(res.value.data) ? res.value.data : [] };
+}
+
 /* ------------------------------------------------------------------ */
 /* Webhook signatures                                                  */
 /* ------------------------------------------------------------------ */

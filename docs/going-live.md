@@ -14,22 +14,29 @@ watches (Vercel → Project → Settings → Git → Production Branch).
 
 1. **Vercel**: vercel.com → Add New Project → import this GitHub repo.
    Set **Root Directory** to `apps/web`. Framework auto-detects (Next.js);
-   pnpm workspaces are handled natively.
+   pnpm workspaces are handled natively. `apps/web/vercel.json` pins the
+   functions to **London (`lhr1`)**: every click makes several database round
+   trips one after another, so the functions must sit next to the database.
 
-2. **Supabase**: create a project, then run **every** file in
-   `supabase/migrations/` **in order**, in the Supabase SQL editor (or
-   `supabase db push`):
+2. **Supabase**: create a project in **London (eu-west-2)**, the same place
+   as the functions (if you pick another region, change `regions` in
+   `apps/web/vercel.json` to the Vercel region nearest it). Then run
+   **every** file in `supabase/migrations/` **in order**, in the Supabase SQL
+   editor (or `supabase db push`):
 
    `0001` → `0002` → `0003` → `0004` → `0005` → **both** `0006` files
    (`0006_draft_quotes.sql` and `0006_property_intelligence.sql`) → `0007` →
-   `0008` → `0009` → **`0010_pilot_platform.sql`** → **`0011_storage_limits.sql`**.
+   `0008` → `0009` → **`0010_pilot_platform.sql`** → **`0011_storage_limits.sql`**
+   → **`0012_rate_limits.sql`**.
 
    `0010` is the pilot platform itself: the staff and sign-in tables, every
    project record (surveys, designs, proposals, orders, invoices, payments,
    documents…) and the `project-media` bucket. **Without it nobody can sign
    in.** `0011` sets each storage bucket's size limit and file types (the
    public photo upload takes photos only); `/api/health` and `/ops/status`
-   report a bucket without them. Re-running a file is safe. If you skip one the
+   report a bucket without them. `0012` makes the sign-in limits count once
+   for the whole site rather than per server instance (`/ops/launch` shows
+   amber without it). Re-running a file is safe. If you skip one the
    site looks connected but can't save; `/login` says so, and so do the
    deploy logs (`[schema] The database is missing …`).
 
@@ -44,7 +51,7 @@ watches (Vercel → Project → Settings → Git → Production Branch).
    | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | The database. Without them the site is in demo mode and saves nothing. | Supabase → Settings → API |
    | `SESSION_SECRET` | Signs every sign-in. Missing, under 32 characters, or a template value: production signs **nobody** in. | `openssl rand -hex 32` |
    | `ADMIN_EMAILS` | The first sign-in from one of these (comma separated) creates its admin account. The only way to get the first admin. | Your own addresses |
-   | `RESEND_API_KEY`, `EMAIL_FROM` | Sign-in links, the proposal email (pre-contract information and the cancellation form, which must reach the customer on a durable medium), the contract copy, every update. Without email a live deployment refuses to issue proposals. | Resend; verify the `EMAIL_FROM` domain there first |
+   | `RESEND_API_KEY`, `EMAIL_FROM` | Sign-in links, the proposal email (pre-contract information and the cancellation form, which must reach the customer on a durable medium), the contract copy, every update. Without email a live deployment refuses to issue proposals. Every email's **Reply-To is the company email in Settings**, so it must be a monitored inbox: the acceptance email asks customers who want an early start to reply with the exact words, and that reply is the legal evidence. | Resend; verify the `EMAIL_FROM` domain there first |
    | `NEXT_PUBLIC_APP_URL` | The live domain (`https://…`): every link in every email. | Your domain |
    | `CRON_SECRET` | The scheduled jobs in `apps/web/vercel.json`: daily ops (survey and day-before reminders, proposal expiry, outbox retries, aftercare), the morning digest and the abandoned-quote follow-up. Without it they all answer 401. | `openssl rand -hex 32` |
 
@@ -54,10 +61,16 @@ watches (Vercel → Project → Settings → Git → Production Branch).
      `sk_live_…`) and `STRIPE_WEBHOOK_SECRET`. In Stripe → Developers →
      Webhooks add the endpoint `https://<your-domain>/api/stripe/webhook`
      for `checkout.session.completed`,
-     `checkout.session.async_payment_succeeded` and
-     `checkout.session.async_payment_failed`; its signing secret is
-     `STRIPE_WEBHOOK_SECRET`. Money is only ever recorded from that verified
-     webhook. Without Stripe, bank transfers are recorded by hand.
+     `checkout.session.async_payment_succeeded`,
+     `checkout.session.async_payment_failed`, `charge.refunded`,
+     `charge.refund.updated`, `charge.dispute.created` and
+     `charge.dispute.closed`; its signing secret is `STRIPE_WEBHOOK_SECRET`.
+     Money is only ever recorded from that verified webhook. **Refund card
+     payments in Stripe's dashboard**: the refund is recorded on the money
+     page by itself (with a credit note so it isn't asked for again) and the
+     team gets an email; recording it by hand as well is refused. A dispute
+     (chargeback) is an urgent team email with its deadline. Without Stripe,
+     bank transfers are recorded by hand.
    - **SMS**: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM`.
      Without them texts are stored as "demo, not sent" in `/ops/messages`;
      customers still get every email.
@@ -124,6 +137,9 @@ watches (Vercel → Project → Settings → Git → Production Branch).
 | A bucket shows "No file size or type limits" in `/api/health` | Migration `0011` hasn't been run | Run `0011_storage_limits.sql` |
 | "mime type … is not supported" uploading | The file isn't a type the bucket stores | Photos (JPEG, PNG, WebP, HEIC), PDFs and MP4/.mov only (0011) |
 | Reminders, expiries and the digest never happen | `CRON_SECRET` missing (the crons answer 401) | Set it, redeploy |
+| `/ops/launch` shows "Shared sign-in limits" amber | Migration `0012` hasn't been run, so each server instance counts sign-in requests on its own | Run `0012_rate_limits.sql` |
+| A refund made in Stripe doesn't appear on the money page | The webhook isn't sent `charge.refunded` | Add `charge.refunded` and `charge.refund.updated` to the endpoint in Stripe (step 3); Stripe resends recent events from its dashboard |
+| Pages feel slow (a second or more per click) | The functions and the database are far apart | Put Supabase and `regions` in `apps/web/vercel.json` in the same place (London by default) |
 | Property intelligence shows 0 | The property book hasn't been loaded | `/ops/intel` → **Seed sample book**, or the importer ([property-intelligence.md](./property-intelligence.md)) |
 
 **The key idea:** the site only falls back to demo mode (works, saves
@@ -157,4 +173,8 @@ repository variable to your live domain, and use **Run workflow** to test it.
 `/ops/analytics` shows visitors, sessions, traffic sources, campaigns (via
 `utm_*` tags on your links), geography and the quote funnel from landing to
 saved. It's first-party and cookieless: a random id in the browser plus
-Vercel's edge geo (never the raw IP), nothing to consent to.
+Vercel's edge geo (never the raw IP). Keeping that id on someone's device is
+still storage the law covers, so the privacy notice explains it and anyone
+can turn analytics off (`/privacy#analytics`, linked from every footer; a
+browser's Global Privacy Control signal counts as off). Expect the numbers to
+undercount those visitors.

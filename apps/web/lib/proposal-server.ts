@@ -11,6 +11,7 @@ import {
   customerSafeProposal,
   defaultOptionFor,
   depositPence,
+  performanceDueOn,
   documentCompany,
   documentCustomer,
   draftProposal,
@@ -921,6 +922,8 @@ async function createContractDocument(project: Project, record: ProposalRecord, 
       balanceDueDays: settings.payments.balanceDueDays,
       methods: settings.payments.methods,
     },
+    // Schedule 2 (j) as offered: finished within these weeks of acceptance.
+    performance: { withinWeeks: settings.scheduling.installWithinWeeks, byDate: performanceDueOn(a.at, settings.scheduling.installWithinWeeks) },
     complaints: { process: company.complaintsProcess, ...(company.adr ? { adr: company.adr } : {}) },
     guarantees: record.guarantees ?? guaranteeLines(settings, record.warranty),
   };
@@ -993,7 +996,9 @@ export async function acceptProposal(
     ...(meta.userAgent ? { userAgent: meta.userAgent } : {}),
     cancellationNoticeVersion: CANCELLATION_NOTICE_VERSION,
     earlyStartWordingVersion: EARLY_START_WORDING_VERSION,
-    ...(project.proposal.documentsByEmailConsent ? { documentsByEmailConsentAt: project.proposal.documentsByEmailConsent.at } : {}),
+    ...(project.proposal.documentsByEmailConsent
+      ? { documentsByEmailConsentAt: project.proposal.documentsByEmailConsent.at, documentsByEmailConsent: project.proposal.documentsByEmailConsent }
+      : {}),
     ...(shownTerms ? { termsHash: shownTerms } : {}),
   });
   const errors = acceptanceErrors(record, withoutAt(acceptance), today);

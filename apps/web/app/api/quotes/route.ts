@@ -251,7 +251,7 @@ export async function POST(request: Request) {
     supportPhone: settings.company.phone,
   });
   const allowed = await emailAllowance(supabase, contact.email, id, Date.now());
-  const emailed = allowed.customer ? await sendEmail(contact.email, email.subject, email.html) : false;
+  const emailed = allowed.customer ? await sendEmail(contact.email, email.subject, email.html, { replyTo: settings.company.email }) : false;
   // Ping the team so a real submission is never missed (unless a flood is on: it's all in ops anyway).
   if (allowed.team) await notifyNewLead(contact, quote.totalGbp, survey.postcode, id, attribution, consents.marketing);
   const res = NextResponse.json({ ok: true, demo: false, id, emailed });

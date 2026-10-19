@@ -5,6 +5,7 @@ import { appUrl } from "@/lib/brand";
 import { emailConfigured, sendEmail, teamInbox } from "@/lib/email";
 import { dispatch, loadProject } from "@/lib/project-service";
 import { sendSms, smsConfigured } from "@/lib/providers/sms";
+import * as customersRepo from "@/lib/repo/customers";
 import { messageStore } from "@/lib/repo/messages";
 import { getSettings } from "@/lib/settings-server";
 import { getServiceClient } from "@/lib/supabase-server";
@@ -44,12 +45,19 @@ function realOutbox(): Outbox | null {
     customerLink,
     appUrl,
     teamInbox,
+    // The customer record's own answer: marketing is only ever a consent when it was ticked.
+    marketingConsent: async (project) => {
+      const id = project?.customer.customerId;
+      if (!id) return false;
+      const customer = await customersRepo.get(id);
+      return Boolean(customer?.marketingConsent);
+    },
     email: {
       provider: "resend",
       configured: emailConfigured,
       // sendEmail only reports accepted / not accepted (Resend's id isn't surfaced yet).
-      send: async (to, subject, html) => {
-        const ok = await sendEmail(to, subject, html);
+      send: async (to, subject, html, opts) => {
+        const ok = await sendEmail(to, subject, html, opts);
         return ok ? { ok } : { ok, error: "Resend didn't accept the message (see server logs)" };
       },
     },

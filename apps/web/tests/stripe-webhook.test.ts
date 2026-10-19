@@ -91,7 +91,77 @@ test("decideStripeEvent: only cleared money counts", () => {
   // Expired sessions and unrelated events are acknowledged and ignored.
   assert.equal(decideStripeEvent(event("checkout.session.expired", session({ payment_status: "unpaid" })), "test").kind, "ignore");
   assert.equal(decideStripeEvent(event("payment_intent.succeeded", { id: "pi_1" }), "test").kind, "ignore");
-  assert.equal(decideStripeEvent(event("charge.refunded", { id: "ch_1" }), "test").kind, "ignore");
+  assert.equal(decideStripeEvent(event("charge.refunded", { id: "ch_1", currency: "usd" }), "test").kind, "ignore", "not pounds");
+});
+
+test("decideStripeEvent: refunds made in Stripe, with or without the charge's refund list", () => {
+  const charge = (over: Record<string, unknown> = {}) => ({
+    id: "ch_demo_1",
+    object: "charge",
+    currency: "gbp",
+    amount: 125_000,
+    amount_refunded: 20_000,
+    payment_intent: "pi_demo_456",
+    metadata: { invoice_id: INVOICE, project_id: PROJECT },
+    ...over,
+  });
+  // Newer API versions: no list, so the route asks Stripe for it.
+  const bare = decideStripeEvent(event("charge.refunded", charge()), "test");
+  assert.deepEqual(bare, { kind: "refund", refunds: null, chargeId: "ch_demo_1", paymentIntent: "pi_demo_456", invoiceId: INVOICE, projectId: PROJECT, eventId: "evt_demo_1" });
+  // Older ones carry it.
+  const listed = decideStripeEvent(
+    event("charge.refunded", charge({ refunds: { object: "list", data: [{ id: "re_demo_1", amount: 20_000, status: "succeeded", created: Date.UTC(2026, 9, 18, 11) / 1000, reason: "requested_by_customer" }] } })),
+    "test",
+  );
+  assert.equal(listed.kind, "refund");
+  if (listed.kind !== "refund") return;
+  assert.deepEqual(listed.refunds, [
+    { refundId: "re_demo_1", chargeId: "ch_demo_1", paymentIntent: "pi_demo_456", amountPence: 20_000, status: "succeeded", refundedAt: "2026-10-18T11:00:00.000Z", reason: "requested_by_customer" },
+  ]);
+  // A Refund object on its own (refund.updated, charge.refund.updated).
+  const one = decideStripeEvent(event("refund.updated", { id: "re_demo_2", object: "refund", amount: 5_000, currency: "gbp", status: "succeeded", charge: "ch_demo_1", payment_intent: "pi_demo_456", created: 1 }), "test");
+  assert.equal(one.kind === "refund" && one.refunds?.[0]?.refundId, "re_demo_2");
+  assert.equal(decideStripeEvent(event("charge.refund.updated", { id: "re_x", amount: 0, currency: "gbp" }), "test").kind, "ignore", "no amount");
+  // The other mode's refunds are ignored too.
+  assert.equal(decideStripeEvent(event("charge.refunded", charge(), { livemode: true }), "test").kind, "ignore");
+});
+
+test("decideStripeEvent: a chargeback opening or closing is a dispute for the team", () => {
+  const dispute = { id: "dp_demo_1", object: "dispute", amount: 125_000, charge: "ch_demo_1", payment_intent: "pi_demo_456", reason: "fraudulent", status: "needs_response", evidence_details: { due_by: Date.UTC(2026, 9, 28) / 1000 } };
+  assert.deepEqual(decideStripeEvent(event("charge.dispute.created", dispute), "test"), {
+    kind: "dispute",
+    phase: "created",
+    disputeId: "dp_demo_1",
+    chargeId: "ch_demo_1",
+    paymentIntent: "pi_demo_456",
+    amountPence: 125_000,
+    reason: "fraudulent",
+    status: "needs_response",
+    respondBy: "2026-10-28T00:00:00.000Z",
+    eventId: "evt_demo_1",
+  });
+  const closed = decideStripeEvent(event("charge.dispute.closed", { ...dispute, status: "lost" }), "test");
+  assert.equal(closed.kind === "dispute" && closed.phase, "closed");
+});
+
+test("priorSession: one payable Checkout page per bill", async () => {
+  const { priorSession } = await import("../app/api/pay/[invoiceId]/prior-session.ts");
+  const calls: string[] = [];
+  const deps = (o: { expire?: boolean; after?: "complete" | "expired" | "open"; recorded?: boolean } = {}) => ({
+    expire: async (id: string) => (calls.push(`expire:${id}`), o.expire === false ? { ok: false as const, error: "Stripe: already complete" } : { ok: true as const, value: {} }),
+    retrieve: async (id: string) => (calls.push(`retrieve:${id}`), { ok: true as const, value: { status: o.after ?? ("open" as const) } }),
+    recorded: async () => o.recorded === true,
+  });
+  const s = (status: "open" | "complete" | "expired", amount = 125_000) => ({ id: "cs_test_prior", status, amount_total: amount, url: "https://checkout.stripe.com/c/pay/cs_test_prior" });
+  assert.deepEqual(await priorSession(s("open"), 125_000, deps()), { url: "https://checkout.stripe.com/c/pay/cs_test_prior" }, "still open for the same amount: the same page");
+  assert.equal(calls.length, 0);
+  assert.equal(await priorSession(s("open", 125_000), 100_000, deps()), "new", "another amount: the old page is closed first");
+  assert.deepEqual(calls, ["expire:cs_test_prior"]);
+  assert.equal(await priorSession(s("complete"), 125_000, deps()), "paid", "paid but not recorded yet: read it back, don't charge again");
+  assert.equal(await priorSession(s("complete"), 30_000, deps({ recorded: true })), "new", "paid and recorded: what's owed now is new");
+  assert.equal(await priorSession(s("expired"), 125_000, deps()), "new");
+  assert.equal(await priorSession(s("open", 1), 125_000, deps({ expire: false, after: "complete" })), "paid", "paid while we tried to close it");
+  assert.equal(await priorSession(s("open", 1), 125_000, deps({ expire: false, after: "open" })), "failed");
 });
 
 test("decideStripeEvent: a test event never pays a live invoice, and the other way round", () => {
@@ -193,4 +263,103 @@ test("recordStripePayment: a replayed event and the return page together record 
   const wrong = await recordStripePayment({ ...decided.payment, sessionId: "cs_test_other", projectId: PROJECT });
   assert.equal(wrong.ok, false);
   assert.equal((await paymentsRepo.listForInvoice(INVOICE)).length, 1);
+});
+
+test("refunds made in Stripe are recorded once against their payment, with a credit note; hand-recording them is refused", async () => {
+  const { resetDemoData, buildDemoDataset } = await import("../lib/demo-seed/index.ts");
+  const { recordStripePayment, recordStripeRefund, recordRefund, alertStripeDispute } = await import("../lib/money-server.ts");
+  const invoicesRepo = await import("../lib/repo/invoices.ts");
+  const paymentsRepo = await import("../lib/repo/payments.ts");
+  const messagesRepo = await import("../lib/repo/messages.ts");
+  const { invoiceOutstanding } = await import("@aircon/domain");
+
+  const now = new Date().toISOString();
+  await resetDemoData({ now });
+  const projectId = buildDemoDataset({ now }).projects[2]!.project.id;
+  const balance: Invoice = {
+    id: INVOICE,
+    projectId,
+    number: "DIH-DEMO-9002",
+    kind: "balance",
+    status: "issued",
+    lines: [{ label: "Balance (DEMO)", netPence: 125_000, taxCode: "zero-esm", taxPence: 0, totalPence: 125_000 }],
+    netPence: 125_000,
+    taxPence: 0,
+    totalPence: 125_000,
+    paidPence: 0,
+    issuedAt: now,
+    notes: "DEMO invoice: no real money changed hands.",
+  };
+  await invoicesRepo.insert(balance);
+  const paid = await recordStripePayment({ sessionId: "cs_test_refund_1", invoiceId: INVOICE, projectId, amountPence: 125_000, paymentIntent: "pi_demo_refund", receivedAt: now, eventId: "evt_pay" });
+  assert.ok(paid.ok);
+
+  // Hand-recording a card refund of a Stripe payment would count it twice: refused, pointing at Stripe.
+  process.env.STRIPE_SECRET_KEY = "sk_test_demo_only_not_real_0000000000";
+  const OFFICE = { id: "aa000000-0000-4000-8000-0000000000c1", email: "office@demo.dang.invalid", name: "DEMO Office", roles: ["admin" as const], external: false, active: true, qualifications: [] };
+  const byHand = await recordRefund(projectId, { invoiceId: INVOICE, amountPence: 10_000, method: "card", refundedOn: now.slice(0, 10), reason: "Goodwill (DEMO)", requestId: crypto.randomUUID() }, OFFICE);
+  assert.ok(!byHand.ok && /refund it in Stripe/.test(byHand.error), !byHand.ok ? byHand.error : "");
+  delete process.env.STRIPE_SECRET_KEY;
+
+  // Refunded £200 in Stripe's dashboard: recorded from Stripe's word, matched by the PaymentIntent.
+  const refund = { refundId: "re_demo_refund_1", paymentIntent: "pi_demo_refund", amountPence: 20_000, status: "succeeded", refundedAt: now, reason: "requested_by_customer", eventId: "evt_refund" };
+  const r1 = await recordStripeRefund(refund);
+  assert.ok(r1.ok && r1.value.recorded, JSON.stringify(r1));
+  assert.ok(r1.ok && r1.value.creditNote, "a credit note goes with it");
+  const again = await recordStripeRefund({ ...refund, eventId: "evt_refund_retry" });
+  assert.ok(again.ok);
+  const onInvoice = await paymentsRepo.listForInvoice(INVOICE);
+  const refunds = onInvoice.filter((p) => p.amountPence < 0);
+  assert.equal(refunds.length, 1, "recorded once, however often Stripe says so");
+  assert.equal(refunds[0]!.provider, "stripe");
+  assert.equal(refunds[0]!.providerRef, "stripe-refund:re_demo_refund_1");
+  assert.equal(refunds[0]!.status, "refunded");
+  assert.equal(refunds[0]!.amountPence, -20_000);
+  const all = await invoicesRepo.listForProject(projectId);
+  const inv = all.find((i) => i.id === INVOICE)!;
+  assert.equal(inv.paidPence, 105_000);
+  assert.equal(invoiceOutstanding(inv, all), 0, "not asked for again");
+  assert.equal(all.filter((i) => i.kind === "credit-note" && i.creditsInvoiceId === INVOICE).length, 1, "one credit note, not one per retry");
+
+  // A failed refund records nothing new, and one we can't match tells the team.
+  const failed = await recordStripeRefund({ ...refund, refundId: "re_demo_failed", status: "failed" });
+  assert.ok(failed.ok && !failed.value.recorded);
+  const stray = await recordStripeRefund({ ...refund, refundId: "re_demo_stray", paymentIntent: "pi_not_ours" });
+  assert.ok(stray.ok && !stray.value.recorded);
+
+  // A chargeback is an urgent alert on the project.
+  await alertStripeDispute({ phase: "created", disputeId: "dp_demo_1", paymentIntent: "pi_demo_refund", amountPence: 125_000, reason: "fraudulent", respondBy: "2026-10-28T00:00:00.000Z" });
+  const alerts = (await messagesRepo.listForProject(projectId)).filter((m) => m.event === "team-alert");
+  assert.ok(alerts.some((m) => /Card refund recorded from Stripe: £200 on DIH-DEMO-9002/.test(m.subject ?? "")), "the team hears about the refund");
+  assert.ok(alerts.some((m) => /^\[Urgent\] Chargeback/.test(m.subject ?? "")), "and urgently about the chargeback");
+});
+
+test("a Stripe payment for more than was owed is recorded, and the team is told", async () => {
+  const { resetDemoData, buildDemoDataset } = await import("../lib/demo-seed/index.ts");
+  const { recordStripePayment } = await import("../lib/money-server.ts");
+  const invoicesRepo = await import("../lib/repo/invoices.ts");
+  const messagesRepo = await import("../lib/repo/messages.ts");
+  const now = new Date().toISOString();
+  await resetDemoData({ now });
+  const projectId = buildDemoDataset({ now }).projects[2]!.project.id;
+  const id = "5a1e0c4d-7b0a-4f7e-9d55-0000000000f6";
+  await invoicesRepo.insert({
+    id,
+    projectId,
+    number: "DIH-DEMO-9003",
+    kind: "balance",
+    status: "issued",
+    lines: [{ label: "Balance (DEMO)", netPence: 50_000, taxCode: "zero-esm", taxPence: 0, totalPence: 50_000 }],
+    netPence: 50_000,
+    taxPence: 0,
+    totalPence: 50_000,
+    paidPence: 0,
+    issuedAt: now,
+  });
+  // Two Checkout pages for one bill, both paid.
+  assert.ok((await recordStripePayment({ sessionId: "cs_test_over_1", invoiceId: id, projectId, amountPence: 50_000, paymentIntent: "pi_over_1", receivedAt: now, eventId: "e1" })).ok);
+  assert.ok((await recordStripePayment({ sessionId: "cs_test_over_2", invoiceId: id, projectId, amountPence: 50_000, paymentIntent: "pi_over_2", receivedAt: now, eventId: "e2" })).ok);
+  const alerts = (await messagesRepo.listForProject(projectId)).filter((m) => m.event === "team-alert" && /Overpaid/.test(m.subject ?? ""));
+  assert.equal(alerts.length, 1, "the second payment, not the first");
+  assert.match(alerts[0]!.subject ?? "", /\[Urgent\] Overpaid by card: £500 more than was owed on DIH-DEMO-9003/);
 });

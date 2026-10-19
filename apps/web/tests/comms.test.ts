@@ -447,6 +447,8 @@ test("the proposal email carries the Schedule 2 information, the instructions an
   assert.match(t, /due within 7 days of the invoice/);
   assert.match(t, /You can pay by bank transfer or card\./);
   assert.match(t, /at least 5 days ahead/);
+  // Schedule 2 (j): the time by which we undertake to finish, as frozen on the proposal.
+  assert.match(t, /We'll finish your installation within 8 weeks of the day you accept, on dates agreed with you/);
   assert.match(t, /This proposal is valid until 3 Dec 2026\./);
   // (l) (m) (n): cancellation, return costs, reasonable costs on early start.
   assert.match(t, /If you accept, you can cancel without giving a reason until 14 days after the day your equipment is delivered to you\./);
@@ -809,7 +811,7 @@ function harness(
   const delivered: { id: string; event: string; status: string }[] = [];
   const db = createLocalClient({ backend: "memory" });
   const store = messageStore(db);
-  const sent: { channel: string; to: string; body: string; subject?: string }[] = [];
+  const sent: { channel: string; to: string; body: string; subject?: string; replyTo?: string }[] = [];
   const minted: { projectId: string; path: string; recipient: string }[] = [];
   const emailResults = [...(opts.emailOk ?? [])];
   const project = opts.project === undefined ? baseProject() : opts.project;
@@ -831,9 +833,9 @@ function harness(
     email: {
       provider: "resend",
       configured: () => opts.email ?? false,
-      send: async (to, subject, html) => {
+      send: async (to, subject, html, sendOpts) => {
         const ok = emailResults.length ? emailResults.shift()! : true;
-        if (ok) sent.push({ channel: "email", to, body: html, subject });
+        if (ok) sent.push({ channel: "email", to, body: html, subject, ...(sendOpts?.replyTo ? { replyTo: sendOpts.replyTo } : {}) });
         return ok ? { ok } : { ok, error: "Resend said no" };
       },
     },
@@ -850,7 +852,7 @@ function harness(
     },
     log: () => {},
   };
-  return { db, store, sent, minted, delivered, outbox: createOutbox(deps) };
+  return { db, store, sent, minted, delivered, deps, outbox: createOutbox(deps) };
 }
 
 const surveyBooked = { scheduledFor: "2026-11-03T10:00:00.000Z" } as const;
@@ -895,6 +897,17 @@ test("live email: the link is minted at send, for the recipient, and never store
   await h.outbox.resend(stored.id);
   assert.equal(h.minted.length, 2);
   assert.match(h.sent[1]!.body, /t=fresh2/);
+});
+
+test("every email carries the company address as Reply-To, so a reply reaches a monitored inbox", async () => {
+  const h = harness({ email: true });
+  await h.outbox.notify("survey-booked", { projectId: PROJECT_ID, data: surveyBooked, discriminator: "reply-1" });
+  assert.equal(h.sent[0]!.replyTo, SETTINGS.company.email);
+  // And from the email module itself: a malformed one is left off rather than refused by the provider.
+  const { replyToAddress } = await import("../lib/email.ts");
+  assert.equal(replyToAddress(" hello@dang.example "), "hello@dang.example");
+  assert.equal(replyToAddress("Dang <hello@dang.example>"), undefined);
+  assert.equal(replyToAddress(""), undefined);
 });
 
 test("a sign-in link only goes to the customer's own address", async () => {
@@ -1229,6 +1242,31 @@ test("follow-ups respect an opt-out, at notify and when a queued one is due; rev
   assert.equal((await withLink.outbox.notify("review-request", { projectId: PROJECT_ID, data: {}, discriminator: "review" })).status, "sent");
   assert.ok(withLink.sent[0]!.body.includes(`href="${REVIEW_URL}"`));
   assert.equal(withLink.minted.length, 0, "no sign-in token in a review request");
+});
+
+test("the service reminder offers to book only with marketing consent; the due date and warranty facts go to everyone", async () => {
+  const plain = render("service-reminder", { dueOn: "2027-12-03" });
+  assert.match(plain.text, /due its yearly service around/);
+  assert.match(plain.text, /warranties often require a yearly service/);
+  assert.doesNotMatch(plain.text, /book/i, "no offer without consent");
+  const opted = render("service-reminder", { dueOn: "2027-12-03" }, { ...ctxFor(), marketingConsent: true });
+  assert.match(opted.text, /We can do it for you: to book, call 020 7946 0123/);
+
+  // Through the outbox: it asks for the customer's consent for this event, and renders accordingly.
+  const asked: string[] = [];
+  const h = harness({ email: true });
+  const withConsent = createOutbox({
+    ...h.deps,
+    marketingConsent: async (p) => {
+      asked.push(p?.id ?? "none");
+      return true;
+    },
+  });
+  await withConsent.notify("service-reminder", { projectId: PROJECT_ID, data: { dueOn: "2027-12-03" }, discriminator: "svc-consent" });
+  assert.deepEqual(asked, [PROJECT_ID]);
+  assert.match(h.sent.at(-1)!.body, /We can do it for you/);
+  await h.outbox.notify("service-reminder", { projectId: PROJECT_ID, data: { dueOn: "2027-12-03" }, discriminator: "svc-none" });
+  assert.doesNotMatch(h.sent.at(-1)!.body, /We can do it for you/, "no consent on record: no offer");
 });
 
 test("pure helpers: consent, addresses, headline", () => {

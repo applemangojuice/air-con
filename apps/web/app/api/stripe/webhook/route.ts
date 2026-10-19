@@ -1,9 +1,9 @@
 import { notify } from "@/lib/comms/outbox";
-import { recordStripePayment } from "@/lib/money-server";
-import { stripeMode, stripeWebhookSecret, verifyStripeSignature } from "@/lib/providers/stripe";
+import { alertStripeDispute, recordStripePayment, recordStripeRefund } from "@/lib/money-server";
+import { listRefundsForCharge, stripeMode, stripeWebhookSecret, verifyStripeSignature } from "@/lib/providers/stripe";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { getServiceClient } from "@/lib/supabase-server";
-import { decideStripeEvent, parseStripeEvent } from "./stripe-events";
+import { decideStripeEvent, parseStripeEvent, refundFacts, type StripeRefundFacts } from "./stripe-events";
 
 /**
  * POST /api/stripe/webhook: Stripe's signed notifications, the only way a
@@ -13,7 +13,10 @@ import { decideStripeEvent, parseStripeEvent } from "./stripe-events";
  *  * The raw body is verified against STRIPE_WEBHOOK_SECRET (HMAC-SHA256,
  *    five-minute tolerance) before anything is parsed. Bad signature: 400.
  *  * Idempotent: the payment's provider reference is the Checkout Session id
- *    (unique), so Stripe's retries and replays record it once.
+ *    (unique), so Stripe's retries and replays record it once; a refund's is
+ *    its refund id, the same way.
+ *  * Refunds made in Stripe are recorded against the payment they came from;
+ *    disputes (chargebacks) and overpayments are urgent team alerts.
  *  * 200 for anything handled or deliberately ignored; 500 only when our side
  *    failed, so Stripe retries later.
  */
@@ -54,6 +57,41 @@ export async function POST(request: Request): Promise<Response> {
         });
       }
       return json({ received: true });
+    }
+
+    if (decision.kind === "dispute") {
+      await alertStripeDispute(decision);
+      return json({ received: true });
+    }
+
+    if (decision.kind === "refund") {
+      let refunds: StripeRefundFacts[] | null = decision.refunds;
+      if (refunds === null && decision.chargeId) {
+        // Newer API versions leave the refund list off the charge: ask Stripe for it (a 500 makes Stripe retry if it can't answer).
+        const listed = await listRefundsForCharge(decision.chargeId);
+        if (!listed.ok) {
+          console.error(`[stripe] couldn't list the refunds on ${decision.chargeId}: ${listed.error}`);
+          return json({ error: "Couldn't read the refunds; Stripe will retry" }, 500);
+        }
+        const at = Math.floor(Date.now() / 1000);
+        refunds = listed.value
+          .map((r) => refundFacts({ ...r, charge: r.charge ?? decision.chargeId, payment_intent: r.payment_intent ?? decision.paymentIntent }, at))
+          .filter((r): r is StripeRefundFacts => r !== null);
+      }
+      for (const r of refunds ?? []) {
+        const pi = r.paymentIntent ?? decision.paymentIntent;
+        await recordStripeRefund({
+          refundId: r.refundId,
+          ...(pi ? { paymentIntent: pi } : {}),
+          amountPence: r.amountPence,
+          status: r.status,
+          refundedAt: r.refundedAt,
+          ...(r.reason ? { reason: r.reason } : {}),
+          ...(decision.invoiceId ? { invoiceId: decision.invoiceId } : {}),
+          eventId: decision.eventId,
+        });
+      }
+      return json({ received: true, refunds: refunds?.length ?? 0 });
     }
 
     const result = await recordStripePayment(decision.payment);

@@ -16,7 +16,9 @@ import {
   StageShell,
   Sub,
   primaryCls,
+  secondaryCls,
   useAction,
+  useEchoesNextStep,
   ReachUs,
 } from "./bits";
 import { useHub } from "./controller";
@@ -49,6 +51,7 @@ function ChooseDates({ data, onDone }: { data: PanelProps["data"]; onDone?: () =
   const p = data.project;
   const { run, busy, error, message, readOnly } = useAction();
   const [start, setStart] = useState<string | null>(null);
+  const echoDates = useEchoesNextStep("Choose your install dates");
   const block = data.installBlocks.find((b) => b.startDate === start) ?? null;
   const booked = p.booking.status === "booked" && p.booking.startDate;
   const fee = booked ? rescheduleFeeGbp("installation", daysBetween(data.today, p.booking.startDate!)) : 0;
@@ -80,7 +83,7 @@ function ChooseDates({ data, onDone }: { data: PanelProps["data"]; onDone?: () =
       )}
       <ReadOnlyNote />
       <ActionFeedback error={error} message={message} />
-      <Primary type="submit" disabled={!block || readOnly} busy={busy} busyLabel="Saving your dates…">
+      <Primary type="submit" disabled={!block || readOnly} busy={busy} busyLabel="Saving your dates…" quiet={echoDates && !block}>
         {block ? `${booked ? "Move to" : "Book"} ${block.label}${fee > 0 ? ` (${gbp(fee)})` : ""}` : "Pick your dates"}
       </Primary>
     </form>
@@ -90,6 +93,7 @@ function ChooseDates({ data, onDone }: { data: PanelProps["data"]; onDone?: () =
 function EarlyStart({ data }: { data: PanelProps["data"] }) {
   const p = data.project;
   const { run, busy, error, message, readOnly } = useAction();
+  const echoReply = useEchoesNextStep("Reply to confirm your early start");
   const es = p.proposal.earlyStart;
   const requested = es?.requested ?? p.proposal.earlyStartRequested ?? false;
   const cs = data.cancellation;
@@ -116,7 +120,7 @@ function EarlyStart({ data }: { data: PanelProps["data"] }) {
         <blockquote className="rounded-xl border-l-4 border-accent-500 bg-white px-4 py-3 text-[15px] italic leading-relaxed text-ink-900">
           {data.earlyStartWording}
         </blockquote>
-        <a href={mailto} className={primaryCls()}>
+        <a href={mailto} className={echoReply ? secondaryCls() : primaryCls()}>
           Email us these words
         </a>
         <p className="text-sm text-ink-500">Until it arrives, we can&apos;t start before your cancellation period ends.</p>
@@ -194,6 +198,7 @@ function Prep({ data }: { data: PanelProps["data"] }) {
 function Deposit({ data, slots }: { data: PanelProps["data"]; slots: PanelProps["slots"] }) {
   const p = data.project;
   const hub = useHub();
+  const echoPay = useEchoesNextStep("Pay your deposit");
   if (p.booking.depositStatus === "not-required") return null;
   if (p.booking.depositStatus === "paid") {
     return <Callout tone="good" title="Deposit received">Thank you. It comes off your final balance.</Callout>;
@@ -204,7 +209,7 @@ function Deposit({ data, slots }: { data: PanelProps["data"]; slots: PanelProps[
       <p className="font-semibold text-ink-900">Your deposit{due > 0 ? `: ${money(due)}` : ""}</p>
       <p className="text-[15px] text-ink-700">We confirm your dates once it&apos;s paid. Card or bank transfer.</p>
       {hub.hrefs.pay && due > 0 ? (
-        <Link href={hub.hrefs.pay} className={primaryCls()}>
+        <Link href={hub.hrefs.pay} className={echoPay ? secondaryCls() : primaryCls()}>
           Pay your deposit
         </Link>
       ) : hub.hrefs.pay ? (

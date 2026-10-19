@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { DOCUMENT_KIND_LABEL } from "@aircon/domain";
 import { fmtDay, fmtInstantDay, money } from "@/lib/format";
-import { primaryCls } from "./bits";
+import { primaryCls, secondaryCls, useEchoesNextStep } from "./bits";
 import { useHub } from "./controller";
 import type { HubData } from "./types";
 
@@ -94,6 +94,7 @@ export function DocumentsCard({ data }: { data: HubData }) {
 
 export function PaymentsCard({ data, payButton }: { data: HubData; payButton?: ReactNode }) {
   const hub = useHub();
+  const echoPay = useEchoesNextStep("Pay your deposit", "Pay your invoice", "Pay your balance");
   const m = data.money;
   const contract = data.project.proposal.contractTotalPence;
   if (m.invoicedPence === 0 && contract === undefined) return null;
@@ -144,7 +145,7 @@ export function PaymentsCard({ data, payButton }: { data: HubData; payButton?: R
       {m.outstandingPence > 0 && (
         <div className="mt-4">
           {hub.hrefs.pay ? (
-            <Link href={hub.hrefs.pay} className={primaryCls()}>
+            <Link href={hub.hrefs.pay} className={echoPay ? secondaryCls() : primaryCls()}>
               Pay {money(m.outstandingPence)}
             </Link>
           ) : (

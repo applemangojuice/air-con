@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { TAX_CODES, mergeSettings, schedule2Missing, type PilotSettings, type TaxCodeId } from "@aircon/domain";
+import { INSTALL_WITHIN_WEEKS_MAX, INSTALL_WITHIN_WEEKS_MIN, TAX_CODES, mergeSettings, schedule2Missing, type PilotSettings, type TaxCodeId } from "@aircon/domain";
 import { done, refused, type ActionResult } from "@/components/ops/command/types";
 import { requireStaff } from "@/lib/auth/server";
 import * as settingsRepo from "@/lib/repo/settings";
@@ -84,6 +84,11 @@ const schema = z.object({
     surveyFeeGbp: z.number().int().min(0).max(1000),
     cancellationDays: z.number().int().min(14, "The cancellation period can't be shorter than the statutory 14 days").max(60),
     workingDays: z.array(z.number().int().min(1).max(7)).min(1, "Pick at least one working day"),
+    installWithinWeeks: z
+      .number()
+      .int()
+      .min(INSTALL_WITHIN_WEEKS_MIN, `Allow at least ${INSTALL_WITHIN_WEEKS_MIN} weeks: the cancellation period alone is two`)
+      .max(INSTALL_WITHIN_WEEKS_MAX),
   }),
   serviceArea: z.object({ outcodes: z.array(z.string().trim().toUpperCase().regex(/^[A-Z]{1,2}\d[A-Z\d]?$/, "Outcodes look like SW16 or CR0")).max(400) }),
   sla: z.object({ enabled: z.boolean() }),

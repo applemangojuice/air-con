@@ -9,7 +9,8 @@ import { issueMagicLink } from "@/lib/auth/magic";
 import { breakGlassSession, ensureDemoStaff, setSession, staffSession } from "@/lib/auth/server";
 import { emailConfigured } from "@/lib/email";
 import { isDemoLoginAllowed } from "@/lib/env-mode";
-import { rateLimit, rateLimitIdentity } from "@/lib/rate-limit";
+import { rateLimitIdentity } from "@/lib/rate-limit";
+import { sharedRateLimits } from "@/lib/rate-limit-shared";
 import { pilotSchemaStatus } from "@/lib/schema-check";
 import { getServiceClient } from "@/lib/supabase-server";
 
@@ -62,7 +63,12 @@ export async function requestMagicLink(_prev: LinkState, form: FormData): Promis
     };
   }
   const ip = await clientIp();
-  if (!rateLimit(`magic-ip:${ip}`, 10, 15 * 60_000).ok || !rateLimit(`magic-email:${email}`, 5, 15 * 60_000).ok) {
+  // Shared by every instance (rate-limit-shared): each request is an email to someone's inbox.
+  const limited = await sharedRateLimits([
+    { key: `magic-ip:${ip}`, limit: 10, windowMs: 15 * 60_000 },
+    { key: `magic-email:${email}`, limit: 5, windowMs: 15 * 60_000 },
+  ]);
+  if (!limited.ok) {
     return { status: "error", message: "Too many sign-in requests. Give it a few minutes and try again.", email };
   }
   try {
@@ -94,10 +100,13 @@ export async function breakGlassSignIn(_prev: BreakGlassState, form: FormData): 
   const password = String(form.get("password") ?? "");
   const ip = await clientIp();
   const { perIp, perEmail, global } = BREAK_GLASS_LIMITS;
-  const limited =
-    !rateLimit("break-glass:all", global.limit, global.windowMs).ok ||
-    !rateLimit(`break-glass:${ip}`, perIp.limit, perIp.windowMs).ok ||
-    !rateLimit(`break-glass-email:${email}`, perEmail.limit, perEmail.windowMs).ok;
+  const limited = !(
+    await sharedRateLimits([
+      { key: "break-glass:all", limit: global.limit, windowMs: global.windowMs },
+      { key: `break-glass:${ip}`, limit: perIp.limit, windowMs: perIp.windowMs },
+      { key: `break-glass-email:${email}`, limit: perEmail.limit, windowMs: perEmail.windowMs },
+    ])
+  ).ok;
   // Refusals over the limit aren't audited (that would let a flood write rows);
   // every attempt that's actually checked is.
   if (limited) {

@@ -32,6 +32,9 @@ export const STAFF_LINK_TTL_MINUTES = 20;
 /** Sign-in emails to one address per quarter hour, counted in the database (every instance sees the same count). */
 export const SIGN_IN_LINKS_PER_ADDRESS = 6;
 const SIGN_IN_WINDOW_MS = 15 * 60_000;
+/** And per day: however the quarter hours are spaced, one inbox gets at most this many sign-in emails a day. */
+export const SIGN_IN_LINKS_PER_ADDRESS_PER_DAY = 20;
+const SIGN_IN_DAY_MS = 24 * 60 * 60_000;
 export const CUSTOMER_SIGNIN_TTL_MINUTES = 60;
 export const CUSTOMER_EMAIL_LINK_TTL_DAYS = 30;
 
@@ -117,14 +120,18 @@ export async function issueMagicLink(input: {
   // A brake on anyone sending one address a pile of sign-in emails (and on
   // spending the email quota everything shares). Same answer as any refusal.
   const now = new Date();
-  const recent = await tokensRepo
-    .recentSignInLinks(email, new Date(now.getTime() - SIGN_IN_WINDOW_MS).toISOString(), now.toISOString())
-    .catch((err) => {
+  const count = (windowMs: number) =>
+    tokensRepo.recentSignInLinks(email, new Date(now.getTime() - windowMs).toISOString(), now.toISOString()).catch((err) => {
       console.error("[auth] sign-in link count failed (continuing):", err);
       return 0;
     });
+  const [recent, today] = await Promise.all([count(SIGN_IN_WINDOW_MS), count(SIGN_IN_DAY_MS)]);
   if (recent >= SIGN_IN_LINKS_PER_ADDRESS) {
     console.warn(`[auth] sign-in links to one address held back: ${recent} in the last 15 minutes`);
+    return { sent: false };
+  }
+  if (today >= SIGN_IN_LINKS_PER_ADDRESS_PER_DAY) {
+    console.warn(`[auth] sign-in links to one address held back: ${today} in the last 24 hours`);
     return { sent: false };
   }
   const next = input.next ? safeNextPath(input.next, "") || undefined : undefined;

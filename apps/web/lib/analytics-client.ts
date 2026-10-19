@@ -5,8 +5,14 @@
  * session id in sessionStorage (one per visit). First-touch acquisition (the
  * referrer + any UTM tags on the landing URL) is captured once and reused for
  * the whole session, so a booking can be traced back to the campaign that
- * produced it. Nothing here is personal data; there are no third-party
- * trackers and no cookies, so no banner is owed.
+ * produced it. There are no third-party trackers and no cookies.
+ *
+ * Storing an identifier on the device is still storage under PECR reg 6,
+ * whatever the mechanism, and it isn't strictly necessary. So it's
+ * statistics-only, explained on /privacy, and the visitor can say no at any
+ * time (AnalyticsChoice on /privacy#analytics, linked from every footer):
+ * opted out, or with the browser's Global Privacy Control signal on, nothing
+ * is stored for analytics, what was stored is removed, and no event is sent.
  *
  * Every call to `track()` fires a `navigator.sendBeacon` to /api/track, which
  * degrades to a keepalive fetch and, failing that, silently no-ops. Analytics
@@ -16,6 +22,42 @@
 const VISITOR_KEY = "aircon.vid";
 const SESSION_KEY = "aircon.sid";
 const ATTRIBUTION_KEY = "aircon.attribution";
+/** "1" when this browser said no to analytics. The choice itself is the only thing kept. */
+export const ANALYTICS_OPT_OUT_KEY = "aircon.analytics-off";
+
+/** The browser's own "don't track me" signal (Global Privacy Control), honoured as a no. */
+export function privacySignalOn(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return (navigator as Navigator & { globalPrivacyControl?: boolean }).globalPrivacyControl === true;
+}
+
+/** Has this browser said no to analytics (here, or through Global Privacy Control)? */
+export function analyticsOptedOut(): boolean {
+  if (typeof window === "undefined") return true;
+  if (privacySignalOn()) return true;
+  try {
+    return window.localStorage.getItem(ANALYTICS_OPT_OUT_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+/** Say no (or yes again). No: the identifiers and first-touch record are removed at once. */
+export function setAnalyticsOptOut(off: boolean): void {
+  if (typeof window === "undefined") return;
+  try {
+    if (off) {
+      window.localStorage.setItem(ANALYTICS_OPT_OUT_KEY, "1");
+      window.localStorage.removeItem(VISITOR_KEY);
+      window.localStorage.removeItem(ATTRIBUTION_KEY);
+      window.sessionStorage.removeItem(SESSION_KEY);
+    } else {
+      window.localStorage.removeItem(ANALYTICS_OPT_OUT_KEY);
+    }
+  } catch {
+    /* storage blocked: nothing is stored either way */
+  }
+}
 
 export interface Attribution {
   referrer?: string;
@@ -52,18 +94,18 @@ function fromStore(store: Storage, key: string): string {
 }
 
 export function getVisitorId(): string {
-  if (typeof window === "undefined") return "";
+  if (typeof window === "undefined" || analyticsOptedOut()) return "";
   return fromStore(window.localStorage, VISITOR_KEY);
 }
 
 export function getSessionId(): string {
-  if (typeof window === "undefined") return "";
+  if (typeof window === "undefined" || analyticsOptedOut()) return "";
   return fromStore(window.sessionStorage, SESSION_KEY);
 }
 
-/** Captures first-touch acquisition exactly once, then returns it every time. */
+/** Captures first-touch acquisition exactly once, then returns it every time. Nothing, once they've said no. */
 export function getAttribution(): Attribution {
-  if (typeof window === "undefined") return {};
+  if (typeof window === "undefined" || analyticsOptedOut()) return {};
   try {
     const existing = window.localStorage.getItem(ATTRIBUTION_KEY);
     if (existing) return JSON.parse(existing) as Attribution;
@@ -114,7 +156,7 @@ export interface TrackEvent {
 
 /** Fire-and-forget: records a usage event. Never throws. */
 export function track(type: string, meta?: Record<string, unknown>): void {
-  if (typeof window === "undefined") return;
+  if (typeof window === "undefined" || analyticsOptedOut()) return;
   try {
     const attribution = getAttribution();
     const event: TrackEvent = {

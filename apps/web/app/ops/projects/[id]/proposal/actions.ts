@@ -173,11 +173,13 @@ export async function overrideAction(projectId: string, proposalId: string, kind
 }
 
 /** The customer told us (in person or by email) they're happy to get documents by email: recorded by staff. */
-export async function recordConsentAction(projectId: string, channel: "in-person" | "email"): Promise<ActionResult> {
+export async function recordConsentAction(projectId: string, channel: "in-person" | "email", evidence: string): Promise<ActionResult> {
   const staff = await staffFor(projectId, "proposal.edit");
   if (!staff) return NOT_FOUND;
   if (channel !== "in-person" && channel !== "email") return { ok: false, error: "How did the customer agree?" };
-  const result = await dispatch(projectId, { type: "documents-consent-recorded", channel }, staff);
+  const note = z.string().trim().min(5, channel === "email" ? "Say where their email is (its date and subject), so it can be found again." : "Say how and when they agreed.").max(500).safeParse(evidence);
+  if (!note.success) return { ok: false, error: note.error.issues[0]?.message ?? "Say how they agreed." };
+  const result = await dispatch(projectId, { type: "documents-consent-recorded", channel, evidence: note.data }, staff);
   if ("error" in result) return { ok: false, error: result.error };
   done(projectId);
   return { ok: true };

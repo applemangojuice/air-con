@@ -11,6 +11,7 @@ import {
   effectiveTaxCode,
   isPlaceholderPhone,
   schedule2Missing,
+  performanceCommitment,
   settingsForProposal,
   type CommsEventId,
   type ContractType,
@@ -235,6 +236,11 @@ export interface TemplateContext {
   customerPhone?: string;
   /** How "on my way" will reach them (lib/comms/on-the-way.ts), so the copy only promises what happens. */
   onTheWay: OnTheWayChannel;
+  /**
+   * They opted in to marketing. Only asked for MARKETING_OFFER_EVENTS
+   * (outbox-core), whose offer line needs it; false everywhere else.
+   */
+  marketingConsent: boolean;
 }
 
 const TITLES = new Set(["mr", "mrs", "ms", "miss", "mx", "dr", "prof", "sir", "dame", "rev"]);
@@ -261,6 +267,8 @@ export function templateContext(input: {
   recipientName?: string;
   /** Which providers are live (the outbox passes them); previews leave it out, which reads as demo mode. */
   live?: { sms: boolean; email: boolean };
+  /** Marketing consent, for templates with an offer line (MARKETING_OFFER_EVENTS). Absent: no. */
+  marketingConsent?: boolean;
 }): TemplateContext {
   const c = input.project?.customer;
   const name = (input.recipientName ?? c?.name ?? "").trim();
@@ -275,6 +283,7 @@ export function templateContext(input: {
     customerEmail: c?.email,
     customerPhone: c?.phone,
     onTheWay: onTheWayChannel({ phone: c?.phone, email: c?.email }, input.live ?? { sms: false, email: false }),
+    marketingConsent: input.marketingConsent === true,
   };
 }
 
@@ -613,7 +622,7 @@ const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? o
  */
 function preContractInfo(ctx: TemplateContext, x: ProposalDetails & { cancellation: string; validUntil?: string }): Block[] {
   // What the customer was offered: the proposal's frozen terms over today's settings.
-  const { company, payments, warranty, tax } = settingsForProposal(ctx.settings, x.terms ? { terms: x.terms } : null);
+  const { company, payments, warranty, tax, scheduling } = settingsForProposal(ctx.settings, x.terms ? { terms: x.terms } : null);
   const supply = x.contractType !== "install-only";
   const out: Block[] = [];
 
@@ -684,7 +693,8 @@ function preContractInfo(ctx: TemplateContext, x: ProposalDetails & { cancellati
     `We invoice the balance when the installation is finished. It's due within ${plural(payments.balanceDueDays, "day")} of the invoice.`,
   ];
   if (methods.length) pay.push(`You can pay by ${listJoin(methods).replace(/ and ([^,]+)$/, " or $1")}.`);
-  pay.push(`You choose your install dates after accepting, from the dates we can offer, at least ${INSTALL_LEAD_DAYS} days ahead.`);
+  // (j): the time by which we undertake to finish (else CRA s28's 30-day default would apply).
+  pay.push(`${performanceCommitment(scheduling.installWithinWeeks)} You choose the dates after accepting, from the ones we can offer, at least ${INSTALL_LEAD_DAYS} days ahead.`);
   if (x.validUntil) pay.push(`This proposal is valid until ${dateLong(x.validUntil)}.`);
   out.push({ list: pay });
 
@@ -1430,12 +1440,16 @@ const TEMPLATES: { [E in CommsEventId]: Renderer<E> } = {
     };
   },
 
+  // Operational: the due date and the warranty condition, for everyone. Offering
+  // to do it (a paid service) is marketing, so that line needs their consent.
   "service-reminder": (ctx, d) => ({
     subject: `Your system's yearly service is due ${shortDay(d.dueOn)}`,
     body: [
       { p: ["Your system at ", place(ctx), " is due its yearly service around ", { strong: dateLong(d.dueOn) }, "."] },
-      { p: "A yearly service keeps it running efficiently, and manufacturer warranties often require one." },
-      { p: `To book it, ${reach(ctx.settings, { us: true })}.` },
+      {
+        p: "Manufacturer warranties often require a yearly service by an F-gas certified engineer, and it keeps the system running efficiently. Your handover pack has the details for your model.",
+      },
+      ...(ctx.marketingConsent ? [{ p: `We can do it for you: to book, ${reach(ctx.settings, { us: false })}.` } as Block] : []),
     ],
     cta: "Open your project",
   }),

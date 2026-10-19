@@ -195,7 +195,11 @@ export async function bookSurveyAction(projectId: string, fd: FormData): Promise
 export async function documentsConsentAction(projectId: string, fd: FormData): Promise<ActionResult> {
   const channel = field(fd, "channel");
   if (channel !== "in-person" && channel !== "email") return refused("How did the customer agree?");
-  return run(projectId, { type: "documents-consent-recorded", channel }, "Recorded: the customer agreed to get documents by email.", "proposal.edit");
+  const evidence = field(fd, "evidence").trim();
+  if (evidence.length < 5) {
+    return refused(channel === "email" ? "Say where their email is (its date and subject), so it can be found again." : "Say how and when they agreed.");
+  }
+  return run(projectId, { type: "documents-consent-recorded", channel, evidence }, "Recorded: the customer agreed to get documents by email.", "proposal.edit");
 }
 
 /** Their early-start email or signed form, with the copy itself: the same path as the booking page (booking-server). */

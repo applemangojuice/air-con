@@ -47,6 +47,17 @@ export async function getByProviderRef(providerRef: string): Promise<Payment | n
   return data ? fromRow(data) : null;
 }
 
+/** The card payment Stripe took through this PaymentIntent (its id is the payment's reference). */
+export async function findStripeByIntent(paymentIntent: string): Promise<Payment | null> {
+  if (!/^pi_[A-Za-z0-9_]+$/.test(paymentIntent)) return null;
+  const data = must(
+    await db().from(TABLE).select("*").eq("provider", "stripe").eq("payment->>reference", paymentIntent).gt("amount_pence", 0).limit(1),
+    "payments findStripeByIntent",
+  );
+  const row = (data ?? [])[0];
+  return row ? fromRow(row) : null;
+}
+
 export async function listForProject(projectId: string): Promise<Payment[]> {
   if (!isUuid(projectId)) return [];
   const data = must(

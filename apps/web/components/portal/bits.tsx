@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
 import type { Blocker, StageInfo, StageState } from "@aircon/domain";
 import { STAFF_READ_ONLY, canAct, useHub } from "./controller";
 import type { PersonCard, PortalRequest } from "./types";
@@ -330,6 +330,19 @@ const SECONDARY =
 export const primaryCls = (block = true) => `${PRIMARY} ${block ? "w-full sm:w-auto" : ""}`;
 export const secondaryCls = (block = true) => `${SECONDARY} ${block ? "w-full sm:w-auto" : ""}`;
 
+/**
+ * The label on the hub's "Your next step" card (customerNextAction), so a
+ * panel showing the same action further down doesn't repeat it as a second
+ * filled button: one obvious next action per screen (plan §F1).
+ */
+export const NextStepContext = createContext<string | null>(null);
+
+/** True when the next-step card already offers this action: the panel's copy of it is then the quiet one. */
+export function useEchoesNextStep(...labels: string[]): boolean {
+  const label = useContext(NextStepContext);
+  return label !== null && labels.includes(label);
+}
+
 export function Primary({
   onClick,
   disabled,
@@ -338,6 +351,7 @@ export function Primary({
   type = "button",
   children,
   block = true,
+  quiet = false,
 }: {
   onClick?: () => void;
   disabled?: boolean;
@@ -346,9 +360,11 @@ export function Primary({
   type?: "button" | "submit";
   children: ReactNode;
   block?: boolean;
+  /** Drawn as a secondary button: the next-step card already carries this action (useEchoesNextStep). */
+  quiet?: boolean;
 }) {
   return (
-    <button type={type} onClick={onClick} disabled={disabled || busy} aria-busy={busy || undefined} className={primaryCls(block)}>
+    <button type={type} onClick={onClick} disabled={disabled || busy} aria-busy={busy || undefined} className={quiet ? secondaryCls(block) : primaryCls(block)}>
       {busy ? busyLabel : children}
     </button>
   );

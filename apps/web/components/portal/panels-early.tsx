@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import type { Project } from "@aircon/domain";
+import { DOCUMENTS_CONSENT_HINT, DOCUMENTS_CONSENT_LABEL, documentsConsentCovers, type Project } from "@aircon/domain";
 import { Checkbox } from "@/components/kit/form";
 import { fmtDay, fmtDayTime, gbp, money } from "@/lib/format";
 import {
@@ -21,7 +21,9 @@ import {
   Sub,
   TextButton,
   primaryCls,
+  secondaryCls,
   useAction,
+  useEchoesNextStep,
   ReachUs,
 } from "./bits";
 import { useHub } from "./controller";
@@ -56,9 +58,9 @@ export const SURVEY_PREP = [
   "Someone 18 or over at home for the whole visit.",
 ];
 
-const CONSENT_LABEL = "I'm happy to receive my proposal and contract documents by email";
-const CONSENT_HINT =
-  "Your proposal, contract and cancellation form are legal documents. We can only email them if you agree; otherwise we'll arrange paper copies, which takes a little longer.";
+// Word for word what the record keeps (DOCUMENTS_CONSENT_WORDING.portal).
+const CONSENT_LABEL = DOCUMENTS_CONSENT_LABEL;
+const CONSENT_HINT = DOCUMENTS_CONSENT_HINT;
 
 const surveyFeeLine = (p: Project) => (p.survey.feeGbp > 0 ? `${gbp(p.survey.feeGbp)} survey fee` : "Free, with no obligation");
 
@@ -117,7 +119,8 @@ function BookSurvey({ data }: { data: PanelProps["data"] }) {
   const [slot, setSlot] = useState<string | null>(null);
   const [mode, setMode] = useState<"in-person" | "video">("in-person");
   const [consent, setConsent] = useState(false);
-  const consented = Boolean(p.proposal.documentsByEmailConsent);
+  const consented = documentsConsentCovers(p);
+  const echo = useEchoesNextStep("Book your home survey");
 
   if (data.surveySlots.length === 0) {
     return (
@@ -184,7 +187,7 @@ function BookSurvey({ data }: { data: PanelProps["data"] }) {
       )}
       <ReadOnlyNote />
       <ActionFeedback error={error} message={message} />
-      <Primary type="submit" disabled={!slot || readOnly} busy={busy} busyLabel="Booking your survey…">
+      <Primary type="submit" disabled={!slot || readOnly} busy={busy} busyLabel="Booking your survey…" quiet={echo && !slot}>
         {slot ? `Book my survey: ${fmtDayTime(slot)}` : "Pick a time to book"}
       </Primary>
     </form>
@@ -289,6 +292,7 @@ export function SurveyPanel({ data, state, goTo }: PanelProps) {
   const info = data.stages.survey;
   const report = data.documents.find((d) => d.kind === "survey-report");
   const hub = useHub();
+  const echoBook = useEchoesNextStep("Book your home survey");
 
   if (s.status === "not-booked") {
     return (
@@ -296,7 +300,9 @@ export function SurveyPanel({ data, state, goTo }: PanelProps) {
         <Explainer info={info} />
         <div className="space-y-3">
           <Locked>Pick a time for your survey first. It takes about {data.scheduling.surveyDurationMinutes} minutes.</Locked>
-          <Primary onClick={() => goTo("price")}>Book my home survey</Primary>
+          <Primary onClick={() => goTo("price")} quiet={echoBook}>
+            Book my home survey
+          </Primary>
         </div>
       </StageShell>
     );
@@ -377,6 +383,7 @@ export function SurveyPanel({ data, state, goTo }: PanelProps) {
 function ConsentBox() {
   const { run, busy, error, message, readOnly } = useAction();
   const [ticked, setTicked] = useState(false);
+  const echo = useEchoesNextStep("Agree to get your documents by email");
   return (
     <form
       className="space-y-3 rounded-2xl border border-accent-100 bg-accent-50 p-4 sm:p-5"
@@ -389,7 +396,7 @@ function ConsentBox() {
       <Checkbox label={CONSENT_LABEL} hint={CONSENT_HINT} checked={ticked} onChange={(e) => setTicked(e.target.checked)} disabled={readOnly || busy} />
       <ReadOnlyNote />
       <ActionFeedback error={error} message={message} />
-      <Primary type="submit" disabled={!ticked || readOnly} busy={busy} busyLabel="Saving…">
+      <Primary type="submit" disabled={!ticked || readOnly} busy={busy} busyLabel="Saving…" quiet={echo && !ticked}>
         Save my choice
       </Primary>
     </form>
@@ -446,7 +453,8 @@ export function ProposalPanel({ data, state, goTo, slots }: PanelProps) {
   const hub = useHub();
   const contract = data.documents.find((d) => d.kind === "contract");
   const proposalDoc = data.documents.find((d) => d.kind === "proposal");
-  const consented = Boolean(p.proposal.documentsByEmailConsent);
+  const consented = documentsConsentCovers(p);
+  const echoReview = useEchoesNextStep("Review your proposal");
 
   if (p.proposal.status === "accepted") {
     const contractHref = contract ? hub.hrefs.document(contract.id) : null;
@@ -502,7 +510,7 @@ export function ProposalPanel({ data, state, goTo, slots }: PanelProps) {
           </p>
           <div className="mt-4">
             {proposalHref ? (
-              <Link href={proposalHref} className={primaryCls()}>
+              <Link href={proposalHref} className={echoReview ? secondaryCls() : primaryCls()}>
                 Review your proposal
               </Link>
             ) : (

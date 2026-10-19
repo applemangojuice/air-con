@@ -295,8 +295,8 @@ export const COMMS_EVENTS: Record<CommsEventId, CommsEventDef> = {
     channels: ["email"],
     audience: "customer",
     trigger: "cron",
-    description: "The yearly service is due soon. Opt-out line.",
-    templateVersion: 2,
+    description: "The yearly service is due soon: the date and the warranty condition; the offer to book it only with marketing consent. Opt-out line.",
+    templateVersion: 3,
   },
   "team-alert": {
     id: "team-alert",

@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
+  documentsConsentCovers,
   CANCELLATION_RULE_STATUS,
   GATE_LABEL,
   ISSUE_KIND_LABEL,
@@ -418,7 +419,20 @@ export default async function CommandCentrePage({
                   ["Viewed", p.proposal.viewedAt ? fmtInstant(p.proposal.viewedAt) : p.proposal.issuedAt ? "Not yet" : null],
                   ["Accepted", p.proposal.acceptedAt ? `${p.proposal.acceptedOptionLabel ?? ""}, ${fmtInstant(p.proposal.acceptedAt)}` : null],
                   ["Contract", p.proposal.contractTotalPence !== undefined ? <Money key="c" pence={p.proposal.contractTotalPence} /> : null],
-                  ["Documents by email", p.proposal.documentsByEmailConsent ? `Agreed (${p.proposal.documentsByEmailConsent.channel}), ${fmtInstant(p.proposal.documentsByEmailConsent.at)}` : <span key="n" className="font-semibold text-amber-800">Not agreed yet</span>],
+                  [
+                    "Documents by email",
+                    p.proposal.documentsByEmailConsent ? (
+                      <span key="c">
+                        Agreed ({p.proposal.documentsByEmailConsent.channel}), {fmtInstant(p.proposal.documentsByEmailConsent.at)}
+                        {p.proposal.documentsByEmailConsent.email ? ` for ${p.proposal.documentsByEmailConsent.email}` : ""}
+                        {p.proposal.documentsByEmailConsent.recordedBy ? `, recorded by ${p.proposal.documentsByEmailConsent.recordedBy.name}` : ""}
+                        {p.proposal.documentsByEmailConsent.evidence ? <span className="block text-xs text-ink-500">{p.proposal.documentsByEmailConsent.evidence}</span> : null}
+                        {!documentsConsentCovers(p) ? <span className="block font-semibold text-amber-800">Not for their current address: ask again</span> : null}
+                      </span>
+                    ) : (
+                      <span key="n" className="font-semibold text-amber-800">Not agreed yet</span>
+                    ),
+                  ],
                 ]}
               />
               {p.proposal.changeRequest && <Note tone="warn">They asked: “{p.proposal.changeRequest}”</Note>}
@@ -452,7 +466,7 @@ export default async function CommandCentrePage({
                   </Link>
                 </Note>
               )}
-              {canEdit && proposalOpen && !p.proposal.documentsByEmailConsent && <ConsentForm action={bind(documentsConsentAction)} />}
+              {canEdit && proposalOpen && !documentsConsentCovers(p) && <ConsentForm action={bind(documentsConsentAction)} />}
             </SectionCard>
 
             {/* Booking */}

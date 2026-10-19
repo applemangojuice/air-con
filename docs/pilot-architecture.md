@@ -1787,3 +1787,68 @@ changelog and the reasons, so nobody "fixes" a deliberate choice back.
       registered, VAT-inclusive catalogue prices count net. Order lines and
       cost lines carry `vatIncluded`. Revenue takes off price-reduction credit
       notes (`reductionsPence`), never corrections. Both are CSV columns.
+34. **Hardening review, batch 6 (before the first real customers).**
+    - *Refunds and chargebacks in Stripe*: the webhook also takes
+      `charge.refunded` (fetching the refund list from Stripe when the event
+      leaves it off), `charge.refund.updated`, `refund.created/updated`, and
+      `charge.dispute.created/closed`. A refund made in Stripe's dashboard is
+      recorded once (`stripe-refund:<refund id>`) against the card payment it
+      came from (`findStripePayment`: our invoice id from the charge's
+      metadata, else the PaymentIntent), through the same `applyRefund` as the
+      hand form, with its default credit note ("they keep it") when it
+      reopens the invoice; the team is told what was done. A hand-recorded
+      card refund of a Stripe payment is refused (it would count twice). A
+      dispute is an urgent team alert (nothing recorded: the money is held
+      until it's decided; a lost one is recorded by hand as "still owed").
+      `issueInvoice` takes a system issuer for that credit note.
+    - *One payable Checkout page per bill*: the invoice remembers its latest
+      session (`checkoutSessionId`, internal). `/api/pay` reuses it while it's
+      open for what's owed, expires it at Stripe before opening another for a
+      different amount, and sends a paid-but-unrecorded one to the return page
+      instead of charging again (`prior-session.ts`). A Stripe payment above
+      what was owed is still recorded as received, with an urgent alert.
+    - *Max Rows*: Supabase cuts every select at 1000 rows without an error.
+      The board's batched reads (`rowsWhereIn`) and `loadAllProjects` read
+      page by page (`selectAllPages`: the first page asks for the count, so a
+      small result costs one request). The local backend enforces the same cap
+      (`maxRows`, `LOCAL_MAX_ROWS`, default 1000), so tests and the e2e walk
+      meet it too.
+    - *Payments counted once*: (already in place from batch 3) the
+      `payment-recorded` action carries the payment id and the reducer
+      refuses one it already counts (`money.paymentIds`).
+    - *Region*: `apps/web/vercel.json` pins functions to `lhr1` (London), next
+      to a Supabase project in eu-west-2; going-live.md says to create it there.
+    - *Shared rate limits*: sign-in links, portal links and break-glass are
+      also counted in `rate_limits` (migration 0012, `rate_limit_hit`: one
+      atomic statement, keys hashed) so every Vercel instance sees one count;
+      without 0012 they fall back to the per-instance count (amber on
+      /ops/launch). One address gets at most 20 sign-in emails a day as well as
+      6 a quarter hour (`SIGN_IN_LINKS_PER_ADDRESS_PER_DAY`, counted in
+      `login_tokens`).
+    - *Schedule 2 (j)*: `settings.scheduling.installWithinWeeks` (default 8)
+      is frozen on each proposal's terms at issue and said in one sentence
+      (`performanceCommitment`) on the proposal page, in both contract emails
+      and on the contract (`ContractSnapshot.performance`: the weeks and the
+      date they run to from acceptance).
+    - *Cookies and analytics*: the privacy notice names both cookies (sign-in,
+      and `dih_quote`, 7 days). Usage analytics can be turned off per browser
+      (`AnalyticsChoice` on /privacy#analytics, linked from every footer; Global
+      Privacy Control counts as off): off stores nothing for analytics, removes
+      what was stored and sends nothing.
+    - *Documents-by-email consent, provable*: the record keeps the words and
+      their version (`DOCUMENTS_CONSENT_WORDING`), the address it covers, and
+      for one staff recorded, who and the evidence (required: how and when;
+      for an email, its date and subject). An agreement covers its address
+      only (`documentsConsentCovers`): a changed email needs a new one before
+      issue. The acceptance copies the whole record.
+    - *Replies reach us*: every email carries `reply_to` = the company email
+      in settings.
+    - *The service reminder*: due date and warranty facts go to everyone; the
+      offer to book it only with marketing consent (`MARKETING_OFFER_EVENTS`,
+      `ctx.marketingConsent`, from the customer record).
+    - *The saved quote asks for nothing it can't take*: `/q` lists the details
+      the answers didn't cover as what the surveyor checks
+      (`gapsAsSurveyChecks`), and the band copy no longer says "add them".
+    - *One filled button per screen*: a panel action the next-step card
+      already offers is drawn as a secondary button (`useEchoesNextStep`)
+      until it's the actual submit (a slot picked, the box ticked).

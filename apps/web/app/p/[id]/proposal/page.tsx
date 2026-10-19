@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { EARLY_START_WORDING_VERSION, can, cancellationCopy, cancellationSentence, earlyStartWording, guaranteeLines } from "@aircon/domain";
+import { EARLY_START_WORDING_VERSION, can, cancellationCopy, cancellationSentence, earlyStartWording, guaranteeLines, performanceCommitment } from "@aircon/domain";
 import { Logo } from "@/components/site/logo";
 import { realPhone } from "@/components/site/claims";
 import { ProposalView } from "@/components/proposal/proposal-view";
@@ -179,6 +179,7 @@ export default async function CustomerProposalPage({
     paymentTerms: Object.fromEntries(proposal.options.map((o) => [o.id, paymentTerms(o.pricing.totalPence, settings)])),
     extraCharges: extraCharges(),
     earliestStart: earliestStartNote(contractType, settings, today),
+    performance: performanceCommitment(settings.scheduling.installWithinWeeks),
     cancellation: {
       summary: cancellationSentence({ accepted: false, contractType }, settings.scheduling.cancellationDays),
       days: settings.scheduling.cancellationDays,

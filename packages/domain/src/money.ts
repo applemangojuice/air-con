@@ -85,6 +85,12 @@ export interface Invoice {
   /** When the project's own totals (money.invoicedPence) took this invoice in. */
   recordedOnProjectAt?: string;
   /**
+   * The latest Stripe Checkout Session opened to pay it: reused while it's
+   * open for the same amount, closed before a new one is opened, so one bill
+   * never has two payable Checkout pages.
+   */
+  checkoutSessionId?: string;
+  /**
    * True from the moment it's numbered until its document, the project's
    * totals and the email are all done; a retry finishes the rest. Absent on
    * invoices made any other way, which are treated as complete.

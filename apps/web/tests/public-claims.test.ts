@@ -10,6 +10,7 @@ const {
   cancellationSummary,
   coverageFor,
   fgasClaim,
+  gapsAsSurveyChecks,
   installDaysPhrase,
   installDurationCopy,
   listOutcodes,
@@ -183,4 +184,28 @@ test("finance: the lender's own example, word for word, with who provides it, an
   assert.match(lines[0]!, /provided by DEMO Lending Ltd, authorised and regulated by the Financial Conduct Authority \(firm reference 123456\)/);
   assert.match(lines[1]!, /credit broker, not a lender, and an appointed representative .*AR 987654/);
   assert.doesNotMatch(JSON.stringify(ps.finance), /11\.9/);
+});
+
+test("the saved quote never asks for details it has no way to add: gaps read as what the surveyor checks", async () => {
+  const { scoreConfidence } = await import("@aircon/domain");
+  const empty = scoreConfidence({ rooms: [], outdoor: { location: "unsure", photos: [] }, electrics: { condition: "unsure", photos: [] } } as never);
+  const bare = scoreConfidence({
+    postcode: "SW16 9ZZ",
+    property: { type: "semi-detached", era: "1930-1950", bedrooms: 3, ownership: "owner" },
+    rooms: [{ id: "r1", name: "Bedroom", type: "bedroom", size: "medium", floor: "first", glazing: "medium", orientation: "south", hasExternalWall: true, photos: [] }],
+    outdoor: { location: "unsure", photos: [] },
+    electrics: { condition: "unsure", photos: [] },
+  } as never);
+  const gaps = [...empty.gaps, ...bare.gaps];
+  assert.ok(gaps.length >= 5, "every gap the engine can raise");
+  const checks = gapsAsSurveyChecks(gaps);
+  assert.deepEqual(checks, [
+    "Which rooms you'd like heated and cooled.",
+    "The wall in each room where its indoor unit goes.",
+    "Where the outdoor unit goes.",
+    "Your fuse board, for the new circuit.",
+  ]);
+  for (const c of checks) assert.doesNotMatch(c, /^(Add|Tell us|Check)\b/, c);
+  assert.deepEqual(gapsAsSurveyChecks(["Something new the engine says"]), [], "an unknown gap isn't shown as an instruction");
+  for (const band of Object.values(claims.BAND_COPY)) assert.doesNotMatch(band.body, /\bAdd them\b|photos would firm/i, band.body);
 });

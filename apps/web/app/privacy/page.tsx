@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { AnalyticsChoice } from "@/components/site/analytics-choice";
 import { SiteFooter } from "@/components/site/footer";
 import { SiteHeader } from "@/components/site/header";
 import { textLink } from "@/components/site/styles";
@@ -13,7 +14,7 @@ export const metadata: Metadata = {
   description: "How Dang, It's Hot collects, uses and protects your personal data, how long we keep it, and your rights.",
 };
 
-const LAST_UPDATED = "18 Oct 2026";
+const LAST_UPDATED = "19 Oct 2026";
 
 /**
  * Written to match what the platform actually does: the quote funnel and its
@@ -89,8 +90,11 @@ export default async function PrivacyPage() {
               Our own first-party analytics: pages viewed, approximate location (country and city, worked out by our
               hosting provider; we don&apos;t store your IP address), device type and how far you got through the
               quote. A random identifier is kept in your browser; it isn&apos;t linked to your name unless you save a
-              quote. There are no third-party trackers and no advertising cookies.{" "}
-              <Basis>legitimate interests: understanding and improving the service.</Basis>
+              quote. There are no third-party trackers and no advertising cookies. You can{" "}
+              <a className={textLink} href="#analytics">
+                turn analytics off
+              </a>{" "}
+              at any time. <Basis>legitimate interests: understanding and improving the service.</Basis>
             </Item>
             <Item name="Public property records">
               To design installations and decide where to offer our service, we use public data about properties
@@ -165,12 +169,27 @@ export default async function PrivacyPage() {
         </Section>
 
         <Section title="Cookies and storage">
+          <p>We use two small cookies, both strictly necessary for something you asked for:</p>
+          <ul className="list-disc space-y-2 pl-5">
+            <li>
+              <strong>Signing in</strong>: set when you open a sign-in link, it keeps you signed in to your project
+              page (or, for our team, the staff tools).
+            </li>
+            <li>
+              <strong>Your saved quote</strong> (<code>dih_quote</code>): set when you save a quote, it remembers for 7
+              days which quotes were saved from this browser, so &ldquo;Book my home survey&rdquo; can open your project
+              straight away. It holds only the quote references, signed so it can&apos;t be altered, and it never signs
+              you in to anything else.
+            </li>
+          </ul>
           <p>
-            We use one cookie, and only when you sign in: it keeps you signed in to your project page (or, for our
-            team, the staff tools), and it&apos;s strictly necessary for that. The site also keeps a little data in
-            your browser&apos;s storage: your in-progress quote (so you don&apos;t lose your answers) and a random
-            analytics identifier. Clearing your browser data removes them.
+            The site also keeps a little data in your browser&apos;s storage: your in-progress quote (so you don&apos;t
+            lose your answers) and, unless you turn analytics off, a random analytics identifier and how you first
+            arrived (the referring site and any campaign tags in the link). Analytics off means we store nothing for
+            analytics and send no usage events from this browser; your browser&apos;s Global Privacy Control signal
+            counts as off. Clearing your browser data removes all of it.
           </p>
+          <AnalyticsChoice />
         </Section>
 
         <Section title="Changes">

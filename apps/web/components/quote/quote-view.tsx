@@ -7,6 +7,7 @@ import {
   BAND_COPY,
   PRICE_PROMISE,
   financeDisclosure,
+  gapsAsSurveyChecks,
   installDurationCopy,
   validUntil,
   vatCopy,
@@ -41,7 +42,8 @@ export function QuoteView({
   const band = BAND_COPY[quote.confidence.band];
   const vat = vatCopy(settings);
   const warranty = warrantyCopy(settings);
-  const checks = customerChecks(quote.reviewFlags, { outdoorUnits: quote.systems.length });
+  // What the answers didn't cover, then what the engine wants confirmed: one list, all the surveyor's.
+  const checks = [...new Set([...gapsAsSurveyChecks(quote.confidence.gaps), ...customerChecks(quote.reviewFlags, { outdoorUnits: quote.systems.length })])];
   const until = createdAt ? validUntil(settings, createdAt) : null;
   const finance = settings.finance.offered ? settings.finance : null;
 
@@ -129,22 +131,10 @@ export function QuoteView({
         </div>
       </section>
 
-      {/* Confidence gaps */}
-      {quote.confidence.gaps.length > 0 && (
-        <section className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-4">
-          <h2 className="text-sm font-bold text-amber-900">To firm up your price</h2>
-          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-amber-900">
-            {quote.confidence.gaps.map((gap) => (
-              <li key={gap}>{gap}</li>
-            ))}
-          </ul>
-          <p className="mt-2 text-xs text-amber-900">Or leave it to your surveyor: they check all of this at your home.</p>
-        </section>
-      )}
-
-      {/* What the survey confirms, in the customer's words (the engine's flags are written for the office) */}
+      {/* What the survey confirms, in the customer's words: the details the answers didn't cover
+          (nothing can be added here, so never as instructions) and the engine's flags (written for the office). */}
       {checks.length > 0 && (
-        <section className="mt-4 rounded-2xl border border-line bg-surface p-4">
+        <section className="mt-6 rounded-2xl border border-line bg-surface p-4">
           <h2 className="text-sm font-bold">Your surveyor will check</h2>
           <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-ink-700">
             {checks.map((check) => (

@@ -273,6 +273,61 @@ export const CONTRACT_TYPES: readonly ContractType[] = ["supply-and-install", "i
 /** How the customer agreed to get contract documents by email instead of on paper (CCR reg 10(2)). */
 export type DocumentsConsentChannel = "portal" | "in-person" | "email";
 
+/** The portal's tick box (the hub's proposal panel and the survey booking form), word for word. */
+export const DOCUMENTS_CONSENT_LABEL = "I'm happy to receive my proposal and contract documents by email";
+export const DOCUMENTS_CONSENT_HINT =
+  "Your proposal, contract and cancellation form are legal documents. We can only email them if you agree; otherwise we'll arrange paper copies, which takes a little longer.";
+
+/**
+ * The words each way of agreeing used, versioned. Reg 10(2) lets the
+ * pre-contract information and the contract go by email instead of on paper
+ * only with the customer's agreement, and we must be able to show that
+ * agreement (reg 17), so the record keeps the words, their version, the
+ * address it covers and, when staff recorded it, who did and where the
+ * evidence is.
+ */
+export const DOCUMENTS_CONSENT_WORDING: Record<DocumentsConsentChannel, { version: string; text: string }> = {
+  portal: { version: "docs-by-email/portal-1", text: `${DOCUMENTS_CONSENT_LABEL}. ${DOCUMENTS_CONSENT_HINT}` },
+  "in-person": {
+    version: "docs-by-email/in-person-1",
+    text: "Asked in person: \"Are you happy to receive your proposal and contract documents by email?\" The customer said yes.",
+  },
+  email: {
+    version: "docs-by-email/email-1",
+    text: "The customer told us by email that they're happy to receive their proposal and contract documents by email.",
+  },
+};
+
+/** The customer's agreement to get the contract documents by email, as recorded. */
+export interface DocumentsConsentRecord {
+  at: string;
+  channel: DocumentsConsentChannel;
+  /** DOCUMENTS_CONSENT_WORDING[channel]: what they agreed to. Absent on agreements recorded before it was kept. */
+  wordingVersion?: string;
+  text?: string;
+  /** The address the agreement covers: the customer's email when they gave it. */
+  email?: string;
+  /** Recorded by staff (in person, by email): who recorded it. */
+  recordedBy?: { staffId: string; name: string };
+  /** Recorded by staff: how and when they agreed, and where the proof is (the email's date and subject, say). */
+  evidence?: string;
+  /** A photo or screenshot of the evidence, when there is one. */
+  evidenceMediaId?: string;
+}
+
+/**
+ * Does the recorded agreement cover the address we'd send to? An agreement
+ * given for one address doesn't carry over to a different one; older
+ * records without an address are taken as covering the one on file.
+ */
+export function documentsConsentCovers(project: Pick<Project, "proposal" | "customer">): boolean {
+  const c = project.proposal.documentsByEmailConsent;
+  if (!c) return false;
+  if (!c.email) return true;
+  const now = project.customer.email?.trim().toLowerCase();
+  return !now || c.email.trim().toLowerCase() === now;
+}
+
 /**
  * The customer's request to start inside the cancellation period (CCR reg
  * 36(1)): an express request, made by the customer on a durable medium for
@@ -376,7 +431,7 @@ export interface Project {
     /** Set at issue; supply-and-install until then. */
     contractType: ContractType;
     /** Agreement to get the contract documents by email (else they must be on paper). Proposal issue needs it. */
-    documentsByEmailConsent?: { at: string; channel: DocumentsConsentChannel };
+    documentsByEmailConsent?: DocumentsConsentRecord;
     /**
      * When the issue email carrying the Schedule 2 information, the
      * cancellation instructions and the model form (the durable medium)
@@ -1067,6 +1122,13 @@ export function blockersFor(project: Project, ctx: ReadinessContext, gate: GateI
           "customer",
           "Ask the customer to confirm they're happy to get documents by email",
         );
+      } else if (!documentsConsentCovers(p)) {
+        block(
+          "documents-consent-missing",
+          `The customer agreed to get documents by email at ${p.proposal.documentsByEmailConsent.email}, not at ${p.customer.email}.`,
+          "customer",
+          "Ask the customer to confirm they're happy to get documents at their new address",
+        );
       }
       if (!p.customer.email?.trim()) {
         block(
@@ -1743,8 +1805,12 @@ export type ProjectAction =
   | { type: "design-updated"; designId: string; version: number; status: "draft" | "in-review" }
   | { type: "design-approved"; designId: string; version: number; by: string }
   // proposal
-  /** The customer agreed to get contract documents by email (customer on the portal, or ops recording it). */
-  | { type: "documents-consent-recorded"; channel: DocumentsConsentChannel }
+  /**
+   * The customer agreed to get contract documents by email: on the portal
+   * themselves, or staff recording an agreement given in person or by email,
+   * with the evidence (how and when; where the email is).
+   */
+  | { type: "documents-consent-recorded"; channel: DocumentsConsentChannel; evidence?: string; evidenceMediaId?: string }
   | {
       type: "proposal-issued";
       proposalId: string;
@@ -2165,9 +2231,32 @@ export function applyProjectAction(project: Project, action: ProjectAction, now:
     case "documents-consent-recorded": {
       if (!["portal", "in-person", "email"].includes(action.channel)) return err("How did the customer agree?");
       if (p.proposal.status === "accepted") return err("The contract is already in place.");
-      // The first agreement stands; asking again changes nothing.
-      if (p.proposal.documentsByEmailConsent) return ok();
-      p.proposal.documentsByEmailConsent = { at: now, channel: action.channel };
+      // The first agreement for this address stands; asking again changes nothing.
+      if (documentsConsentCovers(p)) return ok();
+      const evidence = action.evidence?.trim().slice(0, 500);
+      if (action.channel !== "portal") {
+        // Told to us, not ticked by them: it must be ours to record, and provable later (reg 17).
+        if (!staff) return err("Only our team can record an agreement given in person or by email.");
+        if (!evidence || evidence.length < 5) {
+          return err(
+            action.channel === "email"
+              ? "Say where their email is (its date and subject, say), so it can be found again."
+              : "Say how and when they agreed (at the survey, on the phone on Tuesday…).",
+          );
+        }
+      }
+      const wording = DOCUMENTS_CONSENT_WORDING[action.channel];
+      const address = p.customer.email?.trim();
+      p.proposal.documentsByEmailConsent = {
+        at: now,
+        channel: action.channel,
+        wordingVersion: wording.version,
+        text: wording.text,
+        ...(address ? { email: address } : {}),
+        ...(staff && action.channel !== "portal" ? { recordedBy: { staffId: staff.id, name: staff.name } } : {}),
+        ...(evidence && action.channel !== "portal" ? { evidence } : {}),
+        ...(action.evidenceMediaId && action.channel !== "portal" ? { evidenceMediaId: action.evidenceMediaId } : {}),
+      };
       log(
         "documents-consent-recorded",
         "You agreed to get your proposal, contract and cancellation information by email.",
@@ -3310,7 +3399,7 @@ export function customerNextAction(project: Project): { label: string; href?: st
         return { label: "Ask us for an updated proposal", href: `${base}/proposal` };
       }
       // The proposal can't be sent until they've agreed to email delivery.
-      if (p.survey.status === "submitted" && !p.proposal.documentsByEmailConsent) {
+      if (p.survey.status === "submitted" && !documentsConsentCovers(p)) {
         return { label: "Agree to get your documents by email", href: `${base}#proposal` };
       }
       return null; // designing, or revising after a change request

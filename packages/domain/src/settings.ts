@@ -119,6 +119,14 @@ export interface PilotSettings {
     surveyFeeGbp: number;
     cancellationDays: number;
     workingDays: number[] /* 1=Mon … 5=Fri */;
+    /**
+     * Schedule 2 (j): the time by which we undertake to complete the work,
+     * in weeks from acceptance (dates are then agreed inside it). Frozen on
+     * each proposal at issue, printed in the proposal, both contract emails
+     * and the contract. Without a stated time, CRA s28's 30-day default for
+     * delivering goods would apply.
+     */
+    installWithinWeeks: number;
   };
   serviceArea: { outcodes: string[] };
   sla: { enabled: boolean };
@@ -221,6 +229,7 @@ export const DEFAULT_SETTINGS: PilotSettings = {
     surveyFeeGbp: 0,
     cancellationDays: 14,
     workingDays: [1, 2, 3, 4, 5],
+    installWithinWeeks: 8,
   },
   serviceArea: {
     outcodes: [
@@ -296,6 +305,10 @@ function validList<T>(stored: unknown[], ok: (v: unknown) => v is T, fallback: r
  * of a fixed set (union members, list items code reads without checking) are
  * checked here, so junk can't reach `TAX_CODES[code].ratePct` and the like.
  */
+/** The performance window's bounds: past the 14-day cancellation period, inside a year. */
+export const INSTALL_WITHIN_WEEKS_MIN = 3;
+export const INSTALL_WITHIN_WEEKS_MAX = 52;
+
 function sanitise(s: PilotSettings): PilotSettings {
   const d = DEFAULT_SETTINGS;
   const isStr = (v: unknown): v is string => typeof v === "string";
@@ -312,6 +325,9 @@ function sanitise(s: PilotSettings): PilotSettings {
     d.scheduling.workingDays,
   );
   s.scheduling.surveySlotTimes = validList(s.scheduling.surveySlotTimes, isStr, d.scheduling.surveySlotTimes);
+  // Whole weeks, long enough to cover the cancellation period and the kit, never open-ended.
+  const weeks = s.scheduling.installWithinWeeks;
+  if (!Number.isInteger(weeks) || weeks < INSTALL_WITHIN_WEEKS_MIN || weeks > INSTALL_WITHIN_WEEKS_MAX) s.scheduling.installWithinWeeks = d.scheduling.installWithinWeeks;
   s.serviceArea.outcodes = validList(s.serviceArea.outcodes, isStr, d.serviceArea.outcodes);
   s.comms.disabledEvents = validList(s.comms.disabledEvents, isStr, d.comms.disabledEvents);
   s.discounts = validList(

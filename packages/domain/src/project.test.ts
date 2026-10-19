@@ -3,6 +3,8 @@ import { test } from "node:test";
 import { generateQuote } from "./pricing.ts";
 import {
   dayUpdateLabel,
+  DOCUMENTS_CONSENT_WORDING,
+  documentsConsentCovers,
   CANCELLATION_RULE_STATUS,
   EARLY_START_WORDING_VERSION,
   earlyStartEvidenceProblem,
@@ -309,7 +311,13 @@ test("the whole pilot journey runs price → aftercare and closes", () => {
   assert.equal(p.proposal.contractType, "supply-and-install");
   assert.equal(p.proposal.goodsReceivedOn, "2026-11-13");
   assert.equal(p.proposal.cancellationEndsOn, "2026-11-27");
-  assert.deepEqual(p.proposal.documentsByEmailConsent, { at: "2026-10-24T10:00:00.000Z", channel: "portal" });
+  assert.deepEqual(p.proposal.documentsByEmailConsent, {
+    at: "2026-10-24T10:00:00.000Z",
+    channel: "portal",
+    wordingVersion: DOCUMENTS_CONSENT_WORDING.portal.version,
+    text: DOCUMENTS_CONSENT_WORDING.portal.text,
+    email: p.customer.email,
+  });
   // Recorded when the issue email went, not at issue.
   assert.equal(p.proposal.preContractInfoSentAt, "2026-10-26T09:01:00.000Z");
   assert.equal(p.proposal.confirmationSentAt, "2026-10-27T18:01:00.000Z");
@@ -556,12 +564,35 @@ test("documents-consent-recorded: once, by the customer or ops, before acceptanc
   assert.equal(ev.type, "documents-consent-recorded");
   assert.equal(ev.actor, "customer");
   assert.equal(ev.internal, undefined);
-  const again = step(p, { type: "documents-consent-recorded", channel: "in-person" }, T.issue, { actor: ADMIN });
+  // What they agreed to, in which words, for which address (reg 10(2), provable under reg 17).
+  assert.equal(p.proposal.documentsByEmailConsent?.wordingVersion, "docs-by-email/portal-1");
+  assert.match(p.proposal.documentsByEmailConsent?.text ?? "", /happy to receive my proposal and contract documents by email/);
+  assert.equal(p.proposal.documentsByEmailConsent?.email, p.customer.email);
+  assert.equal(p.proposal.documentsByEmailConsent?.recordedBy, undefined, "they ticked it themselves");
+  const again = step(p, { type: "documents-consent-recorded", channel: "in-person", evidence: "Said so at the door" }, T.issue, { actor: ADMIN });
   assert.deepEqual(again.proposal.documentsByEmailConsent, p.proposal.documentsByEmailConsent); // the first agreement stands
   assert.equal(again.events.length, p.events.length);
-  const byOps = step(walk("design-approved"), { type: "documents-consent-recorded", channel: "in-person" }, T.design, { actor: ADMIN });
-  assert.deepEqual(byOps.proposal.documentsByEmailConsent, { at: T.design, channel: "in-person" });
+  // Staff recording one they were told: it needs the evidence, and keeps who recorded it.
+  refuses(walk("design-approved"), { type: "documents-consent-recorded", channel: "email" }, T.design, { actor: ADMIN }, /Say where their email is/);
+  refuses(walk("design-approved"), { type: "documents-consent-recorded", channel: "in-person", evidence: "Said so at the door" }, T.design, {}, /Only our team/);
+  const byOps = step(walk("design-approved"), { type: "documents-consent-recorded", channel: "email", evidence: "Their email of 24 Oct, Re: your survey" }, T.design, { actor: ADMIN });
+  assert.deepEqual(byOps.proposal.documentsByEmailConsent, {
+    at: T.design,
+    channel: "email",
+    wordingVersion: DOCUMENTS_CONSENT_WORDING.email.version,
+    text: DOCUMENTS_CONSENT_WORDING.email.text,
+    email: byOps.customer.email,
+    recordedBy: { staffId: ADMIN.id, name: ADMIN.name },
+    evidence: "Their email of 24 Oct, Re: your survey",
+  });
   assert.equal(byOps.events.at(-1)!.actor, "ops");
+  // An agreement covers the address it was given for: a new address needs a new one before issue.
+  const moved = step(p, { type: "set-customer-contact", email: "new-address@example.test" }, T.issue, { actor: ADMIN });
+  assert.equal(documentsConsentCovers(moved), false);
+  assert.ok(blockersFor(moved, ctx(T.issue, {}), "proposal-issue").some((b) => b.code === "documents-consent-missing" && /new-address@example\.test/.test(b.message)));
+  const reagreed = step(moved, { type: "documents-consent-recorded", channel: "portal" }, T.issue);
+  assert.equal(reagreed.proposal.documentsByEmailConsent?.email, "new-address@example.test");
+  assert.equal(documentsConsentCovers(reagreed), true);
   refuses(walk("design-approved"), { type: "documents-consent-recorded", channel: "fax" } as never, T.design, {}, /How did the customer agree/);
   refuses(walk("proposal-accepted"), { type: "documents-consent-recorded", channel: "portal" }, T.dates, {}, /already in place/);
   // It survives a re-issue: consent is the customer's, not the version's.

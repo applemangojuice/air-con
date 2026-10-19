@@ -258,6 +258,12 @@ export function ContractDoc({ snap, ctx }: { snap: ContractSnapshot; ctx: DocCon
           ]}
         />
         {o.installDays > 0 && <p>Installation takes {o.installDays} working days, on dates you choose with us.</p>}
+        {snap.performance && (
+          <p>
+            We&apos;ll finish your installation by {fmtDate(snap.performance.byDate)} (within {snap.performance.withinWeeks} weeks of the day you accepted), on dates agreed
+            with you. If you choose later dates, it&apos;s by then instead.
+          </p>
+        )}
       </DocSection>
       <DocSection title="Included, not included, assumed">
         <p className="font-semibold text-ink-900">Included</p>

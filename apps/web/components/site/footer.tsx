@@ -16,6 +16,7 @@ const links = [
 const legalLinks = [
   { label: "Terms", href: "/terms" },
   { label: "Privacy", href: "/privacy" },
+  { label: "Analytics choices", href: "/privacy#analytics" },
 ];
 
 /**

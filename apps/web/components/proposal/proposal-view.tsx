@@ -214,7 +214,11 @@ export function ProposalView({ data }: { data: ProposalPageData }) {
                 <dd className="font-semibold text-ink-900">{data.approvedBy ?? "Our engineer"}</dd>
               </div>
             </dl>
-            {state !== "accepted" && <p className="mt-4 text-sm leading-relaxed text-ink-500">{data.earliestStart}</p>}
+            {state !== "accepted" && (
+              <p className="mt-4 text-sm leading-relaxed text-ink-500">
+                {data.performance} {data.earliestStart}
+              </p>
+            )}
           </div>
 
           {aboveInstant && (

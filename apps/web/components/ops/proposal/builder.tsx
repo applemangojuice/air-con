@@ -449,6 +449,7 @@ function Fixes(props: BuilderProps & { flushEdits: () => Promise<boolean> }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [email, setEmail] = useState("");
+  const [consentEvidence, setConsentEvidence] = useState("");
   const run = async (fn: () => Promise<ActionResult>) => {
     setBusy(true);
     setMsg(null);
@@ -476,11 +477,20 @@ function Fixes(props: BuilderProps & { flushEdits: () => Promise<boolean> }) {
         <p className="text-sm text-ink-700">
           Did {props.customer.name || "the customer"} tell you they&apos;re happy to get documents by email? Record how. (They can also agree on their project page.)
         </p>
+        <div className="mt-2">
+          <Input
+            label="How and when they agreed"
+            hint="Kept with the agreement, so it can be shown later: for an email, its date and subject."
+            value={consentEvidence}
+            maxLength={500}
+            onChange={(e) => setConsentEvidence(e.target.value)}
+          />
+        </div>
         <div className="mt-2 flex flex-wrap gap-2">
-          <Button variant="secondary" disabled={busy} onClick={() => run(() => recordConsentAction(props.projectId, "in-person"))}>
+          <Button variant="secondary" disabled={busy || consentEvidence.trim().length < 5} onClick={() => run(() => recordConsentAction(props.projectId, "in-person", consentEvidence))}>
             They agreed in person
           </Button>
-          <Button variant="secondary" disabled={busy} onClick={() => run(() => recordConsentAction(props.projectId, "email"))}>
+          <Button variant="secondary" disabled={busy || consentEvidence.trim().length < 5} onClick={() => run(() => recordConsentAction(props.projectId, "email", consentEvidence))}>
             They agreed by email
           </Button>
         </div>

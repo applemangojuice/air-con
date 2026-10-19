@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { currentStage, customerNextAction, projectTimeline, stageState, type Project, type ProjectStageId } from "@aircon/domain";
 import { ProjectStepper } from "@/components/project/timeline";
 import { fmtDay, fmtDayTime, money } from "@/lib/format";
-import { primaryCls } from "./bits";
+import { NextStepContext, primaryCls } from "./bits";
 import { useHub } from "./controller";
 import type { HubSlots, PanelProps } from "./panel-types";
 import { BookingPanel, KitPanel } from "./panels-booking";
@@ -196,8 +196,11 @@ export function Hub({ data, slots, controls, refLabel }: { data: HubData; slots?
 
   const Panel = PANELS[selected];
   const panel = <Panel data={data} state={stageState(p, selected)} goTo={go} slots={slots} />;
+  // The card's action is the one filled button; panels repeating it draw theirs quietly.
+  const nextLabel = customerNextAction(p)?.label ?? null;
 
   return (
+    <NextStepContext.Provider value={nextLabel}>
     <div>
       <StaffStrip data={data} />
       <header className="mb-6 sm:mb-8">
@@ -230,5 +233,6 @@ export function Hub({ data, slots, controls, refLabel }: { data: HubData; slots?
         </section>
       </div>
     </div>
+    </NextStepContext.Provider>
   );
 }

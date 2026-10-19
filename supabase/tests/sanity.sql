@@ -514,4 +514,37 @@ reset role;
 
 do $$ begin raise notice 'ok: anon sees nothing, service_role sees everything'; end $$;
 
+\echo '--- sanity: shared rate limits (0012)'
+
+set role service_role;
+do $$
+declare
+  r record;
+begin
+  select * into r from public.rate_limit_hit('demo-rate-key', 2, 60);
+  assert r.allowed and r.retry_after_seconds = 0, 'the first hit is allowed';
+  select * into r from public.rate_limit_hit('demo-rate-key', 2, 60);
+  assert r.allowed, 'the second hit is allowed';
+  select * into r from public.rate_limit_hit('demo-rate-key', 2, 60);
+  assert not r.allowed and r.retry_after_seconds between 1 and 60, 'the third hit in the window is refused, with a wait';
+  select * into r from public.rate_limit_hit('demo-other-key', 2, 60);
+  assert r.allowed, 'another key has its own count';
+  -- A window that has ended starts again from one.
+  update public.rate_limits set window_start = now() - interval '2 minutes' where key = 'demo-rate-key';
+  select * into r from public.rate_limit_hit('demo-rate-key', 2, 60);
+  assert r.allowed and (select hits from public.rate_limits where key = 'demo-rate-key') = 1, 'an ended window resets';
+  raise notice 'ok: rate_limit_hit counts, refuses and resets';
+end
+$$;
+reset role;
+
+set role anon;
+select pg_temp.expect_error('anon cannot call rate_limit_hit', '42501', $sql$
+  select * from public.rate_limit_hit('demo-anon', 100, 60)
+$sql$);
+select pg_temp.expect_error('anon cannot read rate limits', '42501', $sql$
+  select count(*) from public.rate_limits
+$sql$);
+reset role;
+
 \echo '--- sanity: all checks passed'

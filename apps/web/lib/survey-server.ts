@@ -626,7 +626,16 @@ export async function recordDocumentsConsent(projectId: string, staff: StaffMemb
     const contact = await dispatch(projectId, { type: "set-customer-contact", email }, staff);
     if ("error" in contact) return fail(contact.status, contact.error);
   }
-  const result = await dispatch(projectId, { type: "documents-consent-recorded", channel: "in-person" }, staff);
+  const result = await dispatch(
+    projectId,
+    {
+      type: "documents-consent-recorded",
+      channel: "in-person",
+      // The surveyor asked the question on the screen and ticked "I asked, and they said yes".
+      evidence: `Asked at the home survey by ${staff.name}, who confirmed on the survey app that they said yes.`,
+    },
+    staff,
+  );
   if ("error" in result) return fail(result.status, result.error, result.blockers);
   const consent = result.project.proposal.documentsByEmailConsent;
   if (!consent) return fail(502, "The consent wasn't recorded. Try again.");

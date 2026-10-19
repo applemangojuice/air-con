@@ -54,12 +54,12 @@ import { emailConfigured } from "./email";
 import { isDemoSeedId } from "./demo-seed/ids";
 import { healthReport } from "./health";
 import { isPlaceholderValue, placeholderKeys, realEnv } from "./env-placeholders";
-import { PILOT_MIGRATION, checkPilotSchema } from "./schema-check";
+import { PILOT_MIGRATION, checkPilotSchema, probeTable } from "./schema-check";
 import { MEDIA_CONTENT_TYPES, MEDIA_MAX_BYTES, safeMediaName, signedMediaUrls } from "./media-server";
 import { DAILY_JOB_IDS, DONE_STATUSES, dailyJobsFor, emptySummary, type DailyJob, type DailyOpsSummary } from "./ops-core-schedule";
 import { dispatch, londonToday } from "./project-service";
 import { smsConfigured } from "./providers/sms";
-import { db, isUuid, must, type Row } from "./repo/base";
+import { db, isUuid, selectAllPages, type Row } from "./repo/base";
 import * as catalogueRepo from "./repo/catalogue";
 import * as complianceRepo from "./repo/compliance";
 import * as designsRepo from "./repo/designs";
@@ -99,13 +99,29 @@ import { MEDIA_BUCKET, dataBackend, getServiceClient } from "./supabase-server";
 
 const CHUNK = 100;
 
-/** Rows of a table whose `column` is one of `ids`, in chunks (PostgREST URLs have limits). */
-async function rowsWhereIn(table: string, column: string, ids: string[], select = "*"): Promise<Row[]> {
+/**
+ * Rows of a table whose `column` is one of `ids`: in chunks of ids (PostgREST
+ * URLs have limits), each read page by page (selectAllPages), because 100
+ * projects' compliance items or install evidence pass Supabase's 1000-row
+ * cap, which would otherwise cut them off without an error.
+ */
+export async function rowsWhereIn(table: string, column: string, ids: string[], select = "*"): Promise<Row[]> {
   const wanted = [...new Set(ids.filter(isUuid))];
   const out: Row[] = [];
   for (let i = 0; i < wanted.length; i += CHUNK) {
-    const res = await db().from(table).select(select).in(column, wanted.slice(i, i + CHUNK));
-    out.push(...((must(res as { data: Row[] | null; error: { message: string } | null }, `${table} batch`) ?? []) as Row[]));
+    const chunk = wanted.slice(i, i + CHUNK);
+    out.push(
+      ...(await selectAllPages<Row>(
+        (from, to, count) =>
+          db()
+            .from(table)
+            .select(select, count ? { count: "exact" } : undefined)
+            .in(column, chunk)
+            .order("id")
+            .range(from, to) as unknown as PromiseLike<{ data: unknown[] | null; error: { message: string } | null; count?: number | null }>,
+        `${table} batch`,
+      )),
+    );
   }
   return out;
 }
@@ -312,8 +328,18 @@ export interface LoadedProject {
 
 /** Every readable project, most recently touched first. Unreadable snapshots are skipped and logged. */
 export async function loadAllProjects(limit = 500): Promise<LoadedProject[]> {
-  const res = await db().from("projects").select("id, created_at, updated_at, project").order("updated_at", { ascending: false }).limit(limit);
-  const rows = (must(res as { data: Row[] | null; error: { message: string } | null }, "projects list") ?? []) as Row[];
+  // Page by page: past Supabase's 1000-row cap a single select would stop short without saying so.
+  const rows = await selectAllPages<Row>(
+    (from, to, count) =>
+      db()
+        .from("projects")
+        .select("id, created_at, updated_at, project", count ? { count: "exact" } : undefined)
+        .order("updated_at", { ascending: false })
+        .order("id")
+        .range(from, to) as unknown as PromiseLike<{ data: unknown[] | null; error: { message: string } | null; count?: number | null }>,
+    "projects list",
+    { limit },
+  );
   const out: LoadedProject[] = [];
   for (const row of rows) {
     try {
@@ -697,7 +723,7 @@ export async function goLiveChecks(): Promise<GoLiveCheck[]> {
           : !allOk
             ? `Some checks failed: ${[...schema.errors, ...report.tables.filter((t) => !t.ok).map((t) => `${t.table}: ${t.error ?? "error"}`)].slice(0, 4).join("; ")}.`
             : "Every pilot table and column is there.",
-      fix: `Run every file in supabase/migrations in order (0001 to 0010, both 0006 files) in the Supabase SQL editor; ${PILOT_MIGRATION} is the pilot platform. Then reload this page.`,
+      fix: `Run every file in supabase/migrations in order (0001 to 0012, both 0006 files) in the Supabase SQL editor; ${PILOT_MIGRATION} is the pilot platform. Then reload this page.`,
       href: "/ops/status",
     });
   } else {
@@ -709,7 +735,7 @@ export async function goLiveChecks(): Promise<GoLiveCheck[]> {
         backend === "none"
           ? "No database: nothing saves."
           : `Using the local ${backend} backend. Fine for trying things out; real customers need Supabase (local files don't survive a Vercel deploy).`,
-      fix: "Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in Vercel, run every migration 0001 to 0010 in order, redeploy.",
+      fix: "Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in Vercel, run every migration 0001 to 0012 in order, redeploy.",
     });
   }
   const buckets = report.buckets.filter((b) => !b.ok);
@@ -720,6 +746,21 @@ export async function goLiveChecks(): Promise<GoLiveCheck[]> {
       level: "red",
       detail: `Missing: ${buckets.map((b) => b.bucket).join(", ")}. Photo uploads fail without them.`,
       fix: "Migration 0010 creates project-media; 0001 and 0004 the survey buckets.",
+    });
+  }
+
+  // Sign-in limits every instance shares (0012): without it each Vercel instance counts on its own.
+  const client = backend === "supabase" ? getServiceClient() : null;
+  if (client) {
+    const limits = await probeTable(client, "rate_limits");
+    checks.push({
+      id: "rate-limits",
+      label: "Shared sign-in limits (migration 0012)",
+      level: limits.ok ? "green" : "amber",
+      detail: limits.ok
+        ? "Sign-in and portal link limits are counted once for the whole site."
+        : "Not there yet, so each server instance counts sign-in requests on its own: a flood of sign-in emails is only lightly slowed.",
+      fix: "Run supabase/migrations/0012_rate_limits.sql in the Supabase SQL editor, then reload this page.",
     });
   }
 

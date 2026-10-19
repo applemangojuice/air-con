@@ -13,7 +13,7 @@ import {
   type PriceLine,
 } from "./costing.ts";
 import type { DesignRecord, DesignVariant, RoomDesignInput } from "./design-record.ts";
-import type { ContractType, ReadinessContext } from "./project.ts";
+import type { ContractType, DocumentsConsentRecord, ReadinessContext } from "./project.ts";
 import { TAX_CODES, effectiveTaxCode, type PilotSettings, type TaxCodeId } from "./settings.ts";
 
 /**
@@ -100,6 +100,12 @@ export interface AcceptanceRecord {
   earlyStartWordingVersion?: string;
   /** When they agreed to get the contract documents by email. */
   documentsByEmailConsentAt?: string;
+  /**
+   * That agreement as it stood when they accepted (reg 10(2)): how, the
+   * words and their version, the address it covers, and for one staff
+   * recorded, who and where the evidence is.
+   */
+  documentsByEmailConsent?: DocumentsConsentRecord;
   /** sha256 of the canonical JSON of the terms text they were shown (ProposalRecord.termsText). */
   termsHash?: string;
 }
@@ -237,13 +243,15 @@ export function guaranteeLines(settings: PilotSettings, manufacturerText?: strin
   return out;
 }
 
-/** The payment terms a proposal is offered on (Schedule 2 (u), (j)) and its cancellation days. */
+/** The payment terms a proposal is offered on (Schedule 2 (u), (j)), its cancellation days and the time we undertake to finish by. */
 export interface ProposalTerms {
   depositPct: number;
   depositTiming: PilotSettings["payments"]["depositTiming"];
   balanceDueDays: number;
   methods: PilotSettings["payments"]["methods"];
   cancellationDays: number;
+  /** Schedule 2 (j): weeks from acceptance to a finished installation. Absent on proposals issued before it was frozen. */
+  installWithinWeeks?: number;
 }
 
 export function proposalTermsFrom(settings: PilotSettings): ProposalTerms {
@@ -254,7 +262,24 @@ export function proposalTermsFrom(settings: PilotSettings): ProposalTerms {
     balanceDueDays: p.balanceDueDays,
     methods: [...p.methods],
     cancellationDays: settings.scheduling.cancellationDays,
+    installWithinWeeks: settings.scheduling.installWithinWeeks,
   };
+}
+
+/**
+ * Schedule 2 (j), in one sentence everywhere it's said (the proposal page,
+ * both contract emails, the contract): the time by which we undertake to
+ * finish, from acceptance, with the dates agreed inside it.
+ */
+export function performanceCommitment(weeks: number): string {
+  return `We'll finish your installation within ${weeks} weeks of the day you accept, on dates agreed with you. If you choose later dates, it's by then instead.`;
+}
+
+/** The date that commitment runs to, from the day they accepted (yyyy-mm-dd). */
+export function performanceDueOn(acceptedAtIso: string, weeks: number): string {
+  const d = new Date(`${acceptedAtIso.slice(0, 10)}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + weeks * 7);
+  return d.toISOString().slice(0, 10);
 }
 
 /**
@@ -270,7 +295,11 @@ export function settingsForProposal(settings: PilotSettings, record: Pick<Propos
   return {
     ...settings,
     payments: { ...settings.payments, depositPct: t.depositPct, depositTiming: t.depositTiming, balanceDueDays: t.balanceDueDays, methods: [...t.methods] },
-    scheduling: { ...settings.scheduling, cancellationDays: Math.max(t.cancellationDays, 14) },
+    scheduling: {
+      ...settings.scheduling,
+      cancellationDays: Math.max(t.cancellationDays, 14),
+      ...(typeof t.installWithinWeeks === "number" ? { installWithinWeeks: t.installWithinWeeks } : {}),
+    },
   };
 }
 

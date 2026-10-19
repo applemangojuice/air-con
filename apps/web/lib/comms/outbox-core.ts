@@ -131,9 +131,13 @@ export interface OutboxDeps {
   customerLink(projectId: string, path: string, recipient: string): Promise<string>;
   appUrl(): string;
   teamInbox(): string | null;
-  /** Marketing events only (none exist today): has this customer opted in? */
+  /**
+   * Has this customer opted in to marketing? Asked for MARKETING_EVENTS (none
+   * today) and MARKETING_OFFER_EVENTS (whose offer line needs it). Absent: no.
+   */
   marketingConsent?(project: Project | null): Promise<boolean>;
-  email: { configured(): boolean; provider: string; send(to: string, subject: string, html: string): Promise<SendResult> };
+  /** `replyTo`: where a reply goes (settings.company.email), so it reaches a monitored inbox whatever EMAIL_FROM is. */
+  email: { configured(): boolean; provider: string; send(to: string, subject: string, html: string, opts?: { replyTo?: string }): Promise<SendResult> };
   sms: { configured(): boolean; provider: string; send(to: string, body: string): Promise<SendResult> };
   /**
    * A message was sent (provider acknowledged) or stored as demo. Awaited,
@@ -157,6 +161,16 @@ export function optedOut(event: CommsEventId, project: Pick<Project, "aftercare"
  * Anything promotional added later goes here and is refused without consent.
  */
 export const MARKETING_EVENTS: ReadonlySet<CommsEventId> = new Set<CommsEventId>();
+
+/**
+ * Operational messages with an offer in them that only marketing consent
+ * allows (ICO: promoting a paid service is direct marketing, and the soft
+ * opt-in doesn't cover someone who declined it). The message goes to
+ * everyone; its template adds the offer only when ctx.marketingConsent.
+ * The yearly service reminder: due-date and warranty facts for everyone,
+ * "we can book it for you" only with consent.
+ */
+export const MARKETING_OFFER_EVENTS: ReadonlySet<CommsEventId> = new Set<CommsEventId>(["service-reminder"]);
 
 /** Pure: may this event go to this person? Operational messages always may; marketing needs an opt-in. */
 export function consentAllows(event: CommsEventId, marketingConsent: boolean): boolean {
@@ -284,10 +298,13 @@ export function createOutbox(deps: OutboxDeps) {
       }
       let res: SendResult;
       try {
-        res =
-          m.channel === "email"
-            ? await deps.email.send(m.to, content.subject, content.html ?? content.text)
-            : await deps.sms.send(m.to, content.text);
+        if (m.channel === "email") {
+          // Replies go to the company address in settings (the emails ask customers to reply).
+          const replyTo = (settings ?? (await deps.getSettings().catch(() => undefined)))?.company.email?.trim();
+          res = await deps.email.send(m.to, content.subject, content.html ?? content.text, replyTo ? { replyTo } : undefined);
+        } else {
+          res = await deps.sms.send(m.to, content.text);
+        }
       } catch (err) {
         res = { ok: false, error: err instanceof Error ? err.message : String(err) };
       }
@@ -340,7 +357,9 @@ export function createOutbox(deps: OutboxDeps) {
       if (def.fallback === "email" && (!opts.channels || opts.channels.includes("email")) && onTheWayChannel(recipient, live) === "email") {
         channels = ["email"];
       }
-      const marketingOk = MARKETING_EVENTS.has(event) ? Boolean(await deps.marketingConsent?.(project)) : true;
+      const askConsent = MARKETING_EVENTS.has(event) || MARKETING_OFFER_EVENTS.has(event);
+      const marketingConsent = askConsent ? Boolean(await deps.marketingConsent?.(project).catch(() => false)) : false;
+      const marketingOk = MARKETING_EVENTS.has(event) ? marketingConsent : true;
 
       const results: ChannelResult[] = [];
       const pending: { channel: Channel; key: string; to: string }[] = [];
@@ -372,6 +391,7 @@ export function createOutbox(deps: OutboxDeps) {
         live,
         portalUrl: link.portalUrl,
         recipientName: recipient.name ?? (event === "magic-link" ? (opts.data as CommsData["magic-link"]).name : undefined),
+        marketingConsent,
       });
       const rendered: RenderedMessage = renderMessage(event, ctx, opts.data);
       const now = deps.now();

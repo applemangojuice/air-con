@@ -330,8 +330,14 @@ const KIND_TITLE: Record<InvoiceKind, string> = {
   "credit-note": "credit note",
 };
 
+/**
+ * Who issues an invoice: a staff member, or the system for the one thing it
+ * issues by itself (the credit note that goes with a refund made in Stripe).
+ */
+export type Issuer = StaffMember | { kind: "system"; name: string };
+
 /** Raise and issue an invoice (or a credit note) in one step. */
-export async function issueInvoice(projectId: string, input: IssueInput, staff: StaffMember): Promise<Outcome<Invoice>> {
+export async function issueInvoice(projectId: string, input: IssueInput, staff: Issuer): Promise<Outcome<Invoice>> {
   const project = await loadProject(projectId);
   if (!project) return fail("Project not found.", 404);
   const [settings, invoices, issues, proposal, contractDoc] = await Promise.all([
@@ -394,7 +400,7 @@ export async function issueInvoice(projectId: string, input: IssueInput, staff: 
     const plan = planned()[input.kind];
     const early = input.earlyReason?.trim();
     if (plan.early && early) {
-      if (!staff.roles.includes("admin")) return fail("Only an admin can bill the balance before the installation is finished.", 403);
+      if (!("roles" in staff) || !staff.roles.includes("admin")) return fail("Only an admin can bill the balance before the installation is finished.", 403);
       extra = { notes: [`Billed before the installation finished: ${early}`, input.notes?.trim()].filter(Boolean).join(" · ") };
     } else if (!plan.available) {
       return fail(plan.early ? `${plan.reason} An admin can bill it early, with a reason.` : (plan.reason ?? "Nothing to bill."));
@@ -451,7 +457,7 @@ export async function issueInvoice(projectId: string, input: IssueInput, staff: 
  * failure part-way) never doubles anything: the printable document, the
  * project's invoiced total, the deposit request, the customer's email.
  */
-export async function finishIssue(invoice: Invoice, actor: StaffMember): Promise<{ invoice: Invoice; warning?: string }> {
+export async function finishIssue(invoice: Invoice, actor: Issuer): Promise<{ invoice: Invoice; warning?: string }> {
   let inv = invoice;
   // Only invoices this module numbered carry the flag; anything else is complete as it stands.
   if (!inv.issuing) return { invoice: inv };
@@ -539,8 +545,8 @@ export async function finishIssue(invoice: Invoice, actor: StaffMember): Promise
 
 /** An invoice as the customer's document shows it: no internal bookkeeping. */
 export function customerInvoice(inv: Invoice): Invoice {
-  const { requestId: _r, issuing: _i, recordedOnProjectAt: _p, notes: _n, createdBy: _c, ...rest } = inv;
-  void [_r, _i, _p, _n, _c];
+  const { requestId: _r, issuing: _i, recordedOnProjectAt: _p, notes: _n, createdBy: _c, checkoutSessionId: _s, ...rest } = inv;
+  void [_r, _i, _p, _n, _c, _s];
   return rest;
 }
 
@@ -807,6 +813,10 @@ export type RefundTreatment = CreditPurpose | "owed";
 /**
  * A refund we made: a negative payment against the invoice it came from (or
  * the account credit note it pays out), with the reason.
+ *
+ * A card payment taken through Stripe is refunded in Stripe, and recorded
+ * here from Stripe's own confirmation (recordStripeRefund), so it's refused
+ * here as a card refund: recording it by hand as well would count it twice.
  */
 export async function recordRefund(
   projectId: string,
@@ -822,46 +832,106 @@ export async function recordRefund(
   },
   staff: StaffMember,
 ): Promise<Outcome<{ payment: Payment; duplicate: boolean; creditNote?: Invoice }>> {
+  const today = londonToday();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.refundedOn) || input.refundedOn > today) return fail("The refund date must be today or earlier.");
+  if (input.method === "card" && stripeConfigured()) {
+    const paidByStripe = (await paymentsRepo.listForInvoice(input.invoiceId)).some((p) => p.provider === "stripe" && p.amountPence > 0);
+    if (paidByStripe) {
+      return fail(
+        "That was paid by card through Stripe, so refund it in Stripe (Payments, open the payment, Refund). It's recorded here by itself within a minute of Stripe confirming it, with a credit note so it isn't asked for again.",
+      );
+    }
+  }
+  return applyRefund(
+    projectId,
+    {
+      invoiceId: input.invoiceId,
+      amountPence: input.amountPence,
+      method: input.method,
+      provider: "manual",
+      providerRef: `refund:${input.requestId}`,
+      refundedAt: `${input.refundedOn}T12:00:00.000Z`,
+      reason: input.reason,
+      creditRequestId: `refund-credit:${input.requestId}`,
+      recordedBy: staff.name,
+      ...(input.reference?.trim() ? { reference: input.reference.trim() } : {}),
+      ...(input.treatment ? { treatment: input.treatment } : {}),
+    },
+    staff,
+  );
+}
+
+/** The refund itself, however it was made: checks, the negative payment, and the credit note when it reopened the invoice. */
+async function applyRefund(
+  projectId: string,
+  input: {
+    invoiceId: string;
+    amountPence: number;
+    method: Payment["method"];
+    provider: Payment["provider"];
+    providerRef: string;
+    refundedAt: string;
+    reason: string;
+    creditRequestId: string;
+    recordedBy?: string;
+    reference?: string;
+    eventId?: string;
+    treatment?: RefundTreatment;
+  },
+  actor: Issuer,
+): Promise<Outcome<{ payment: Payment; duplicate: boolean; creditNote?: Invoice }>> {
   const invoice = await invoicesRepo.get(input.invoiceId);
   if (!invoice || invoice.projectId !== projectId) return fail("That invoice isn't on this project.", 404);
   if (!input.reason.trim()) return fail("Say why the money went back.");
   if (!(input.amountPence > 0)) return fail("Enter the amount refunded.");
-  const before = await invoicesRepo.listForProject(projectId);
-  if (invoice.kind === "credit-note") {
-    // Paying out credit on the account: never more than is left on it, or than they're in credit overall.
-    const refundable = refundableCreditPence(invoice, before);
-    if (input.amountPence > refundable) {
-      const inCredit = Math.max(0, -outstandingPence(before));
-      return fail(
-        refundable > 0
-          ? `Only ${money(refundable)} of ${invoice.number} can be refunded: the rest is covering what they owe.`
-          : inCredit > 0
-            ? `${invoice.number} has nothing left to refund.`
-            : `The customer isn't in credit: ${invoice.number} is covering what they owe.`,
-      );
+  const asActor = "roles" in actor ? actor : ({ kind: "system", name: actor.name } as const);
+  let owedBefore: number;
+  let recorded: Outcome<{ payment: Payment; duplicate: boolean }>;
+  const existing = await paymentsRepo.getByProviderRef(input.providerRef);
+  if (existing && existing.projectId === projectId) {
+    // A replay (a double click, Stripe sending it again): finish whatever the first left undone,
+    // never check it again against the totals it already changed.
+    recorded = await recordPayment({ ...existing }, asActor);
+    if (!recorded.ok) return recorded;
+    const now = await invoicesRepo.listForProject(projectId);
+    owedBefore = Math.max(0, invoiceOutstanding(now.find((i) => i.id === invoice.id) ?? invoice, now) - input.amountPence);
+  } else {
+    const before = await invoicesRepo.listForProject(projectId);
+    if (invoice.kind === "credit-note") {
+      // Paying out credit on the account: never more than is left on it, or than they're in credit overall.
+      const refundable = refundableCreditPence(invoice, before);
+      if (input.amountPence > refundable) {
+        const inCredit = Math.max(0, -outstandingPence(before));
+        return fail(
+          refundable > 0
+            ? `Only ${money(refundable)} of ${invoice.number} can be refunded: the rest is covering what they owe.`
+            : inCredit > 0
+              ? `${invoice.number} has nothing left to refund.`
+              : `The customer isn't in credit: ${invoice.number} is covering what they owe.`,
+        );
+      }
+    } else if (input.amountPence > invoice.paidPence) {
+      return fail(`Only ${money(invoice.paidPence)} has been paid on ${invoice.number}.`);
     }
-  } else if (input.amountPence > invoice.paidPence) {
-    return fail(`Only ${money(invoice.paidPence)} has been paid on ${invoice.number}.`);
+    owedBefore = invoiceOutstanding(invoice, before);
+    recorded = await recordPayment(
+      {
+        projectId,
+        invoiceId: invoice.id,
+        method: input.method,
+        provider: input.provider,
+        providerRef: input.providerRef,
+        amountPence: -input.amountPence,
+        status: "refunded",
+        receivedAt: input.refundedAt,
+        ...(input.recordedBy ? { recordedBy: input.recordedBy } : {}),
+        note: input.reason.trim(),
+        ...(input.reference ? { reference: input.reference } : {}),
+        ...(input.eventId ? { eventId: input.eventId } : {}),
+      },
+      asActor,
+    );
   }
-  const today = londonToday();
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.refundedOn) || input.refundedOn > today) return fail("The refund date must be today or earlier.");
-  const owedBefore = invoiceOutstanding(invoice, before);
-  const recorded = await recordPayment(
-    {
-      projectId,
-      invoiceId: invoice.id,
-      method: input.method,
-      provider: "manual",
-      providerRef: `refund:${input.requestId}`,
-      amountPence: -input.amountPence,
-      status: "refunded",
-      receivedAt: `${input.refundedOn}T12:00:00.000Z`,
-      recordedBy: staff.name,
-      note: input.reason.trim(),
-      ...(input.reference?.trim() ? { reference: input.reference.trim() } : {}),
-    },
-    staff,
-  );
   if (!recorded.ok || invoice.kind === "credit-note" || (input.treatment ?? "reduction") === "owed") return recorded;
 
   // The refund reopened the invoice: unless they still owe it, a credit note
@@ -878,9 +948,9 @@ export async function recordRefund(
       reason: `Refunded: ${input.reason.trim()}`,
       creditsInvoiceId: invoice.id,
       creditPurpose: input.treatment === "correction" ? "correction" : "reduction",
-      requestId: `refund-credit:${input.requestId}`,
+      requestId: input.creditRequestId,
     },
-    staff,
+    actor,
   );
   if (!credited.ok) {
     return { ...recorded, warning: `Refund recorded, but the credit note for it wasn't issued (${credited.error}): issue one against ${invoice.number} so it isn't asked for again.` };
@@ -943,6 +1013,9 @@ export async function recordStripePayment(facts: {
     console.error(`[stripe] session ${facts.sessionId} names invoice ${facts.invoiceId} on ${facts.projectId}, which doesn't match our records`);
     return fail("That invoice isn't on that project.", 404);
   }
+  // What was still owed before this arrived: more than that is an overpayment (two Checkout pages
+  // for one bill both paid, say), recorded as it came in and flagged for the team.
+  const owedBefore = invoice.status === "void" ? 0 : invoiceOutstanding(invoice, await invoicesRepo.listForProject(facts.projectId));
   const result = await recordPayment(
     {
       projectId: facts.projectId,
@@ -964,8 +1037,197 @@ export async function recordStripePayment(facts: {
       data: { title: `Card payment on a void invoice: ${invoice.number}`, lines: ["The money arrived and is recorded. Refund it, or set it against another invoice."], urgent: true },
       discriminator: `void-payment:${facts.sessionId}`,
     });
+  } else if (result.ok && !result.value.duplicate && facts.amountPence > owedBefore) {
+    const extra = facts.amountPence - owedBefore;
+    await notify("team-alert", {
+      projectId: facts.projectId,
+      data: {
+        title: `Overpaid by card: ${money(extra)} more than was owed on ${invoice.number}`,
+        lines: [
+          `Stripe took ${money(facts.amountPence)}; ${owedBefore > 0 ? `${money(owedBefore)} was owed` : "nothing was owed"}. The extra is on their account as credit.`,
+          "Refund the extra in Stripe (it's recorded here by itself), or leave it to come off their next invoice and tell them so.",
+          `Stripe session ${facts.sessionId}`,
+        ],
+        urgent: true,
+      },
+      discriminator: `overpaid:${facts.sessionId}`,
+    });
   }
   return result;
+}
+
+/* ------------------------------------------------------------------ */
+/* Refunds and disputes made in Stripe                                 */
+/* ------------------------------------------------------------------ */
+
+/** The card payment a Stripe refund or dispute is about: by our invoice id when Stripe carried it, else by the PaymentIntent. */
+export async function findStripePayment(ref: { paymentIntent?: string; invoiceId?: string }): Promise<Payment | null> {
+  if (!ref.paymentIntent) return null;
+  if (ref.invoiceId) {
+    const onInvoice = (await paymentsRepo.listForInvoice(ref.invoiceId)).find((p) => p.provider === "stripe" && p.amountPence > 0 && p.reference === ref.paymentIntent);
+    if (onInvoice) return onInvoice;
+  }
+  return paymentsRepo.findStripeByIntent(ref.paymentIntent);
+}
+
+export interface StripeRefundInput {
+  refundId: string;
+  paymentIntent?: string;
+  amountPence: number;
+  status: string;
+  refundedAt: string;
+  reason?: string;
+  invoiceId?: string;
+  eventId: string;
+}
+
+const STRIPE_REASON: Record<string, string> = {
+  requested_by_customer: "the customer asked",
+  duplicate: "a duplicate payment",
+  fraudulent: "fraud",
+  expired_uncaptured_charge: "the payment was never captured",
+};
+
+/**
+ * A refund made in Stripe (its dashboard, mostly): recorded against the card
+ * payment it came from, once (`stripe-refund:<refund id>`), the same way as a
+ * refund recorded by hand: a negative payment, and when it reopens the
+ * invoice, a credit note so nobody asks for that money again ("they keep it",
+ * the hand form's default). Money they'd overpaid needs none and gets none.
+ * The team hears what was done. A refund that failed at Stripe records
+ * nothing (or, if it was recorded while pending, tells the team to put it
+ * back).
+ */
+export async function recordStripeRefund(refund: StripeRefundInput): Promise<Outcome<{ payment?: Payment; recorded: boolean; creditNote?: Invoice }>> {
+  const providerRef = `stripe-refund:${refund.refundId}`;
+  const original = await findStripePayment({ ...(refund.paymentIntent ? { paymentIntent: refund.paymentIntent } : {}), ...(refund.invoiceId ? { invoiceId: refund.invoiceId } : {}) });
+  if (!original || !original.invoiceId) {
+    console.error(`[stripe] refund ${refund.refundId} (${refund.paymentIntent ?? "no payment intent"}) matches no card payment we recorded`);
+    await notify("team-alert", {
+      data: {
+        title: `A Stripe refund we couldn't match: ${money(refund.amountPence)}`,
+        lines: [
+          `Stripe refunded ${money(refund.amountPence)} (refund ${refund.refundId}${refund.paymentIntent ? `, payment ${refund.paymentIntent}` : ""}), and it isn't a card payment recorded here.`,
+          "Find the project in Stripe's dashboard (the payment's description names the invoice) and record the refund by hand: Money, Record a refund, How: Other.",
+        ],
+        urgent: true,
+      },
+      discriminator: `stripe-refund-unmatched:${refund.refundId}`,
+    });
+    return { ok: true, value: { recorded: false }, message: "No matching payment." };
+  }
+  const projectId = original.projectId;
+  const already = await paymentsRepo.getByProviderRef(providerRef);
+  if (refund.status === "failed" || refund.status === "canceled") {
+    if (already) {
+      await notify("team-alert", {
+        projectId,
+        data: {
+          title: `A refund failed at Stripe: ${money(refund.amountPence)}`,
+          lines: [
+            `Stripe says refund ${refund.refundId} ${refund.status === "failed" ? "failed" : "was cancelled"}, so the money didn't go back to the customer.`,
+            "It was recorded here while it was pending. Record the money as received again (Money, Record a payment you've seen, Card taken elsewhere, reference the refund id), then sort it out with the customer.",
+          ],
+          urgent: true,
+        },
+        discriminator: `stripe-refund-failed:${refund.refundId}`,
+      });
+    }
+    return { ok: true, value: { recorded: false }, message: `Refund ${refund.status}: nothing recorded.` };
+  }
+  if (refund.status !== "succeeded" && refund.status !== "pending") {
+    return { ok: true, value: { recorded: false }, message: `Refund ${refund.status}: not yet.` };
+  }
+  const why = refund.reason ? STRIPE_REASON[refund.reason] ?? refund.reason.replace(/_/g, " ") : null;
+  const result = await applyRefund(
+    projectId,
+    {
+      invoiceId: original.invoiceId,
+      amountPence: refund.amountPence,
+      method: "card",
+      provider: "stripe",
+      providerRef,
+      refundedAt: refund.refundedAt,
+      reason: `Refunded in Stripe${why ? ` (${why})` : ""}`,
+      creditRequestId: `stripe-refund-credit:${refund.refundId}`,
+      recordedBy: "Stripe",
+      reference: refund.refundId,
+      eventId: refund.eventId,
+      treatment: "reduction",
+    },
+    { kind: "system", name: "Stripe" },
+  );
+  if (!result.ok) {
+    // Most likely recorded by hand already: more refunded than is recorded as paid.
+    await notify("team-alert", {
+      projectId,
+      data: {
+        title: `A Stripe refund couldn't be recorded: ${money(refund.amountPence)}`,
+        lines: [`Stripe refunded ${money(refund.amountPence)} (refund ${refund.refundId}), but it wasn't recorded: ${result.error}`, "Check the money page: if it was already recorded by hand, nothing more is needed."],
+        urgent: true,
+      },
+      discriminator: `stripe-refund-refused:${refund.refundId}`,
+    });
+    return { ok: true, value: { recorded: false }, message: result.error };
+  }
+  if (!already) {
+    const invoice = await invoicesRepo.get(original.invoiceId);
+    const credit = result.value.creditNote;
+    await notify("team-alert", {
+      projectId,
+      data: {
+        title: `Card refund recorded from Stripe: ${money(refund.amountPence)}${invoice ? ` on ${invoice.number}` : ""}`,
+        lines: [
+          `Refunded in Stripe (${refund.refundId}) and recorded here from Stripe's confirmation.`,
+          credit
+            ? `Credit note ${credit.number} went with it (money off the price), so it isn't asked for again.`
+            : "It was money they'd overpaid or had as credit, so no credit note was needed.",
+          ...(result.warning ? [result.warning] : []),
+        ],
+      },
+      discriminator: `stripe-refund:${refund.refundId}`,
+    });
+  }
+  return { ok: true, value: { payment: result.value.payment, recorded: true, ...(result.value.creditNote ? { creditNote: result.value.creditNote } : {}) }, ...(result.warning ? { warning: result.warning } : {}) };
+}
+
+/** A chargeback opened or settled at Stripe: the team must hear at once (the evidence has a deadline). */
+export async function alertStripeDispute(d: {
+  phase: "created" | "closed";
+  disputeId: string;
+  paymentIntent?: string;
+  amountPence: number;
+  reason?: string;
+  status?: string;
+  respondBy?: string;
+}): Promise<void> {
+  const original = d.paymentIntent ? await findStripePayment({ paymentIntent: d.paymentIntent }) : null;
+  const invoice = original?.invoiceId ? await invoicesRepo.get(original.invoiceId) : null;
+  const on = invoice ? ` on ${invoice.number}` : "";
+  const lines =
+    d.phase === "created"
+      ? [
+          `The customer's bank is disputing a card payment of ${money(d.amountPence)}${on}${d.reason ? ` (${d.reason.replace(/_/g, " ")})` : ""}. Stripe holds the money until it's decided.`,
+          `Answer it in Stripe's dashboard (Payments, Disputes)${d.respondBy ? ` by ${d.respondBy.slice(0, 10)}` : ""}: the contract, the proposal and the job's photos are the evidence.`,
+          "Nothing has changed here yet: the payment still shows as received.",
+        ]
+      : d.status === "won"
+        ? [`The dispute over ${money(d.amountPence)}${on} was decided in our favour: the money stays with us. Nothing to change here.`]
+        : [
+            `The dispute over ${money(d.amountPence)}${on} closed as "${(d.status ?? "lost").replace(/_/g, " ")}".`,
+            d.status === "lost"
+              ? "The money has gone back to the customer's bank. Record it on the money page (Record a refund, How: Other, and say they still owe it) so the invoice shows it's unpaid again."
+              : "Check Stripe's dashboard for what it means for the money.",
+          ];
+  await notify("team-alert", {
+    ...(original ? { projectId: original.projectId } : {}),
+    data: {
+      title: d.phase === "created" ? `Chargeback: a card payment of ${money(d.amountPence)}${on} is disputed` : `Chargeback closed (${d.status ?? "closed"}): ${money(d.amountPence)}${on}`,
+      lines: [...lines, `Stripe dispute ${d.disputeId}${original ? "" : " (no matching payment recorded here)"}`],
+      urgent: d.phase === "created" || d.status === "lost",
+    },
+    discriminator: `stripe-dispute:${d.disputeId}:${d.phase}`,
+  });
 }
 
 /**

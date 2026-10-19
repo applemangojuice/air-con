@@ -22,15 +22,28 @@ export function teamInbox(): string | null {
   return match ? match[1] : from;
 }
 
-export async function sendEmail(to: string, subject: string, html: string): Promise<boolean> {
+/** A usable Reply-To: a plausible single address, else nothing (Resend refuses a malformed one). */
+export function replyToAddress(value: string | null | undefined): string | undefined {
+  const v = value?.trim();
+  return v && /^[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]+$/.test(v) ? v : undefined;
+}
+
+/**
+ * Send one email. `replyTo` is where the customer's reply goes: our company
+ * address from settings, so a reply (an express early-start request, a
+ * question about a proposal) reaches a monitored inbox even when EMAIL_FROM
+ * is a sending-only or no-reply address.
+ */
+export async function sendEmail(to: string, subject: string, html: string, opts: { replyTo?: string } = {}): Promise<boolean> {
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.EMAIL_FROM;
   if (!apiKey || !from) return false;
+  const replyTo = replyToAddress(opts.replyTo);
   try {
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
-      body: JSON.stringify({ from, to: [to], subject, html }),
+      body: JSON.stringify({ from, to: [to], subject, html, ...(replyTo ? { reply_to: replyTo } : {}) }),
     });
     if (!res.ok) console.error("email send failed:", res.status, await res.text());
     return res.ok;
@@ -41,10 +54,10 @@ export async function sendEmail(to: string, subject: string, html: string): Prom
 }
 
 /** Team alert: no-op (false) when the inbox isn't configured. */
-export async function sendTeamEmail(subject: string, html: string): Promise<boolean> {
+export async function sendTeamEmail(subject: string, html: string, opts: { replyTo?: string } = {}): Promise<boolean> {
   const to = teamInbox();
   if (!to) return false;
-  return sendEmail(to, subject, html);
+  return sendEmail(to, subject, html, opts);
 }
 
 export function escapeHtml(value: string): string {

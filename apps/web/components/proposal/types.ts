@@ -54,6 +54,8 @@ export interface ProposalPageData {
   paymentTerms: Record<string, string[]>;
   extraCharges: string;
   earliestStart: string;
+  /** Schedule 2 (j): the time by which we undertake to finish (performanceCommitment, from the frozen terms). */
+  performance: string;
   cancellation: {
     /** The plain sentence before they accept. */
     summary: string;

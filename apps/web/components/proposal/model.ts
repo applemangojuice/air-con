@@ -85,6 +85,8 @@ export function buildAcceptanceRecord(input: {
   cancellationNoticeVersion: string;
   earlyStartWordingVersion: string;
   documentsByEmailConsentAt?: string;
+  /** The documents-by-email agreement in full, copied into the acceptance. */
+  documentsByEmailConsent?: AcceptanceRecord["documentsByEmailConsent"];
   /** sha256 of the frozen terms text they were shown (termsHash). */
   termsHash?: string;
 }): AcceptanceRecord {
@@ -111,6 +113,7 @@ export function buildAcceptanceRecord(input: {
     contractType,
     earlyStartWordingVersion: input.earlyStartWordingVersion,
     ...(input.documentsByEmailConsentAt ? { documentsByEmailConsentAt: input.documentsByEmailConsentAt } : {}),
+    ...(input.documentsByEmailConsent ? { documentsByEmailConsent: { ...input.documentsByEmailConsent } } : {}),
     ...(input.termsHash ? { termsHash: input.termsHash } : {}),
   };
 }

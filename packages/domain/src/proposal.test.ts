@@ -32,6 +32,7 @@ import {
   type ProposalOption,
   type ProposalRecord,
 } from "./proposal.ts";
+import { performanceCommitment, performanceDueOn, proposalTermsFrom, settingsForProposal } from "./proposal.ts";
 import { DEFAULT_SETTINGS, mergeSettings, type PilotSettings } from "./settings.ts";
 
 /* Fixtures: a fictional DEMO two-room home, Standard and Quiet. */
@@ -366,6 +367,25 @@ test("agreedPaymentsFor: the accepted proposal's frozen schedule, not today's se
   assert.deepEqual(agreedPaymentsFor(accepted, live), { depositPct: 20, depositTiming: "on-acceptance", balanceDueDays: 14 });
   assert.equal(agreedPaymentsFor(issued({ terms }), live), undefined, "no contract yet: settings rule");
   assert.equal(agreedPaymentsFor(null, live), undefined);
+});
+
+test("Schedule 2 (j): the time we undertake to finish by is frozen at issue and stated plainly", () => {
+  assert.equal(DEFAULT_SETTINGS.scheduling.installWithinWeeks, 8);
+  // Junk or a window shorter than the cancellation period falls back to the default.
+  assert.equal(mergeSettings({ scheduling: { installWithinWeeks: 1 } } as never).scheduling.installWithinWeeks, 8);
+  assert.equal(mergeSettings({ scheduling: { installWithinWeeks: 6.5 } } as never).scheduling.installWithinWeeks, 8);
+  assert.equal(mergeSettings({ scheduling: { installWithinWeeks: 10 } } as never).scheduling.installWithinWeeks, 10);
+  // Frozen with the terms: a later settings change doesn't move what was offered.
+  const offered = proposalTermsFrom(mergeSettings({ scheduling: { installWithinWeeks: 6 } } as never));
+  assert.equal(offered.installWithinWeeks, 6);
+  const today = mergeSettings({ scheduling: { installWithinWeeks: 12 } } as never);
+  assert.equal(settingsForProposal(today, { terms: offered }).scheduling.installWithinWeeks, 6);
+  // A proposal issued before the window was frozen gets today's settings.
+  const { installWithinWeeks: _w, ...older } = offered;
+  void _w;
+  assert.equal(settingsForProposal(today, { terms: older }).scheduling.installWithinWeeks, 12);
+  assert.match(performanceCommitment(6), /within 6 weeks of the day you accept, on dates agreed with you/);
+  assert.equal(performanceDueOn("2026-10-19T15:30:00.000Z", 6), "2026-11-30");
 });
 
 test("proposalIssueErrors: VAT treatment and tax overrides", () => {

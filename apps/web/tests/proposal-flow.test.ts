@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { DEFAULT_SETTINGS, mergeSettings } from "@aircon/domain";
+import { DEFAULT_SETTINGS, mergeSettings, performanceDueOn } from "@aircon/domain";
 import { money } from "../lib/format.ts";
 import { registerAppResolver } from "./helpers/resolve-app.ts";
 
@@ -267,7 +267,7 @@ test("payment terms are frozen at issue: a later settings change never changes t
   const issuedResult = await server.issueDraft(DEMO2, draftId, ADMIN);
   assert.equal(issuedResult.ok, true, JSON.stringify(issuedResult));
   const issued = (await proposalsRepo.get(draftId))!;
-  assert.deepEqual(issued.terms, { depositPct: 0, depositTiming: "on-acceptance", balanceDueDays: 7, methods: ["bank-transfer", "card"], cancellationDays: 14 });
+  assert.deepEqual(issued.terms, { depositPct: 0, depositTiming: "on-acceptance", balanceDueDays: 7, methods: ["bank-transfer", "card"], cancellationDays: 14, installWithinWeeks: 8 });
   // The full terms text is frozen with it, and emailed in full.
   assert.ok(issued.termsText && issued.termsText.length >= 10, "the terms text is on the record");
   assert.deepEqual(issued.termsText!.map((t) => t.id).slice(0, 3), ["who", "price", "survey"]);
@@ -276,12 +276,13 @@ test("payment terms are frozen at issue: a later settings change never changes t
   assert.deepEqual(before.proposal.termsText, issued.termsText, "the customer sees the frozen text");
   const issueMail = (await messagesRepo.listForProject(DEMO2)).find((m) => m.event === "proposal-issued" && m.channel === "email" && /version 2/.test(m.subject ?? ""));
   assert.match(issueMail!.bodyText, /There's no deposit/);
+  assert.match(issueMail!.bodyText, /We'll finish your installation within 8 weeks of the day you accept/, "Schedule 2 (j)");
   assert.match(issueMail!.bodyText, new RegExp(`Our terms \\(version ${issued.termsVersion}\\)`, "i"));
   assert.match(issueMail!.bodyText, /12\. Our responsibility to you/);
 
   // The founders turn deposits on after it went out.
   const live = mergeSettings(await settingsRepo.getValue(settingsRepo.PILOT_SETTINGS_KEY));
-  await settingsRepo.setValue(settingsRepo.PILOT_SETTINGS_KEY, mergeSettings({ ...live, payments: { ...live.payments, depositPct: 25, balanceDueDays: 30 } }), "test");
+  await settingsRepo.setValue(settingsRepo.PILOT_SETTINGS_KEY, mergeSettings({ ...live, payments: { ...live.payments, depositPct: 25, balanceDueDays: 30 }, scheduling: { ...live.scheduling, installWithinWeeks: 20 } }), "test");
 
   const after = (await server.loadCustomerProposal(DEMO2))!;
   assert.equal(after.settings.payments.depositPct, 0, "the page still shows the terms it was issued on");
@@ -307,8 +308,18 @@ test("payment terms are frozen at issue: a later settings change never changes t
   assert.deepEqual(contractTerms.termsText, issued.termsText);
   assert.equal(contractTerms.termsHash, acceptedRecord.acceptance?.termsHash);
   assert.deepEqual([payments.depositPct, payments.depositPence, payments.balanceDueDays], [0, 0, 7], "the contract states the terms offered");
+  // Schedule 2 (j): finished within the weeks offered (8, not today's 20), from the day they accepted.
+  const performance = (contract.snapshot as { performance?: { withinWeeks: number; byDate: string } }).performance;
+  assert.equal(performance?.withinWeeks, 8);
+  assert.equal(performance?.byDate, performanceDueOn(acceptedRecord.acceptance!.at, 8));
+  // And the documents-by-email agreement goes into the acceptance in full.
+  const consentCopy = acceptedRecord.acceptance?.documentsByEmailConsent;
+  assert.equal(consentCopy?.at, acceptedRecord.acceptance?.documentsByEmailConsentAt);
+  assert.match(consentCopy?.wordingVersion ?? "", /^docs-by-email\//);
+  assert.match(consentCopy?.text ?? "", /proposal and contract documents by email/);
   const confirmation = (await messagesRepo.listForProject(DEMO2)).find((m) => m.event === "proposal-accepted" && m.channel === "email");
   assert.match(confirmation!.bodyText, /There's no deposit/);
+  assert.match(confirmation!.bodyText, /within 8 weeks of the day you accept/);
   assert.match(confirmation!.bodyText, /within 7 days of the invoice/);
   assert.match(confirmation!.bodyText, /our terms are in full at the end of this email/);
   assert.match(confirmation!.bodyText, /14\. The legal bits/);

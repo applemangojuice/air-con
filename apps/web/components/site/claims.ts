@@ -415,6 +415,11 @@ export function quoteConsentRecord(input: {
 /* Price confidence (the band, said honestly)                           */
 /* ------------------------------------------------------------------ */
 
+/**
+ * The band, on the saved quote (QuoteView): there's nothing more to add
+ * there, so the copy never asks for it. What's missing is listed as what the
+ * surveyor checks (gapsAsSurveyChecks), and the home survey confirms the price.
+ */
 export const BAND_COPY = {
   high: {
     label: "High confidence",
@@ -424,14 +429,31 @@ export const BAND_COPY = {
   medium: {
     label: "Good estimate",
     tone: "bg-amber-50 text-amber-900 border-amber-200",
-    body: "A good estimate from your answers. A few photos would firm it up, and your home survey confirms it.",
+    body: "A good estimate from your answers. Your surveyor checks the rest at your home survey, which confirms the price.",
   },
   low: {
     label: "Early estimate",
     tone: "bg-amber-50 text-amber-900 border-amber-200",
-    body: "An early estimate: a few details are missing. Add them to firm it up; your home survey confirms the price.",
+    body: "An early estimate: a few details weren't in your answers. Your surveyor checks them at your home survey, which confirms the price.",
   },
 } as const;
+
+/**
+ * The confidence engine's gaps (packages/domain confidence.ts, written as
+ * things to add while the funnel's photo step is open) as what the surveyor
+ * checks instead, for the saved quote, where nothing can be added. Unknown
+ * gaps are left out rather than shown as an instruction nobody can follow.
+ */
+export function gapsAsSurveyChecks(gaps: readonly string[]): string[] {
+  const out: string[] = [];
+  for (const gap of gaps) {
+    if (/at least one room/i.test(gap)) out.push("Which rooms you'd like heated and cooled.");
+    else if (/photo of each room/i.test(gap)) out.push("The wall in each room where its indoor unit goes.");
+    else if (/outdoor unit/i.test(gap)) out.push("Where the outdoor unit goes.");
+    else if (/fuse board/i.test(gap)) out.push("Your fuse board, for the new circuit.");
+  }
+  return [...new Set(out)];
+}
 
 /** The one sentence that replaces "price locked / guaranteed" everywhere. */
 export const PRICE_PROMISE =

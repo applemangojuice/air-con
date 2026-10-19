@@ -347,6 +347,15 @@ export function SettingsEditor({
           <Text label="Survey slot times" value={slots} onChange={(v) => { setDirty(true); setSlots(v); }} hint="London time, comma separated, e.g. 10:00, 13:00, 16:00." />
           <Text label="Survey fee (£)" type="number" min={0} value={s.scheduling.surveyFeeGbp} onChange={(v) => patch("scheduling", { surveyFeeGbp: Math.round(Number(v)) })} hint="0 for free surveys." />
           <Text label="Cancellation period (days)" type="number" min={14} max={60} value={s.scheduling.cancellationDays} onChange={(v) => patch("scheduling", { cancellationDays: Number(v) })} hint="14 is the legal minimum." />
+          <Text
+            label="We finish within (weeks of acceptance)"
+            type="number"
+            min={3}
+            max={52}
+            value={s.scheduling.installWithinWeeks}
+            onChange={(v) => patch("scheduling", { installWithinWeeks: Math.round(Number(v)) })}
+            hint="The time we promise to finish by (Schedule 2), in every proposal from now on. Allow for the cancellation period and the kit."
+          />
           <fieldset className="sm:col-span-2">
             <legend className="text-sm font-semibold text-ink-900">Working days</legend>
             <div className="mt-1 flex flex-wrap gap-x-4">

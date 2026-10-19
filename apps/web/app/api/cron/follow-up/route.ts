@@ -4,6 +4,7 @@ import { constantTimeEqual } from "@/lib/auth/session";
 import { appUrl } from "@/lib/brand";
 import { brandedEmail, emailConfigured, sendEmail } from "@/lib/email";
 import { followUpLines, followUpSubject } from "@/lib/follow-up";
+import { getSettings } from "@/lib/settings-server";
 import { getServiceClient } from "@/lib/supabase-server";
 
 /**
@@ -98,13 +99,15 @@ export async function GET(request: Request) {
 
   let sent = 0;
   const failed: string[] = [];
+  // Replies go to the company address in settings, whatever EMAIL_FROM is.
+  const replyTo = await getSettings().then((s) => s.company.email).catch(() => undefined);
 
   // Small parallel chunks: fast enough to finish inside the function budget,
   // slow enough to stay under Resend's rate limit.
   for (let i = 0; i < toSend.length; i += 5) {
     const chunk = toSend.slice(i, i + 5);
     const results = await Promise.all(
-      chunk.map((d) => sendFollowUp(d.email, d.postcode)),
+      chunk.map((d) => sendFollowUp(d.email, d.postcode, replyTo)),
     );
     results.forEach((ok, j) => {
       if (ok) sent++;
@@ -125,7 +128,7 @@ export async function GET(request: Request) {
   return NextResponse.json({ ok: true, sent, failed: failed.length, failedIds: failed });
 }
 
-async function sendFollowUp(to: string, postcode: string): Promise<boolean> {
+async function sendFollowUp(to: string, postcode: string, replyTo: string | undefined): Promise<boolean> {
   const [greeting, opener, link, promise, signoff] = followUpLines(postcode);
   return sendEmail(
     to,
@@ -136,6 +139,7 @@ async function sendFollowUp(to: string, postcode: string): Promise<boolean> {
 <p style="margin:0 0 14px;font-size:13px"><a href="${link}" style="color:#a84508">${link}</a></p>
 <p style="margin:0 0 14px">${esc(promise)}</p>
 <p style="margin:0 0 28px">${esc(signoff).replace(/\n/g, "<br/>")}</p>`),
+    { replyTo },
   );
 }
 

@@ -342,6 +342,9 @@ function RefundFields({ id, todayIso, treatment, max }: { id: string; todayIso: 
         <label className={label} htmlFor={`rr-${id}`}>Reason</label>
         <input id={`rr-${id}`} name="reason" required maxLength={300} className={field} />
       </div>
+      <p className="text-xs text-ink-500 sm:col-span-2">
+        Paid by card through Stripe? Refund it in Stripe instead: it&apos;s recorded here by itself within a minute, with a credit note so it isn&apos;t asked for again.
+      </p>
       {treatment && (
         <fieldset className="sm:col-span-2">
           <legend className={label}>Do they still owe it?</legend>

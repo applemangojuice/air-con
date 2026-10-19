@@ -74,6 +74,19 @@ export interface LocalClientOptions {
   filesRoute?: string;
   /** Clock, for tests. */
   now?: () => Date;
+  /**
+   * The most rows one select returns, like Supabase's Max Rows (PostgREST
+   * `max-rows`, 1000 by default): more are silently cut off, so code that
+   * reads big tables has to page (repo/base selectAllPages) here exactly as
+   * it must against the real thing. Default: LOCAL_MAX_ROWS, else 1000.
+   */
+  maxRows?: number;
+}
+
+/** LOCAL_MAX_ROWS, else Supabase's default 1000. */
+export function defaultMaxRows(): number {
+  const n = Number(process.env.LOCAL_MAX_ROWS);
+  return Number.isInteger(n) && n > 0 ? n : 1000;
 }
 
 export interface LocalError {
@@ -510,8 +523,9 @@ export class LocalQuery implements PromiseLike<LocalResponse> {
     const count = this.countMode ? matched.length : null;
     if (this.head) return ok(null, count, 200);
     const sorted = sortRows(matched, this.orders);
-    const end = this.limitN === null ? undefined : this.offsetN + this.limitN;
-    const page = sorted.slice(this.offsetN, end).map((r) => projectRow(r, items));
+    // Max Rows: never more than the cap, whatever the limit or range asked for (and no error about it).
+    const take = Math.min(this.limitN ?? Number.POSITIVE_INFINITY, this.db.maxRows);
+    const page = sorted.slice(this.offsetN, this.offsetN + take).map((r) => projectRow(r, items));
     return this.shape(asReturned(page), count, 200);
   }
 
@@ -1057,6 +1071,7 @@ export class LocalClient {
   readonly filesRoute: string;
   readonly secret: string | null;
   readonly now: () => Date;
+  readonly maxRows: number;
   readonly storage: LocalStorageApi;
   readonly files: LocalFilesHandle;
 
@@ -1069,6 +1084,7 @@ export class LocalClient {
     this.filesRoute = opts.filesRoute ?? LOCAL_FILES_ROUTE;
     this.secret = opts.secret || (process.env.NODE_ENV === "production" ? null : DEV_FALLBACK_SECRET);
     this.now = opts.now ?? (() => new Date());
+    this.maxRows = opts.maxRows && opts.maxRows > 0 ? Math.floor(opts.maxRows) : defaultMaxRows();
     this.storage = new LocalStorageApi(this);
 
     const secret = this.secret;

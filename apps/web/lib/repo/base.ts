@@ -32,6 +32,47 @@ export function must<T>(res: { data: T | null; error: DbError | null }, what: st
   return res.data;
 }
 
+/**
+ * Supabase's Max Rows (PostgREST `max-rows`, 1000 by default): a select
+ * returns at most this many rows and says nothing about the rest. The local
+ * backend enforces the same cap (LOCAL_MAX_ROWS), so tests see it too.
+ */
+export const MAX_ROWS = 1000;
+
+type PageResult = { data: unknown[] | null; error: DbError | null; count?: number | null };
+
+/**
+ * Every row a query matches, read a page at a time, so the Max Rows cap can
+ * never silently drop any. `page(from, to, count)` builds the query afresh
+ * for each page: it must apply `.range(from, to)` over an order on a unique
+ * key (end with `.order("id")`), or pages could overlap or skip a row, and
+ * when `count` is true select with `{ count: "exact" }`. The first page asks
+ * for the total, so a result under the cap costs one request as before, and
+ * paging carries on by what actually came back, whatever the server's cap is
+ * set to. Stops once `limit` rows are in.
+ */
+export async function selectAllPages<T = Row>(
+  page: (from: number, to: number, count: boolean) => PromiseLike<PageResult>,
+  what: string,
+  opts: { limit?: number; pageSize?: number } = {},
+): Promise<T[]> {
+  const size = Math.max(1, opts.pageSize ?? MAX_ROWS);
+  const limit = opts.limit ?? Number.POSITIVE_INFINITY;
+  const out: T[] = [];
+  let total: number | null = null;
+  for (let from = 0; out.length < limit && (total === null || out.length < total); ) {
+    const want = Math.min(size, limit - out.length);
+    const res = await page(from, from + want - 1, total === null);
+    const rows = (must(res, what) ?? []) as T[];
+    if (total === null) total = typeof res.count === "number" ? res.count : null;
+    out.push(...rows);
+    // No count to go by: a short page is the end. With one, only an empty page (rows deleted mid-read) is.
+    if (rows.length === 0 || (total === null && rows.length < want)) break;
+    from += rows.length;
+  }
+  return out.slice(0, Number.isFinite(limit) ? limit : undefined);
+}
+
 /** Postgres unique violation, from Supabase or the local backend. */
 export function isUniqueViolation(error: DbError | null | undefined): boolean {
   return error?.code === "23505";

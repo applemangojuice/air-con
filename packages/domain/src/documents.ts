@@ -188,6 +188,12 @@ export interface ContractSnapshot extends DocumentHeader {
     balanceDueDays: number;
     methods: PilotSettings["payments"]["methods"];
   };
+  /**
+   * Schedule 2 (j) as agreed: we finish within `withinWeeks` of acceptance,
+   * so by `byDate`, on dates agreed inside it. Absent on contracts made
+   * before it was recorded.
+   */
+  performance?: { withinWeeks: number; byDate: string };
   /** Our complaints process and ADR as published when the contract was made. */
   complaints?: { process: string; adr?: string };
   /** The guarantee lines as given at acceptance. */

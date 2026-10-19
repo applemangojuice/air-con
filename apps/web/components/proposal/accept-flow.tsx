@@ -194,7 +194,7 @@ export function AcceptFlow({
                 </ul>
               </Row>
               <Row label="Timing">
-                {option.installDays} working day{option.installDays === 1 ? "" : "s"} at your home. {data.earliestStart}
+                {option.installDays} working day{option.installDays === 1 ? "" : "s"} at your home. {data.performance} {data.earliestStart}
               </Row>
               <Row label="Cancelling">{data.cancellation.summary}</Row>
               <Row label="Optional extras">None. Nothing extra is added unless you agree it in writing.</Row>
@@ -291,7 +291,7 @@ export function AcceptFlow({
                 </Fact>
                 <Fact label="Extra charges">{data.extraCharges}</Fact>
                 <Fact label="How long">
-                  {option.installDays} working day{option.installDays === 1 ? "" : "s"} at your home, on dates you choose after accepting.
+                  {option.installDays} working day{option.installDays === 1 ? "" : "s"} at your home. {data.performance}
                 </Fact>
                 <Fact label="What you commit to">{(data.paymentTerms[option.id] ?? []).slice(0, 2).join(" ")}</Fact>
                 <Fact label="Starting early">{earlyStart ? "Yes, you've asked us to start within your cancellation period." : "No, we'll wait until your cancellation period ends."}</Fact>

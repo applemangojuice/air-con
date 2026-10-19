@@ -12,7 +12,7 @@ import {
   type StaffMember,
 } from "@aircon/domain";
 import { gbp, money } from "@/lib/format";
-import { ActionFeedback, Primary } from "./bits";
+import { ActionFeedback, Primary, useEchoesNextStep } from "./bits";
 import { HubControllerProvider, type HubController } from "./controller";
 import { DEMO_SETTINGS, DEMO_TEAM, demoContext, demoHubData, demoPhoto, type DemoState } from "./demo";
 import { Hub } from "./hub";
@@ -600,6 +600,7 @@ function DemoPay({
   chain:(steps: { action: ProjectAction; actor?: StaffMember }[], extra?: (s: DemoState) => DemoState) => string | null;
 }) {
   const [error, setError] = useState<string | null>(null);
+  const echo = useEchoesNextStep("Pay your deposit", "Pay your invoice", "Pay your balance");
   const due = state.invoices.find((i) => i.paidPence < i.totalPence);
   if (!due) return <p className="text-sm text-ink-500">Your invoice will appear here to pay.</p>;
   const amount = due.totalPence - due.paidPence;
@@ -611,7 +612,9 @@ function DemoPay({
   };
   return (
     <div className="space-y-2">
-      <Primary onClick={pay}>Pay {money(amount)} (DEMO)</Primary>
+      <Primary onClick={pay} quiet={echo}>
+        Pay {money(amount)} (DEMO)
+      </Primary>
       <p className="text-xs text-ink-500">In the demo no money moves; for real, this opens your secure payment page.</p>
       <ActionFeedback error={error} />
     </div>

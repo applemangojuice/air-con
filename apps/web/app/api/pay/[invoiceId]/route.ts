@@ -1,11 +1,14 @@
-import { invoiceOutstanding } from "@aircon/domain";
+import { invoiceOutstanding, type Invoice } from "@aircon/domain";
 import { requireProjectAccess } from "@/lib/auth/server";
 import { appUrl } from "@/lib/brand";
 import { loadProject } from "@/lib/project-service";
-import { createCheckoutSession, stripeConfigured } from "@/lib/providers/stripe";
+import { createCheckoutSession, expireCheckoutSession, retrieveCheckoutSession, stripeConfigured } from "@/lib/providers/stripe";
+import { mutateRow } from "@/lib/purchasing-server";
+import { priorSession } from "./prior-session";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { isUuid } from "@/lib/repo/base";
 import * as invoicesRepo from "@/lib/repo/invoices";
+import * as paymentsRepo from "@/lib/repo/payments";
 
 /**
  * POST /api/pay/<invoiceId>: start a card payment for what's left on one
@@ -15,6 +18,12 @@ import * as invoicesRepo from "@/lib/repo/invoices";
  *
  * Nothing is recorded here: the payment exists once Stripe's signed webhook
  * (or Stripe's own API, read back on the return page) says it's paid.
+ *
+ * One payable Checkout page per bill: the invoice remembers its latest
+ * session. Still open for the same amount, it's reused; open for another
+ * amount, it's closed (expired at Stripe) before a new one is made; already
+ * paid, the customer goes to the return page, which records it, instead of
+ * being sent to pay again.
  */
 
 export const runtime = "nodejs";
@@ -47,6 +56,24 @@ export async function POST(request: Request, { params }: { params: Promise<{ inv
   const project = await loadProject(invoice.projectId);
   // A cancelled contract takes no more money (reg 34): anything paid is refunded.
   if (project?.closure.reason === "cancelled") return back("cancelled-contract");
+  const prior = invoice.checkoutSessionId;
+  if (prior) {
+    const seen = await retrieveCheckoutSession(prior);
+    if (!seen.ok) {
+      console.error(`[pay] reading the last checkout for ${invoice.number} failed:`, seen.error);
+      return back("failed");
+    }
+    const answer = await priorSession(seen.value, owed, {
+      expire: expireCheckoutSession,
+      retrieve: retrieveCheckoutSession,
+      recorded: async (id) => Boolean(await paymentsRepo.getByProviderRef(id)),
+    });
+    // Paid already: the return page reads it back from Stripe and records it.
+    if (answer === "paid") return Response.redirect(`${base}/p/${invoice.projectId}/pay?session=${encodeURIComponent(prior)}`, 303);
+    if (answer === "failed") return back("failed");
+    if (typeof answer === "object") return Response.redirect(answer.url, 303);
+  }
+
   const session = await createCheckoutSession({
     // Charge what's still owed after payments and credit notes, never more.
     invoice: { ...invoice, paidPence: invoice.totalPence - owed },
@@ -54,12 +81,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ inv
     cancelUrl: `${base}/p/${invoice.projectId}/pay?card=cancelled`,
     ...(project?.customer.email ? { customerEmail: project.customer.email } : {}),
     ...(project ? { description: [project.customer.addressLine, project.customer.postcode].filter(Boolean).join(", ") } : {}),
-    // The same invoice and amount within a day returns the same Checkout page, so a double tap can't open two.
-    idempotencyKey: `checkout:${invoice.id}:${owed}:${new Date().toISOString().slice(0, 10)}`,
+    // Two taps at once open the same page (the same key while the last one is the same); after that, the stored session decides.
+    idempotencyKey: `checkout:${invoice.id}:${owed}:${prior ?? "first"}:${new Date().toISOString().slice(0, 10)}`,
   });
   if (!session.ok) {
     console.error(`[pay] checkout for ${invoice.number} failed:`, session.error);
     return back("failed");
+  }
+  if (session.value.id !== prior) {
+    const saved = await mutateRow<Invoice>("invoices", invoice.id, invoicesRepo, (cur) => ({ ok: true, value: { ...cur, checkoutSessionId: session.value.id } }));
+    if (!saved.ok) console.error(`[pay] couldn't remember checkout ${session.value.id} on ${invoice.number}: ${saved.error}`);
   }
   return Response.redirect(session.value.url, 303);
 }

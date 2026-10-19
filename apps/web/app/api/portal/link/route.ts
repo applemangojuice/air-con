@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { emailConfigured } from "@/lib/email";
 import { portalJson, sendSignInLink, type LinkTarget } from "@/lib/portal-server";
-import { clientKey, enforceRateLimit, rateLimit, rateLimitIdentity } from "@/lib/rate-limit";
+import { clientKey, rateLimitIdentity } from "@/lib/rate-limit";
+import { enforceSharedRateLimit, sharedRateLimits } from "@/lib/rate-limit-shared";
 import { getServiceClient } from "@/lib/supabase-server";
 
 /**
@@ -28,7 +29,8 @@ const bodySchema = z.union([
 ]);
 
 export async function POST(request: Request): Promise<Response> {
-  const limited = enforceRateLimit(request, "portal-link", 8, 15 * 60_000);
+  // Shared by every instance (rate-limit-shared): each request can be an email to someone's inbox.
+  const limited = await enforceSharedRateLimit(request, "portal-link", 8, 15 * 60_000);
   if (limited) return limited;
   if (!getServiceClient()) {
     return portalJson({ ok: false, error: "Sign-in isn't available on this demo site. Try the playable demo instead." }, 503);
@@ -45,9 +47,11 @@ export async function POST(request: Request): Promise<Response> {
         ? { kind: "document", documentId: body.documentId.toLowerCase() }
         : { kind: "email", email: body.email };
   const key = target.kind === "project" ? target.projectId : target.kind === "document" ? target.documentId : target.email;
-  const perTarget = rateLimit(`portal-link-target:${key}`, 3, 15 * 60_000);
-  const perIpTarget = rateLimit(`portal-link-ip:${rateLimitIdentity(clientKey(request))}:${key}`, 2, 5 * 60_000);
-  if (!perTarget.ok || !perIpTarget.ok) return portalJson({ ok: true, emailLive: emailConfigured() });
+  const perTarget = await sharedRateLimits([
+    { key: `portal-link-target:${key}`, limit: 3, windowMs: 15 * 60_000 },
+    { key: `portal-link-ip:${rateLimitIdentity(clientKey(request))}:${key}`, limit: 2, windowMs: 5 * 60_000 },
+  ]);
+  if (!perTarget.ok) return portalJson({ ok: true, emailLive: emailConfigured() });
 
   const result = await sendSignInLink(target);
   return portalJson({ ok: true, emailLive: result.emailLive, ...(result.devLink ? { devLink: result.devLink } : {}) });

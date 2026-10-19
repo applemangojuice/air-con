@@ -1,4 +1,5 @@
 import {
+  documentsConsentCovers,
   canonicalJson,
   currentStage,
   customerNextAction,
@@ -557,7 +558,7 @@ export async function customerAct(projectId: string, actor: CustomerActor, req: 
       }
       if (req.kind === "reschedule-survey") return act(projectId, actor, name, { type: "reschedule-survey", scheduledFor: req.scheduledFor });
       const booked = await act(projectId, actor, name, { type: "book-survey", scheduledFor: req.scheduledFor, mode: req.mode });
-      if (!booked.ok || !req.documentsConsent || project.proposal.documentsByEmailConsent) return booked;
+      if (!booked.ok || !req.documentsConsent || documentsConsentCovers(project)) return booked;
       const consent = await act(projectId, actor, name, { type: "documents-consent-recorded", channel: "portal" });
       return consent.ok
         ? booked
