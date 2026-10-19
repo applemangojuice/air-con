@@ -17,6 +17,7 @@ const PREFERRED_START_LABEL: Record<BookingRequest["preferredStart"], string> = 
 };
 import { PHOTO_BUCKET, getServiceClient } from "@/lib/supabase-server";
 import { requireStaff } from "@/lib/auth/server";
+import { isUuid } from "@/lib/repo/base";
 
 export const metadata: Metadata = {
   title: "Quote detail · ops",
@@ -33,7 +34,8 @@ export default async function OpsQuoteDetailPage({
   await requireStaff("projects.view-all");
   const { id } = await params;
   const supabase = getServiceClient();
-  if (!supabase) notFound();
+  // A link that isn't a quote id is a 404, not a query Postgres refuses (22P02).
+  if (!supabase || !isUuid(id)) notFound();
 
   const { data: q } = await supabase.from("quote_requests").select("*").eq("id", id).single();
   if (!q) notFound();

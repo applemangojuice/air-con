@@ -123,13 +123,18 @@ const first = (row, ...names) => {
 
 /* ---------------- upsert helpers ------------------------------------- */
 
+/** Supabase's Max Rows: no select returns more, so big reads go page by page. */
+const PAGE = 1000;
+/** Keys per `in (…)`: each one is in the request URL, which the API gateway caps (~16 KB). */
+const IN_CHUNK = 100;
+
 async function loadExistingByKey(keys) {
   const map = new Map();
-  for (let i = 0; i < keys.length; i += 400) {
+  for (let i = 0; i < keys.length; i += IN_CHUNK) {
     const { data, error } = await supabase
       .from("properties")
       .select("id, address_key, intel")
-      .in("address_key", keys.slice(i, i + 400));
+      .in("address_key", keys.slice(i, i + IN_CHUNK));
     if (error) throw new Error(error.message);
     for (const row of data ?? []) map.set(row.address_key, row);
   }
@@ -298,10 +303,17 @@ if (kind === "epc") {
       article4: truthy(first(row, "ARTICLE_4", "ARTICLE4")),
     });
   }
-  const { data, error } = await supabase.from("properties").select("id, postcode, intel").limit(100000);
-  if (error) throw new Error(error.message);
+  // Every property, a page at a time: Supabase returns at most Max Rows
+  // (1000) per select, however big the limit, and says nothing about the rest.
+  const data = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data: page, error } = await supabase.from("properties").select("id, postcode, intel").order("id").range(from, from + PAGE - 1);
+    if (error) throw new Error(error.message);
+    data.push(...(page ?? []));
+    if (!page || page.length < PAGE) break;
+  }
   const rows = [];
-  for (const row of data ?? []) {
+  for (const row of data) {
     const c = byPostcode.get(row.postcode.toUpperCase().replace(/\s+/g, ""));
     if (!c) continue;
     const intel = row.intel;

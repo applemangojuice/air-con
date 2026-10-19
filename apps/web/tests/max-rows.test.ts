@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createProject, generateQuote, instantiateCompliance, type Survey } from "@aircon/domain";
 import { registerAppResolver } from "./helpers/resolve-app.ts";
+import { ensureProjectRow, insertProjectRow, quoteRow } from "./helpers/rows.ts";
 
 // Supabase's Max Rows: a select returns at most 1000 rows and says nothing
 // about the rest. The local backend enforces the same cap (here a tiny one,
@@ -30,7 +31,9 @@ const projectId = (n: number) => `0000000${n}`.slice(-8) + "-de5e-4000-8000-0000
 
 test("the local backend cuts a select off at its Max Rows, like Supabase, and range pages past it", async () => {
   const local = createLocalClient({ backend: "memory", maxRows: 3 });
-  await local.from("ops_notes").insert(Array.from({ length: 8 }, (_, i) => ({ quote_id: "q", note: `DEMO note ${i}` })));
+  const quote = quoteRow();
+  assert.equal((await local.from("quote_requests").insert(quote)).error, null);
+  assert.equal((await local.from("ops_notes").insert(Array.from({ length: 8 }, (_, i) => ({ quote_id: quote.id, note: `DEMO note ${i}` })))).error, null);
   const all = await local.from("ops_notes").select("note");
   assert.equal(all.data?.length, 3, "cut to the cap, without an error");
   assert.equal(all.error, null);
@@ -66,7 +69,8 @@ test("the board's batched reads get every compliance item, past the row cap", as
   const ids = [1, 2, 3].map(projectId);
   const items = ids.flatMap((id) => instantiateCompliance(id, () => crypto.randomUUID()));
   assert.ok(items.length > 7 * 3, "more rows than the cap");
-  for (const item of items) await db().from("compliance_items").insert(complianceRepo.toRow(item));
+  for (const id of ids) await ensureProjectRow(db(), id);
+  for (const item of items) assert.equal((await db().from("compliance_items").insert(complianceRepo.toRow(item))).error, null);
   const direct = await db().from("compliance_items").select("id");
   assert.equal(direct.data?.length, 7, "an unpaged read would have stopped at the cap");
 
@@ -74,6 +78,9 @@ test("the board's batched reads get every compliance item, past the row cap", as
   for (const id of ids) {
     assert.equal(records.compliance.get(id)?.length, items.filter((i) => i.projectId === id).length, `all of ${id}'s items`);
   }
+  // Their items go with them (on delete cascade), leaving the next test an empty board.
+  assert.equal((await db().from("projects").delete().in("id", ids)).error, null);
+  assert.equal((await db().from("compliance_items").select("id", { count: "exact", head: true })).count, 0);
 });
 
 test("loadAllProjects pages past the cap, and still stops at its own limit", async () => {
@@ -88,10 +95,34 @@ test("loadAllProjects pages past the cap, and still stops at its own limit", asy
       survey: SURVEY,
       quote: generateQuote(SURVEY),
     });
-    await db().from("projects").insert({ id, quote_id: p.quoteId, schema_version: 2, project: p, updated_at: `2026-10-${String(n - 9).padStart(2, "0")}T09:00:00.000Z` });
+    await insertProjectRow(db(), { id, quote_id: p.quoteId, schema_version: 2, project: p, updated_at: `2026-10-${String(n - 9).padStart(2, "0")}T09:00:00.000Z` });
   }
   const all = await loadAllProjects();
   assert.equal(all.length, 20);
   assert.equal(all[0]!.project.id, projectId(29), "most recently touched first");
   assert.equal((await loadAllProjects(9)).length, 9);
+});
+
+test("the property book (table, coverage, mailing export) and the catalogue page past the cap", async () => {
+  const { queryIntel } = await import("../lib/intel-server.ts");
+  const catalogueRepo = await import("../lib/repo/catalogue.ts");
+  const homes = Array.from({ length: 20 }, (_, n) => ({
+    id: `addr-demo-${String(n).padStart(2, "0")}`,
+    intel: {},
+    address_line: `${n} Demo Road`,
+    address_key: `${n} demo road sw16 9zz`,
+    postcode: "SW16 9ZZ",
+    outcode: "SW16",
+    priority_score: n % 4,
+  }));
+  assert.equal((await db().from("properties").insert(homes)).error, null);
+  const book = await queryIntel({});
+  assert.equal(book.length, 20, "every home, not the first page");
+  assert.equal(new Set(book.map((r) => r.id)).size, 20, "no home twice across pages");
+  assert.deepEqual(book.slice(0, 5).map((r) => r.priority_score), [3, 3, 3, 3, 3], "highest priority first");
+  assert.equal((await queryIntel({}, 9)).length, 9, "and its own limit still holds");
+
+  const items = Array.from({ length: 15 }, (_, n) => ({ id: `demo-cap-${n}`, kind: "material", label: `DEMO part ${n}`, item: {} }));
+  assert.equal((await db().from("catalogue_items").insert(items)).error, null);
+  assert.equal((await catalogueRepo.list()).length, 15);
 });

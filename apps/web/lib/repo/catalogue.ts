@@ -1,5 +1,5 @@
 import type { CatalogueItem, CatalogueKind } from "@aircon/domain";
-import { db, jsonObject, must, nowIso, type Row } from "./base";
+import { db, jsonObject, must, nowIso, selectAllPages, type Row } from "./base";
 
 /**
  * `catalogue_items`: equipment, materials, labour and services. Ids are
@@ -37,11 +37,14 @@ export async function get(id: string): Promise<CatalogueItem | null> {
 }
 
 export async function list(opts: { kind?: CatalogueKind; activeOnly?: boolean } = {}): Promise<CatalogueItem[]> {
-  let q = db().from(TABLE).select("*");
-  if (opts.kind) q = q.eq("kind", opts.kind);
-  if (opts.activeOnly) q = q.eq("active", true);
-  const data = must(await q.order("kind", { ascending: true }).order("label", { ascending: true }), "catalogue list");
-  return (data ?? []).map(fromRow);
+  // Page by page past Max Rows (1000): a big supplier import must not silently drop the items that sort last.
+  const data = await selectAllPages<Row>((from, to, count) => {
+    let q = db().from(TABLE).select("*", count ? { count: "exact" } : undefined);
+    if (opts.kind) q = q.eq("kind", opts.kind);
+    if (opts.activeOnly) q = q.eq("active", true);
+    return q.order("kind", { ascending: true }).order("label", { ascending: true }).order("id").range(from, to);
+  }, "catalogue list");
+  return data.map(fromRow);
 }
 
 /** What designs, costing and purchasing pick from. */

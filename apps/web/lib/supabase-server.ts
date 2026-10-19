@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { sessionSecretUsable } from "./auth/session.ts";
 import { createLocalClient, defaultDataDir, type LocalBackendKind } from "./db/local-client.ts";
+import { nulSafe } from "./db/no-nul.ts";
 import { realEnv } from "./env-placeholders.ts";
 
 export const PHOTO_BUCKET = "survey-photos";
@@ -46,12 +47,14 @@ function localClient(kind: LocalBackendKind): SupabaseClient {
           : "[local-db] SESSION_SECRET not set: signing local file URLs with the dev fallback secret.",
       );
     }
-    client = createLocalClient({
-      backend: kind,
-      dataDir,
-      secret: usable ? process.env.SESSION_SECRET : undefined,
-      buckets: [PHOTO_BUCKET, VIDEO_BUCKET, MEDIA_BUCKET],
-    });
+    client = nulSafe(
+      createLocalClient({
+        backend: kind,
+        dataDir,
+        secret: usable ? process.env.SESSION_SECRET : undefined,
+        buckets: [PHOTO_BUCKET, VIDEO_BUCKET, MEDIA_BUCKET],
+      }),
+    );
     cache.set(key, client);
   }
   return client;
@@ -65,9 +68,12 @@ function localClient(kind: LocalBackendKind): SupabaseClient {
 export function getServiceClient(): SupabaseClient | null {
   const backend = dataBackend();
   if (backend === "supabase") {
-    return createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
-      auth: { persistSession: false },
-    });
+    // Writes lose any NUL first: Postgres refuses it in text and jsonb (lib/db/no-nul.ts).
+    return nulSafe(
+      createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+        auth: { persistSession: false },
+      }),
+    );
   }
   if (backend === "none") return null;
   return localClient(backend);
