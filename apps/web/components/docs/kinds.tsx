@@ -7,6 +7,7 @@ import {
   TAX_CODES,
   earlyStartWording,
   type Annotation,
+  type CertificateSnapshot,
   type CommissioningCertificateSnapshot,
   type ContractSnapshot,
   type HandoverPackSnapshot,
@@ -36,6 +37,8 @@ import { Bullets, DocSection, Facts, Table } from "./shell";
 
 export interface DocPhoto {
   url: string | null;
+  /** image/… or application/pdf. */
+  contentType?: string;
   annotations: Annotation[];
   width?: number;
   height?: number;
@@ -52,7 +55,15 @@ export interface DocContext {
   /** Where links to other documents go (null: plain text). */
   docHref: (id: string) => string | null;
   /** Facts that may have moved on since the document was issued, from the live project. */
-  live?: { electricalCert?: string; warrantyRegistered?: boolean; serviceDueOn?: string; projectHref?: string };
+  live?: {
+    electricalCert?: string;
+    /** The certificate documents behind "received" and "registered", once they exist. */
+    electricalCertDocumentId?: string;
+    warrantyRegistered?: boolean;
+    warrantyDocumentId?: string;
+    serviceDueOn?: string;
+    projectHref?: string;
+  };
   /** Customer-visible as-built photos (handover pack). */
   asBuilt?: DocPhoto[];
 }
@@ -574,6 +585,57 @@ export function CommissioningDoc({ snap }: { snap: CommissioningCertificateSnaps
 }
 
 /* ------------------------------------------------------------------ */
+/* Certificate                                                         */
+/* ------------------------------------------------------------------ */
+
+export function CertificateDoc({ snap, ctx }: { snap: CertificateSnapshot; ctx: DocContext }) {
+  const c = snap.certificate;
+  const files = c.mediaIds.map((id) => ctx.photos.get(id)).filter((f): f is DocPhoto => Boolean(f));
+  return (
+    <>
+      <DocSection title={c.title}>
+        <Facts
+          rows={[
+            [c.kind === "warranty-registration" ? "Registration reference" : "Certificate number", c.reference ?? ""],
+            ["Issued by", c.issuer ?? ""],
+            ["Received", fmtDate(c.receivedOn)],
+            ["Note", c.note ?? ""],
+          ]}
+        />
+        <p>
+          {c.kind === "electrical-installation"
+            ? "Keep it with your home's paperwork: you may be asked for it if you sell the house. The Building Regulations compliance certificate comes to you directly from the electrician's registration scheme."
+            : "Keep it with your home's paperwork: you'll need it for any warranty claim."}
+        </p>
+      </DocSection>
+      {files.length > 0 && (
+        <DocSection title={files.length === 1 ? "The document" : "The documents"}>
+          <ul className="space-y-3">
+            {files.map((f, i) =>
+              f.contentType === "application/pdf" || !f.url ? (
+                <li key={i}>
+                  {f.url ? (
+                    <a href={f.url} className="font-semibold text-accent-700 underline" target="_blank" rel="noreferrer">
+                      Open {f.caption ?? `the ${c.kind === "warranty-registration" ? "confirmation" : "certificate"}`} (PDF)
+                    </a>
+                  ) : (
+                    <span className="text-ink-500">The file is still uploading. Refresh in a minute.</span>
+                  )}
+                </li>
+              ) : (
+                <li key={i}>
+                  <Photo photo={f} alt={f.caption ?? c.title} />
+                </li>
+              ),
+            )}
+          </ul>
+        </DocSection>
+      )}
+    </>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /* Handover pack                                                       */
 /* ------------------------------------------------------------------ */
 
@@ -616,17 +678,31 @@ export function HandoverPackDoc({ snap, ctx }: { snap: HandoverPackSnapshot; ctx
         <Facts
           rows={[
             ["Electrical installation certificate (BS 7671)", ELECTRICAL_STATUS[snap.electricalCert.status] ?? plain(snap.electricalCert.status)],
-            ["Building Regulations compliance certificate", snap.electricalCert.status === "received" ? "Received" : `Due by ${fmtDate(snap.electricalCert.dueBy)}`],
+            [
+              "Building Regulations compliance certificate",
+              (liveElectrical ?? snap.electricalCert.status) === "not-required"
+                ? "Not needed"
+                : `Sent to you by the electrician's registration scheme, due by ${fmtDate(snap.electricalCert.dueBy)}. Tell us if it hasn't arrived.`,
+            ],
             ["Now", liveElectrical && liveElectrical !== snap.electricalCert.status ? `${ELECTRICAL_STATUS[liveElectrical] ?? plain(liveElectrical)} (updated since this pack was issued)` : ""],
           ]}
         />
+        {ctx.live?.electricalCertDocumentId && ctx.docHref(ctx.live.electricalCertDocumentId) && (
+          <Link href={ctx.docHref(ctx.live.electricalCertDocumentId)!} className="font-semibold text-accent-700 underline">
+            Open your electrical installation certificate
+          </Link>
+        )}
         <p>The new circuit is notifiable work. The electrician&apos;s scheme sends the compliance certificate within 30 days of completion; we chase it and add it to your documents.</p>
       </DocSection>
 
       <DocSection title="4. Running and maintaining it">
-        <Facts rows={[["Operating and maintenance information", snap.maintenanceInfo.provided ? "Provided (below and in the manufacturer's manual)" : `Due by ${fmtDate(snap.maintenanceInfo.dueBy)}`]]} />
+        <Facts rows={[["Operating and maintenance information", snap.maintenanceInfo.provided ? "Provided (the care guide below and the manufacturer's manuals)" : `Due by ${fmtDate(snap.maintenanceInfo.dueBy)}`]]} />
         <Bullets items={snap.care} />
-        <p>The manufacturer&apos;s user manual came in the box. Ask us any time and we&apos;ll email you a copy.</p>
+        <p>
+          {snap.maintenanceInfo.provided
+            ? "We handed over the manufacturer's user and maintenance manuals at your walkthrough. Ask us any time and we'll email you a copy."
+            : "The manufacturer's user and maintenance manuals come with your walkthrough. Ask us any time and we'll email you a copy."}
+        </p>
       </DocSection>
 
       <DocSection title="5. Warranty and guarantee">

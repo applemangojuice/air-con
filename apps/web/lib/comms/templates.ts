@@ -284,7 +284,7 @@ const PORTAL_PATH: Record<CommsEventId, string | null> = {
   "variation-accepted": "/documents",
   "issue-update": "",
   "handover-ready": "#handover",
-  "certificate-issued": "#handover",
+  "certificate-issued": "/documents",
   "check-in-7d": "#aftercare",
   "feedback-30d": "#aftercare",
   "review-request": "#aftercare", // only if there's no review link to send them to
@@ -1300,12 +1300,12 @@ const TEMPLATES: { [E in CommsEventId]: Renderer<E> } = {
   "certificate-issued": (ctx, d) => {
     const electrical = d.kind === "electrical-certificate";
     return {
-      subject: electrical ? "Your electrical certificate is in your handover pack" : "Your manufacturer warranty is registered",
+      subject: electrical ? "Your electrical certificate is in your documents" : "Your manufacturer warranty is registered",
       body: [
         {
           p: electrical
-            ? `The electrical installation certificate for the work at ${place(ctx)} has arrived. It's now in your handover pack.`
-            : `We've registered the manufacturer's warranty for your system at ${place(ctx)}. The confirmation is in your handover pack.`,
+            ? `The electrical installation certificate for the work at ${place(ctx)} has arrived. It's now in your documents on your project page, beside your handover pack.`
+            : `We've registered the manufacturer's warranty for your system at ${place(ctx)}. The registration and its reference are in your documents on your project page.`,
         },
         {
           p: electrical
@@ -1314,7 +1314,7 @@ const TEMPLATES: { [E in CommsEventId]: Renderer<E> } = {
         },
         { p: "Nothing for you to do." },
       ],
-      cta: "Open your handover pack",
+      cta: "See your documents",
     };
   },
 

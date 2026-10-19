@@ -403,7 +403,11 @@ export interface Project {
     signoff?: { at: string; name: string; outcome: "all-good" | "snags"; snagCount: number };
     packDocumentId?: string;
     electricalCert: "pending" | "received" | "not-required";
+    /** The certificate document (kind "certificate") behind "received". */
+    electricalCertDocumentId?: string;
     warrantyRegistered: boolean;
+    /** The warranty registration document behind "registered". */
+    warrantyDocumentId?: string;
     warrantyDueOn?: string;
   };
   closure: { closed: boolean; closedAt?: string; reason?: string };
@@ -1667,8 +1671,10 @@ export type ProjectAction =
   | { type: "commissioning-signed"; by: string }
   | { type: "handover-pack-published"; documentId: string }
   | { type: "handover-signed"; name: string; outcome: "all-good" | "snags"; snagCount: number }
-  | { type: "electrical-cert-updated"; status: Project["handover"]["electricalCert"] }
-  | { type: "warranty-registered" }
+  /** "received" needs the certificate document (the file is in the customer's documents before we say so). */
+  | { type: "electrical-cert-updated"; status: Project["handover"]["electricalCert"]; documentId?: string }
+  /** Needs the registration's document (its reference and any confirmation file). */
+  | { type: "warranty-registered"; documentId?: string }
   // money
   | { type: "invoice-issued"; amountPence: number }
   | { type: "payment-recorded"; amountPence: number }
@@ -2084,7 +2090,7 @@ export function applyProjectAction(project: Project, action: ProjectAction, now:
       p.money.contractTotalPence = action.contractTotalPence;
       log(
         "proposal-accepted",
-        `You accepted your proposal (${action.optionLabel}, ${fmtPence(action.contractTotalPence)}). Your contract and cancellation form are in your documents. Next: choose your install dates.`,
+        `You accepted your proposal (${action.optionLabel}, ${fmtPence(action.contractTotalPence)}). We're sending you your contract and cancellation form to keep. Next: choose your install dates.`,
         "customer",
       );
       return ok();
@@ -2472,10 +2478,14 @@ export function applyProjectAction(project: Project, action: ProjectAction, now:
     case "electrical-cert-updated": {
       if (!["pending", "received", "not-required"].includes(action.status)) return err("Unknown certificate status.");
       if (p.handover.electricalCert === action.status) return err(`The certificate is already marked ${action.status}.`);
+      // Never tell the customer it's in their documents unless it is.
+      if (action.status === "received" && !action.documentId?.trim()) return err("Add the certificate itself (its file and number) to mark it received.");
       p.handover.electricalCert = action.status;
       if (action.status === "received") {
+        p.handover.electricalCertDocumentId = action.documentId!.trim();
         log("electrical-cert-updated", "Your electrical installation certificate is in your documents.", "ops");
       } else {
+        delete p.handover.electricalCertDocumentId;
         log("electrical-cert-updated", `Electrical certificate marked ${action.status}.`, "ops", { internal: true });
       }
       return ok();
@@ -2483,8 +2493,10 @@ export function applyProjectAction(project: Project, action: ProjectAction, now:
 
     case "warranty-registered": {
       if (p.handover.warrantyRegistered) return err("The warranty is already registered.");
+      if (!action.documentId?.trim()) return err("Add the registration (its reference, and the confirmation if there is one) to mark the warranty registered.");
       p.handover.warrantyRegistered = true;
-      log("warranty-registered", "Your manufacturer warranty is registered.", "ops");
+      p.handover.warrantyDocumentId = action.documentId.trim();
+      log("warranty-registered", "Your manufacturer warranty is registered. The confirmation is in your documents.", "ops");
       return ok();
     }
 

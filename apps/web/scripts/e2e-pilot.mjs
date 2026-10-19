@@ -1142,10 +1142,20 @@ try {
 
     await go(admin, `/ops/projects/${ids.pid}`);
     const ho = admin.locator("#handover");
-    await ho.getByRole("button", { name: "Received" }).click();
-    check("electrical certificate received", await waitFor(admin, /Certificate marked received/));
-    await ho.getByRole("button", { name: "Warranty registered" }).click();
-    check("warranty registered", await waitFor(admin, /Warranty\s*Registered/));
+    // The certificate goes in with its file and number, so "it's in your documents" is true.
+    await ho.locator("summary").filter({ hasText: "Electrical certificate received" }).click();
+    const certForm = ho.locator("form").filter({ has: admin.getByLabel(/^Certificate number/) });
+    await certForm.locator('input[type="file"]').setInputFiles(PHOTO);
+    await certForm.getByText("Uploaded").waitFor({ timeout: 30_000 });
+    await certForm.getByLabel(/^Certificate number/).fill("DEMO-EIC-0001");
+    await certForm.getByLabel(/^Issued by/).fill("DEMO scheme");
+    await certForm.getByRole("button", { name: "Add to their documents" }).click();
+    check("electrical certificate received, with its file", await waitFor(admin, /Certificate received and added to the customer's documents/));
+    await ho.locator("summary").filter({ hasText: "Warranty registered" }).click();
+    const warForm = ho.locator("form").filter({ has: admin.getByLabel(/^Registration reference/) });
+    await warForm.getByLabel(/^Registration reference/).fill("DEMO-WR-0042");
+    await warForm.getByRole("button", { name: "Add to their documents" }).click();
+    check("warranty registered, with its reference", await waitFor(admin, /Warranty\s*Registered/));
     await go(tech, `/ops/projects/${ids.pid}/compliance`);
     await reviewCompliance(tech);
     check("every compliance item settled", await has(tech, /DONE\s*(\d+) of \1/));
@@ -1186,6 +1196,11 @@ try {
       "customer's documents: contract, commissioning certificate, handover pack and invoices",
       /Contract confirmation/i.test(docs) && /Commissioning certificate/i.test(docs) && /Handover pack/i.test(docs) && /Invoice/i.test(docs),
       docs.slice(0, 600),
+    );
+    check(
+      "…and the electrical certificate and warranty registration the timeline says are there",
+      /Electrical installation certificate/i.test(docs) && /Manufacturer warranty registration/i.test(docs),
+      docs.slice(0, 900),
     );
     await shot(customer, "J-documents");
   });

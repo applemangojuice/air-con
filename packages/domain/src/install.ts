@@ -1487,6 +1487,8 @@ export function runsheetFromDesign(
       { key: "condensate", kind: "check", label: "Where the condensate goes", role: "walkthrough" },
       { key: "normal", kind: "check", label: "Normal sounds, drips and defrost steam", role: "walkthrough" },
       { key: "isolator", kind: "check", label: "Where the isolator is", role: "walkthrough" },
+      // Building Regulations reg 40: operating and maintenance information. The care guide is in the pack; the manuals are the rest.
+      { key: "manuals", kind: "check", label: "Manufacturer's user and maintenance manuals handed over", role: "walkthrough" },
     ],
   });
   for (const r of rooms) {

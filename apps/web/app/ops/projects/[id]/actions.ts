@@ -26,6 +26,7 @@ import { done, refused, type ActionResult } from "@/components/ops/command/types
 import { londonToUtcIso, slotIso } from "@/components/ops/command/model";
 import { audit } from "@/lib/audit";
 import { requireStaff } from "@/lib/auth/server";
+import { recordCertificate } from "@/lib/certificates-server";
 import { resend } from "@/lib/comms/outbox";
 import { dispatch, loadProject, pilotNumberHolder } from "@/lib/project-service";
 import * as issuesRepo from "@/lib/repo/issues";
@@ -197,11 +198,31 @@ export async function earlyStartEvidenceAction(projectId: string, fd: FormData):
 export async function electricalCertAction(projectId: string, fd: FormData): Promise<ActionResult> {
   const status = field(fd, "status");
   if (status !== "pending" && status !== "received" && status !== "not-required") return refused("Pick a status.");
-  return run(projectId, { type: "electrical-cert-updated", status }, status === "received" ? "Certificate marked received." : `Certificate marked ${status.replace("-", " ")}.`);
+  if (status === "received") return certificateAction(projectId, "electrical-installation", fd);
+  return run(projectId, { type: "electrical-cert-updated", status }, `Certificate marked ${status.replace("-", " ")}.`);
 }
 
-export async function warrantyRegisteredAction(projectId: string): Promise<ActionResult> {
-  return run(projectId, { type: "warranty-registered" }, "Warranty marked registered.");
+export async function warrantyRegisteredAction(projectId: string, fd: FormData): Promise<ActionResult> {
+  return certificateAction(projectId, "warranty-registration", fd);
+}
+
+/** The certificate's file and reference go into the customer's documents first; then the project is told. */
+async function certificateAction(projectId: string, kind: "electrical-installation" | "warranty-registration", fd: FormData): Promise<ActionResult> {
+  const staff = await requireStaff("projects.edit");
+  if (!uuid.safeParse(projectId).success) return refused("Project not found.");
+  const result = await recordCertificate(
+    projectId,
+    {
+      kind,
+      reference: field(fd, "reference"),
+      mediaIds: fd.getAll("mediaId").map(String),
+      ...(field(fd, "issuer") ? { issuer: field(fd, "issuer") } : {}),
+    },
+    staff,
+  );
+  if (!result.ok) return refused(result.error, result.blockers as never);
+  refresh(projectId);
+  return done(kind === "electrical-installation" ? "Certificate received and added to the customer's documents." : "Warranty registered; the registration is in the customer's documents.");
 }
 
 /* ------------------------------------------------------------------ */

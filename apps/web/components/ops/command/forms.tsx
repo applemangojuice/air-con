@@ -266,26 +266,6 @@ export function EarlyStartForm({ action, requested }: { action: Action; requeste
   );
 }
 
-export function ElectricalCertForm({ action, current }: { action: Action; current: string }) {
-  const options = [
-    { value: "pending", label: "Pending" },
-    { value: "received", label: "Received" },
-    { value: "not-required", label: "Not required" },
-  ].filter((o) => o.value !== current);
-  return (
-    <ActionForm action={action}>
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs font-semibold text-ink-700">Mark as</span>
-        {options.map((o) => (
-          <SubmitButton key={o.value} name="status" value={o.value} variant="secondary" busyLabel="…">
-            {o.label}
-          </SubmitButton>
-        ))}
-      </div>
-    </ActionForm>
-  );
-}
-
 export function OneButton({ action, label, confirm, variant = "secondary" }: { action: Action; label: string; confirm?: string; variant?: "primary" | "secondary" }) {
   return (
     <ActionForm action={action} confirm={confirm}>

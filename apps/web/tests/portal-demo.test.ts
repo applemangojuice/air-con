@@ -112,8 +112,8 @@ function journey(early: boolean) {
   act({ type: "invoice-issued", amountPence: 360_000 }, T.surveyor);
   s.invoices = [...s.invoices, { id: "i2", kind: "balance", status: "paid", totalPence: 360_000, paidPence: 360_000, number: "DEMO-0002" }];
   act({ type: "payment-recorded", amountPence: 360_000 });
-  act({ type: "electrical-cert-updated", status: "received" }, T.surveyor);
-  act({ type: "warranty-registered" }, T.surveyor);
+  act({ type: "electrical-cert-updated", status: "received", documentId: "demo-cert-eic" }, T.surveyor);
+  act({ type: "warranty-registered", documentId: "demo-cert-war" }, T.surveyor);
   act({ type: "project-closed" }, T.surveyor);
   return s;
 }

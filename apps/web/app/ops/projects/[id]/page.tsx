@@ -40,18 +40,17 @@ import {
   ContactForm,
   Disclosure,
   EarlyStartForm,
-  ElectricalCertForm,
   LearningForm,
   LearningStatusForm,
   NextActionForm,
   NoteForm,
-  OneButton,
   OwnerForm,
   PilotForm,
   RaiseIssueForm,
   ResendForm,
 } from "@/components/ops/command/forms";
 import { requireStaff } from "@/lib/auth/server";
+import { ElectricalCertificateForms, WarrantyRegistrationForm } from "./certificate-forms";
 import { listDocuments } from "@/lib/documents-server";
 import { fmtDate, fmtDay, fmtDayTime, fmtInstantDay } from "@/lib/format";
 import { blockersByGate, issueKindDefaults, loadCommandRecords, selfSurveyDiff } from "@/lib/ops-core-server";
@@ -552,16 +551,24 @@ export default async function CommandCentrePage({
                     ) : null,
                   ],
                   ["Customer sign-off", p.handover.signoff ? `${p.handover.signoff.name}: ${p.handover.signoff.outcome === "all-good" ? "all good" : `${p.handover.signoff.snagCount} snag${p.handover.signoff.snagCount === 1 ? "" : "s"}`}` : null],
-                  ["Electrical certificate", <StatusChip key="ec" status={p.handover.electricalCert} />],
+                  [
+                    "Electrical certificate",
+                    <span key="ec" className="inline-flex flex-wrap items-center gap-2">
+                      <StatusChip status={p.handover.electricalCert} />
+                      {p.handover.electricalCertDocumentId && (
+                        <Link href={`/d/${p.handover.electricalCertDocumentId}`} className="font-semibold text-accent-700 hover:underline">
+                          Open it
+                        </Link>
+                      )}
+                    </span>,
+                  ],
                   ["Warranty", p.handover.warrantyRegistered ? "Registered" : p.handover.warrantyDueOn ? `Register by ${fmtDate(p.handover.warrantyDueOn)}` : "Not registered"],
                 ]}
               />
               {canEdit && (
                 <>
-                  <ElectricalCertForm action={bind(electricalCertAction)} current={p.handover.electricalCert} />
-                  {!p.handover.warrantyRegistered && (
-                    <OneButton action={bind(warrantyRegisteredAction)} label="Warranty registered" confirm="Only mark it registered once the manufacturer has confirmed it. Carry on?" />
-                  )}
+                  <ElectricalCertificateForms action={bind(electricalCertAction)} projectId={id} current={p.handover.electricalCert} />
+                  {!p.handover.warrantyRegistered && <WarrantyRegistrationForm action={bind(warrantyRegisteredAction)} projectId={id} />}
                 </>
               )}
             </SectionCard>

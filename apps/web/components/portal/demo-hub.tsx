@@ -426,10 +426,23 @@ export function DemoHub({ initialProject }: { initialProject: Project }) {
     }
     if (p.handover.electricalCert !== "received" || !p.handover.warrantyRegistered) {
       add("The certificate arrives and we register your warranty", () =>
-        chain([
-          ...(p.handover.electricalCert !== "received" ? [{ action: { type: "electrical-cert-updated", status: "received" } as ProjectAction, actor: office, at: state.now + 6 * DAY }] : []),
-          ...(!p.handover.warrantyRegistered ? [{ action: { type: "warranty-registered" } as ProjectAction, actor: office }] : []),
-        ]),
+        chain(
+          [
+            ...(p.handover.electricalCert !== "received"
+              ? [{ action: { type: "electrical-cert-updated", status: "received", documentId: "demo-cert-eic" } as ProjectAction, actor: office, at: state.now + 6 * DAY }]
+              : []),
+            ...(!p.handover.warrantyRegistered ? [{ action: { type: "warranty-registered", documentId: "demo-cert-war" } as ProjectAction, actor: office }] : []),
+          ],
+          // In the documents before the timeline says so, as on the real thing.
+          (s) => ({
+            ...s,
+            documents: [
+              ...s.documents,
+              ...(p.handover.electricalCert !== "received" ? [doc("demo-cert-eic", "certificate", "Electrical installation certificate", "DIH-CE-DEMO-EIC-v1", s.now)] : []),
+              ...(!p.handover.warrantyRegistered ? [doc("demo-cert-war", "certificate", "Manufacturer warranty registration", "DIH-CE-DEMO-WAR-v1", s.now)] : []),
+            ],
+          }),
+        ),
       );
     }
     if (!p.aftercare.feedbackRequestedAt) {

@@ -1999,8 +1999,19 @@ function buildProject(sc: Scenario, today: string, settings: PilotSettings, invo
   message("invoice-issued", "email", balanceInvoiceId, balanceIssuedAt, `Invoice ${balanceNumber}`, `Your balance invoice ${balanceNumber} for ${fmtGbp(balancePence)} is in your documents. It's due by ${balanceInvoice.dueOn}.`);
   document("invoice", "invoice-balance", `Invoice ${balanceNumber} (balance)`, balanceIssuedAt, invoiceSnapshot(balanceInvoice, balanceIssuedAt, []));
 
-  story.act({ type: "warranty-registered" }, at(nextWorkingDay(addDays(cal.d3!, 1)), "10:00"), ADMIN);
-  story.act({ type: "electrical-cert-updated", status: "received" }, at(snagFixed, "11:00"), ADMIN);
+  // The certificate and the registration go into the documents first, then the project says so.
+  const warrantyAt = at(nextWorkingDay(addDays(cal.d3!, 1)), "10:00");
+  const warrantyDoc = document("certificate", "certificate-warranty", "Manufacturer warranty registration", warrantyAt, {
+    ...header(warrantyAt),
+    certificate: { kind: "warranty-registration", title: "Manufacturer warranty registration", reference: "DEMO-WR-0042", issuer: "DEMO manufacturer", receivedOn: warrantyAt.slice(0, 10), mediaIds: [] },
+  });
+  story.act({ type: "warranty-registered", documentId: warrantyDoc.id }, warrantyAt, ADMIN);
+  const certAt = at(snagFixed, "11:00");
+  const eicDoc = document("certificate", "certificate-electrical", "Electrical installation certificate", certAt, {
+    ...header(certAt),
+    certificate: { kind: "electrical-installation", title: "Electrical installation certificate", reference: "DEMO-EIC-0001", issuer: "DEMO scheme", receivedOn: certAt.slice(0, 10), mediaIds: [] },
+  });
+  story.act({ type: "electrical-cert-updated", status: "received", documentId: eicDoc.id }, certAt, ADMIN);
   story.act({ type: "payment-recorded", amountPence: balancePence }, balancePaidAt);
   message("payment-received", "email", balancePayment.providerRef, balancePaidAt, "Payment received", `We've received your balance of ${fmtGbp(balancePence)}. Thank you: you're all paid up.`);
   document("receipt", "receipt-balance", `Receipt for ${balanceNumber}`, balancePaidAt, { ...header(balancePaidAt), payment: balancePayment, invoice: balanceInvoice });

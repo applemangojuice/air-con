@@ -229,8 +229,8 @@ const JOURNEY: Step[] = [
   ["commissioning-signed", { type: "commissioning-signed", by: "Tess Lead" }, T.done, { actor: TECH_LEAD }],
   ["handover-pack-published", { type: "handover-pack-published", documentId: "doc-hp-1" }, T.handover, { actor: TECH_LEAD }],
   ["handover-signed", { type: "handover-signed", name: "Alex Demo", outcome: "all-good", snagCount: 0 }, T.handover, { actor: INSTALLER }],
-  ["electrical-cert-updated", { type: "electrical-cert-updated", status: "received" }, T.after, { actor: ADMIN }],
-  ["warranty-registered", { type: "warranty-registered" }, T.after, { actor: ADMIN }],
+  ["electrical-cert-updated", { type: "electrical-cert-updated", status: "received", documentId: "doc-eic" }, T.after, { actor: ADMIN }],
+  ["warranty-registered", { type: "warranty-registered", documentId: "doc-war" }, T.after, { actor: ADMIN }],
   ["invoice-issued", { type: "invoice-issued", amountPence: 645_000 }, T.after, { actor: ADMIN }],
   ["payment-recorded", { type: "payment-recorded", amountPence: 645_000 }, "2026-11-24T10:00:00.000Z"],
   ["aftercare-checkin-sent", { type: "aftercare-checkin-sent" }, "2026-11-26T09:00:00.000Z"],
@@ -1225,8 +1225,19 @@ test("warranty, certificates, invoices and payments", () => {
   const p = walk("warranty-registered");
   assert.equal(p.handover.warrantyRegistered, true);
   assert.equal(p.handover.electricalCert, "received");
-  refuses(p, { type: "warranty-registered" }, T.after, {}, /already registered/);
-  refuses(p, { type: "electrical-cert-updated", status: "received" }, T.after, {}, /already marked/);
+  assert.equal(p.handover.electricalCertDocumentId, "doc-eic");
+  assert.equal(p.handover.warrantyDocumentId, "doc-war");
+  refuses(p, { type: "warranty-registered", documentId: "doc-war-2" }, T.after, {}, /already registered/);
+  refuses(p, { type: "electrical-cert-updated", status: "received", documentId: "doc-eic-2" }, T.after, {}, /already marked/);
+  // "In your documents" is only ever said once the document exists.
+  const signed = walk("handover-signed");
+  refuses(signed, { type: "electrical-cert-updated", status: "received" }, T.after, { actor: ADMIN }, /Add the certificate itself/);
+  refuses(signed, { type: "warranty-registered" }, T.after, { actor: ADMIN }, /Add the registration/);
+  const received = step(signed, { type: "electrical-cert-updated", status: "received", documentId: "doc-eic" }, T.after, { actor: ADMIN });
+  assert.equal(received.events.at(-1)!.label, "Your electrical installation certificate is in your documents.");
+  const back = step(received, { type: "electrical-cert-updated", status: "pending" }, T.after, { actor: ADMIN });
+  assert.equal(back.handover.electricalCertDocumentId, undefined);
+  assert.equal(step(signed, { type: "warranty-registered", documentId: "doc-war" }, T.after, { actor: ADMIN }).events.at(-1)!.label, "Your manufacturer warranty is registered. The confirmation is in your documents.");
   refuses(p, { type: "invoice-issued", amountPence: 10.5 }, T.after, {}, /whole-pence/);
   refuses(p, { type: "payment-recorded", amountPence: 0 }, T.after, {}, /whole-pence/);
   const credit = step(walk("invoice-issued"), { type: "invoice-issued", amountPence: -5_000 }, T.after, { actor: ADMIN });

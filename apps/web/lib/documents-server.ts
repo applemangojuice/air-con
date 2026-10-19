@@ -38,7 +38,14 @@ import * as documentsRepo from "./repo/documents";
  */
 
 /** Kinds a project has several of, each its own series. */
-export const MULTI_INSTANCE_KINDS: ReadonlySet<DocumentKind> = new Set<DocumentKind>(["invoice", "receipt", "variation"]);
+export const MULTI_INSTANCE_KINDS: ReadonlySet<DocumentKind> = new Set<DocumentKind>(["invoice", "receipt", "variation", "certificate"]);
+
+/** A certificate's series: one per kind of certificate (a re-upload is a new version of it). */
+const CERTIFICATE_INSTANCE: Record<string, string> = {
+  "electrical-installation": "EIC",
+  "building-regulations": "BRC",
+  "warranty-registration": "WAR",
+};
 
 const refPart = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]/g, "");
 
@@ -62,6 +69,8 @@ export function documentInstance<K extends DocumentKind>(kind: K, snapshot: Docu
       const n = (snapshot as DocumentSnapshots["variation"]).issue?.number;
       return typeof n === "number" && Number.isFinite(n) ? String(n) : undefined;
     }
+    case "certificate":
+      return CERTIFICATE_INSTANCE[(snapshot as DocumentSnapshots["certificate"]).certificate?.kind ?? ""];
     default:
       return undefined;
   }

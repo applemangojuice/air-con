@@ -191,3 +191,23 @@ test("the summary starts at zero for every job", () => {
   assert.deepEqual(Object.keys(s.jobs).sort(), [...DAILY_JOB_IDS].sort());
   assert.ok(Object.values(s.jobs).every((j) => j.planned === 0 && j.done === 0));
 });
+
+test("an electrical certificate past its 30 days alerts the team, weekly, until it's in", () => {
+  const done = (completed: string, cert: "pending" | "received" = "pending") =>
+    project((p) => {
+      p.install = { ...p.install, status: "complete", completedAt: `${completed}T15:00:00.000Z` };
+      p.handover = { ...p.handover, electricalCert: cert };
+    });
+  const completed = addDays(TODAY, -31); // due 30 days on: yesterday
+  const jobs = dailyJobsFor(done(completed), TODAY, DEFAULT_SETTINGS);
+  const alert = jobs.find((j) => j.job === "paperwork-overdue");
+  assert.ok(alert && alert.kind === "notify" && alert.event === "team-alert");
+  assert.match((alert.data as { title: string }).title, /Overdue: the electrical certificate/);
+  assert.equal((alert.data as { urgent?: boolean }).urgent, true);
+  // Not before it's due, not every day, and never once it's in.
+  assert.ok(!jobsOf(done(addDays(TODAY, -30))).includes("paperwork-overdue"), "due today: not yet late");
+  assert.ok(!jobsOf(done(addDays(TODAY, -33))).includes("paperwork-overdue"), "3 days late: between weekly alerts");
+  assert.ok(jobsOf(done(addDays(TODAY, -38))).includes("paperwork-overdue"), "8 days late: the weekly alert");
+  assert.ok(!jobsOf(done(completed, "received")).includes("paperwork-overdue"));
+  assert.ok(DAILY_JOB_IDS.includes("paperwork-overdue"));
+});

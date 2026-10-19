@@ -1,5 +1,6 @@
 import {
   daysBetween,
+  handoverDeadlines,
   reviewRequestDue,
   seasonalCheck,
   seasonalCheckDue,
@@ -35,7 +36,8 @@ export type DailyJobId =
   | "feedback-30d"
   | "review-request"
   | "seasonal-check"
-  | "service-reminder";
+  | "service-reminder"
+  | "paperwork-overdue";
 
 export const DAILY_JOB_IDS: DailyJobId[] = [
   "survey-reminder",
@@ -48,6 +50,7 @@ export const DAILY_JOB_IDS: DailyJobId[] = [
   "review-request",
   "seasonal-check",
   "service-reminder",
+  "paperwork-overdue",
 ];
 
 export const DAILY_JOB_LABEL: Record<DailyJobId, string> = {
@@ -61,14 +64,16 @@ export const DAILY_JOB_LABEL: Record<DailyJobId, string> = {
   "review-request": "Review requests",
   "seasonal-check": "Change-of-season checks",
   "service-reminder": "Service reminders",
+  "paperwork-overdue": "Overdue certificates (team alerts)",
 };
 
-type NotifyEvent = Exclude<DailyJobId, "proposal-expired">;
+type NotifyJob = Exclude<DailyJobId, "proposal-expired">;
+type NotifyEvent = Exclude<NotifyJob, "paperwork-overdue"> | "team-alert";
 
 export type DailyJob =
   | {
       kind: "notify";
-      job: NotifyEvent;
+      job: NotifyJob;
       projectId: string;
       event: NotifyEvent;
       data: CommsData[NotifyEvent];
@@ -95,6 +100,12 @@ export const CHECK_IN_LAST_DAY = 21;
 export const FEEDBACK_LAST_DAY = 60;
 /** The service reminder goes out this many days before the service is due. */
 export const SERVICE_REMINDER_DAYS_BEFORE = 30;
+/**
+ * The certificates that must reach the customer within 30 days of completion
+ * (Building Regulations 2010 reg 20; handoverDeadlines): the team hears once
+ * a week while one is overdue, until it's in.
+ */
+export const PAPERWORK_ALERT_EVERY_DAYS = 7;
 
 const dateOf = (iso: string) => iso.slice(0, 10);
 
@@ -190,6 +201,31 @@ export function dailyJobsFor(project: Project, todayIso: string, settings: Pilot
     if (seasonalCheckDue(p, today)) {
       const check = seasonalCheck(p)!;
       notify("seasonal-check", { mode: check.mode }, check.on, { type: "seasonal-check-sent" });
+    }
+  }
+  // Paperwork the law gives 30 days for: the electrical certificate (and,
+  // through the compliance checklist, the heat pump's own certificate and
+  // commissioning notice). A team alert, weekly, while it's overdue.
+  if (p.install.status === "complete" && p.install.completedAt && p.handover.electricalCert === "pending") {
+    const due = handoverDeadlines(dateOf(p.install.completedAt)).electricalCertDueBy;
+    const late = daysBetween(due, today);
+    if (late > 0 && (late - 1) % PAPERWORK_ALERT_EVERY_DAYS === 0) {
+      jobs.push({
+        kind: "notify",
+        job: "paperwork-overdue",
+        projectId: p.id,
+        event: "team-alert",
+        data: {
+          title: `Overdue: the electrical certificate for ${p.customer.name || "a customer"}`,
+          lines: [
+            `It was due to reach the customer by ${due} (30 days after completion), and it isn't recorded yet.`,
+            "Chase the electrician's scheme, then add the certificate (file and number) on the command centre.",
+            "Check the heat pump's Building Regulations certificate and commissioning notice on the compliance checklist too.",
+          ],
+          urgent: true,
+        },
+        discriminator: `paperwork-overdue:${due}:${late}`,
+      });
     }
   }
   if (p.aftercare.serviceDueOn) {

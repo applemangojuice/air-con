@@ -92,14 +92,19 @@ export const COMPLIANCE_CATEGORY_LABEL: Record<ComplianceTemplateItem["category"
 /**
  * Keys: ownership-authority, planning-pd, designations, noise-assessment,
  * outdoor-siting, structural-fixings, asbestos, concealed-services,
- * electrical-scope, fgas-company, fgas-engineer, manufacturer-requirements,
- * working-at-height, rams, equipment-compatibility, design-approval,
- * commissioning-approval, electrical-certificate, warranty-registration,
+ * electrical-scope, heat-pump-building-regs, fgas-company, fgas-engineer,
+ * manufacturer-requirements, working-at-height, rams,
+ * equipment-compatibility, design-approval, commissioning-approval,
+ * electrical-certificate, commissioning-notice,
+ * heat-pump-compliance-certificate, warranty-registration,
  * cancellation-and-consent.
  *
  * Statutory: planning (PD, designations, noise), asbestos, electrical (Part P
- * scope and certificate), F-gas (company, engineers, commissioning), working
- * at height, the risk assessment, and the consumer cancellation rules.
+ * scope and certificate), the heat pump as building work (its Part L route
+ * before booking, the commissioning notice and the compliance certificate
+ * before closing; building control to confirm), F-gas (company, engineers,
+ * commissioning), working at height, the risk assessment, and the consumer
+ * cancellation rules.
  */
 export const COMPLIANCE_TEMPLATE: ComplianceTemplateItem[] = [
   /* ---------------- before the proposal goes out ---------------- */
@@ -211,6 +216,19 @@ export const COMPLIANCE_TEMPLATE: ComplianceTemplateItem[] = [
     guidance:
       "A new circuit for the outdoor unit is notifiable electrical work. Agree the circuit, protective device, cable route and isolator with an electrician registered with a competent person scheme, who self-certifies it. Without one, a building notice goes to the council before work starts. Check the board: a spare way, the RCD type, earthing, and any asbestos flash guard in an old fuse box.",
     evidenceHint: "The electrician's scope note or quote, their scheme registration number, and a photo of the board.",
+  },
+  {
+    key: "heat-pump-building-regs",
+    label: "Building Regulations route for the heat pump",
+    category: "permissions",
+    statutory: true,
+    gate: "booking",
+    ownerRole: "admin",
+    approvalNeeds: "note",
+    basis: "Building Regulations 2010 Part L, Sch 3 (competent person schemes), reg 12. Building control to confirm",
+    guidance:
+      "Installing a split heat pump or air conditioner is very likely building work under Part L, separate from the electrical circuit. Before the booking, record how this job is covered: the competent person scheme our installer is registered with for this work (scheme and registration number), who then self-certifies it; or, without one, the building notice reference given to the council before work starts. Once work has started, a missed notice can only be put right by regularisation. Mark it not applicable only on building control's written word that this install isn't building work.",
+    evidenceHint: "The scheme name and registration number, or the building notice reference and the date it went in (or building control's written confirmation that none is needed).",
   },
   {
     key: "fgas-company",
@@ -357,6 +375,30 @@ export const COMPLIANCE_TEMPLATE: ComplianceTemplateItem[] = [
     guidance:
       "A BS 7671 Electrical Installation Certificate for the new circuit, and the scheme's Building Regulations compliance certificate, which must reach the customer within 30 days of completion. The job can't close without it.",
     evidenceHint: "The EIC (PDF or photo) and the scheme's notification reference.",
+  },
+  {
+    key: "commissioning-notice",
+    label: "Commissioning notice to building control",
+    category: "permissions",
+    statutory: true,
+    gate: "closed",
+    ownerRole: "admin",
+    basis: "Building Regulations 2010 reg 44 (commissioning). Building control to confirm",
+    guidance:
+      "Within 30 days of completion, give building control notice that the heat pump was commissioned to the manufacturer's instructions (the competent person scheme does it for its members when we register the job with them). The commissioning record is the evidence. Due 30 days after the install completed.",
+    evidenceHint: "The scheme's job registration (or the notice sent to building control), with its date.",
+  },
+  {
+    key: "heat-pump-compliance-certificate",
+    label: "Building Regulations certificate for the heat pump, to the customer",
+    category: "permissions",
+    statutory: true,
+    gate: "closed",
+    ownerRole: "admin",
+    basis: "Building Regulations 2010 reg 20 (competent person self-certification)",
+    guidance:
+      "Under a competent person scheme, the customer (the occupier) gets a Building Regulations compliance certificate for the heat pump work within 30 days of completion, as well as the electrician's one for the circuit. Under a building notice, it's building control's completion certificate instead. Chase it, and add it to the customer's documents. Due 30 days after the install completed.",
+    evidenceHint: "The certificate (PDF or photo) and its number, or the council's completion certificate.",
   },
   {
     key: "warranty-registration",

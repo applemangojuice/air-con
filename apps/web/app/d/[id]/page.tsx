@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import {
   documentCompany,
   documentCustomer,
+  type CertificateSnapshot,
   type CommissioningCertificateSnapshot,
   type ContractSnapshot,
   type DocumentHeader,
@@ -16,6 +17,7 @@ import {
   type VariationSnapshot,
 } from "@aircon/domain";
 import {
+  CertificateDoc,
   CommissioningDoc,
   ContractDoc,
   HandoverPackDoc,
@@ -123,7 +125,9 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
     live: project
       ? {
           electricalCert: project.handover.electricalCert,
+          ...(project.handover.electricalCertDocumentId ? { electricalCertDocumentId: project.handover.electricalCertDocumentId } : {}),
           warrantyRegistered: project.handover.warrantyRegistered,
+          ...(project.handover.warrantyDocumentId ? { warrantyDocumentId: project.handover.warrantyDocumentId } : {}),
           ...(project.aftercare.serviceDueOn ? { serviceDueOn: project.aftercare.serviceDueOn } : {}),
           projectHref: `/p/${project.id}`,
         }
@@ -156,6 +160,9 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
       break;
     case "survey-report":
       body = <SurveyReportDoc snap={snap as SurveyReportSnapshot} ctx={ctx} />;
+      break;
+    case "certificate":
+      body = <CertificateDoc snap={snap as CertificateSnapshot} ctx={ctx} />;
       break;
   }
 
@@ -212,5 +219,7 @@ function wellFormed(doc: DocumentRecord): boolean {
       );
     case "survey-report":
       return obj(s.survey) && obj((s.survey as { data?: unknown }).data) && arr(s.promises);
+    case "certificate":
+      return obj(s.certificate) && arr((s.certificate as { mediaIds?: unknown }).mediaIds);
   }
 }

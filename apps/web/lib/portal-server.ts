@@ -328,11 +328,16 @@ export function documentMediaIds(doc: Pick<DocumentRecord, "kind" | "snapshot">)
   if (doc.kind === "handover-pack") {
     for (const a of (s.asBuilt as { mediaId?: string }[] | undefined) ?? []) if (a?.mediaId) ids.push(a.mediaId);
   }
+  if (doc.kind === "certificate") {
+    ids.push(...(((s.certificate as { mediaIds?: string[] } | undefined)?.mediaIds ?? []) as string[]));
+  }
   return [...new Set(ids.filter((id) => typeof id === "string"))];
 }
 
 export interface DocPhotoView {
   url: string | null;
+  /** image/… or application/pdf (a certificate's file). */
+  contentType?: string;
   annotations: MediaItem["annotations"];
   width?: number;
   height?: number;
@@ -361,6 +366,7 @@ export async function documentPhotos(doc: DocumentRecord): Promise<{ photos: Map
   const urls = await safe("document media urls", () => signedMediaUrls(own, 4 * 3600), new Map<string, string>());
   const view = (m: MediaItem): DocPhotoView => ({
     url: urls.get(m.id) ?? null,
+    contentType: m.contentType,
     annotations: m.annotations,
     ...(m.width ? { width: m.width } : {}),
     ...(m.height ? { height: m.height } : {}),

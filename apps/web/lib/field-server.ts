@@ -1557,7 +1557,9 @@ export async function handoverDraft(projectId: string, staff: StaffMember): Prom
     documents: links,
     warranty: { text: warrantyText, registered: project.handover.warrantyRegistered, ...(project.handover.warrantyRegistered ? {} : { dueOn }) },
     electricalCert: { status: project.handover.electricalCert, dueBy: deadlines.electricalCertDueBy },
-    maintenanceInfo: { dueBy: deadlines.maintenanceInfoDueBy, provided: true },
+    // Provided once the walkthrough (which includes handing over the manufacturer's manuals) is done,
+    // never just because a pack exists.
+    maintenanceInfo: { dueBy: deadlines.maintenanceInfoDueBy, provided: Boolean(progress?.walkthroughDone) },
     fgas: fgas.filter((f) => f.record).map((f) => f.record!),
     care: CARE_GUIDE,
     contacts: [

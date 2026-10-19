@@ -106,12 +106,14 @@ export function AcceptedPanel({
           <ol className="mt-3 space-y-3">
             {[
               emailDemo
-                ? "This is a demo: email isn't set up, so nothing was emailed. Your contract and cancellation form are in your documents."
+                ? `This is a demo: email isn't set up, so nothing was emailed.${view.contractDocumentId ? " Your contract and cancellation form are in your documents." : ""}`
                 : view.confirmationSentAt && !justNow
                   ? `We emailed your contract and cancellation form${view.email ? ` to ${view.email}` : ""} on ${fmtDate(view.confirmationSentAt)}. Please keep that email: it's your copy.`
                   : view.email
                     ? `Your contract and cancellation form are on their way to ${view.email}. Please keep that email: it's your copy.${justNow ? "" : ` If it hasn't arrived, call us on ${phone} and we'll send it again.`}`
-                    : "Your contract and cancellation form are in your documents. Please keep a copy.",
+                    : view.contractDocumentId
+                      ? "Your contract and cancellation form are in your documents. Please keep a copy."
+                      : `We'll send you your contract and cancellation form to keep. If they don't arrive, call us on ${phone}.`,
               "Choose your install dates on your project page. We then confirm the dates and introduce your team.",
               "We order your equipment and tell you when it's delivered.",
             ].map((t, i) => (

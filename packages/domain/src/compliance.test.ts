@@ -54,6 +54,7 @@ const CONTRACT_KEYS = [
   "asbestos",
   "concealed-services",
   "electrical-scope",
+  "heat-pump-building-regs",
   "fgas-company",
   "fgas-engineer",
   "manufacturer-requirements",
@@ -63,6 +64,8 @@ const CONTRACT_KEYS = [
   "design-approval",
   "commissioning-approval",
   "electrical-certificate",
+  "commissioning-notice",
+  "heat-pump-compliance-certificate",
   "warranty-registration",
   "cancellation-and-consent",
 ];

@@ -23,7 +23,8 @@ export type DocumentKind =
   | "receipt"
   | "commissioning-certificate"
   | "handover-pack"
-  | "survey-report";
+  | "survey-report"
+  | "certificate";
 
 export const DOCUMENT_KIND_LABEL: Record<DocumentKind, string> = {
   proposal: "Proposal",
@@ -34,6 +35,7 @@ export const DOCUMENT_KIND_LABEL: Record<DocumentKind, string> = {
   "commissioning-certificate": "Commissioning certificate",
   "handover-pack": "Handover pack",
   "survey-report": "Survey report",
+  certificate: "Certificate",
 };
 
 /** Two-letter codes inside refs. Stable: refs are printed on paper. */
@@ -46,6 +48,7 @@ export const DOCUMENT_KIND_CODE: Record<DocumentKind, string> = {
   "commissioning-certificate": "CC",
   "handover-pack": "HP",
   "survey-report": "SR",
+  certificate: "CE",
 };
 
 export interface DocumentRecord {
@@ -204,6 +207,36 @@ export interface VariationSnapshot extends DocumentHeader {
   contractTotalPence?: number;
 }
 
+/** What a certificate document is: each kind is its own series of versions. */
+export type CertificateKind = "electrical-installation" | "building-regulations" | "warranty-registration";
+
+export const CERTIFICATE_KIND_LABEL: Record<CertificateKind, string> = {
+  "electrical-installation": "Electrical installation certificate",
+  "building-regulations": "Building Regulations compliance certificate",
+  "warranty-registration": "Manufacturer warranty registration",
+};
+
+/**
+ * A certificate or confirmation we hold for the customer: the file itself
+ * (the scheme's PDF, a photo of the paper copy, the manufacturer's email)
+ * and its reference. It exists before anything tells the customer it's "in
+ * your documents".
+ */
+export interface CertificateSnapshot extends DocumentHeader {
+  certificate: {
+    kind: CertificateKind;
+    title: string;
+    /** The certificate or notification number, or the warranty registration reference. */
+    reference?: string;
+    /** Who issued it (the electrician's scheme, the manufacturer). */
+    issuer?: string;
+    receivedOn: string;
+    /** The uploaded files (media ids on this project). */
+    mediaIds: string[];
+    note?: string;
+  };
+}
+
 export interface InvoiceSnapshot extends DocumentHeader {
   invoice: Invoice;
   /** Verified payments against it at the moment of issue (usually none). */
@@ -267,6 +300,7 @@ export interface DocumentSnapshots {
   "commissioning-certificate": CommissioningCertificateSnapshot;
   "handover-pack": HandoverPackSnapshot;
   "survey-report": SurveyReportSnapshot;
+  certificate: CertificateSnapshot;
 }
 
 export type DocumentSnapshot<K extends DocumentKind = DocumentKind> = DocumentSnapshots[K];
