@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { QUALIFICATION_LABEL, STAFF_ROLES, type QualificationKind, type StaffMember } from "@aircon/domain";
+import { QUALIFICATION_LABEL, STAFF_ROLES, sameJson, type QualificationKind, type StaffMember } from "@aircon/domain";
 import { done, refused, type ActionResult } from "@/components/ops/command/types";
 import { audit } from "@/lib/audit";
 import { requireStaff } from "@/lib/auth/server";
@@ -103,7 +103,7 @@ export async function saveStaffAction(fd: FormData): Promise<ActionResult> {
   try {
     if (existing) {
       const saved = await staffRepo.update({ ...record, id: existing.id }, admin);
-      const changed = (Object.keys(record) as (keyof typeof record)[]).filter((k) => JSON.stringify(record[k]) !== JSON.stringify(existing[k]));
+      const changed = (Object.keys(record) as (keyof typeof record)[]).filter((k) => !sameJson(record[k], existing[k]));
       await audit({ actor: admin, action: "staff.update", entity: "staff", entityId: saved.id, detail: { changed } });
       revalidatePath("/ops/staff");
       revalidatePath(`/ops/staff/${saved.id}`);

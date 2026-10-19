@@ -27,8 +27,13 @@ when something's red. Start there.
      any username, this password.
    - `GETADDRESS_API_KEY` (optional): address autofill for postcodes not
      yet in the property database. Free tier at getaddress.io.
-   - `RESEND_API_KEY` + `EMAIL_FROM` + `NEXT_PUBLIC_APP_URL` (optional):
-     quote emails.
+   - `RESEND_API_KEY` + `EMAIL_FROM` + `NEXT_PUBLIC_APP_URL`: **required
+     before any real customer**. They carry the sign-in links, the proposal
+     email (the pre-contract information and cancellation form the law needs
+     on a durable medium) and the contract copy. Without them a live
+     deployment refuses to issue proposals, and a proposal can't be accepted
+     or an install booked until its email has really gone. Verify the
+     `EMAIL_FROM` domain in Resend first: a rejected send records nothing.
 4. **Data**: load the property book. The step-by-step is in
    [loading-data.md](./loading-data.md) — start with the committed sample
    CSVs to smoke-test the pipeline, then swap in the real EPC bulk downloads

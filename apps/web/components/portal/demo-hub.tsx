@@ -4,6 +4,7 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import {
   applyProjectAction,
   cancellationSentence,
+  isFullName,
   type Blocker,
   type Project,
   type ProjectAction,
@@ -150,10 +151,19 @@ export function DemoHub({ initialProject }: { initialProject: Project }) {
         case "variation": {
           const issue = s.issues.find((i) => i.id === req.issueId);
           if (!issue?.variation || issue.variation.status !== "proposed") return fail("That change has already been decided.");
+          // The same rule as the real thing: a yes needs their typed name and the agree-to-pay press.
+          if (req.decision === "accept" && (!isFullName(req.name ?? "") || req.agreed !== true)) {
+            return fail("Type your first name and surname, then press the button to agree.");
+          }
           const status = req.decision === "accept" ? "accepted" : "declined";
           const next: HubIssue = {
             ...issue,
-            variation: { ...issue.variation, status, decidedAt: new Date(s.now).toISOString(), decidedBy: p.customer.name },
+            variation: {
+              ...issue.variation,
+              status,
+              decidedAt: new Date(s.now).toISOString(),
+              decidedBy: req.decision === "accept" ? (req.name ?? "").trim() : p.customer.name,
+            },
           };
           const updated = { ...s, issues: s.issues.map((i) => (i.id === issue.id ? next : i)) };
           stateRef.current = updated;
@@ -243,6 +253,8 @@ export function DemoHub({ initialProject }: { initialProject: Project }) {
             action: { type: "proposal-issued", proposalId: "demo-proposal", version: 1, validUntil: addWorkingDays(today, 20), optionCount: 1 },
             actor: office,
           },
+          // The outbox records this once the issue email has gone; in the demo it "goes" at once.
+          { action: { type: "pre-contract-info-sent", proposalId: "demo-proposal", messageId: "demo-issue-message", demo: true } },
         ],
         (s) => ({ ...s, documents: [...s.documents, doc("demo-proposal-doc", "proposal", "Your proposal", "DIH-PR-DEMO-v1", s.now)] }),
       ),

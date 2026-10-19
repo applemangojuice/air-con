@@ -136,7 +136,7 @@ export function ProposalView({ data }: { data: ProposalPageData }) {
 
       {accepted && (
         <div ref={acceptedRef} className="scroll-mt-6">
-          <AcceptedPanel view={accepted} projectId={data.projectId} firstName={data.firstName} phone={data.company.phone} justNow={Boolean(justAccepted)} />
+          <AcceptedPanel view={accepted} projectId={data.projectId} firstName={data.firstName} phone={data.company.phone} justNow={Boolean(justAccepted)} emailDemo={Boolean(data.emailDemo)} />
         </div>
       )}
 
@@ -249,7 +249,18 @@ export function ProposalView({ data }: { data: ProposalPageData }) {
       {canAccept && (
         <section id="accept" aria-labelledby="accept-h" className="scroll-mt-6">
           <SectionHeading n={next()} id="accept-h" title="Accept your proposal" lead="Four short steps. Nothing is agreed until the last one." />
-          <AcceptFlow data={data} optionId={option.id} onOptionChange={setOptionId} onAccepted={onAccepted} />
+          {data.infoPending ? (
+            <div role="status" className="rounded-3xl border border-amber-200 bg-amber-50 p-5 text-sm leading-relaxed text-amber-900 sm:p-6">
+              <p className="font-semibold">Your contract information is still on its way</p>
+              <p className="mt-1">
+                Before you accept, the law says you need this proposal&apos;s contract information and cancellation form by email, to keep. We
+                haven&apos;t been able to send it yet{data.email ? ` to ${data.email}` : ""}. We&apos;re on it, and you can accept here as soon as it
+                arrives. If it hasn&apos;t come by tomorrow, call us on {data.company.phone} or email {data.company.email}.
+              </p>
+            </div>
+          ) : (
+            <AcceptFlow data={data} optionId={option.id} onOptionChange={setOptionId} onAccepted={onAccepted} />
+          )}
         </section>
       )}
 

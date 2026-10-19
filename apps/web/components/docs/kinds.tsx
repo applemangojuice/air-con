@@ -366,12 +366,24 @@ export function VariationDoc({ snap }: { snap: VariationSnapshot }) {
             ["Contract", snap.contractRef ?? ""],
             ["Contract total", snap.contractTotalPence !== undefined ? money(snap.contractTotalPence) : ""],
             [
-              "New total if accepted",
+              v.status === "accepted" ? "New contract total" : "New total if accepted",
               snap.contractTotalPence !== undefined ? money(snap.contractTotalPence + v.totalDeltaPence) : "",
             ],
+            ...(v.acceptance
+              ? ([
+                  ["What you agreed to", `“${v.acceptance.wording}”`],
+                  ["Name typed", v.acceptance.name],
+                  ...(v.acceptance.ip ? ([["From", v.acceptance.ip]] as [string, ReactNode][]) : []),
+                  ["Fingerprint (sha256)", <span key="h" className="break-all font-mono text-xs">{v.acceptance.contentHash}</span>],
+                ] as [string, ReactNode][])
+              : []),
           ]}
         />
-        <p>No extra work is done without your written yes. If you decline, we carry on exactly as agreed.</p>
+        <p>
+          {v.status === "accepted"
+            ? "This change is part of your contract, on the same terms, and paid with your balance. Changed your mind? Tell us before we start this extra work and we won't do it."
+            : "No extra work is done without your written yes. If you decline, we carry on exactly as agreed."}
+        </p>
       </DocSection>
     </>
   );

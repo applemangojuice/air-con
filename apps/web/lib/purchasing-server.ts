@@ -347,15 +347,26 @@ export async function syncKitStatus(projectId: string, staff: StaffMember | null
       status = "delivered";
       summary = s.shortages ? `${s.shortages} item${s.shortages === 1 ? "" : "s"} still to come` : "";
     }
+    // Where it went decides when a supply-and-install cancellation period
+    // starts: only kit at the customer's home starts it now (reg 30(3)).
+    const arrived = status === "delivered" || status === "inspected";
     const same =
       k.status === status &&
       k.shortages === s.shortages &&
       (s.expectedDate === undefined || k.expectedDate === s.expectedDate) &&
-      (k.summary ?? "") === summary;
+      (k.summary ?? "") === summary &&
+      (!arrived || (k.deliveredTo ?? "customer") === s.deliveredTo);
     if (same) return { changed: false };
     const result = await dispatch(
       projectId,
-      { type: "kit-updated", status, ...(s.expectedDate ? { expectedDate: s.expectedDate } : {}), summary, shortages: s.shortages },
+      {
+        type: "kit-updated",
+        status,
+        ...(s.expectedDate ? { expectedDate: s.expectedDate } : {}),
+        summary,
+        shortages: s.shortages,
+        ...(arrived ? { deliveredTo: s.deliveredTo } : {}),
+      },
       staff ?? { kind: "system", name: "purchasing" },
     );
     if ("error" in result) {

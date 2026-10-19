@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { ANNOTATION_STYLE, estimateLabel, validateAnnotations, type Annotation, type Point } from "@aircon/domain";
+import { ANNOTATION_STYLE, estimateLabel, sameJson, validateAnnotations, type Annotation, type Point } from "@aircon/domain";
 import { annotationColour, chipTextColour, legendEntries } from "./annotation-summary";
 import { ModalPortal } from "./modal-portal";
 import {
@@ -146,7 +146,7 @@ function writeDraft(key: string | undefined, annotations: Annotation[] | null): 
   }
 }
 
-const same = (a: Annotation[], b: Annotation[]) => JSON.stringify(a) === JSON.stringify(b);
+const same = (a: Annotation[], b: Annotation[]) => sameJson(a, b);
 
 /** The editor as a true modal: everything behind it is inert until it closes. */
 export function Annotator(props: AnnotatorProps) {

@@ -222,6 +222,15 @@ export function warrantyCopy(ps: PublicSettings): { headline: string; body: stri
   return null;
 }
 
+/**
+ * What to say about guarantees when settings hold no warranty facts
+ * (warrantyCopy is null): neutral, and never a guarantee we may not offer
+ * (DMCC Act 2024: claiming a guarantee you don't hold is a misleading
+ * action). It promises only what's true of every proposal: the warranties
+ * that apply are set out in writing before anything is agreed.
+ */
+export const GUARANTEE_FALLBACK = "Your proposal sets out exactly which warranties apply, in writing, before you agree to anything.";
+
 /** F-gas company certification in plain words, only while it's held and current. */
 export function fgasClaim(ps: PublicSettings): string | null {
   if (!ps.fgas) return null;

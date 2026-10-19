@@ -141,7 +141,9 @@ export function commsForAction(project: Project, action: ProjectAction, actor?: 
     }
 
     // The issue email is the durable copy of the pre-contract information
-    // (the reducer records preContractInfoSentAt at issue). for-action adds
+    // (the outbox records preContractInfoSentAt once it has gone: see
+    // followUpForDelivered). Keyed on the proposal id, which
+    // followUpForDelivered reads back. for-action adds
     // the proposal record's options and prices; the project's rooms stand in
     // if it can't be read.
     case "proposal-issued":
@@ -295,9 +297,10 @@ export function commsForAction(project: Project, action: ProjectAction, actor?: 
       if (!p.handover.packDocumentId) return [];
       return [notice("certificate-issued", { kind: "warranty-confirmation" }, "warranty-confirmation")];
 
-    // Recorded by the outbox once the acceptance email has gone (see
-    // followUpForDelivered): it must never send anything itself, or the
-    // two could feed each other.
+    // Recorded by the outbox once the issue or acceptance email has gone
+    // (see followUpForDelivered): they must never send anything themselves,
+    // or the two could feed each other.
+    case "pre-contract-info-sent":
     case "contract-confirmation-sent":
       return [];
 
@@ -306,22 +309,43 @@ export function commsForAction(project: Project, action: ProjectAction, actor?: 
   }
 }
 
+/** The occurrence a stored message was keyed on (idempotencyKey: event:project:discriminator:channel). */
+function discriminatorOf(key: string): string {
+  const parts = key.split(":");
+  return parts.length >= 4 ? parts.slice(2, -1).join(":") : "";
+}
+
 /**
  * What a delivered message records on its project, if anything. Called by
  * the outbox whenever a message is sent (or stored in demo mode): on the
- * first send, a cron retry or a resend alike. Today one rule: the
- * acceptance email (the customer's contract copy) sets confirmationSentAt,
- * which ready-to-install needs (CCR reg 12(4)). The action it returns sends
- * nothing (commsForAction maps it to []) and is idempotent, so this can't
- * loop.
+ * first send, a cron retry or a resend alike. Two contract facts:
+ *  * the issue email (Schedule 2 information, cancellation instructions and
+ *    the model form on a durable medium, CCR regs 10 and 12) sets
+ *    preContractInfoSentAt for that proposal version, which acceptance needs;
+ *  * the acceptance email (the customer's contract copy) sets
+ *    confirmationSentAt, which ready-to-install needs (reg 12(4)).
+ * A message stored in demo mode was never delivered, so it counts only where
+ * nothing is real (`demoCounts`: a demo deployment or development), and the
+ * event says "demo mode". On a live deployment a demo or failed send records
+ * nothing, so the gates hold until the email really goes. The actions
+ * returned send nothing (commsForAction maps them to []) and are idempotent,
+ * so this can't loop.
  */
 export function followUpForDelivered(
-  message: Pick<MessageRecord, "id" | "event" | "channel" | "projectId">,
+  message: Pick<MessageRecord, "id" | "event" | "channel" | "projectId" | "idempotencyKey">,
   status: "sent" | "demo",
+  opts: { demoCounts: boolean },
 ): { projectId: string; action: ProjectAction } | null {
-  if (message.event !== "proposal-accepted" || message.channel !== "email" || !message.projectId) return null;
-  return {
-    projectId: message.projectId,
-    action: { type: "contract-confirmation-sent", messageId: message.id, ...(status === "demo" ? { demo: true } : {}) },
-  };
+  if (message.channel !== "email" || !message.projectId) return null;
+  if (status === "demo" && !opts.demoCounts) return null;
+  const demo = status === "demo" ? { demo: true } : {};
+  if (message.event === "proposal-issued") {
+    const proposalId = discriminatorOf(message.idempotencyKey);
+    if (!proposalId || proposalId === "-") return null;
+    return { projectId: message.projectId, action: { type: "pre-contract-info-sent", proposalId, messageId: message.id, ...demo } };
+  }
+  if (message.event === "proposal-accepted") {
+    return { projectId: message.projectId, action: { type: "contract-confirmation-sent", messageId: message.id, ...demo } };
+  }
+  return null;
 }

@@ -154,6 +154,20 @@ export interface CommsData {
     complete?: { handoverPack: boolean };
   };
   "variation-approval": { title: string; description?: string; totalDeltaPence: number; issueNumber?: number };
+  "variation-accepted": {
+    title: string;
+    description?: string;
+    issueNumber?: number;
+    priceDeltaNetPence: number;
+    taxPence: number;
+    totalDeltaPence: number;
+    acceptedAt: string;
+    /** The name the customer typed, and the words on the button they pressed. */
+    name: string;
+    wording: string;
+    /** The contract total with this change, when known. */
+    newContractTotalPence?: number;
+  };
   "issue-update": { title: string; update: string; nextStep?: string; dueOn?: string; issueNumber?: number };
   "handover-ready": { electricalCertPending?: boolean };
   "certificate-issued": { kind: "electrical-certificate" | "warranty-confirmation" };
@@ -253,6 +267,7 @@ const PORTAL_PATH: Record<CommsEventId, string | null> = {
   "installer-on-my-way": "#install",
   "install-day-update": "#install",
   "variation-approval": "#install",
+  "variation-accepted": "/documents",
   "issue-update": "",
   "handover-ready": "#handover",
   "certificate-issued": "#handover",
@@ -1164,6 +1179,40 @@ const TEMPLATES: { [E in CommsEventId]: Renderer<E> } = {
         `${smsHead(ctx)} Hi ${ctx.firstName}, a change to your install needs your OK before we go ahead. We've emailed you the details. ${smsTail(ctx)}`,
         `${smsHead(ctx)} A change to your install needs your OK. Details by email. ${smsTail(ctx)}`,
       ],
+    };
+  },
+
+  // The customer's durable copy of extra work they agreed to pay for.
+  "variation-accepted": (ctx, d) => {
+    const { settings } = ctx;
+    const delta = d.totalDeltaPence;
+    const vat = settings.tax.vatRegistered;
+    return {
+      subject: `You agreed a change to your installation${d.issueNumber ? ` (change #${d.issueNumber})` : ""}`,
+      body: [
+        { p: `Thanks ${ctx.firstName}. This is your copy of the change you agreed to for the work at ${place(ctx)}. Please keep this email.` },
+        { p: { strong: d.title } },
+        ...(d.description ? [{ quote: d.description } as Block] : []),
+        {
+          facts: [
+            ...(vat ? ([["Price change before VAT", money(d.priceDeltaNetPence)], ["VAT", money(d.taxPence)]] as [string, string][]) : []),
+            ["Total price change", `${delta > 0 ? "+" : ""}${money(delta)}${vat ? "" : " (no VAT: we're not VAT registered)"}`],
+            ...(d.newContractTotalPence !== undefined ? ([["Your new contract total", money(d.newContractTotalPence)]] as [string, string][]) : []),
+            ["Agreed by", d.name],
+            ["When", fmtDayTime(d.acceptedAt)],
+            ["What you agreed to", `"${d.wording}"`],
+          ],
+        },
+        {
+          p: delta > 0
+            ? "It's added to your contract and paid with your balance (or invoiced on its own), on the same payment terms."
+            : "It's part of your contract now, on the same terms.",
+        },
+        {
+          p: `Changed your mind? Tell us before we start this extra work and we won't do it: reply to this email${settings.company.phone && !isPlaceholderPhone(settings.company.phone) ? ` or call ${settings.company.phone}` : ""}. Your cancellation rights on the contract itself are unchanged.`,
+        },
+      ],
+      cta: "See the change in your documents",
     };
   },
 

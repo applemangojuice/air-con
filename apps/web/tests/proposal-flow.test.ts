@@ -125,6 +125,9 @@ test("revise, save, issue: the new version supersedes the old, the email carries
   assert.equal(project?.proposal.status, "issued");
   assert.equal(project?.proposal.proposalId, draftId);
   assert.equal(project?.proposal.version, 2);
+  // Recorded by the outbox once the issue email went (stored as demo, which counts outside a live deployment).
+  assert.ok(project?.proposal.preContractInfoSentAt, "the delivered issue email records the pre-contract information");
+  assert.ok(project?.events.some((e) => e.type === "pre-contract-info-sent" && /demo mode/.test(e.label) && e.internal));
   assert.equal((await proposalsRepo.get(draftId))?.status, "issued");
   const old = await proposalsRepo.get(v1.id);
   assert.equal(old?.status, "superseded");

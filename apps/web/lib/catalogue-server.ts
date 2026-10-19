@@ -6,6 +6,7 @@ import {
   compatibilityRuleErrors,
   mergeCsvRow,
   planSeedMerge,
+  sameJson,
   type CatalogueItem,
   type CompatibilityRule,
   type StaffMember,
@@ -227,7 +228,7 @@ export async function saveItem(input: unknown, actor: StaffMember, mode: "create
 
 function changedKeys(a: CatalogueItem, b: CatalogueItem): string[] {
   const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
-  return [...keys].filter((k) => JSON.stringify((a as unknown as Record<string, unknown>)[k]) !== JSON.stringify((b as unknown as Record<string, unknown>)[k]));
+  return [...keys].filter((k) => !sameJson((a as unknown as Record<string, unknown>)[k], (b as unknown as Record<string, unknown>)[k]));
 }
 
 /** Retire or restore. Items are never deleted: designs and orders point at them. */

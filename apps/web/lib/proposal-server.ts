@@ -5,6 +5,7 @@ import {
   blockersFor,
   buildCostLines,
   can,
+  canonicalJson,
   cancellationCopy,
   cancellationStatus,
   customerSafeProposal,
@@ -43,9 +44,11 @@ import {
   type SurveyRecord,
 } from "@aircon/domain";
 import { audit } from "./audit";
+import { demoLoginAllowed } from "./auth/access";
 import { CANCELLATION_NOTICE_VERSION, LEGAL_REVIEW_NOTE, cancellationForm, cancellationInstructions } from "./comms/legal-text";
 import { notify } from "./comms/outbox";
 import { createDocument, listDocuments } from "./documents-server";
+import { emailConfigured } from "./email";
 import { signedMediaUrls, updateMedia } from "./media-server";
 import { buildReadinessContext, dispatch, loadProject, londonToday } from "./project-service";
 import { db, isUuid } from "./repo/base";
@@ -154,12 +157,12 @@ async function quoteSurvey(quoteId: string): Promise<Survey | null> {
  * else none.
  */
 export async function engineReference(project: Project, survey: SurveyRecord | null): Promise<EngineReference> {
-  const base = await quoteSurvey(project.quoteId);
+  const [base, settings] = await Promise.all([quoteSurvey(project.quoteId), getSettings()]);
   if (survey && base) {
     try {
       // measuredToEngineSurvey turns the measured rooms into engine input (areas, runs).
       const measured = measuredToEngineSurvey(survey.data, base);
-      return { netPence: engineListNetPence(measured), source: "measured", note: "The pricing engine re-run on the measured survey." };
+      return { netPence: engineListNetPence(measured, settings), source: "measured", note: "The pricing engine re-run on the measured survey." };
     } catch (err) {
       console.error("[proposal] measured engine price failed:", err);
     }
@@ -167,7 +170,7 @@ export async function engineReference(project: Project, survey: SurveyRecord | n
   if (base) {
     try {
       return {
-        netPence: engineListNetPence(base),
+        netPence: engineListNetPence(base, settings),
         source: "self-survey",
         note: survey
           ? "The pricing engine on the customer's own online survey (the measured survey couldn't be re-run: see the server log)."
@@ -611,6 +614,14 @@ export async function issueDraft(projectId: string, proposalId: string, staff: S
   const stored = await proposalsRepo.get(proposalId);
   if (!stored || stored.projectId !== projectId) return fail("Proposal not found", 404);
   if (stored.status !== "draft") return fail("This version has already been issued.");
+  // The issue email is the customer's durable copy of the pre-contract
+  // information: on a live deployment it has to be able to go.
+  if (!emailConfigured() && !demoLoginAllowed(process.env)) {
+    return fail(
+      "Email isn't set up, so the proposal and its pre-contract information can't reach the customer. Add RESEND_API_KEY and EMAIL_FROM in Vercel (see /ops/status), then issue it.",
+      503,
+    );
+  }
   const project = await loadProject(projectId);
   if (!project) return fail("Project not found", 404);
   if (project.proposal.status === "accepted") return fail("The proposal is accepted. Changes now go through a variation.");
@@ -636,7 +647,7 @@ export async function issueDraft(projectId: string, proposalId: string, staff: S
   if (gate.some((b) => b.severity === "block")) return fail("The project isn't ready for a proposal yet.", 409, { blockers: gate });
 
   // Write the refreshed wording before the issue email reads the record.
-  if (JSON.stringify([record.warranty, record.guarantees, record.termsVersion]) !== JSON.stringify([stored.warranty, stored.guarantees, stored.termsVersion])) {
+  if (canonicalJson([record.warranty, record.guarantees, record.termsVersion]) !== canonicalJson([stored.warranty, stored.guarantees, stored.termsVersion])) {
     try {
       record = await proposalsRepo.update(record);
     } catch (err) {
@@ -942,6 +953,15 @@ export async function acceptProposal(
     return fail("This home already has an accepted proposal.");
   }
   if (project.proposal.proposalId !== record.id) return fail("This isn't your current proposal. Please reload the page.", 409);
+  // The pre-contract information must have reached them on a durable medium
+  // first (CCR regs 10, 12): the outbox records it once the issue email went.
+  if (!project.proposal.preContractInfoSentAt) {
+    return fail(
+      "We haven't been able to email you this proposal's contract information and cancellation form yet, and you need them before you accept. Nothing has been accepted. We're on it: please try again once the email arrives, or call us.",
+      409,
+      { errors: ["info-pending"] },
+    );
+  }
 
   const hash = await proposalDocumentHash(record);
   if (form.documentHash !== hash) {

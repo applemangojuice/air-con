@@ -13,6 +13,7 @@ import {
   surveyPriceCopy,
   vatCopy,
   warrantyCopy,
+  GUARANTEE_FALLBACK,
   type PublicSettings,
 } from "@/components/site/claims";
 import { primaryBtn, textLink } from "@/components/site/styles";
@@ -84,7 +85,7 @@ function faqsFor(s: PublicSettings): { q: string; a: string }[] {
     },
     {
       q: "What guarantees do I get?",
-      a: `${warranty ? `${warranty.headline}. ${warranty.body}` : "Your proposal sets out the manufacturer's warranty and our workmanship guarantee in writing, before you agree to anything."} All of this is on top of your statutory rights, not instead of them.`,
+      a: `${warranty ? `${warranty.headline}. ${warranty.body}` : GUARANTEE_FALLBACK} All of this is on top of your statutory rights, not instead of them.`,
     },
     {
       q: "How do I pay?",

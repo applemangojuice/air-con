@@ -63,6 +63,18 @@ test("warranty copy comes only from settings", () => {
   assert.equal(warrantyCopy(pub({ warranty: { workmanshipYears: 0, manufacturerSummary: null } })), null, "an explicit 'none' isn't advertised");
 });
 
+test("with no warranty facts, the public pages promise no guarantee we may not hold", async () => {
+  const { readFile } = await import("node:fs/promises");
+  assert.doesNotMatch(claims.GUARANTEE_FALLBACK, /workmanship|guarantee/i);
+  assert.match(claims.GUARANTEE_FALLBACK, /which warranties apply, in writing/);
+  // The home page and the FAQ (and its structured data) fall back to it, never to a hard-coded promise.
+  for (const page of ["../app/page.tsx", "../app/faq/page.tsx"]) {
+    const src = await readFile(new URL(page, import.meta.url), "utf8");
+    assert.doesNotMatch(src, /our workmanship guarantee/i, page);
+    assert.match(src, /GUARANTEE_FALLBACK/, page);
+  }
+});
+
 test("F-gas claim needs a complete, in-date company certificate", () => {
   const cert = (c: unknown) => pub({ company: { ...DEFAULT_SETTINGS.company, fgasCompanyCert: c } });
   assert.match(fgasClaim(cert({ body: "REFCOM", number: "F12345" }))!, /REFCOM F-gas company certificate \(no\. F12345\)/);

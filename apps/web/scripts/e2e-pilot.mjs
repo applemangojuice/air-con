@@ -1017,13 +1017,22 @@ try {
     check("updates feed says 'Day 1 done' once", !(await has(customer, /Day 1 done: Day 1 done/)));
     check("customer sees the variation to decide", await has(customer, /A change needs your answer[\s\S]*DEMO: 2 m more trunking/));
     await shot(customer, "H-variation");
+    // A yes is an agreement to pay: a second step, with their typed name and the exact words.
+    await customer.getByRole("button", { name: /^Yes, go ahead/ }).click();
+    const agree = customer.getByRole("button", { name: /^I agree to pay £[\d,.]+ more/ });
+    await agree.waitFor({ timeout: 10_000 });
+    check("accepting a variation asks them to agree to pay, by name", (await agree.count()) === 1 && (await customer.getByLabel("Your full name").count()) === 1);
+    await customer.getByLabel("Your full name").fill(CUSTOMER.name.replace(" (DEMO)", ""));
+    await shot(customer, "H-variation-agree");
     const [decided] = await Promise.all([
       customer.waitForRequest((r) => /\/variations\/[0-9a-f-]{36}$/.test(r.url()) && r.method() === "POST"),
-      customer.getByRole("button", { name: /^Yes, go ahead/ }).click(),
+      agree.click(),
     ]);
     ids.variationId = decided.url().match(/variations\/([0-9a-f-]{36})$/)[1];
     check("variation accepted on the portal", await waitFor(customer, /You said yes/));
     check("the customer's timeline dates the install to the day it really started", await has(customer, new RegExp(`Install\\s*(?:, (?:now|done)\\s*)?${londonDayLabel(new Date())}`)), (await text(customer)).match(/Install[^\n]*\n[^\n]*/)?.[0]);
+    await go(customer, `/p/${ids.pid}/documents`);
+    check("the agreed change is in the customer's documents", await waitFor(customer, /Change #\d+: DEMO: 2 m more trunking/));
 
     // Day 2: installer, then the electrician and the tech lead for their locked steps.
     await go(installer, `/field/jobs/${ids.pid}/day/2`);
@@ -1198,6 +1207,7 @@ try {
       ["Kit update", "Email"],
       ["Installer on my way", "SMS"],
       ["Variation approval", "Email"],
+      ["Variation accepted", "Email"],
       ["Install day update", "Email"],
       ["Handover ready", "Email"],
       ["Certificate issued", "Email"],

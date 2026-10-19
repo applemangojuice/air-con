@@ -81,3 +81,18 @@ test("the eight learning prompts, with stable unique ids", () => {
   assert.equal(LEARNING_PROMPTS[0]!.question, "What took longer than expected?");
   assert.equal(LEARNING_PROMPTS[7]!.question, "Which checklist step was unclear?");
 });
+
+test("canonicalJson ignores key order; jsonbKeyOrder matches Postgres jsonb (length, then bytes)", async () => {
+  const { canonicalJson, jsonbKeyOrder, sameJson } = await import("./json.ts");
+  const a = { b: 1, a: { y: [1, { q: 2, p: undefined }], x: null }, c: undefined };
+  const b = { a: { x: null, y: [1, { q: 2 }] }, b: 1 };
+  assert.equal(canonicalJson(a), canonicalJson(b));
+  assert.ok(sameJson(a, b));
+  assert.ok(!sameJson({ a: 1 }, { a: 2 }));
+  assert.equal(canonicalJson([undefined, () => 1]), "[null,null]");
+  // Postgres: select '{"label":1,"id":2,"tier":3,"bom":4,"Zeta":5,"alpha":6}'::jsonb
+  //   → {"id": 2, "bom": 4, "Zeta": 5, "tier": 3, "alpha": 6, "label": 1}
+  assert.deepEqual(Object.keys(jsonbKeyOrder({ label: 1, id: 2, tier: 3, bom: 4, Zeta: 5, alpha: 6 })), ["id", "bom", "Zeta", "tier", "alpha", "label"]);
+  // Byte length, not UTF-16 length: "é" is two bytes.
+  assert.deepEqual(Object.keys(jsonbKeyOrder({ é: 1, ab: 2, z: 3 })), ["z", "ab", "é"]);
+});

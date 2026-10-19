@@ -15,6 +15,7 @@ import {
   surveyPriceCopy,
   vatCopy,
   warrantyCopy,
+  GUARANTEE_FALLBACK,
 } from "@/components/site/claims";
 import { onDarkBtn, primaryBtn, textLink } from "@/components/site/styles";
 import { AREA_PAGES } from "@/app/areas/area-data";
@@ -83,7 +84,7 @@ export default async function HomePage() {
       ? { title: warranty.headline, body: `${warranty.body} All on top of your statutory rights.` }
       : {
           title: "Guarantees, spelled out",
-          body: "Your proposal sets out the manufacturer's warranty and our workmanship guarantee in writing, before you agree to anything.",
+          body: GUARANTEE_FALLBACK,
         },
     {
       title: "Updates without chasing",

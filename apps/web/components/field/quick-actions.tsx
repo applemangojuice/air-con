@@ -18,6 +18,7 @@ import { BlockerList } from "@/components/kit/blocker-list";
 import { getFieldOutbox, newOpId, type SyncOp } from "@/lib/field-outbox";
 import { prepareImage } from "@/lib/media-client";
 import { locate, nowIso, parseReading } from "./capture";
+import { editDraft, followDefaults, openDraft, type EndDayDraft } from "./end-day-draft";
 import { londonDateOf, londonTime, telHref, fmtDay } from "./format";
 import { Sheet } from "./sheet";
 import type { FieldJob } from "./types";
@@ -692,8 +693,9 @@ function EndDaySheet({ open, onClose, data, merged, n: liveN, clockEntryId }: { 
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
   const online = useOnline();
   const [stage, setStage] = useState<"summary" | "photos" | "sent" | "learn" | "finished">("summary");
-  const [summary, setSummary] = useState("");
-  const [message, setMessage] = useState("");
+  // What the installer types is theirs: see end-day-draft.ts.
+  const [draft, setDraft] = useState<EndDayDraft>(() => openDraft({ summary: "", message: "" }));
+  const { summary, message } = draft;
   const [photos, setPhotos] = useState<DayPhoto[] | null>(null);
   const [chosen, setChosen] = useState<string[]>([]);
   const [preview, setPreview] = useState<{ subject: string; text: string; mode: "live" | "demo"; to: string | null } | null>(null);
@@ -732,10 +734,12 @@ function EndDaySheet({ open, onClose, data, merged, n: liveN, clockEntryId }: { 
     };
   }, [merged, data.header.today, data.header.totalDays, data.header.installStatus, n]);
 
+  // Filled once, when the sheet opens. A sync or refresh while it's open
+  // (new outbox items or acks, router.refresh) makes new defaults, and must
+  // never wipe what the installer typed, or change what was previewed.
   useEffect(() => {
     if (open) {
-      setSummary(defaults.summary);
-      setMessage(defaults.message);
+      setDraft(openDraft(defaults));
     } else {
       setStage("summary");
       setPhotos(null);
@@ -746,7 +750,10 @@ function EndDaySheet({ open, onClose, data, merged, n: liveN, clockEntryId }: { 
       setEmailStatus(null);
       setAnswers({});
     }
-  }, [open, defaults]);
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (open) setDraft((d) => followDefaults(d, defaults, stage === "summary"));
+  }, [open, defaults, stage]);
 
   useEffect(() => {
     if (stage !== "photos" || photos) return;
@@ -814,7 +821,15 @@ function EndDaySheet({ open, onClose, data, merged, n: liveN, clockEntryId }: { 
       </button>
     ) : stage === "photos" ? (
       <div className="flex gap-2">
-        <button type="button" onClick={() => setStage("summary")} className={SECONDARY}>
+        <button
+          type="button"
+          onClick={() => {
+            // Editing again means previewing again: what's sent is always what was previewed.
+            setPreview(null);
+            setStage("summary");
+          }}
+          className={SECONDARY}
+        >
           Back
         </button>
         {preview ? (
@@ -855,13 +870,20 @@ function EndDaySheet({ open, onClose, data, merged, n: liveN, clockEntryId }: { 
               <label htmlFor="end-summary" className="mb-1.5 block text-sm font-semibold text-ink-900">
                 Summary for the office
               </label>
-              <textarea id="end-summary" rows={4} value={summary} onChange={(e) => setSummary(e.target.value)} className={INPUT} />
+              <textarea id="end-summary" rows={4} value={summary} onChange={(e) => setDraft((d) => editDraft(d, "summary", e.target.value))} className={INPUT} />
             </div>
             <div>
               <label htmlFor="end-message" className="mb-1.5 block text-sm font-semibold text-ink-900">
                 Update for the customer
               </label>
-              <textarea id="end-message" rows={5} value={message} onChange={(e) => setMessage(e.target.value)} className={INPUT} aria-describedby="end-message-hint" />
+              <textarea
+                id="end-message"
+                rows={5}
+                value={message}
+                onChange={(e) => setDraft((d) => editDraft(d, "message", e.target.value))}
+                className={INPUT}
+                aria-describedby="end-message-hint"
+              />
               <p id="end-message-hint" className="mt-1.5 text-xs text-ink-500">
                 Plain and friendly: what&apos;s done, what&apos;s next, anything they need to decide. Leave it empty to close the day without emailing.
               </p>

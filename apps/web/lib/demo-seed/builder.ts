@@ -1447,6 +1447,7 @@ function buildProject(sc: Scenario, today: string, settings: PilotSettings, invo
     ADMIN,
   );
   message("proposal-issued", "email", `${proposal.id}:v1`, at(cal.issued!, "11:01"), "Your proposal is ready", `Hi ${sc.customer.signName}, your proposal is ready, with ${options.length === 1 ? "one option" : `${options.length} options`}. It's valid until ${validUntil}. It includes your cancellation rights and the model cancellation form.`);
+  story.act({ type: "pre-contract-info-sent", proposalId: proposal.id, demo: true }, at(cal.issued!, "11:01"));
   story.act({ type: "proposal-viewed", proposalId: proposal.id }, at(cal.issued!, "19:12"));
   timeEntry("proposal", ADMIN, at(cal.issued!, "10:00"), 50);
   document("proposal", "proposal", "Your proposal", at(cal.issued!, "11:00"), { ...header(at(cal.issued!, "11:00")), proposal: customerSafe(proposal) });

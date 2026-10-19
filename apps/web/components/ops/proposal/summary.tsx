@@ -47,6 +47,15 @@ export function IssuedSummary({ proposal, project, canSeeMargins }: { proposal: 
             <dd className="font-semibold text-ink-900">{pp.documentsByEmailConsent ? `Agreed ${fmtDate(pp.documentsByEmailConsent.at)}` : "Not agreed"}</dd>
           </div>
         </dl>
+        {pp.proposalId === proposal.id && (pp.status === "issued" || pp.status === "changes-requested") && !pp.preContractInfoSentAt && (
+          <div role="status" className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+            <p className="font-semibold">The proposal email hasn&apos;t been delivered yet</p>
+            <p className="mt-1">
+              It carries the pre-contract information and the cancellation form, so the customer can&apos;t accept until it has gone. Check it in
+              Messages and resend it.
+            </p>
+          </div>
+        )}
         {(proposal.changeRequest || (pp.proposalId === proposal.id && pp.changeRequest)) && (
           <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
             <p className="font-semibold">The customer asked for changes</p>

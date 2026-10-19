@@ -4,6 +4,7 @@ import {
   LINK_PLACEHOLDER,
   LEARNING_PROMPTS,
   TAX_CODES,
+  effectiveTaxCode,
   blockersFor,
   buildCommissioningRecord,
   can,
@@ -955,7 +956,15 @@ async function raiseIssue(
     return { issue: existing, created: false };
   }
   const settings = await getSettings();
-  const taxCode = settings.tax.vatRegistered ? settings.tax.defaultTaxCode : "outside-scope";
+  // A variation is priced on the contract's own tax treatment (the accepted
+  // option's code), not whatever settings say today; settings only when
+  // there's no accepted contract on record.
+  let taxCode = effectiveTaxCode(settings);
+  if (input.variation) {
+    const accepted = await proposalsRepo.acceptedForProject(project.id).catch(() => null);
+    const option = accepted?.acceptance ? accepted.options.find((o) => o.id === accepted.acceptance!.optionId) : undefined;
+    if (option?.pricing.taxCode && TAX_CODES[option.pricing.taxCode]) taxCode = option.pricing.taxCode;
+  }
   const issue = createIssue({
     id: input.id,
     projectId: project.id,

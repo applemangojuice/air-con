@@ -475,7 +475,7 @@ export default async function CommandCentrePage({
                       </Disclosure>
                     )
                   )}
-                  {!p.proposal.confirmationSentAt && <Note tone="warn">The contract confirmation email hasn&apos;t gone yet. Check Messages below.</Note>}
+                  {!p.proposal.confirmationSentAt && <Note tone="warn">The contract confirmation email hasn&apos;t been delivered yet, so the install can&apos;t start. Check Messages below and resend it.</Note>}
                 </div>
               )}
             </SectionCard>

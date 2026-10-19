@@ -21,6 +21,7 @@ const ALL: CommsEventId[] = [
   "installer-on-my-way",
   "install-day-update",
   "variation-approval",
+  "variation-accepted",
   "issue-update",
   "handover-ready",
   "certificate-issued",

@@ -1,5 +1,5 @@
 import { cache } from "react";
-import { DEFAULT_SETTINGS, mergeSettings, type PilotSettings } from "@aircon/domain";
+import { DEFAULT_SETTINGS, mergeSettings, sameJson, type PilotSettings } from "@aircon/domain";
 import { audit, type AuditActorInput } from "./audit";
 import * as settingsRepo from "./repo/settings";
 import { getServiceClient } from "./supabase-server";
@@ -40,7 +40,7 @@ export async function saveSettings(next: PilotSettings, actor: AuditActorInput):
   const name = actor && "name" in actor ? actor.name : undefined;
   await settingsRepo.setValue(settingsRepo.PILOT_SETTINGS_KEY, merged, name);
   const changed = (Object.keys(merged) as (keyof PilotSettings)[]).filter(
-    (k) => JSON.stringify(merged[k]) !== JSON.stringify(before[k]),
+    (k) => !sameJson(merged[k], before[k]),
   );
   await audit({
     actor,

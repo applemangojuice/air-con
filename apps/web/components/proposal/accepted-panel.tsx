@@ -26,7 +26,22 @@ export interface AcceptedView {
   confirmationSentAt?: string;
 }
 
-export function AcceptedPanel({ view, projectId, firstName, phone, justNow }: { view: AcceptedView; projectId: string; firstName: string; phone: string; justNow: boolean }) {
+export function AcceptedPanel({
+  view,
+  projectId,
+  firstName,
+  phone,
+  justNow,
+  emailDemo = false,
+}: {
+  view: AcceptedView;
+  projectId: string;
+  firstName: string;
+  phone: string;
+  justNow: boolean;
+  /** No email provider (a demo deployment): nothing was emailed, so never say it was. */
+  emailDemo?: boolean;
+}) {
   const [copied, setCopied] = useState(false);
   const needsReply = view.earlyStartRequested && !view.earlyStartEvidenced && Boolean(view.wording);
 
@@ -90,11 +105,13 @@ export function AcceptedPanel({ view, projectId, firstName, phone, justNow }: { 
           <h3 className="font-semibold text-ink-900">What happens next</h3>
           <ol className="mt-3 space-y-3">
             {[
-              view.confirmationSentAt && !justNow
-                ? `We emailed your contract and cancellation form${view.email ? ` to ${view.email}` : ""} on ${fmtDate(view.confirmationSentAt)}. Please keep that email: it's your copy.`
-                : view.email
-                  ? `Your contract and cancellation form are on their way to ${view.email}. Please keep that email: it's your copy.`
-                  : "Your contract and cancellation form are in your documents. Please keep a copy.",
+              emailDemo
+                ? "This is a demo: email isn't set up, so nothing was emailed. Your contract and cancellation form are in your documents."
+                : view.confirmationSentAt && !justNow
+                  ? `We emailed your contract and cancellation form${view.email ? ` to ${view.email}` : ""} on ${fmtDate(view.confirmationSentAt)}. Please keep that email: it's your copy.`
+                  : view.email
+                    ? `Your contract and cancellation form are on their way to ${view.email}. Please keep that email: it's your copy.${justNow ? "" : ` If it hasn't arrived, call us on ${phone} and we'll send it again.`}`
+                    : "Your contract and cancellation form are in your documents. Please keep a copy.",
               "Choose your install dates on your project page. We then confirm the dates and introduce your team.",
               "We order your equipment and tell you when it's delivered.",
             ].map((t, i) => (

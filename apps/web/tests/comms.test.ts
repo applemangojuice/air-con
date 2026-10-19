@@ -168,6 +168,18 @@ const FULL: { [E in CommsEventId]: CommsData[E] } = {
   "installer-on-my-way": { etaMinutes: 25, at: "2026-12-01T08:05:00.000Z", name: "Jo Demo" },
   "install-day-update": { n: 1, totalDays: 3, text: "Holes drilled and sealed, brackets up.", photoCount: 3, nextDate: "2026-12-02", by: "Jo Demo" },
   "variation-approval": { title: "Condensate pump in the loft room", description: "No fall to an outside wall.", totalDeltaPence: 18_000, issueNumber: 4 },
+  "variation-accepted": {
+    title: "Condensate pump in the loft room",
+    description: "No fall to an outside wall.",
+    issueNumber: 4,
+    priceDeltaNetPence: 15_000,
+    taxPence: 3_000,
+    totalDeltaPence: 18_000,
+    acceptedAt: "2026-12-01T11:30:00.000Z",
+    name: "Sam Taylor",
+    wording: "I agree to pay £180 more (including VAT)",
+    newContractTotalPence: 663_000,
+  },
   "issue-update": { title: "Drip from the bedroom unit", update: "We've found a kinked drain hose.", nextStep: "Jo will replace it.", dueOn: "2026-12-08", issueNumber: 5 },
   "handover-ready": { electricalCertPending: true },
   "certificate-issued": { kind: "electrical-certificate" },
@@ -199,6 +211,7 @@ const MIN: { [E in CommsEventId]: CommsData[E] } = {
   "installer-on-my-way": { etaMinutes: 10, at: "" },
   "install-day-update": { n: 2, text: "" },
   "variation-approval": { title: "Extra trunking", totalDeltaPence: 0 },
+  "variation-accepted": { title: "Extra trunking", priceDeltaNetPence: 0, taxPence: 0, totalDeltaPence: 0, acceptedAt: "2026-12-01T11:30:00.000Z", name: "Sam Taylor", wording: "I agree to this change (no change to my price)" },
   "issue-update": { title: "Remote not pairing", update: "" },
   "handover-ready": {},
   "certificate-issued": { kind: "warranty-confirmation" },
@@ -738,6 +751,7 @@ test("the issue email is the pre-contract one; the confirmation record never sen
   assert.ok(renderMessage("proposal-issued", ctxFor(), data).text.includes("BEFORE YOU DECIDE"));
 
   for (const action of [
+    { type: "pre-contract-info-sent", proposalId: "prop-1" },
     { type: "contract-confirmation-sent" },
     { type: "contract-confirmation-sent", messageId: "m1", demo: true },
     { type: "documents-consent-recorded", channel: "portal" },
@@ -750,13 +764,22 @@ test("the issue email is the pre-contract one; the confirmation record never sen
     assert.deepEqual(commsForAction(p, action), [], action.type);
   }
   // Only the acceptance email, delivered by email to a project, records the confirmation.
-  const m = { id: "m-1", event: "proposal-accepted" as const, channel: "email" as const, projectId: PROJECT_ID };
-  assert.deepEqual(followUpForDelivered(m, "sent"), { projectId: PROJECT_ID, action: { type: "contract-confirmation-sent", messageId: "m-1" } });
-  assert.deepEqual(followUpForDelivered(m, "demo"), { projectId: PROJECT_ID, action: { type: "contract-confirmation-sent", messageId: "m-1", demo: true } });
-  assert.equal(followUpForDelivered({ ...m, event: "team-alert" }, "sent"), null);
-  assert.equal(followUpForDelivered({ ...m, event: "proposal-issued" }, "sent"), null);
-  assert.equal(followUpForDelivered({ ...m, channel: "sms" }, "sent"), null);
-  assert.equal(followUpForDelivered({ ...m, projectId: undefined }, "sent"), null);
+  const live = { demoCounts: false };
+  const demoDeployment = { demoCounts: true };
+  const m = { id: "m-1", event: "proposal-accepted" as const, channel: "email" as const, projectId: PROJECT_ID, idempotencyKey: `proposal-accepted:${PROJECT_ID}:prop-1:email` };
+  assert.deepEqual(followUpForDelivered(m, "sent", live), { projectId: PROJECT_ID, action: { type: "contract-confirmation-sent", messageId: "m-1" } });
+  // Stored in demo mode is not delivered: it counts only on a demo deployment, and says so.
+  assert.equal(followUpForDelivered(m, "demo", live), null);
+  assert.deepEqual(followUpForDelivered(m, "demo", demoDeployment), { projectId: PROJECT_ID, action: { type: "contract-confirmation-sent", messageId: "m-1", demo: true } });
+  assert.equal(followUpForDelivered({ ...m, event: "team-alert" }, "sent", live), null);
+  assert.equal(followUpForDelivered({ ...m, channel: "sms" }, "sent", live), null);
+  assert.equal(followUpForDelivered({ ...m, projectId: undefined }, "sent", live), null);
+  // The issue email records the pre-contract information for its own proposal version.
+  const issueMail = { ...m, event: "proposal-issued" as const, idempotencyKey: `proposal-issued:${PROJECT_ID}:prop-1:email` };
+  assert.deepEqual(followUpForDelivered(issueMail, "sent", live), { projectId: PROJECT_ID, action: { type: "pre-contract-info-sent", proposalId: "prop-1", messageId: "m-1" } });
+  assert.equal(followUpForDelivered(issueMail, "demo", live), null);
+  assert.deepEqual(followUpForDelivered(issueMail, "demo", demoDeployment), { projectId: PROJECT_ID, action: { type: "pre-contract-info-sent", proposalId: "prop-1", messageId: "m-1", demo: true } });
+  assert.equal(followUpForDelivered({ ...issueMail, channel: "sms", idempotencyKey: `proposal-issued:${PROJECT_ID}:prop-1:sms` }, "sent", live), null);
   // And recording it twice changes nothing: the reducer keeps the first.
   const accepted = baseProject();
   accepted.proposal.status = "accepted";

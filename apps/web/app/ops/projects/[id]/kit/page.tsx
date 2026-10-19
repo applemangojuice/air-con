@@ -469,9 +469,10 @@ function OrderCard({
                     <input id={`notes-${po.id}`} name="notes" defaultValue={po.notes ?? ""} maxLength={1000} className={field} />
                   </div>
                 </div>
-                {po.destination === "storage" || po.destination === "installer" ? (
+                {po.destination !== "customer" ? (
                   <p className="mt-3 text-xs text-ink-500">
-                    Kit delivered to us or the installer reaches the customer at install: their cancellation period counts from then (legal review required).
+                    Kit delivered to us, the installer or a subcontractor reaches the customer at install: their cancellation period starts on
+                    day 1, so the install can only start with their early-start request on file (legal review required).
                   </p>
                 ) : null}
               </ActionForm>

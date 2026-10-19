@@ -568,3 +568,23 @@ test("getServiceClient: Supabase first, then local (file in dev), else demo mode
     set(Object.fromEntries(Object.entries(saved).filter(([, v]) => v !== undefined)));
   }
 });
+
+test("jsonb columns come back in Postgres jsonb key order (shortest key first, then bytes), like PostgREST", async () => {
+  const db = memory();
+  const record = { label: "Good", id: "v1", tier: "good", systems: [{ roomIds: ["r1"], outdoorItemId: "o1" }], bom: [], verdict: { ok: true, at: "x" } };
+  const inserted = await db.from("designs").insert({ project_id: "p1", version: 1, record }).select("record").single();
+  assert.equal(inserted.error, null);
+  const read = await db.from("designs").select("*").eq("project_id", "p1").single();
+  for (const got of [inserted.data, read.data] as { record: Record<string, unknown> }[]) {
+    assert.deepEqual(Object.keys(got.record), ["id", "bom", "tier", "label", "systems", "verdict"]);
+    assert.deepEqual(Object.keys((got.record.systems as Record<string, unknown>[])[0]), ["roomIds", "outdoorItemId"]);
+    assert.deepEqual(Object.keys(got.record.verdict as Record<string, unknown>), ["at", "ok"]);
+    // Same content, so an order-insensitive comparison still matches.
+    assert.deepEqual(got.record, record);
+    assert.notEqual(JSON.stringify(got.record), JSON.stringify(record));
+  }
+  // Callers get copies: changing what came back never changes the store.
+  (read.data as { record: { label: string } }).record.label = "changed";
+  const again = await db.from("designs").select("record").eq("project_id", "p1").single();
+  assert.equal((again.data as { record: { label: string } }).record.label, "Good");
+});

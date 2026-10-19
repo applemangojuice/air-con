@@ -762,7 +762,7 @@ export interface OptionPricing { pricingBasis: "engine" | "cost-plus" | "manual"
   discount?: { code: string; label: string; reason: string; amountPence: number }; netPence: number; taxCode: TaxCodeId; taxPence: number;
   totalPence: number; costPence: number; unpricedCostLines: number; grossMarginPct: number; grossMarginPctBeforeDiscount: number;
   contributionPence: number; belowMinMargin: boolean }
-export function engineListNetPence(survey: Survey): number;           // [F4] round(generateQuote(survey).totalGbp * 100 / 1.2)
+export function engineListNetPence(survey: Survey, settings: PilotSettings): number; // [F4] round(totalGbp * 100 / (1 + rate of effectiveTaxCode)): the online price is what the customer pays (§K29)
 export function buildCostLines(input: { variant: DesignVariant; catalogue: CatalogueItem[]; labour: LabourPlan; settings: PilotSettings;
   extras?: CostLine[] }): CostLine[];                                  // [F4] includes unrecoverable input VAT when not VAT registered
 export function priceOption(input: { costLines: CostLine[]; basis: OptionPricing["pricingBasis"]; engineNetPence: number; manualNetPence?: number;

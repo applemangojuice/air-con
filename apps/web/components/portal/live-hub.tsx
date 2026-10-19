@@ -25,7 +25,12 @@ const POLL_MS = 120_000;
 
 function endpoint(projectId: string, req: PortalRequest): { url: string; body: unknown } {
   const base = `/api/portal/${projectId}`;
-  if (req.kind === "variation") return { url: `${base}/variations/${req.issueId}`, body: { decision: req.decision } };
+  if (req.kind === "variation") {
+    return {
+      url: `${base}/variations/${req.issueId}`,
+      body: { decision: req.decision, ...(req.name !== undefined ? { name: req.name } : {}), ...(req.agreed !== undefined ? { agreed: req.agreed } : {}) },
+    };
+  }
   if (req.kind === "problem") return { url: `${base}/problems`, body: { title: req.title, detail: req.detail, mediaIds: req.mediaIds } };
   return { url: `${base}/actions`, body: req };
 }

@@ -80,7 +80,7 @@ const total = (lines: CostLine[]) => lines.reduce((a, l) => a + (l.totalPence ??
 
 /* ------------------------------------------------------------------ */
 
-test("engineListNetPence is the engine's VAT-inclusive total, net of 20%, in pence", () => {
+test("engineListNetPence: the online price less the tax the proposal adds back, so an unchanged design costs what the quote said", () => {
   const survey: Survey = {
     postcode: "SW16 9ZZ",
     addressLine: "1 Demo Street",
@@ -92,8 +92,21 @@ test("engineListNetPence is the engine's VAT-inclusive total, net of 20%, in pen
     electrics: { condition: "modern-spare-ways", photos: [] },
   };
   const gbp = generateQuote(survey).totalGbp;
-  assert.equal(engineListNetPence(survey), Math.round((gbp * 100) / 1.2));
-  assert.ok(Number.isInteger(engineListNetPence(survey)));
+  const registered = (code: "standard-20" | "zero-esm" | "reduced-5") =>
+    mergeSettings({ ...DEFAULT_SETTINGS, tax: { ...DEFAULT_SETTINGS.tax, vatRegistered: true, defaultTaxCode: code } });
+  // Registered at 20%: the engine's total includes VAT.
+  assert.equal(engineListNetPence(survey, registered("standard-20")), Math.round((gbp * 100) / 1.2));
+  // Not registered (the default) or zero-rated: no VAT comes off, because none goes back on.
+  assert.equal(engineListNetPence(survey, DEFAULT_SETTINGS), Math.round(gbp * 100));
+  assert.equal(engineListNetPence(survey, registered("zero-esm")), Math.round(gbp * 100));
+  assert.ok(Number.isInteger(engineListNetPence(survey, registered("standard-20"))));
+  // The promise, under every tax code: for an unchanged survey (standard tier,
+  // no discount) the proposal total is the online instant price (to the pound).
+  const instantPence = Math.round(gbp * 100);
+  for (const settings of [DEFAULT_SETTINGS, registered("standard-20"), registered("zero-esm"), registered("reduced-5")]) {
+    const p = priceOption({ costLines: [], basis: "engine", engineNetPence: engineListNetPence(survey, settings), settings, tier: "standard" });
+    assert.ok(Math.abs(p.totalPence - instantPence) <= 100, `${p.taxCode}: ${p.totalPence} vs instant ${instantPence}`);
+  }
 });
 
 test("defaultLabourPlan: crew of two for the install block, half a day's electrics, a commissioning day", () => {

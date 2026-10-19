@@ -57,10 +57,67 @@ export interface Issue {
     status: "proposed" | "accepted" | "declined";
     decidedAt?: string;
     decidedBy?: string;
+    /** The customer's agreement to pay, as they gave it (accepted variations from the portal). */
+    acceptance?: VariationAcceptance;
   };
   resolution?: string;
   resolvedAt?: string;
   history: { at: string; by: string; note: string; status?: IssueStatus }[];
+}
+
+/**
+ * The durable record of a customer agreeing to a priced change: what they
+ * typed, the words on the button they pressed, what they were shown (its
+ * fingerprint and amounts) and where from. Extra paid work is an obligation
+ * to pay, so it gets the same care as the contract itself (CCR regs 14, 17).
+ */
+export interface VariationAcceptance {
+  at: string;
+  /** The full name the customer typed. */
+  name: string;
+  /** The exact words on the button they pressed (variationAgreeWording). */
+  wording: string;
+  /** sha256 of variationContent: the change exactly as they saw it. */
+  contentHash: string;
+  priceDeltaNetPence: number;
+  taxPence: number;
+  totalDeltaPence: number;
+  ip?: string;
+  userAgent?: string;
+}
+
+const gbp = (pence: number) => {
+  const abs = Math.abs(Math.round(pence));
+  const pounds = Math.floor(abs / 100)
+    .toString()
+    .replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const p = abs % 100;
+  return `£${pounds}${p ? `.${String(p).padStart(2, "0")}` : ""}`;
+};
+
+/**
+ * The words on the customer's "yes" to a variation: an unambiguous
+ * agreement to pay when it costs more (reg 14(3)), plain agreement when it
+ * doesn't. The same function builds the button and the stored record.
+ */
+export function variationAgreeWording(v: { totalDeltaPence: number; taxPence: number }): string {
+  if (v.totalDeltaPence > 0) return `I agree to pay ${gbp(v.totalDeltaPence)} more${v.taxPence > 0 ? " (including VAT)" : ""}`;
+  if (v.totalDeltaPence < 0) return `I agree to this change (${gbp(v.totalDeltaPence)} off my price)`;
+  return "I agree to this change (no change to my price)";
+}
+
+/** What a customer agrees to when they accept a variation: the fields their acceptance fingerprints. */
+export function variationContent(issue: Pick<Issue, "id" | "number" | "title" | "variation">): Record<string, unknown> {
+  const v = issue.variation;
+  return {
+    id: issue.id,
+    number: issue.number,
+    title: issue.title,
+    description: v?.description ?? "",
+    priceDeltaNetPence: v?.priceDeltaNetPence ?? 0,
+    taxPence: v?.taxPence ?? 0,
+    totalDeltaPence: v?.totalDeltaPence ?? 0,
+  };
 }
 
 export const ISSUE_KIND_LABEL: Record<IssueKind, string> = {

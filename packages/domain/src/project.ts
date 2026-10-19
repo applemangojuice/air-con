@@ -339,8 +339,11 @@ export interface Project {
     /** Agreement to get the contract documents by email (else they must be on paper). Proposal issue needs it. */
     documentsByEmailConsent?: { at: string; channel: DocumentsConsentChannel };
     /**
-     * When the issue email went out carrying the Schedule 2 information, the
-     * cancellation instructions and the model form (the durable medium).
+     * When the issue email carrying the Schedule 2 information, the
+     * cancellation instructions and the model form (the durable medium)
+     * reached the provider for this version: recorded by the outbox
+     * (`pre-contract-info-sent`), never at issue, so a failed send leaves it
+     * unset and the proposal can't be accepted until it goes.
      */
     preContractInfoSentAt?: string;
     /** When the acceptance confirmation (the contract copy) was sent. Needed before work starts (reg 12(4)). */
@@ -376,6 +379,14 @@ export interface Project {
     inspectedAt?: string;
     summary?: string;
     shortages: number;
+    /**
+     * Where the delivered kit is: "customer" when every required item went
+     * to the customer's home, "elsewhere" when any of it went to our storage,
+     * the installer or a subcontractor (it then reaches the customer with
+     * the crew, on install day 1). Decides when a supply-and-install
+     * cancellation period starts (reg 30(3)).
+     */
+    deliveredTo?: "customer" | "elsewhere";
   };
   install: {
     status: "not-started" | "in-progress" | "complete";
@@ -988,6 +999,17 @@ export function blockersFor(project: Project, ctx: ReadinessContext, gate: GateI
       const lapsed = (p.proposal.validUntil !== undefined && dateOf(p.proposal.validUntil) < today) || Boolean(ctx.proposalCheck?.expired);
       if (!issued) {
         block("proposal-not-issued", "There's no issued proposal to accept.", "ops", "Issue the proposal");
+      } else if (!p.proposal.preContractInfoSentAt) {
+        // Schedule 2 information, the cancellation instructions and the
+        // model form must reach the customer on a durable medium before the
+        // contract (CCR regs 10 and 12): the outbox records it once the
+        // issue email has gone.
+        block(
+          "pre-contract-info-not-sent",
+          "The proposal email (the pre-contract information and cancellation form) hasn't been delivered yet, so it can't be accepted.",
+          "ops",
+          "Check the proposal email in messages and resend it",
+        );
       } else if (lapsed) {
         block(
           "proposal-expired",
@@ -1090,7 +1112,9 @@ export function blockersFor(project: Project, ctx: ReadinessContext, gate: GateI
         const days = s.scheduling.cancellationDays;
         const runs = cs.endsOn
           ? `runs until the end of ${fmtDate(cs.endsOn)}`
-          : `runs until ${days} days after the kit is delivered`;
+          : p.kit.deliveredTo === "elsewhere"
+            ? `hasn't started: the kit went to our storage or the installer, so it reaches the customer with the crew on day 1 and the ${days} days run from then`
+            : `runs until ${days} days after the kit is delivered to the customer`;
         if (cs.basis === "unknown") {
           block("cancellation-unknown", "The cancellation period can't be worked out: there's no accepted contract on record.", "ops", "Check the acceptance record");
         } else if (earlyStartRequestedOf(p)) {
@@ -1605,6 +1629,8 @@ export type ProjectAction =
       earlyStartWordingVersion?: string;
     }
   | { type: "proposal-expired" }
+  /** System (outbox): the issue email for this proposal version (the pre-contract information) went out. Idempotent. */
+  | { type: "pre-contract-info-sent"; proposalId: string; messageId?: string; demo?: boolean }
   /** System: the acceptance confirmation email (the contract copy) went out. Idempotent. */
   | { type: "contract-confirmation-sent"; messageId?: string; demo?: boolean }
   /** The customer asks to start early after accepting (on the portal, or by email or form, recorded by ops). */
@@ -1618,7 +1644,20 @@ export type ProjectAction =
   | { type: "deposit-requested"; amountPence: number }
   | { type: "deposit-paid"; amountPence: number }
   // kit
-  | { type: "kit-updated"; status: KitStatus; expectedDate?: string; summary?: string; shortages: number }
+  | {
+      type: "kit-updated";
+      status: KitStatus;
+      expectedDate?: string;
+      summary?: string;
+      shortages: number;
+      /**
+       * Where the delivered kit went (purchasing's kitSummary always says).
+       * "elsewhere" (our storage, the installer, a subcontractor) doesn't
+       * start the cancellation period: the goods reach the customer at
+       * install. Left out means the customer's home.
+       */
+      deliveredTo?: "customer" | "elsewhere";
+    }
   // install
   | { type: "installer-on-my-way"; etaMinutes: number; by: string }
   | { type: "install-day-started"; n: number; by: string }
@@ -1673,6 +1712,7 @@ const AFTER_CLOSE: ReadonlySet<ProjectAction["type"]> = new Set<ProjectAction["t
   "seasonal-check-sent",
   "aftercare-opt-out",
   "contract-confirmation-sent",
+  "pre-contract-info-sent",
 ]);
 
 const KIT_STATUSES: readonly KitStatus[] = ["not-ordered", "ordered", "confirmed", "dispatched", "delivered", "inspected"];
@@ -1760,6 +1800,21 @@ export function applyProjectAction(project: Project, action: ProjectAction, now:
     if (!blocking.length) return null;
     const more = blocking.length > 1 ? ` (and ${blocking.length - 1} more)` : "";
     return err(`Not ready (${GATE_LABEL[g]}): ${blocking[0]!.message}${more}`, all);
+  };
+
+  /**
+   * supply-and-install: the last of the goods is in the customer's
+   * possession today, so their cancellation period starts (once). Returns
+   * the customer-facing sentence about the new end date ("" when nothing
+   * changed).
+   */
+  const startGoodsPeriod = (): string => {
+    if (p.proposal.status !== "accepted" || p.proposal.contractType !== "supply-and-install" || p.proposal.goodsReceivedOn) return "";
+    const days = settings.scheduling.cancellationDays;
+    const acceptedOn = dateOf(p.proposal.acceptedAt ?? today);
+    p.proposal.goodsReceivedOn = today;
+    p.proposal.cancellationEndsOn = laterOf(addDays(today, days), addDays(acceptedOn, days));
+    return ` Your cancellation period now runs until the end of ${fmtDate(p.proposal.cancellationEndsOn)}.`;
   };
 
   /** The signed-in staff member, qualified for a step that legally needs one. */
@@ -1940,6 +1995,9 @@ export function applyProjectAction(project: Project, action: ProjectAction, now:
       // agreement to email delivery. Its issue email carries the Schedule 2
       // information, the cancellation instructions and the model form.
       const consent = p.proposal.documentsByEmailConsent;
+      // Issuing the same version again (a retry) keeps its delivered email:
+      // the outbox won't send that version's email twice.
+      const sentBefore = p.proposal.proposalId === action.proposalId ? p.proposal.preContractInfoSentAt : undefined;
       p.proposal = {
         status: "issued",
         proposalId: action.proposalId,
@@ -1949,7 +2007,9 @@ export function applyProjectAction(project: Project, action: ProjectAction, now:
         optionCount: action.optionCount,
         contractType,
         ...(consent ? { documentsByEmailConsent: consent } : {}),
-        preContractInfoSentAt: now,
+        // preContractInfoSentAt is recorded by the outbox once the issue
+        // email has actually gone (pre-contract-info-sent), never here.
+        ...(sentBefore ? { preContractInfoSentAt: sentBefore } : {}),
       };
       log(
         "proposal-issued",
@@ -2026,6 +2086,24 @@ export function applyProjectAction(project: Project, action: ProjectAction, now:
         "proposal-accepted",
         `You accepted your proposal (${action.optionLabel}, ${fmtPence(action.contractTotalPence)}). Your contract and cancellation form are in your documents. Next: choose your install dates.`,
         "customer",
+      );
+      return ok();
+    }
+
+    case "pre-contract-info-sent": {
+      // Only the current version's email counts (each version is its own
+      // proposal id): a late send of an older version's email says nothing
+      // about the one the customer is reading.
+      if (!action.proposalId || p.proposal.proposalId !== action.proposalId) return ok();
+      if (p.proposal.preContractInfoSentAt) return ok(); // the first send is the one that counts
+      p.proposal.preContractInfoSentAt = now;
+      log(
+        "pre-contract-info-sent",
+        action.demo
+          ? "Proposal email (pre-contract information) recorded in demo mode (stored, not delivered)."
+          : "Proposal email sent: the pre-contract information and cancellation form, on a durable medium.",
+        "system",
+        { internal: true },
       );
       return ok();
     }
@@ -2192,26 +2270,20 @@ export function applyProjectAction(project: Project, action: ProjectAction, now:
       if (action.summary !== undefined) p.kit.summary = action.summary;
       if ((action.status === "delivered" || action.status === "inspected") && !p.kit.deliveredAt) p.kit.deliveredAt = now;
       if (action.status === "inspected") p.kit.inspectedAt = now;
-      // supply-and-install: the cancellation period runs to the end of 14
-      // days after the LAST of the goods arrives (reg 30(3)–(4)), so the clock
-      // starts on the first update with everything here, and never moves after.
-      // Never earlier than 14 days from acceptance. Assumes delivery to the
-      // customer's home; legal review required (see cancellationStatus).
-      let periodNote = "";
       const arrived = action.status === "delivered" || action.status === "inspected";
-      if (
-        arrived &&
-        action.shortages === 0 &&
-        p.proposal.status === "accepted" &&
-        p.proposal.contractType === "supply-and-install" &&
-        !p.proposal.goodsReceivedOn
-      ) {
-        const days = settings.scheduling.cancellationDays;
-        const acceptedOn = dateOf(p.proposal.acceptedAt ?? today);
-        p.proposal.goodsReceivedOn = today;
-        p.proposal.cancellationEndsOn = laterOf(addDays(today, days), addDays(acceptedOn, days));
-        periodNote = ` Your cancellation period now runs until the end of ${fmtDate(p.proposal.cancellationEndsOn)}.`;
-      }
+      const withCustomer = action.deliveredTo !== "elsewhere";
+      if (arrived) p.kit.deliveredTo = withCustomer ? "customer" : "elsewhere";
+      else delete p.kit.deliveredTo;
+      // supply-and-install: the cancellation period runs to the end of 14
+      // days after the LAST of the goods comes into the customer's physical
+      // possession (reg 30(3)–(4)), so the clock starts on the first update
+      // with everything at their home, and never moves after. Kit delivered
+      // to our storage, the installer or a subcontractor reaches them with
+      // the crew: the clock starts on install day 1 instead. Never earlier
+      // than 14 days from acceptance. Legal review required (see
+      // cancellationStatus).
+      let periodNote = "";
+      if (arrived && action.shortages === 0 && withCustomer) periodNote = startGoodsPeriod();
       const toCome = action.shortages
         ? ` ${action.shortages} item${action.shortages === 1 ? " is" : "s are"} still to come; we're on it.`
         : "";
@@ -2283,8 +2355,16 @@ export function applyProjectAction(project: Project, action: ProjectAction, now:
       day.date = today;
       p.install.status = "in-progress";
       p.install.startedAt ??= now;
+      // Kit we held (storage, the installer, a subcontractor) comes into the
+      // customer's possession with the crew today: their period starts now.
+      const arrivedWithCrew = n === 1 && p.kit.deliveredTo === "elsewhere" ? startGoodsPeriod() : "";
       const of = n <= p.booking.installDays ? ` of ${p.booking.installDays}` : "";
-      log("install-day-started", `Day ${n}${of} has started. ${action.by} is on site.`, "field", { actorName: action.by });
+      log(
+        "install-day-started",
+        `Day ${n}${of} has started. ${action.by} is on site.${arrivedWithCrew ? ` Your equipment arrived with the crew today.${arrivedWithCrew}` : ""}`,
+        "field",
+        { actorName: action.by },
+      );
       return ok();
     }
 
@@ -2643,8 +2723,11 @@ export interface CancellationStatus {
  *    a sales contract: the period ends `cancellationDays` days after the last
  *    of the goods comes into the customer's possession (reg 30(3)–(4)). Until
  *    the kit is recorded as fully delivered, the end isn't known and the
- *    period has NOT ended. We assume delivery to the customer's home; kit
- *    delivered to us first comes into their possession at install.
+ *    period has NOT ended. Kit delivered to the customer's home starts it
+ *    at delivery (kit-updated); kit delivered to our storage, the installer
+ *    or a subcontractor comes into their possession with the crew, so it
+ *    starts on install day 1 (and the install can only start then on their
+ *    express early-start request).
  *  * Reg 31: if the cancellation information wasn't given before the
  *    contract (the proposal issue email), the period runs until 14 days after
  *    it was given (the confirmation email), or 12 months past the normal end

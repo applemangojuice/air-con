@@ -14,8 +14,9 @@ import type { OptionSummary } from "./templates";
  * Best-effort by design: the transition has already committed, so a
  * message failure is logged and never rolls it back or reaches the user.
  *
- * Once the acceptance email has actually gone (sent, or stored in demo
- * mode), the outbox records contract-confirmation-sent on the project (see
+ * Once the issue or acceptance email has actually gone (or, on a demo
+ * deployment, been stored in demo mode), the outbox records
+ * pre-contract-info-sent or contract-confirmation-sent on the project (see
  * outbox.ts and followUpForDelivered): there, rather than here, so a cron
  * retry or a resend of a failed first send counts too.
  */

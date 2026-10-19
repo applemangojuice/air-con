@@ -33,6 +33,7 @@ export type CommsEventId =
   | "installer-on-my-way"
   | "install-day-update"
   | "variation-approval"
+  | "variation-accepted"
   | "issue-update"
   | "handover-ready"
   | "certificate-issued"
@@ -203,6 +204,14 @@ export const COMMS_EVENTS: Record<CommsEventId, CommsEventDef> = {
     audience: "customer",
     trigger: "auto",
     description: "A proposed change with its price, waiting for the customer's yes or no in the portal.",
+    templateVersion: 1,
+  },
+  "variation-accepted": {
+    id: "variation-accepted",
+    channels: ["email"],
+    audience: "customer",
+    trigger: "auto",
+    description: "The customer's copy of a change they agreed to: what changes, the price, and the record of their yes.",
     templateVersion: 1,
   },
   "issue-update": {

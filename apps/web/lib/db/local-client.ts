@@ -20,6 +20,7 @@
  * so `node --test` can load it directly.
  */
 
+import { jsonbKeyOrder } from "@aircon/domain";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -140,6 +141,22 @@ function toJson(value: unknown): unknown {
   } catch (err) {
     throw new QueryError("22P02", `invalid input: ${(err as Error).message}`);
   }
+}
+
+/**
+ * Rows as PostgREST returns them: every object or array column comes back
+ * the way Postgres `jsonb` stores it, with object keys shortest first, then
+ * in byte order (not the order the code wrote them). Mirroring that here
+ * means a comparison that depends on key order fails in the tests and the
+ * e2e walk, not only on Supabase. Also a deep copy, so callers never hold
+ * the store's own objects.
+ */
+function asReturned(rows: Row[]): Row[] {
+  return rows.map((row) => {
+    const out: Row = {};
+    for (const [k, v] of Object.entries(row)) out[k] = v !== null && typeof v === "object" ? jsonbKeyOrder(structuredClone(v)) : v;
+    return out;
+  });
 }
 
 function isRecord(v: unknown): v is Row {
@@ -493,7 +510,7 @@ export class LocalQuery implements PromiseLike<LocalResponse> {
     const sorted = sortRows(matched, this.orders);
     const end = this.limitN === null ? undefined : this.offsetN + this.limitN;
     const page = sorted.slice(this.offsetN, end).map((r) => projectRow(r, items));
-    return this.shape(structuredClone(page), count, 200);
+    return this.shape(asReturned(page), count, 200);
   }
 
   private shape(rows: Row[], count: number | null, status: number): LocalResponse {
@@ -536,7 +553,7 @@ export class LocalQuery implements PromiseLike<LocalResponse> {
     const status = this.verb === "insert" || this.verb === "upsert" ? 201 : items ? 200 : 204;
     if (!items) return ok(null, count, status);
     const projected = sortRows(affected, this.orders).map((r) => projectRow(r, items));
-    return this.shape(structuredClone(projected), count, status);
+    return this.shape(asReturned(projected), count, status);
   }
 
   /** Returns the table's next rows (the same array when nothing changed) and the affected rows. */

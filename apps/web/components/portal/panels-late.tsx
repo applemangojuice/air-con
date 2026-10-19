@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useId, useRef, useState } from "react";
-import { handoverDeadlines } from "@aircon/domain";
-import { Textarea } from "@/components/kit/form";
+import { handoverDeadlines, isFullName, variationAgreeWording } from "@aircon/domain";
+import { Input, Textarea } from "@/components/kit/form";
 import { fmtDate, fmtDay, fmtInstantDay, fmtInstantDayTime, money } from "@/lib/format";
 import {
   ActionFeedback,
@@ -77,10 +77,17 @@ const tel = (phone: string) => `tel:${phone.replace(/\s+/g, "")}`;
 /* ------------------------------------------------------------------ */
 
 function VariationCard({ issue }: { issue: HubIssue }) {
-  const { run, busy, error, message, readOnly } = useAction();
+  const { run, busy, error, message, readOnly, clear } = useAction();
   const [choice, setChoice] = useState<"accept" | "decline" | null>(null);
+  // A yes is an agreement to pay: it takes a second, deliberate step with their name.
+  const [confirming, setConfirming] = useState(false);
+  const [name, setName] = useState("");
+  const [touched, setTouched] = useState(false);
   const v = issue.variation!;
   const up = v.totalDeltaPence >= 0;
+  const wording = variationAgreeWording(v);
+  const nameOk = isFullName(name);
+  const nameId = useId();
   return (
     <article className="space-y-3 rounded-2xl border border-accent-100 bg-white p-4 shadow-sm sm:p-5" aria-labelledby={`var-${issue.id}`}>
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -101,29 +108,74 @@ function VariationCard({ issue }: { issue: HubIssue }) {
       <p className="text-sm text-ink-500">No extra work happens without your yes. If you say no, we carry on exactly as agreed.</p>
       <ReadOnlyNote />
       <ActionFeedback error={error} message={message} />
-      <div className="flex flex-col gap-2 sm:flex-row">
-        <Primary
-          onClick={() => {
-            setChoice("accept");
-            void run({ kind: "variation", issueId: issue.id, decision: "accept" });
-          }}
-          disabled={readOnly}
-          busy={busy && choice === "accept"}
-          busyLabel="Saving…"
-        >
-          Yes, go ahead ({up ? "+" : ""}
-          {money(v.totalDeltaPence)})
-        </Primary>
-        <Secondary
-          onClick={() => {
-            setChoice("decline");
-            void run({ kind: "variation", issueId: issue.id, decision: "decline" });
-          }}
-          disabled={readOnly || busy}
-        >
-          {busy && choice === "decline" ? "Saving…" : "No thanks"}
-        </Secondary>
-      </div>
+      {confirming ? (
+        <div className="space-y-3 rounded-2xl border border-line bg-cream p-4">
+          <p className="text-sm font-semibold text-ink-900">Agree to this change</p>
+          <p className="text-sm leading-relaxed text-ink-700">
+            {v.totalDeltaPence > 0
+              ? `It adds ${money(v.totalDeltaPence)} to your contract price${v.taxPence > 0 ? `, including ${money(v.taxPence)} VAT` : ""}, paid with your balance on the same terms.`
+              : v.totalDeltaPence < 0
+                ? `It takes ${money(-v.totalDeltaPence)} off your contract price.`
+                : "It doesn't change your price."}{" "}
+            We&apos;ll email you a copy and keep it in your documents. Changed your mind later? Tell us before we start this work and we won&apos;t do it.
+          </p>
+          <Input
+            id={nameId}
+            label="Your full name"
+            autoComplete="name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            {...(touched && !nameOk ? { error: "Type your first name and surname." } : {})}
+          />
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Primary
+              onClick={() => {
+                setTouched(true);
+                if (!nameOk) return;
+                setChoice("accept");
+                void run({ kind: "variation", issueId: issue.id, decision: "accept", name: name.trim(), agreed: true });
+              }}
+              disabled={readOnly}
+              busy={busy && choice === "accept"}
+              busyLabel="Saving…"
+            >
+              {wording}
+            </Primary>
+            <Secondary
+              onClick={() => {
+                clear();
+                setConfirming(false);
+                setTouched(false);
+              }}
+              disabled={busy}
+            >
+              Back
+            </Secondary>
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <Primary
+            onClick={() => {
+              clear();
+              setConfirming(true);
+            }}
+            disabled={readOnly}
+          >
+            Yes, go ahead ({up ? "+" : ""}
+            {money(v.totalDeltaPence)})
+          </Primary>
+          <Secondary
+            onClick={() => {
+              setChoice("decline");
+              void run({ kind: "variation", issueId: issue.id, decision: "decline" });
+            }}
+            disabled={readOnly || busy}
+          >
+            {busy && choice === "decline" ? "Saving…" : "No thanks"}
+          </Secondary>
+        </div>
+      )}
     </article>
   );
 }

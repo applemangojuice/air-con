@@ -4,6 +4,7 @@ import {
   applyDesignEdits,
   approveDesign,
   can,
+  canonicalJson,
   designApprovalErrors,
   designInputsKey,
   draftDesign,
@@ -146,7 +147,9 @@ export interface DesignPageData {
 
 /** Everything a design is checked against, recomputed on today's catalogue. */
 export function designContentKey(d: Pick<DesignRecord, "rooms" | "variants" | "overrides" | "notes">): string {
-  return JSON.stringify({ rooms: d.rooms, variants: d.variants, overrides: d.overrides, notes: d.notes ?? "" });
+  // Canonical (sorted keys): the stored side comes back from jsonb, which
+  // reorders keys, while the recomputed side is in the order the code builds.
+  return canonicalJson({ rooms: d.rooms, variants: d.variants, overrides: d.overrides, notes: d.notes ?? "" });
 }
 
 function recomputed(design: DesignRecord, catalogue: CatalogueItem[], compatibility: CompatibilityRule[]): DesignRecord {

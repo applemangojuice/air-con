@@ -64,6 +64,7 @@ function journey(early: boolean) {
   act({ type: "design-updated", designId: "d", version: 1, status: "in-review" }, T.techLead);
   act({ type: "design-approved", designId: "d", version: 1, by: T.techLead.name }, T.techLead);
   act({ type: "proposal-issued", proposalId: "p", version: 1, validUntil: schedule.addDays(today(), 30), optionCount: 1 }, T.surveyor);
+  act({ type: "pre-contract-info-sent", proposalId: "p", demo: true });
   assert.equal(customerNextAction(s.project)?.label, "Review your proposal");
   act({ type: "proposal-accepted", proposalId: "p", version: 1, optionLabel: "Standard", contractTotalPence: 450_000, earlyStartRequested: early });
   act({ type: "contract-confirmation-sent", demo: true });

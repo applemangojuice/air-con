@@ -1,4 +1,5 @@
 import type { CommsEventId } from "@aircon/domain";
+import { demoLoginAllowed } from "@/lib/auth/access";
 import { customerLink } from "@/lib/auth/magic";
 import { appUrl } from "@/lib/brand";
 import { emailConfigured, sendEmail, teamInbox } from "@/lib/email";
@@ -53,10 +54,11 @@ function realOutbox(): Outbox | null {
       },
     },
     sms: { provider: "twilio", configured: smsConfigured, send: sendSms },
-    // The acceptance email reaching the customer is a contract fact
-    // (confirmationSentAt): record it however the send happened.
+    // The issue and acceptance emails reaching the customer are contract
+    // facts (preContractInfoSentAt, confirmationSentAt). A demo store counts
+    // only on a demo deployment or in development, where nothing is real.
     onDelivered: async (message, status) => {
-      const next = followUpForDelivered(message, status);
+      const next = followUpForDelivered(message, status, { demoCounts: demoLoginAllowed(process.env) });
       if (!next) return;
       const result = await dispatch(next.projectId, next.action, { kind: "system", name: "outbox" });
       if ("error" in result) console.error(`[outbox] couldn't record ${next.action.type} on ${next.projectId}:`, result.error);

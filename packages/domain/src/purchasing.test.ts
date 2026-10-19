@@ -287,3 +287,23 @@ test("the customer line only says what's been recorded", () => {
   assert.equal(kitCustomerSummary({ requiredLines: 5, deliveredLines: 2, status: "ordered" }), "2 of 5 items delivered so far");
   assert.equal(kitCustomerSummary({ requiredLines: 5, deliveredLines: 5, status: "delivered" }), "");
 });
+
+test("kitSummary: kit at the customer's home only when every required line's order goes there", () => {
+  const received = (po: PurchaseOrder): PurchaseOrder => ({
+    ...po,
+    status: "delivered",
+    deliveredAt: NOW,
+    lines: po.lines.map((l) => ({ ...l, receivedQty: poLineEffectiveQty(l) })),
+  });
+  const all = pos();
+  const home = all.map(received);
+  assert.equal(kitSummary(home).status, "delivered");
+  assert.equal(kitSummary(home).deliveredTo, "customer");
+  for (const destination of ["storage", "installer", "subcontractor"] as const) {
+    const held = all.map((po, i) => received(i === 0 ? { ...po, destination } : po));
+    const s = kitSummary(held);
+    assert.equal(s.status, "delivered", destination);
+    assert.equal(s.shortages, 0, destination);
+    assert.equal(s.deliveredTo, "elsewhere", `${destination}: reaches the customer at install`);
+  }
+});

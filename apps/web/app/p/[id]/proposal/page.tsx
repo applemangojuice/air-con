@@ -7,6 +7,7 @@ import { ProposalView } from "@/components/proposal/proposal-view";
 import { earliestStartNote, extraCharges, paymentTerms, vatNote } from "@/components/proposal/copy";
 import type { ProposalPageData } from "@/components/proposal/types";
 import { getSession, requireProjectAccess } from "@/lib/auth/server";
+import { emailConfigured } from "@/lib/email";
 import { cancellationForm, cancellationInstructions } from "@/lib/comms/legal-text";
 import { loadCustomerProposal } from "@/lib/proposal-server";
 
@@ -148,7 +149,11 @@ export default async function CustomerProposalPage({
     version: proposal.version,
     ...(loaded.documents.proposal && !previewId ? { ref: loaded.documents.proposal.ref } : {}),
     state: loaded.state,
+    ...((loaded.state === "open" || loaded.state === "changes-requested") && !previewId && pp.proposalId === proposal.id && !pp.preContractInfoSentAt
+      ? { infoPending: true }
+      : {}),
     viewer: previewId ? "preview" : access.kind === "staff" ? "staff" : "customer",
+    ...(emailConfigured() ? {} : { emailDemo: true }),
     documentHash: loaded.documentHash,
     firstName,
     place: project.customer.addressLine || (project.customer.postcode ? `your home in ${project.customer.postcode}` : "your home"),

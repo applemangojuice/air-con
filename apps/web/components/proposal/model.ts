@@ -1,4 +1,5 @@
 import {
+  canonicalJson,
   proposalDocumentContent,
   type AcceptanceRecord,
   type ContractType,
@@ -12,20 +13,8 @@ import {
  * same in Node and the browser.
  */
 
-/** JSON with object keys sorted at every level (undefined dropped, as JSON.stringify does), so equal content hashes equally. */
-export function canonicalJson(value: unknown): string {
-  if (value === null || typeof value !== "object") {
-    const s = JSON.stringify(value);
-    return s === undefined ? "null" : s;
-  }
-  if (Array.isArray(value)) {
-    return `[${value.map((v) => (v === undefined || typeof v === "function" ? "null" : canonicalJson(v))).join(",")}]`;
-  }
-  const entries = Object.entries(value as Record<string, unknown>)
-    .filter(([, v]) => v !== undefined && typeof v !== "function")
-    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
-  return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${canonicalJson(v)}`).join(",")}}`;
-}
+/** JSON with object keys sorted at every level, so equal content hashes equally (the domain's, re-exported). */
+export { canonicalJson };
 
 export async function sha256Hex(text: string): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));

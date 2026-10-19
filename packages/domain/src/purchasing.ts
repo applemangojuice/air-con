@@ -1,5 +1,6 @@
 import type { CatalogueItem } from "./catalogue.ts";
 import type { DesignBomLine, DesignRecord } from "./design-record.ts";
+import { sameJson } from "./json.ts";
 import type { Project } from "./project.ts";
 
 /**
@@ -424,7 +425,7 @@ export function updatePoDetails(po: PurchaseOrder, patch: Partial<PurchaseOrder>
   const problem = validate(next);
   if (problem) return { ok: false, error: problem };
   const changes = (Object.keys(patch) as (keyof PurchaseOrder)[])
-    .filter((k) => JSON.stringify(po[k] ?? null) !== JSON.stringify(next[k] ?? null))
+    .filter((k) => !sameJson(po[k] ?? null, next[k] ?? null))
     .map((k) => DETAIL_LABEL[k] ?? String(k));
   if (changes.length === 0) return { ok: false, error: "Nothing changed." };
   next.history.push({ at: now, by: who, note: `Updated ${changes.join(", ")}.` });
@@ -657,7 +658,11 @@ const KIT_ORDER: Project["kit"]["status"][] = ["not-ordered", "ordered", "confir
  * been checked good. `expectedDate` is the last ETA among orders still to
  * arrive, and only when every one of them has an ETA. `shortages` counts
  * required lines still to come once anything has arrived. `damaged` counts
- * damaged units no replacement order covers yet.
+ * damaged units no replacement order covers yet. `deliveredTo` is
+ * "customer" only when every required line is on an order going to the
+ * customer's home: kit sent to our storage, the installer or a
+ * subcontractor reaches the customer with the crew, which is when a
+ * supply-and-install cancellation period starts (reg 30(3)).
  */
 export function kitSummary(pos: PurchaseOrder[]): {
   requiredLines: number;
@@ -667,6 +672,7 @@ export function kitSummary(pos: PurchaseOrder[]): {
   status: Project["kit"]["status"];
   expectedDate?: string;
   shortages: number;
+  deliveredTo: "customer" | "elsewhere";
 } {
   const live = pos.filter((p) => p.status !== "cancelled");
   const required = live.flatMap((po) =>
@@ -703,6 +709,7 @@ export function kitSummary(pos: PurchaseOrder[]): {
     status,
     ...(expectedDate ? { expectedDate } : {}),
     shortages: anyArrived ? required.length - delivered.length : 0,
+    deliveredTo: required.some(({ po }) => po.destination !== "customer") ? "elsewhere" : "customer",
   };
 }
 

@@ -109,12 +109,20 @@ export function markupPct(pricePence: number, costPence: number): number | null 
 /* ------------------------------------------------------------------ */
 
 /**
- * The engine's price for a survey, net of VAT, in pence. The engine quotes
- * GBP including VAT at 20% (pricing.ts), so the net is total / 1.2: the
- * genuine reference price every discount is measured against.
+ * The engine's price for a survey, net of any VAT, in pence: the genuine
+ * reference price every discount is measured against.
+ *
+ * One rule for what the customer pays: the engine's total is the price the
+ * online quote shows them ("your price, confirmed at your survey"), whatever
+ * the tax position, so the net is that total less the tax the proposal will
+ * add back under the business's tax code (effectiveTaxCode). Registered at
+ * 20%: total / 1.2. Not registered (outside scope) or zero-rated: the total
+ * itself, so an unchanged design's proposal total equals the online price
+ * under every tax code.
  */
-export function engineListNetPence(survey: Survey): number {
-  return Math.round((generateQuote(survey).totalGbp * 100) / 1.2);
+export function engineListNetPence(survey: Survey, settings: PilotSettings): number {
+  const rate = TAX_CODES[effectiveTaxCode(settings)]?.ratePct ?? 0;
+  return Math.round((generateQuote(survey).totalGbp * 100) / (1 + rate / 100));
 }
 
 /* ------------------------------------------------------------------ */

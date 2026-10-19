@@ -16,6 +16,14 @@ export interface ProposalPageData {
   version: number;
   ref?: string;
   state: ProposalPageState;
+  /**
+   * The issue email (the pre-contract information and cancellation form on
+   * a durable medium) hasn't been recorded as delivered yet, so this version
+   * can't be accepted until it has.
+   */
+  infoPending?: boolean;
+  /** No email provider on this (demo) deployment: messages are stored, never sent, so no copy may say "we emailed". */
+  emailDemo?: boolean;
   /** "preview": staff previewing a draft; "staff": staff viewing the live page; "customer": the customer. */
   viewer: "customer" | "staff" | "preview";
   documentHash: string;

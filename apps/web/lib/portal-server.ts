@@ -1,8 +1,14 @@
 import {
+  canonicalJson,
   currentStage,
   customerNextAction,
   defaultsForKind,
+  documentCompany,
+  documentCustomer,
+  isFullName,
   isOpen,
+  variationAgreeWording,
+  variationContent,
   transitionIssue,
   outstandingPence,
   STAGE_INFO,
@@ -15,13 +21,14 @@ import {
   type ProjectAction,
   type ProjectStageId,
   type StaffMember,
+  type VariationAcceptance,
 } from "@aircon/domain";
 import { audit } from "./audit";
 import { isPlausibleEmail, normaliseEmail } from "./auth/access";
 import { issueMagicLink } from "./auth/magic";
 import { getSession, requireProjectAccess, type ProjectAccess } from "./auth/server";
 import { notify } from "./comms/outbox";
-import { isCustomerVisible, listDocuments } from "./documents-server";
+import { createDocument, isCustomerVisible, listDocuments } from "./documents-server";
 import { emailConfigured } from "./email";
 import { money } from "./format";
 import { signedMediaUrls } from "./media-server";
@@ -600,7 +607,10 @@ export async function customerAct(projectId: string, actor: CustomerActor, req: 
       return act(projectId, actor, name, { type: "aftercare-opt-out", optedOut: req.optedOut });
 
     case "variation":
-      return decideVariation(projectId, actor, req.issueId, req.decision);
+      return decideVariation(projectId, actor, req.issueId, req.decision, {
+        ...(req.name !== undefined ? { name: req.name } : {}),
+        ...(req.agreed !== undefined ? { agreed: req.agreed } : {}),
+      });
 
     case "problem":
       return reportProblem(projectId, actor, req);
@@ -611,17 +621,38 @@ export async function customerAct(projectId: string, actor: CustomerActor, req: 
 /* Variations                                                          */
 /* ------------------------------------------------------------------ */
 
+/** sha256 hex of a string (Web Crypto: the same in Node and the browser). */
+async function sha256Hex(text: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+export interface VariationAnswer {
+  /** Accepting: the customer's full name, typed. */
+  name?: string;
+  /** Accepting: they pressed the "I agree to pay …" button (variationAgreeWording). */
+  agreed?: boolean;
+  ip?: string;
+  userAgent?: string;
+}
+
 /**
  * The customer's yes or no to a priced variation. Only a customer-visible
  * variation on this project, still waiting for them, can be decided, once.
- * Records the decision and its history, tells the team, and nothing else:
- * invoicing an accepted variation is ours to do (F5).
+ *
+ * A yes is an agreement to pay for extra work, so it's made like the
+ * contract: their typed full name and the "I agree to pay £X more" button
+ * (reg 14), recorded with when, from where, the words they agreed to and a
+ * fingerprint of the change as shown. It then gets its own customer-visible
+ * variation document and an email copy (their durable record), and the team
+ * hears. Invoicing an accepted variation is ours to do (F5). A no is one tap.
  */
 export async function decideVariation(
   projectId: string,
   actor: CustomerActor,
   issueId: string,
   decision: "accept" | "decline",
+  answer: VariationAnswer = {},
 ): Promise<ActResult> {
   const issue = isUuid(issueId) ? await issuesRepo.get(issueId) : null;
   if (!issue || issue.projectId !== projectId || issue.kind !== "variation" || !issue.customerVisible || !issue.variation) {
@@ -631,11 +662,30 @@ export async function decideVariation(
     return { ok: false, error: `You already ${issue.variation.status} this change.`, status: 409 };
   }
   if (!isOpen(issue)) return { ok: false, error: "This change has been withdrawn.", status: 409 };
+  const typedName = answer.name?.trim().replace(/\s+/g, " ") ?? "";
+  if (decision === "accept") {
+    if (!isFullName(typedName)) return { ok: false, error: "Type your first name and surname to agree to this change.", status: 422 };
+    if (answer.agreed !== true) return { ok: false, error: `Press "${variationAgreeWording(issue.variation)}" to agree to this change.`, status: 422 };
+  }
 
   const project = await loadProject(projectId);
   const name = project ? customerName(project) : "The customer";
   const now = new Date().toISOString();
   const status = decision === "accept" ? "accepted" : "declined";
+  const acceptance: VariationAcceptance | undefined =
+    decision === "accept"
+      ? {
+          at: now,
+          name: typedName,
+          wording: variationAgreeWording(issue.variation),
+          contentHash: await sha256Hex(canonicalJson(variationContent(issue))),
+          priceDeltaNetPence: issue.variation.priceDeltaNetPence,
+          taxPence: issue.variation.taxPence,
+          totalDeltaPence: issue.variation.totalDeltaPence,
+          ...(answer.ip ? { ip: answer.ip } : {}),
+          ...(answer.userAgent ? { userAgent: answer.userAgent.slice(0, 300) } : {}),
+        }
+      : undefined;
   const delta = money(issue.variation.totalDeltaPence);
   // The decision moves the issue on (F6's transitionIssue): accepted is work to do, declined is settled.
   const moved = transitionIssue(
@@ -647,7 +697,10 @@ export async function decideVariation(
       : "Declined on the portal. Carry on as agreed.",
     now,
   );
-  const next: Issue = { ...moved, variation: { ...issue.variation, status, decidedAt: now, decidedBy: name } };
+  const next: Issue = {
+    ...moved,
+    variation: { ...issue.variation, status, decidedAt: now, decidedBy: acceptance ? typedName : name, ...(acceptance ? { acceptance } : {}) },
+  };
   try {
     await issuesRepo.update(next);
   } catch (err) {
@@ -659,8 +712,13 @@ export async function decideVariation(
     action: `issue.variation-${status}`,
     entity: "issue",
     entityId: issueId,
-    detail: { projectId, totalDeltaPence: issue.variation.totalDeltaPence },
+    detail: {
+      projectId,
+      totalDeltaPence: issue.variation.totalDeltaPence,
+      ...(acceptance ? { typedName: acceptance.name, wording: acceptance.wording, contentHash: acceptance.contentHash, ip: acceptance.ip ?? null } : {}),
+    },
   });
+  if (acceptance && project) await recordAcceptedVariation(project, next, acceptance);
   await tellTeam(
     projectId,
     `Variation #${issue.number} ${status} by ${name}: ${issue.title}`,
@@ -672,7 +730,66 @@ export async function decideVariation(
     `variation:${issueId}:${status}`,
     true,
   );
-  return { ok: true, message: decision === "accept" ? "Thanks. We've told the team it's a yes." : "Thanks. We've told the team it's a no, and we'll carry on as agreed." };
+  return {
+    ok: true,
+    message:
+      decision === "accept"
+        ? "Thanks. We've told the team it's a yes. Your copy of the change is in your documents, and we've emailed it to you."
+        : "Thanks. We've told the team it's a no, and we'll carry on as agreed.",
+  };
+}
+
+/**
+ * The accepted change's durable record: a customer-visible variation
+ * document (the agreement as made, frozen) and the customer's email copy.
+ * Best-effort, like the contract document: the decision is already saved,
+ * and a failure here is logged for ops to put right.
+ */
+async function recordAcceptedVariation(project: Project, issue: Issue, acceptance: VariationAcceptance): Promise<void> {
+  const v = issue.variation!;
+  const settings = await getSettings();
+  const contract = (await listDocuments(project.id, { kind: "contract", customerVisibleOnly: true }).catch(() => []))[0];
+  const contractTotal = project.proposal.contractTotalPence ?? project.money.contractTotalPence;
+  let documentId: string | undefined;
+  try {
+    const doc = await createDocument(
+      project.id,
+      "variation",
+      {
+        company: documentCompany(settings),
+        customer: documentCustomer(project),
+        issuedAt: acceptance.at,
+        issue: { id: issue.id, number: issue.number, kind: issue.kind, title: issue.title, ...(issue.detail ? { detail: issue.detail } : {}), raisedAt: issue.raisedAt, mediaIds: issue.mediaIds, variation: v },
+        ...(contract ? { contractRef: contract.ref } : {}),
+        ...(contractTotal !== undefined ? { contractTotalPence: contractTotal } : {}),
+      },
+      { title: `Change #${issue.number}: ${issue.title}`, customerVisible: true, createdBy: acceptance.name },
+    );
+    documentId = doc.id;
+  } catch (err) {
+    console.error(`[portal] variation ${issue.id} accepted, but its document failed:`, err);
+  }
+  try {
+    await notify("variation-accepted", {
+      projectId: project.id,
+      data: {
+        title: issue.title,
+        description: v.description,
+        issueNumber: issue.number,
+        priceDeltaNetPence: v.priceDeltaNetPence,
+        taxPence: v.taxPence,
+        totalDeltaPence: v.totalDeltaPence,
+        acceptedAt: acceptance.at,
+        name: acceptance.name,
+        wording: acceptance.wording,
+        ...(contractTotal !== undefined ? { newContractTotalPence: contractTotal + v.totalDeltaPence } : {}),
+      },
+      discriminator: issue.id,
+      ...(documentId ? { path: `/d/${documentId}` } : {}),
+    });
+  } catch (err) {
+    console.error(`[portal] variation ${issue.id} accepted, but its confirmation email failed:`, err);
+  }
 }
 
 /* ------------------------------------------------------------------ */

@@ -154,7 +154,8 @@ export type PortalRequest =
   | { kind: "feedback"; score: number; comments?: string }
   | { kind: "early-start" }
   | { kind: "follow-ups"; optedOut: boolean }
-  | { kind: "variation"; issueId: string; decision: "accept" | "decline" }
+  /** Accepting needs the typed full name and the "I agree to pay …" press (`agreed`). */
+  | { kind: "variation"; issueId: string; decision: "accept" | "decline"; name?: string; agreed?: boolean }
   | { kind: "problem"; title: string; detail: string; mediaIds: string[] };
 
 export type PortalResult = { ok: true; message?: string } | { ok: false; error: string; blockers?: Blocker[] };
