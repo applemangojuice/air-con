@@ -8,6 +8,7 @@ import {
   syntheticId,
   type PropertyIntel,
 } from "@aircon/domain";
+import { selectAllPages } from "./repo/base";
 import { getServiceClient } from "./supabase-server";
 
 /**
@@ -204,21 +205,31 @@ export async function queryIntel(f: IntelFilters, limit = 5000): Promise<IntelRo
       .sort((a, b) => b.priority_score - a.priority_score)
       .slice(0, limit);
   }
-  const { data, error } = await applyFilters(
-    supabase
-      .from("properties")
-      .select(
-        "id, address_line, postcode, outcode, archetype_id, archetype_confidence, planning_risk, has_loft_conversion, epc_rating, floor_area_m2, audited, priority_score, priority_band, lead_status, campaign",
-      ),
-    f,
-  )
-    .order("priority_score", { ascending: false })
-    .limit(limit);
-  if (error) {
-    console.error("intel query failed:", error.message);
+  // Page by page: Supabase returns at most Max Rows (1000) per select, so a
+  // plain .limit(5000) gave the mailing export its first 1000 homes and no
+  // word about the rest. The id breaks priority ties, so pages never overlap.
+  try {
+    return await selectAllPages<IntelRow>(
+      (from, to, count) =>
+        applyFilters(
+          supabase
+            .from("properties")
+            .select(
+              "id, address_line, postcode, outcode, archetype_id, archetype_confidence, planning_risk, has_loft_conversion, epc_rating, floor_area_m2, audited, priority_score, priority_band, lead_status, campaign",
+              count ? { count: "exact" } : undefined,
+            ),
+          f,
+        )
+          .order("priority_score", { ascending: false })
+          .order("id")
+          .range(from, to),
+      "intel query",
+      { limit },
+    );
+  } catch (err) {
+    console.error("intel query failed:", (err as Error).message);
     return [];
   }
-  return (data ?? []) as IntelRow[];
 }
 
 /** Mark a filtered set as part of a campaign (mailing sent). */

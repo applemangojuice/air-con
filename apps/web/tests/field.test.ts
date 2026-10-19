@@ -30,6 +30,7 @@ import {
   type SyncResult,
 } from "../lib/field-outbox.ts";
 import { registerAppResolver } from "./helpers/resolve-app.ts";
+import { insertProjectRow } from "./helpers/rows.ts";
 
 process.env.DATA_BACKEND = "memory";
 delete process.env.SUPABASE_URL;
@@ -251,9 +252,9 @@ const DESIGN: DesignRecord = {
 
 async function seed(install: Project["install"]["status"]): Promise<Project> {
   const db = requireDb();
-  for (const t of ["projects", "install_jobs", "install_evidence", "issues", "time_entries", "media", "messages"]) {
-    await db.from(t).delete().neq("id", "none");
-  }
+  // Deleting the projects takes their jobs, evidence, issues, time, media and messages with them (on delete cascade).
+  const cleared = await db.from("projects").delete().not("id", "is", null);
+  assert.equal(cleared.error, null);
   const base = createProject({
     id: PROJECT,
     quoteId: "6e6e6e6e-5555-4555-8555-00000000f605",
@@ -267,7 +268,7 @@ async function seed(install: Project["install"]["status"]): Promise<Project> {
     booking: { ...base.booking, status: "booked", dates: ["2026-11-10", "2026-11-11", "2026-11-12"], startDate: "2026-11-10", crew: [{ staffId: INSTALLER.id, name: INSTALLER.name, role: "installer", external: false }, { staffId: FGAS.id, name: FGAS.name, role: "installer", external: false }] },
     install: { ...base.install, status: install, days: install === "not-started" ? [] : [{ n: 1, date: "2026-11-10", status: "in-progress", startedAt: "2026-11-10T08:00:00.000Z" }] },
   };
-  await db.from("projects").insert({ id: PROJECT, quote_id: project.quoteId, schema_version: 2, project, install_on: "2026-11-10" });
+  await insertProjectRow(db, { id: PROJECT, quote_id: project.quoteId, schema_version: 2, project, install_on: "2026-11-10" });
   await installJobsRepo.save({
     id: "6f6f6f6f-6666-4666-8666-00000000f606",
     projectId: PROJECT,

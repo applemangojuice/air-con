@@ -1,5 +1,5 @@
 import type { CompatibilityRule } from "@aircon/domain";
-import { db, jsonObject, must, nowIso, type Row } from "./base";
+import { db, jsonObject, must, nowIso, selectAllPages, type Row } from "./base";
 
 /**
  * `catalogue_compatibility`: which indoor units an outdoor unit can drive.
@@ -24,11 +24,18 @@ export async function get(id: string): Promise<CompatibilityRule | null> {
 }
 
 export async function list(): Promise<CompatibilityRule[]> {
-  const data = must(
-    await db().from(TABLE).select("*").order("outdoor_model", { ascending: true }),
+  // Page by page past Max Rows (1000), like the catalogue.
+  const data = await selectAllPages<Row>(
+    (from, to, count) =>
+      db()
+        .from(TABLE)
+        .select("*", count ? { count: "exact" } : undefined)
+        .order("outdoor_model", { ascending: true })
+        .order("id")
+        .range(from, to),
     "compatibility list",
   );
-  return (data ?? []).map(fromRow);
+  return data.map(fromRow);
 }
 
 export async function forOutdoor(outdoorModel: string): Promise<CompatibilityRule[]> {

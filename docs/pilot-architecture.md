@@ -85,9 +85,16 @@ of the supabase-js API used in this repo and returns the same
   with filters, `upsert(row, { onConflict })`, `delete()` with filters.
 - Defaults: `id` → `crypto.randomUUID()` unless provided; `created_at` /
   `updated_at` → now.
-- Keys, unique constraints, SQL defaults and honesty triggers are declared
-  by hand in `lib/db/local-schema.ts`, mirroring the migrations (keep it in
-  step when a migration adds one). Uniques include `projects.quote_id`,
+- The schema is the migrations': `lib/db/db-schema.generated.ts` (every
+  column with its type, NOT NULL and default, keys, unique constraints,
+  foreign keys, checks), generated from a migrated database and checked
+  against it by `supabase/tests/run-migrations.sh`
+  (`UPDATE_SCHEMA=1` rewrites it), plus `lib/db/local-schema.ts` by hand for
+  what a dump can only name (partial/expression unique indexes, check
+  predicates) and the honesty triggers. The local client enforces it as
+  Postgres and PostgREST do (§K36): unknown tables and columns, type casts,
+  NOT NULL, checks, foreign keys with their ON DELETE actions, ON CONFLICT
+  targets, and PostgREST's output shapes. Uniques include `projects.quote_id`,
   `messages.idempotency_key`, `payments.provider_ref`, `staff.email`,
   `customers.email`, `documents.ref`, `invoices.number`, and
   (`project_id`, `version`) on `surveys` / `designs` / `proposals`; from
@@ -1911,3 +1918,46 @@ changelog and the reasons, so nobody "fixes" a deliberate choice back.
       lock, and tag or room only while unlocked; the full-row `update` is for
       system paths. A caption saved while another phone draws or the design is
       approved no longer undoes either.
+36. **Supabase compatibility (the app on PostgREST and the Storage API).**
+    `supabase/tests/compat` runs the built app against Postgres 16 with
+    Supabase's roles, every migration, PostgREST 12.2.3 (Max Rows 1000) and a
+    gateway doing Kong's key check, pg-safeupdate and the Storage API
+    (`supabase/tests/README.md`); the pilot walk, the funnel, the property-book
+    importers over 3,000 homes and a walk of every screen pass on it with no
+    statement refused. What it changed:
+    - *The local backend enforces the real schema* (§B): it was schemaless, so
+      a typo'd column, a non-uuid id, a fractional integer, a half row, an
+      orphan row or a NUL passed locally and failed on Supabase. Tests now
+      build valid rows (`tests/helpers/rows.ts`), and timestamps come back as
+      PostgREST writes them (`…+00:00`), so a string comparison with a JS ISO
+      string fails in the tests too; compare instants.
+    - *NUL is dropped on write* (`lib/db/no-nul.ts`, wrapped round both
+      clients in `getServiceClient`): Postgres refuses U+0000 in text and
+      jsonb, so one pasted into the funnel lost the quote (502).
+    - *Max Rows everywhere*: the property book (`queryIntel`: the /ops/intel
+      table, its coverage figures, the mailing export, templates) asked for
+      5,000 rows and got 1,000; the constraints importer read 1,000 homes and
+      left the rest unflagged; the catalogue and compatibility lists now page
+      too. `import-intel.mjs` keeps `in (…)` lists to 100 keys (URL length).
+    - *Ids that aren't uuids* are a 404 before the query
+      (`requireProjectAccess`, the ops quote page), not a 22P02 Postgres
+      error swallowed into "not found".
+    - *Storage keys* follow Supabase's character rule in the local backend
+      too (ASCII word characters and `/ !-.*'()&$@=;:+,?`); the app's own
+      names were already safe.
+    - *Unique indexes report in creation order*: on a double-tapped invoice
+      Postgres names `invoices_request_id_key` before `invoices_issue_key`,
+      so the second tap is answered with the first invoice; the local
+      backend checks them in that order (the generated dump lists them by
+      OID).
+    - *Pages that intermittently failed to hydrate* (React #418, then a full
+      client re-render) on either backend, more often with Supabase's
+      latency: Next starts hydrating while the page's RSC rows are still
+      streaming in, and when a host element's child is one of those rows (or
+      a client chunk still loading) React suspends, then replays the element
+      without putting its hydration cursor back, so it fails on the
+      element's own first child. `patches/next@15.5.20.patch` (applied by
+      pnpm, `pnpm-workspace.yaml`) restores the cursor in Next's vendored
+      react-dom; drop it when Next ships a React with the fix. The field
+      slot's barcode button is decided after mount, too (it read `window`
+      while rendering).

@@ -11,10 +11,18 @@
  * 21000 for an UPDATE or DELETE without filters (Supabase runs
  * pg-safeupdate), P0001 when a table guard (trigger) rejects a change.
  *
+ * The schema is the migrations' (db-schema.generated.ts + local-schema.ts),
+ * enforced the way Postgres and PostgREST enforce it: unknown tables 42P01,
+ * unknown columns 42703 / PGRST204, values cast to their column types
+ * (22P02, 22003, 22007, 22P05 for NUL), NOT NULL 23502, checks 23514,
+ * foreign keys 23503 with their ON DELETE actions, ON CONFLICT only on a
+ * unique constraint (42P10), and rows returned in PostgREST's shapes
+ * (timestamptz "…+00:00", dates "yyyy-mm-dd", uuids lower case).
+ * supabase/tests/compat runs the app on the real thing to keep this honest.
+ *
  * Deliberately not here: embedded selects (`rel(...)`), rpc, auth,
  * realtime, full-text search. Those fail loudly with an error rather than
- * pretending. Unknown columns read as null because there's no schema to
- * check them against: the Supabase run is the one that catches typos.
+ * pretending.
  *
  * Node-only (fs, crypto) and self-contained: relative imports, no Next.js,
  * so `node --test` can load it directly.
@@ -27,16 +35,20 @@ import { join, resolve } from "node:path";
 import {
   QueryError,
   matchesAll,
+  parseColumnPath,
   parseCondition,
   parseOr,
   parseSelect,
   projectRow,
   sortRows,
+  type CondFilter,
   type Filter,
   type FilterOp,
   type OrderSpec,
+  type SelectItem,
 } from "./local-filters.ts";
-import { canonicalJson, constraintName, tableSchema, type Row, type TableSchema } from "./local-schema.ts";
+import { canonicalJson, tableSchema, type ColumnSchema, type Row, type TableSchema } from "./local-schema.ts";
+import { columnValue, filterLiteral, formatTimestamptz, outputValue, pgTypeName, supportsLike, urlText } from "./local-types.ts";
 import {
   bodyBytes,
   cleanContentType,
@@ -166,12 +178,138 @@ function toJson(value: unknown): unknown {
  * e2e walk, not only on Supabase. Also a deep copy, so callers never hold
  * the store's own objects.
  */
-function asReturned(rows: Row[]): Row[] {
+function asReturned(rows: Row[], schema: TableSchema): Row[] {
   return rows.map((row) => {
     const out: Row = {};
-    for (const [k, v] of Object.entries(row)) out[k] = v !== null && typeof v === "object" ? jsonbKeyOrder(structuredClone(v)) : v;
+    for (const [k, v] of Object.entries(row)) {
+      const col = schema.columns.get(k);
+      const shaped = col ? outputValue(col.type, v) : v;
+      out[k] = shaped !== null && typeof shaped === "object" ? jsonbKeyOrder(structuredClone(shaped)) : shaped;
+    }
     return out;
   });
+}
+
+/* ------------------------------------------------------------------ */
+/* The schema, as Postgres and PostgREST enforce it                    */
+/* ------------------------------------------------------------------ */
+
+function noTable(table: string): QueryError {
+  return new QueryError("42P01", `relation "public.${table}" does not exist`, 404);
+}
+
+function noColumn(table: string, column: string): QueryError {
+  return new QueryError("42703", `column ${table}.${column} does not exist`);
+}
+
+/** The column a select item, filter or order names (its base column for a json path). */
+function columnOf(schema: TableSchema, expr: string): { col: ColumnSchema; path: ReturnType<typeof parseColumnPath> } {
+  const path = parseColumnPath(expr);
+  const col = schema.columns.get(path.column);
+  if (!col) throw noColumn(schema.name, path.column);
+  return { col, path };
+}
+
+function checkSelect(schema: TableSchema, items: SelectItem[]): void {
+  for (const item of items) if (item.kind === "column") columnOf(schema, item.expr);
+}
+
+const OPERATOR: Partial<Record<FilterOp, string>> = { like: "~~", ilike: "~~*", match: "~", imatch: "~*", cs: "@>", cd: "<@", ov: "&&" };
+
+/**
+ * A filter as Postgres runs it: the column must exist, and its literal is
+ * cast to the column's type (a non-uuid against a uuid column is 22P02, not
+ * "no rows"). Returns the filter with typed values to compare.
+ */
+function typedFilter(schema: TableSchema, f: Filter): Filter {
+  if (f.kind !== "cond") return { ...f, items: f.items.map((i) => typedFilter(schema, i)) };
+  const { col, path } = columnOf(schema, f.column);
+  const type = path.steps.length === 0 ? col.type : path.text ? "text" : "jsonb";
+  const op = f.op;
+  if (op === "is") {
+    const v = String(f.value ?? "null").toLowerCase();
+    if ((v === "true" || v === "false") && type !== "boolean") {
+      throw new QueryError("42804", `argument of IS ${v.toUpperCase()} must be type boolean, not type ${pgTypeName(type)}`);
+    }
+    return f;
+  }
+  if (op === "like" || op === "ilike" || op === "match" || op === "imatch") {
+    if (!supportsLike(type)) {
+      throw new QueryError("42883", `operator does not exist: ${pgTypeName(type)} ${OPERATOR[op]} unknown`, 404, null);
+    }
+    return f;
+  }
+  if (op === "cs" || op === "cd" || op === "ov") {
+    if (type !== "jsonb" && type !== "text[]") {
+      throw new QueryError("42883", `operator does not exist: ${pgTypeName(type)} ${OPERATOR[op]} unknown`, 404, null);
+    }
+    return f;
+  }
+  const literal = (v: unknown) => filterLiteral(type, typeof v === "string" ? v : urlText(v));
+  if (op === "in") {
+    const list = Array.isArray(f.value) ? f.value : [f.value];
+    return { ...f, value: list.map(literal) } as CondFilter;
+  }
+  return { ...f, value: literal(f.value) } as CondFilter;
+}
+
+/** A JSON payload value cast to its column, named on failure the way PostgREST names it. */
+function castColumn(schema: TableSchema, column: string, value: unknown): unknown {
+  const col = schema.columns.get(column);
+  if (!col) {
+    throw new QueryError("PGRST204", `Could not find the '${column}' column of '${schema.name}' in the schema cache`);
+  }
+  return columnValue(col.type, value);
+}
+
+/** Every key of every row cast to its column (unknown keys are PGRST204). */
+function castRow(schema: TableSchema, row: Row): Row {
+  const out: Row = {};
+  for (const [k, v] of Object.entries(row)) out[k] = castColumn(schema, k, v);
+  return out;
+}
+
+function assertNotNull(schema: TableSchema, rows: Row[]): void {
+  for (const row of rows) {
+    for (const col of schema.columns.values()) {
+      if (col.notNull && (row[col.name] === null || row[col.name] === undefined)) {
+        throw new QueryError("23502", `null value in column "${col.name}" of relation "${schema.name}" violates not-null constraint`);
+      }
+    }
+  }
+}
+
+function assertChecks(schema: TableSchema, rows: Row[]): void {
+  for (const row of rows) {
+    for (const check of schema.checks) {
+      if (!check.ok(row)) {
+        throw new QueryError("23514", `new row for relation "${schema.name}" violates check constraint "${check.name}"`);
+      }
+    }
+  }
+}
+
+/** Keys present in the parent tables this table's foreign keys point at (read before the write). */
+type ParentKeys = Map<string, Set<string>>;
+
+const fkKey = (v: unknown) => (typeof v === "string" ? v.toLowerCase() : canonicalJson(v));
+
+function assertParents(schema: TableSchema, rows: Row[], parents: ParentKeys, only?: Set<string>): void {
+  for (const row of rows) {
+    for (const fk of schema.foreignKeys) {
+      if (only && !only.has(fk.column)) continue;
+      const v = row[fk.column];
+      if (v === null || v === undefined) continue;
+      if (!parents.get(fk.name)?.has(fkKey(v))) {
+        throw new QueryError(
+          "23503",
+          `insert or update on table "${schema.name}" violates foreign key constraint "${fk.name}"`,
+          409,
+          `Key (${fk.column})=(${String(v)}) is not present in table "${fk.references}".`,
+        );
+      }
+    }
+  }
 }
 
 function isRecord(v: unknown): v is Row {
@@ -205,11 +343,12 @@ function prepareInputs(payload: unknown, defaultToNull: boolean): Row[] {
 
 function withDefaults(schema: TableSchema, row: Row, now: string): Row {
   const out: Row = { ...row };
-  for (const [col, value] of Object.entries(schema.defaults)) {
-    if (!(col in out)) out[col] = structuredClone(value);
+  for (const col of schema.columns.values()) {
+    if (col.name in out || !col.default) continue;
+    if (col.default.kind === "now") out[col.name] = now;
+    else if (col.default.kind === "uuid") out[col.name] = crypto.randomUUID();
+    else out[col.name] = structuredClone(col.default.value);
   }
-  if (schema.autoId && !("id" in out)) out.id = crypto.randomUUID();
-  for (const col of schema.stamps) if (!(col in out)) out[col] = now;
   return out;
 }
 
@@ -223,23 +362,14 @@ function display(v: unknown): string {
   return typeof v === "string" ? v : canonicalJson(v);
 }
 
-function assertKeys(table: string, schema: TableSchema, rows: Row[]): void {
-  for (const row of rows) {
-    for (const col of schema.primaryKey) {
-      if (row[col] === null || row[col] === undefined) {
-        throw new QueryError("23502", `null value in column "${col}" of relation "${table}" violates not-null constraint`);
-      }
-    }
-  }
-}
-
 /** Every changed row against the unchanged rows and each other. */
 function assertUnique(table: string, schema: TableSchema, unchanged: readonly Row[], changed: Row[]): void {
   const constraints = [
-    { cols: schema.primaryKey, primary: true },
-    ...schema.unique.map((cols) => ({ cols, primary: false })),
+    { cols: schema.primaryKey, name: `${table}_pkey` },
+    ...schema.unique.map((u) => ({ cols: u.columns, name: u.name })),
   ];
   for (const c of constraints) {
+    if (c.cols.length === 0) continue;
     const seen = new Set<string>();
     for (const r of unchanged) {
       const k = keyOf(r, c.cols);
@@ -251,7 +381,7 @@ function assertUnique(table: string, schema: TableSchema, unchanged: readonly Ro
       if (seen.has(k)) {
         throw new QueryError(
           "23505",
-          `duplicate key value violates unique constraint "${constraintName(table, c.cols, c.primary)}"`,
+          `duplicate key value violates unique constraint "${c.name}"`,
           409,
           `Key (${c.cols.join(", ")})=(${c.cols.map((col) => display(r[col])).join(", ")}) already exists.`,
         );
@@ -527,7 +657,9 @@ export class LocalQuery implements PromiseLike<LocalResponse> {
   private async execute(): Promise<LocalResponse> {
     try {
       if (this.deferred) throw this.deferred;
-      return this.verb === "select" ? await this.runSelect() : await this.runWrite();
+      const schema = tableSchema(this.table);
+      if (!schema) throw noTable(this.table);
+      return this.verb === "select" ? await this.runSelect(schema) : await this.runWrite(schema);
     } catch (err) {
       if (!(err instanceof QueryError)) throw err;
       if (this.shouldThrow) throw err;
@@ -535,17 +667,25 @@ export class LocalQuery implements PromiseLike<LocalResponse> {
     }
   }
 
-  private async runSelect(): Promise<LocalResponse> {
+  /** Columns exist and filter literals are cast, as Postgres plans the statement. */
+  private prepare(schema: TableSchema, items: SelectItem[] | null): Filter[] {
+    if (items) checkSelect(schema, items);
+    for (const o of this.orders) columnOf(schema, o.column);
+    return this.filters.map((f) => typedFilter(schema, f));
+  }
+
+  private async runSelect(schema: TableSchema): Promise<LocalResponse> {
     const items = parseSelect(this.columns);
+    const filters = this.prepare(schema, items);
     const rows = await this.db.store.read(this.table);
-    const matched = rows.filter((r) => matchesAll(this.filters, r));
+    const matched = rows.filter((r) => matchesAll(filters, r));
     const count = this.countMode ? matched.length : null;
     if (this.head) return ok(null, count, 200);
     const sorted = sortRows(matched, this.orders);
     // Max Rows: never more than the cap, whatever the limit or range asked for (and no error about it).
     const take = Math.min(this.limitN ?? Number.POSITIVE_INFINITY, this.db.maxRows);
-    const page = sorted.slice(this.offsetN, this.offsetN + take).map((r) => projectRow(r, items));
-    return this.shape(asReturned(page), count, 200);
+    const page = sorted.slice(this.offsetN, this.offsetN + take);
+    return this.shape(asReturned(page, schema).map((r) => projectRow(r, items)), count, 200);
   }
 
   private shape(rows: Row[], count: number | null, status: number): LocalResponse {
@@ -567,51 +707,86 @@ export class LocalQuery implements PromiseLike<LocalResponse> {
     return ok(rows, count, status);
   }
 
-  private async runWrite(): Promise<LocalResponse> {
+  /** The keys of the rows this table's foreign keys point at, read before the write. */
+  private async parentKeys(schema: TableSchema): Promise<ParentKeys> {
+    const out: ParentKeys = new Map();
+    for (const fk of schema.foreignKeys) {
+      const parent = await this.db.store.read(fk.references);
+      out.set(fk.name, new Set(parent.map((r) => r[fk.refColumn]).filter((v) => v !== null && v !== undefined).map(fkKey)));
+    }
+    return out;
+  }
+
+  private async runWrite(schema: TableSchema): Promise<LocalResponse> {
     const items = this.returning ? parseSelect(this.columns) : null;
     if ((this.verb === "update" || this.verb === "delete") && this.filters.length === 0) {
       throw new QueryError("21000", `${this.verb.toUpperCase()} requires a WHERE clause`);
     }
-    const schema = tableSchema(this.table);
-    const now = this.db.now().toISOString();
+    const filters = this.prepare(schema, items);
+    const now = formatTimestamptz(this.db.now().getTime());
+    const parents: ParentKeys = this.verb === "delete" ? new Map() : await this.parentKeys(schema);
+    if (this.verb === "delete") await this.db.restrictDelete(schema, filters);
 
     const affected = await this.db.store.mutate(this.table, (rows) => {
-      const out = this.applyWrite(schema, rows, now);
+      const out = this.applyWrite(schema, filters, rows, now, parents);
       // .single() on a write is checked server-side: the write rolls back.
       if (items && this.singular === "single" && out.result.length !== 1) {
         throw singleError(out.result.length);
       }
       return out;
     });
+    if (this.verb === "delete") await this.db.afterDelete(schema, affected);
 
     const count = this.countMode ? affected.length : null;
     const status = this.verb === "insert" || this.verb === "upsert" ? 201 : items ? 200 : 204;
     if (!items) return ok(null, count, status);
-    const projected = sortRows(affected, this.orders).map((r) => projectRow(r, items));
-    return this.shape(asReturned(projected), count, status);
+    const projected = asReturned(sortRows(affected, this.orders), schema).map((r) => projectRow(r, items));
+    return this.shape(projected, count, status);
+  }
+
+  /** The ON CONFLICT target: the primary key, or exactly the columns of a unique constraint. */
+  private conflictTarget(schema: TableSchema): string[] {
+    if (!this.onConflict) return schema.primaryKey;
+    const target = this.onConflict
+      .split(",")
+      .map((c) => c.trim().replace(/^"(.*)"$/, "$1"))
+      .filter(Boolean);
+    for (const c of target) if (!schema.columns.has(c)) throw noColumn(schema.name, c);
+    const same = (cols: string[]) => cols.length === target.length && cols.every((c) => target.includes(c));
+    if (!same(schema.primaryKey) && !schema.unique.some((u) => same(u.columns))) {
+      throw new QueryError("42P10", "there is no unique or exclusion constraint matching the ON CONFLICT specification");
+    }
+    return target;
   }
 
   /** Returns the table's next rows (the same array when nothing changed) and the affected rows. */
-  private applyWrite(schema: TableSchema, rows: readonly Row[], now: string): WriteResult {
+  private applyWrite(schema: TableSchema, filters: Filter[], rows: readonly Row[], now: string, parents: ParentKeys): WriteResult {
     const table = this.table;
     const unchangedRef = rows as Row[];
+    /** What Postgres checks on every row a statement writes. */
+    const checkRows = (written: Row[], fkColumns?: Set<string>) => {
+      assertNotNull(schema, written);
+      assertChecks(schema, written);
+      assertParents(schema, written, parents, fkColumns);
+    };
 
     if (this.verb === "insert") {
-      const inserted = prepareInputs(this.payload, this.defaultToNull).map((r) => withDefaults(schema, r, now));
+      const inserted = prepareInputs(this.payload, this.defaultToNull).map((r) => withDefaults(schema, castRow(schema, r), now));
       if (inserted.length === 0) return { rows: unchangedRef, result: [] };
-      assertKeys(table, schema, inserted);
+      checkRows(inserted);
       assertUnique(table, schema, rows, inserted);
       return { rows: [...rows, ...inserted], result: inserted };
     }
 
     if (this.verb === "update") {
-      const patch = toJson(this.payload);
-      if (!isRecord(patch)) throw new QueryError("PGRST102", "Empty or invalid json: update needs an object");
+      const raw = toJson(this.payload);
+      if (!isRecord(raw)) throw new QueryError("PGRST102", "Empty or invalid json: update needs an object");
+      const patch = castRow(schema, raw);
       const next = rows.slice();
       const changed: Row[] = [];
       const unchanged: Row[] = [];
       rows.forEach((row, i) => {
-        if (!matchesAll(this.filters, row)) {
+        if (!matchesAll(filters, row)) {
           unchanged.push(row);
           return;
         }
@@ -621,19 +796,14 @@ export class LocalQuery implements PromiseLike<LocalResponse> {
         changed.push(after);
       });
       if (changed.length === 0) return { rows: unchangedRef, result: [] };
-      assertKeys(table, schema, changed);
+      checkRows(changed, new Set(Object.keys(patch)));
       assertUnique(table, schema, unchanged, changed);
       return { rows: next, result: changed };
     }
 
     if (this.verb === "upsert") {
-      const inputs = prepareInputs(this.payload, this.defaultToNull);
-      const target = this.onConflict
-        ? this.onConflict
-            .split(",")
-            .map((c) => c.trim().replace(/^"(.*)"$/, "$1"))
-            .filter(Boolean)
-        : schema.primaryKey;
+      const inputs = prepareInputs(this.payload, this.defaultToNull).map((r) => castRow(schema, r));
+      const target = this.conflictTarget(schema);
       const next = rows.slice();
       const index = new Map<string, number>();
       next.forEach((r, i) => {
@@ -645,6 +815,9 @@ export class LocalQuery implements PromiseLike<LocalResponse> {
       const result: Row[] = [];
       for (const input of inputs) {
         const candidate = withDefaults(schema, input, now);
+        // INSERT … ON CONFLICT checks the proposed row first: a partial row fails NOT NULL even when it would merge.
+        assertNotNull(schema, [candidate]);
+        assertChecks(schema, [candidate]);
         const k = keyOf(candidate, target);
         if (k !== null && proposed.has(k) && !this.ignoreDuplicates) {
           throw new QueryError(
@@ -662,7 +835,7 @@ export class LocalQuery implements PromiseLike<LocalResponse> {
           touched.add(next.length - 1);
           result.push(candidate);
         } else if (!this.ignoreDuplicates) {
-          const before = next[at];
+          const before = next[at]!;
           const after = { ...before, ...input };
           runGuard(schema, before, after);
           next[at] = after;
@@ -671,8 +844,8 @@ export class LocalQuery implements PromiseLike<LocalResponse> {
         }
       }
       if (touched.size === 0) return { rows: unchangedRef, result };
-      const changed = [...touched].map((i) => next[i]);
-      assertKeys(table, schema, changed);
+      const changed = [...touched].map((i) => next[i]!);
+      checkRows(changed);
       assertUnique(
         table,
         schema,
@@ -685,7 +858,7 @@ export class LocalQuery implements PromiseLike<LocalResponse> {
     // delete
     const kept: Row[] = [];
     const removed: Row[] = [];
-    for (const row of rows) (matchesAll(this.filters, row) ? removed : kept).push(row);
+    for (const row of rows) (matchesAll(filters, row) ? removed : kept).push(row);
     if (removed.length === 0) return { rows: unchangedRef, result: [] };
     return { rows: kept, result: removed };
   }
@@ -1132,6 +1305,55 @@ export class LocalClient {
 
   from(table: string): LocalTable {
     return new LocalTable(this, table);
+  }
+
+  /**
+   * Foreign keys without ON DELETE (NO ACTION) or RESTRICT: a row another
+   * table still points at can't be deleted (23503), checked before the delete.
+   */
+  async restrictDelete(schema: TableSchema, filters: Filter[]): Promise<void> {
+    const blocking = schema.referencedBy.filter((f) => f.onDelete === "restrict" || f.onDelete === "no action");
+    if (blocking.length === 0) return;
+    const victims = (await this.store.read(schema.name)).filter((r) => matchesAll(filters, r));
+    for (const fk of blocking) {
+      const keys = new Set(victims.map((r) => r[fk.refColumn]).filter((v) => v !== null && v !== undefined).map(fkKey));
+      if (keys.size === 0) continue;
+      const hit = (await this.store.read(fk.table)).find((c) => c[fk.column] !== null && c[fk.column] !== undefined && keys.has(fkKey(c[fk.column])));
+      if (hit) {
+        throw new QueryError(
+          "23503",
+          `update or delete on table "${schema.name}" violates foreign key constraint "${fk.name}" on table "${fk.table}"`,
+          409,
+          `Key (${fk.refColumn})=(${String(hit[fk.column])}) is still referenced from table "${fk.table}".`,
+        );
+      }
+    }
+  }
+
+  /** ON DELETE CASCADE and SET NULL, once the parent rows have gone (and their children's, in turn). */
+  async afterDelete(schema: TableSchema, removed: readonly Row[]): Promise<void> {
+    if (removed.length === 0) return;
+    for (const fk of schema.referencedBy) {
+      if (fk.onDelete !== "cascade" && fk.onDelete !== "set null") continue;
+      const keys = new Set(removed.map((r) => r[fk.refColumn]).filter((v) => v !== null && v !== undefined).map(fkKey));
+      if (keys.size === 0) continue;
+      const refs = (r: Row) => r[fk.column] !== null && r[fk.column] !== undefined && keys.has(fkKey(r[fk.column]));
+      if (fk.onDelete === "set null") {
+        await this.store.mutate(fk.table, (rows) => ({
+          rows: rows.some(refs) ? rows.map((r) => (refs(r) ? { ...r, [fk.column]: null } : r)) : (rows as Row[]),
+          result: null,
+        }));
+        continue;
+      }
+      const gone = await this.store.mutate(fk.table, (rows) => {
+        const kept: Row[] = [];
+        const out: Row[] = [];
+        for (const r of rows) (refs(r) ? out : kept).push(r);
+        return { rows: out.length ? kept : (rows as Row[]), result: out };
+      });
+      const child = tableSchema(fk.table);
+      if (child) await this.afterDelete(child, gone);
+    }
   }
 
   rpc(fn: string): LocalQuery {

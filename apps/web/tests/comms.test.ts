@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as nodeModule from "node:module";
+import { ensureProjectRow } from "./helpers/rows.ts";
 import {
   COMMS_EVENTS,
   DEFAULT_SETTINGS,
@@ -797,7 +798,7 @@ test("the issue email is the pre-contract one; the confirmation record never sen
 /* Outbox engine against the in-memory backend                         */
 /* ------------------------------------------------------------------ */
 
-function harness(
+async function harness(
   opts: {
     email?: boolean;
     sms?: boolean;
@@ -810,6 +811,8 @@ function harness(
 ) {
   const delivered: { id: string; event: string; status: string }[] = [];
   const db = createLocalClient({ backend: "memory" });
+  // Messages belong to a project that exists (messages_project_id_fkey).
+  await ensureProjectRow(db, PROJECT_ID);
   const store = messageStore(db);
   const sent: { channel: string; to: string; body: string; subject?: string; replyTo?: string }[] = [];
   const minted: { projectId: string; path: string; recipient: string }[] = [];
@@ -858,7 +861,7 @@ function harness(
 const surveyBooked = { scheduledFor: "2026-11-03T10:00:00.000Z" } as const;
 
 test("demo mode stores the rendered message as demo and never as sent; the same occurrence is never stored twice", async () => {
-  const h = harness();
+  const h = await harness();
   const first = await h.outbox.notify("survey-booked", { projectId: PROJECT_ID, data: surveyBooked, discriminator: surveyBooked.scheduledFor });
   assert.equal(first.status, "demo");
   assert.equal(first.results[0].to, CUSTOMER.email);
@@ -883,7 +886,7 @@ test("demo mode stores the rendered message as demo and never as sent; the same 
 });
 
 test("live email: the link is minted at send, for the recipient, and never stored", async () => {
-  const h = harness({ email: true });
+  const h = await harness({ email: true });
   const r = await h.outbox.notify("survey-booked", { projectId: PROJECT_ID, data: surveyBooked, discriminator: "live-1" });
   assert.equal(r.status, "sent");
   assert.deepEqual(h.minted, [{ projectId: PROJECT_ID, path: `/p/${PROJECT_ID}#survey`, recipient: CUSTOMER.email }]);
@@ -900,7 +903,7 @@ test("live email: the link is minted at send, for the recipient, and never store
 });
 
 test("every email carries the company address as Reply-To, so a reply reaches a monitored inbox", async () => {
-  const h = harness({ email: true });
+  const h = await harness({ email: true });
   await h.outbox.notify("survey-booked", { projectId: PROJECT_ID, data: surveyBooked, discriminator: "reply-1" });
   assert.equal(h.sent[0]!.replyTo, SETTINGS.company.email);
   // And from the email module itself: a malformed one is left off rather than refused by the provider.
@@ -914,13 +917,13 @@ test("a sign-in link only goes to the customer's own address", async () => {
   // The project's email was changed to an address that isn't the customer record's.
   const changed = applyProjectAction(baseProject(), { type: "set-customer-contact", email: "someone.else@example.test" }, new Date().toISOString());
   assert.ok(changed.ok);
-  const h = harness({ email: true, project: changed.project });
+  const h = await harness({ email: true, project: changed.project });
   const r = await h.outbox.notify("proposal-issued", { projectId: PROJECT_ID, data: { version: 1, validUntil: "2026-12-03" }, discriminator: "p1" });
   assert.equal(r.results[0]!.to, "someone.else@example.test");
   assert.equal(h.minted.length, 0, "no token for someone who isn't the customer");
   assert.match(h.sent[0]!.body, new RegExp(`href="https://dang\\.example/p/${PROJECT_ID}/proposal"`));
   // Once the project belongs to that address's customer (dispatch relinks it), it gets a token.
-  const relinked = harness({ email: true, project: changed.project, customerEmail: "someone.else@example.test" });
+  const relinked = await harness({ email: true, project: changed.project, customerEmail: "someone.else@example.test" });
   await relinked.outbox.notify("proposal-issued", { projectId: PROJECT_ID, data: { version: 1, validUntil: "2026-12-03" }, discriminator: "p1" });
   assert.equal(relinked.minted[0]!.recipient, "someone.else@example.test");
 });
@@ -928,7 +931,7 @@ test("a sign-in link only goes to the customer's own address", async () => {
 test("a removed email stays removed: no recipient, never the quote's old address", async () => {
   const cleared = applyProjectAction(baseProject(), { type: "set-customer-contact", email: "" }, new Date().toISOString());
   assert.ok(cleared.ok && cleared.project.customer.email === undefined);
-  const h = harness({ email: true, project: cleared.project });
+  const h = await harness({ email: true, project: cleared.project });
   const r = await h.outbox.notify("proposal-issued", { projectId: PROJECT_ID, data: { version: 1, validUntil: "2026-12-03" }, discriminator: "p2" });
   assert.equal(r.results[0]!.status, "no-recipient");
   assert.equal(h.sent.length, 0);
@@ -936,7 +939,7 @@ test("a removed email stays removed: no recipient, never the quote's old address
 });
 
 test("magic links: sent once from memory, never stored, never retried", async () => {
-  const h = harness({ email: true, emailOk: [true] });
+  const h = await harness({ email: true, emailOk: [true] });
   const link = "https://dang.example/auth/verify?t=staff-token";
   const r = await h.outbox.notify("magic-link", { to: "staff@example.test", data: { link, name: "Alex Demo", audience: "staff" }, discriminator: "tok-a" });
   assert.equal(r.status, "sent");
@@ -947,7 +950,7 @@ test("magic links: sent once from memory, never stored, never retried", async ()
   assert.equal(stored.linkPath, undefined);
 
   // A failed one isn't sent again with a dead link: it's skipped, and says why.
-  const f = harness({ email: true, emailOk: [false] });
+  const f = await harness({ email: true, emailOk: [false] });
   const failed = await f.outbox.notify("magic-link", { to: "staff@example.test", data: { link, audience: "staff" }, discriminator: "tok-b" });
   assert.equal(failed.status, "failed");
   const later = new Date(Date.now() + 10 * 60_000).toISOString();
@@ -960,7 +963,7 @@ test("magic links: sent once from memory, never stored, never retried", async ()
 });
 
 test("concurrent notifies for one occurrence store exactly one message", async () => {
-  const h = harness();
+  const h = await harness();
   const send = () => h.outbox.notify("survey-booked", { projectId: PROJECT_ID, data: surveyBooked, discriminator: "slot-a" });
   const results = await Promise.all([send(), send(), send()]);
   assert.deepEqual(results.map((r) => r.status).sort(), ["demo", "duplicate", "duplicate"]);
@@ -969,7 +972,7 @@ test("concurrent notifies for one occurrence store exactly one message", async (
 });
 
 test("live providers: email and SMS are sent and acknowledged; phones are normalised", async () => {
-  const h = harness({ email: true, sms: true });
+  const h = await harness({ email: true, sms: true });
   const r = await h.outbox.notify("survey-reminder", { projectId: PROJECT_ID, data: surveyBooked, discriminator: "d1" });
   assert.deepEqual(r.results.map((x) => [x.channel, x.status, x.to]), [
     ["email", "sent", CUSTOMER.email],
@@ -984,7 +987,7 @@ test("live providers: email and SMS are sent and acknowledged; phones are normal
 });
 
 test("failures are recorded, retried by the cron up to three attempts, and resend is one more try on the same key", async () => {
-  const h = harness({ email: true, emailOk: [false, false, false, false] });
+  const h = await harness({ email: true, emailOk: [false, false, false, false] });
   const r = await h.outbox.notify("proposal-issued", { projectId: PROJECT_ID, data: { version: 1, validUntil: "2026-12-03" }, discriminator: "prop-1" });
   assert.equal(r.status, "failed");
   const id = r.results[0].messageId!;
@@ -1009,7 +1012,7 @@ test("failures are recorded, retried by the cron up to three attempts, and resen
 });
 
 test("scheduled messages wait for the cron; turning the event off before then skips them", async () => {
-  const h = harness({ email: true });
+  const h = await harness({ email: true });
   const tomorrow = new Date(Date.now() + 86_400_000).toISOString();
   const r = await h.outbox.notify("check-in-7d", { projectId: PROJECT_ID, data: {}, discriminator: "7d", scheduledFor: tomorrow });
   assert.equal(r.status, "queued");
@@ -1020,7 +1023,7 @@ test("scheduled messages wait for the cron; turning the event off before then sk
   assert.equal(h.sent.length, 1);
 
   const off = mergeSettings({ comms: { disabledEvents: ["service-reminder"] } });
-  const h2 = harness({ email: true, settings: SETTINGS });
+  const h2 = await harness({ email: true, settings: SETTINGS });
   const q = await h2.outbox.notify("service-reminder", { projectId: PROJECT_ID, data: { dueOn: "2027-12-03" }, discriminator: "y1", scheduledFor: tomorrow });
   assert.equal(q.status, "queued");
   const h2off = createOutboxOver(h2, off);
@@ -1030,7 +1033,7 @@ test("scheduled messages wait for the cron; turning the event off before then sk
 });
 
 /** A second engine over the same store, with different settings (as if someone saved them in between). */
-function createOutboxOver(h: ReturnType<typeof harness>, settings: PilotSettings) {
+function createOutboxOver(h: Awaited<ReturnType<typeof harness>>, settings: PilotSettings) {
   return createOutbox({
     store: h.store,
     now: () => new Date().toISOString(),
@@ -1047,7 +1050,7 @@ function createOutboxOver(h: ReturnType<typeof harness>, settings: PilotSettings
 }
 
 test("disabled events, missing recipients and team routing", async () => {
-  const off = harness({ settings: mergeSettings({ comms: { disabledEvents: ["survey-booked"] } }) });
+  const off = await harness({ settings: mergeSettings({ comms: { disabledEvents: ["survey-booked"] } }) });
   const r = await off.outbox.notify("survey-booked", { projectId: PROJECT_ID, data: surveyBooked, discriminator: "x" });
   assert.equal(r.status, "disabled");
   assert.equal((await off.db.from("messages").select("id")).data!.length, 0, "disabled: nothing stored");
@@ -1055,11 +1058,11 @@ test("disabled events, missing recipients and team routing", async () => {
   const noContact = baseProject();
   noContact.customer.email = undefined;
   noContact.customer.phone = "020 7946 0018"; // a landline can't take a text
-  const h = harness({ project: noContact });
+  const h = await harness({ project: noContact });
   const rem = await h.outbox.notify("survey-reminder", { projectId: PROJECT_ID, data: surveyBooked, discriminator: "y" });
   assert.deepEqual(rem.results.map((x) => x.status), ["no-recipient", "no-recipient"]);
 
-  const team = harness();
+  const team = await harness();
   const t = await team.outbox.notify("team-alert", { projectId: PROJECT_ID, data: { title: "Hello team" }, discriminator: "t1" });
   assert.equal(t.results[0].to, "team@example.test");
   const msg = await team.store.get(t.results[0].messageId!);
@@ -1073,7 +1076,7 @@ test("disabled events, missing recipients and team routing", async () => {
 });
 
 test("the engine never throws: a broken dependency becomes an error result", async () => {
-  const h = harness();
+  const h = await harness();
   const broken = createOutbox({
     store: h.store,
     now: () => new Date().toISOString(),
@@ -1093,7 +1096,7 @@ test("the engine never throws: a broken dependency becomes an error result", asy
   assert.equal(r.status, "error");
   assert.match(r.results[0].error ?? "", /on fire/);
 
-  const throwingSend = harness({ email: true });
+  const throwingSend = await harness({ email: true });
   const engine = createOutbox({
     store: throwingSend.store,
     now: () => new Date().toISOString(),
@@ -1152,12 +1155,12 @@ test("the engine never throws: a broken dependency becomes an error result", asy
 
 test("delivery is reported however it happens: demo, first send, cron retry, resend; never on failure", async () => {
   const accepted = { version: 1, optionLabel: "Standard", contractTotalPence: 450_000, acceptedAt: "2026-11-12T15:04:00.000Z", earlyStartRequested: false };
-  const demo = harness();
+  const demo = await harness();
   const d = await demo.outbox.notify("proposal-accepted", { projectId: PROJECT_ID, data: accepted, discriminator: "prop-1" });
   assert.equal(d.status, "demo");
   assert.deepEqual(demo.delivered, [{ id: d.results[0]!.messageId!, event: "proposal-accepted", status: "demo" }]);
 
-  const flaky = harness({ email: true, emailOk: [false, true] });
+  const flaky = await harness({ email: true, emailOk: [false, true] });
   const f = await flaky.outbox.notify("proposal-accepted", { projectId: PROJECT_ID, data: accepted, discriminator: "prop-2" });
   assert.equal(f.status, "failed");
   assert.equal(flaky.delivered.length, 0, "a failed send isn't a delivery");
@@ -1167,7 +1170,7 @@ test("delivery is reported however it happens: demo, first send, cron retry, res
   assert.equal(flaky.delivered.length, 2, "so does a resend (the reducer keeps the first)");
 
   // A hook that throws never fails the send.
-  const h = harness({ email: true });
+  const h = await harness({ email: true });
   const engine = createOutbox({
     store: h.store,
     now: () => new Date().toISOString(),
@@ -1190,7 +1193,7 @@ test("delivery is reported however it happens: demo, first send, cron retry, res
 test("follow-ups respect an opt-out, at notify and when a queued one is due; review requests need a review link", async () => {
   const optedOutProject = applyProjectAction(baseProject(), { type: "aftercare-opt-out", optedOut: true }, new Date().toISOString());
   assert.ok(optedOutProject.ok);
-  const h = harness({ email: true, project: optedOutProject.project });
+  const h = await harness({ email: true, project: optedOutProject.project });
   for (const event of FOLLOW_UP_EVENTS) {
     const data = (event === "service-reminder" ? { dueOn: "2027-12-03" } : event === "seasonal-check" ? { mode: "heating" } : {}) as never;
     const r = await h.outbox.notify(event, { projectId: PROJECT_ID, data, discriminator: "x" });
@@ -1205,7 +1208,7 @@ test("follow-ups respect an opt-out, at notify and when a queued one is due; rev
 
   // Queued before the opt-out, due after it: skipped, and so is a resend.
   let project = baseProject();
-  const later = harness({ email: true, project });
+  const later = await harness({ email: true, project });
   const tomorrow = new Date(Date.now() + 86_400_000).toISOString();
   const q = await later.outbox.notify("check-in-7d", { projectId: PROJECT_ID, data: {}, discriminator: "7d", scheduledFor: tomorrow });
   assert.equal(q.status, "queued");
@@ -1233,12 +1236,12 @@ test("follow-ups respect an opt-out, at notify and when a queued one is due; rev
   assert.equal(later.sent.length, 0);
 
   // No review link in settings: no review request, and nothing stored.
-  const noLink = harness({ email: true, settings: mergeSettings(DEFAULT_SETTINGS) });
+  const noLink = await harness({ email: true, settings: mergeSettings(DEFAULT_SETTINGS) });
   const r = await noLink.outbox.notify("review-request", { projectId: PROJECT_ID, data: {}, discriminator: "review" });
   assert.equal(r.status, "disabled");
   assert.match(r.results[0]!.error ?? "", /No review link/);
   assert.equal((await noLink.db.from("messages").select("id")).data!.length, 0);
-  const withLink = harness({ email: true });
+  const withLink = await harness({ email: true });
   assert.equal((await withLink.outbox.notify("review-request", { projectId: PROJECT_ID, data: {}, discriminator: "review" })).status, "sent");
   assert.ok(withLink.sent[0]!.body.includes(`href="${REVIEW_URL}"`));
   assert.equal(withLink.minted.length, 0, "no sign-in token in a review request");
@@ -1254,7 +1257,7 @@ test("the service reminder offers to book only with marketing consent; the due d
 
   // Through the outbox: it asks for the customer's consent for this event, and renders accordingly.
   const asked: string[] = [];
-  const h = harness({ email: true });
+  const h = await harness({ email: true });
   const withConsent = createOutbox({
     ...h.deps,
     marketingConsent: async (p) => {
@@ -1363,15 +1366,15 @@ test("the booking and day-before emails promise the channel that will really be 
 test("on my way with no mobile goes by email instead of nowhere; with one, by text", async () => {
   const p = baseProject();
   const noPhone = { ...p, customer: { ...p.customer, phone: undefined } } as Project;
-  const h = harness({ project: noPhone, email: true, sms: true });
+  const h = await harness({ project: noPhone, email: true, sms: true });
   const r = await h.outbox.notify("installer-on-my-way", { projectId: PROJECT_ID, data: { etaMinutes: 20, at: new Date().toISOString(), name: "DEMO Ivo" }, discriminator: "d1:20" });
   assert.deepEqual(r.results.map((x) => [x.channel, x.status]), [["email", "sent"]]);
   assert.match(h.sent[0]!.subject ?? "", /on the way/);
-  const textable = harness({ email: true, sms: true });
+  const textable = await harness({ email: true, sms: true });
   const t = await textable.outbox.notify("installer-on-my-way", { projectId: PROJECT_ID, data: { etaMinutes: 20, at: new Date().toISOString() }, discriminator: "d1:20" });
   assert.deepEqual(t.results.map((x) => [x.channel, x.status]), [["sms", "sent"]]);
   // Texts not set up but email live: by email, so it actually arrives.
-  const smsOff = harness({ email: true, sms: false });
+  const smsOff = await harness({ email: true, sms: false });
   const e = await smsOff.outbox.notify("surveyor-on-my-way", { projectId: PROJECT_ID, data: { etaMinutes: 15, at: new Date().toISOString() }, discriminator: "s:15" });
   assert.deepEqual(e.results.map((x) => [x.channel, x.status]), [["email", "sent"]]);
 });

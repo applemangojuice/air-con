@@ -4,6 +4,7 @@ import { cache } from "react";
 import type { Permission, StaffMember } from "@aircon/domain";
 import { audit } from "@/lib/audit";
 import type { CustomerRecord } from "@/lib/repo/customers";
+import { isUuid } from "@/lib/repo/base";
 import * as staffRepo from "@/lib/repo/staff";
 import { PILOT_MIGRATION, staffTableMissing } from "@/lib/schema-check";
 import { getServiceClient } from "@/lib/supabase-server";
@@ -238,7 +239,8 @@ export async function requireProjectAccess(
   const quoteGrant = opts.allowCustomer && session?.kind !== "staff" ? await quoteOwnerGrant() : [];
   if (!session && quoteGrant.length === 0) return null;
   const db = getServiceClient();
-  if (!db) return null;
+  // Not a uuid, not a project (Postgres would refuse the comparison with 22P02, not find nothing).
+  if (!db || !isUuid(projectId)) return null;
   const { data: row } = await db.from("projects").select("id, customer_id, quote_id, project").eq("id", projectId).maybeSingle();
   const project = row
     ? {
