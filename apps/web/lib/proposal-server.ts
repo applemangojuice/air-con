@@ -17,6 +17,7 @@ import {
   earlyStartWording,
   engineListNetPence,
   guaranteeLines,
+  settingsForProposal,
   withSettingsWording,
   hasCurrentQualification,
   measuredToEngineSurvey,
@@ -59,7 +60,9 @@ import * as proposalsRepo from "./repo/proposals";
 import * as staffRepo from "./repo/staff";
 import * as surveysRepo from "./repo/surveys";
 import { getSettings } from "./settings-server";
-import { buildAcceptanceRecord, proposalDocumentHash, withoutAt, type AcceptanceForm } from "@/components/proposal/model";
+import { buildAcceptanceRecord, proposalDocumentHash, termsHash, withoutAt, type AcceptanceForm } from "@/components/proposal/model";
+import { toPublicSettings } from "@/components/site/claims";
+import { termsSections } from "./legal/terms";
 import { formFromRecord } from "@/components/ops/proposal/model";
 
 /**
@@ -636,8 +639,10 @@ export async function issueDraft(projectId: string, proposalId: string, staff: S
   }
   const settings = await getSettings();
   const today = londonToday();
-  // Settings saved since the draft's last edit (guarantees, warranty, terms) still reach the customer.
+  // Settings saved since the draft's last edit (guarantees, warranty, terms, payment terms) still
+  // reach the customer, and are frozen with this version from here on, with the full terms text.
   let record = withSettingsWording(stored, settings);
+  if (record.status === "draft") record = { ...record, termsText: termsSections(toPublicSettings(settings, today)) };
   const errors = proposalIssueErrors(record, settings, today);
   if (errors.length) return fail("The proposal isn't ready to issue yet.", 422, { errors });
 
@@ -647,7 +652,10 @@ export async function issueDraft(projectId: string, proposalId: string, staff: S
   if (gate.some((b) => b.severity === "block")) return fail("The project isn't ready for a proposal yet.", 409, { blockers: gate });
 
   // Write the refreshed wording before the issue email reads the record.
-  if (canonicalJson([record.warranty, record.guarantees, record.termsVersion]) !== canonicalJson([stored.warranty, stored.guarantees, stored.termsVersion])) {
+  if (
+    canonicalJson([record.warranty, record.guarantees, record.termsVersion, record.terms, record.termsText]) !==
+    canonicalJson([stored.warranty, stored.guarantees, stored.termsVersion, stored.terms, stored.termsText])
+  ) {
     try {
       record = await proposalsRepo.update(record);
     } catch (err) {
@@ -807,7 +815,8 @@ export async function loadCustomerProposal(projectId: string, opts: { previewId?
       ...(contractDoc ? { contract: { id: contractDoc.id, ref: contractDoc.ref } } : {}),
     },
     today,
-    settings,
+    // The terms this version was issued on, not today's settings.
+    settings: settingsForProposal(settings, record),
   };
 }
 
@@ -866,7 +875,9 @@ function acceptedSummary(project: Project, record: ProposalRecord, settings: Pil
 }
 
 /** The contract document: the acceptance record, the accepted option and the terms, frozen. Best-effort. */
-async function createContractDocument(project: Project, record: ProposalRecord, settings: PilotSettings, today: string): Promise<string | undefined> {
+async function createContractDocument(project: Project, record: ProposalRecord, live: PilotSettings, today: string): Promise<string | undefined> {
+  // The payment terms and cancellation days the customer was offered, not today's settings.
+  const settings = settingsForProposal(live, record);
   const a = record.acceptance!;
   const contractType = record.contractType ?? "supply-and-install";
   const safe = customerSafeProposal(record);
@@ -897,6 +908,8 @@ async function createContractDocument(project: Project, record: ProposalRecord, 
     assumptions: record.assumptions,
     warranty: record.warranty,
     termsVersion: record.termsVersion,
+    // The full terms text as offered, and its fingerprint.
+    ...(record.termsText?.length ? { termsText: record.termsText, ...(a.termsHash ? { termsHash: a.termsHash } : {}) } : {}),
     cancellation: { text: cancellationCopy(project, { settings, today }), ...(cs.endsOn ? { endsOn: cs.endsOn } : {}), earlyStartRequested: a.earlyStartRequested },
     // The payment schedule as agreed: the deposit is exactly what the deposit invoice will charge (F5's depositPence).
     payments: {
@@ -942,7 +955,8 @@ export async function acceptProposal(
   const opened = await openForCustomer(proposalId);
   if (!opened.ok) return opened;
   let { project, record } = opened;
-  const settings = await getSettings();
+  // Frozen at issue: what they accept is what the page showed them.
+  const settings = settingsForProposal(await getSettings(), record);
   const today = londonToday();
 
   if (project.proposal.status === "accepted") {
@@ -964,6 +978,7 @@ export async function acceptProposal(
   }
 
   const hash = await proposalDocumentHash(record);
+  const shownTerms = await termsHash(record);
   if (form.documentHash !== hash) {
     return fail("Your proposal has been updated since you opened it. Please reload the page to see the latest version.", 409, { errors: ["changed"] });
   }
@@ -977,6 +992,7 @@ export async function acceptProposal(
     cancellationNoticeVersion: CANCELLATION_NOTICE_VERSION,
     earlyStartWordingVersion: EARLY_START_WORDING_VERSION,
     ...(project.proposal.documentsByEmailConsent ? { documentsByEmailConsentAt: project.proposal.documentsByEmailConsent.at } : {}),
+    ...(shownTerms ? { termsHash: shownTerms } : {}),
   });
   const errors = acceptanceErrors(record, withoutAt(acceptance), today);
   if (errors.length) return fail(errors[0]!, 422, { errors });

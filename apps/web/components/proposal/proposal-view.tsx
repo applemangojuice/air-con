@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { fmtDate, money } from "@/lib/format";
 import { AcceptFlow } from "./accept-flow";
 import { AcceptedPanel, type AcceptedView } from "./accepted-panel";
+import { TermsText } from "./terms-text";
 import { Respond } from "./respond";
 import {
   CancelSection,
@@ -311,6 +312,11 @@ export function ProposalView({ data }: { data: ProposalPageData }) {
           . {data.company.legalName}
           {data.company.tradingName && data.company.tradingName !== data.company.legalName ? `, trading as ${data.company.tradingName}` : ""}. Terms version {data.termsVersion}.
         </p>
+        {data.termsText?.length ? (
+          <div className="mt-3">
+            <TermsText sections={data.termsText} version={data.termsVersion} />
+          </div>
+        ) : null}
       </section>
 
       {/* The one next action, always in reach on a phone. */}

@@ -315,7 +315,7 @@ export function SettingsEditor({
         </section>
 
         <Group id="payments" title="Payments">
-          <Text label="Deposit (%)" type="number" min={0} max={100} value={s.payments.depositPct} onChange={(v) => patch("payments", { depositPct: Number(v) })} hint="0 means no deposit." />
+          <Text label="Deposit (%)" type="number" min={0} max={100} value={s.payments.depositPct} onChange={(v) => patch("payments", { depositPct: Number(v) })} hint="0 means no deposit. Proposals already issued, and contracts already made, keep the payment terms they went out on." />
           <div>
             <label className="block text-sm font-semibold text-ink-900">
               Deposit due

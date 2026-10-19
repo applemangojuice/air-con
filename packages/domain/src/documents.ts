@@ -2,7 +2,7 @@ import type { CommissioningRecord } from "./install.ts";
 import type { Issue } from "./issues.ts";
 import type { Invoice, Payment } from "./money.ts";
 import type { ContractType, Project } from "./project.ts";
-import type { AcceptanceRecord, ProposalOption, ProposalRecord } from "./proposal.ts";
+import type { AcceptanceRecord, ProposalOption, ProposalRecord, TermsSection } from "./proposal.ts";
 import type { PilotSettings } from "./settings.ts";
 import type { SurveyRecord } from "./survey-visit.ts";
 
@@ -188,6 +188,9 @@ export interface ContractSnapshot extends DocumentHeader {
   complaints?: { process: string; adr?: string };
   /** The guarantee lines as given at acceptance. */
   guarantees?: string[];
+  /** The full terms text the customer accepted (frozen on the proposal at issue), and its sha256. */
+  termsText?: TermsSection[];
+  termsHash?: string;
 }
 
 /** The customer-facing part of a variation issue: never its internal history. */

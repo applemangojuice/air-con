@@ -255,3 +255,75 @@ test("the builder loads with blockers and the design; a draft starts from the ap
   const start = await server.startDraft(demo4, ADMIN);
   assert.equal(start.ok, false);
 });
+
+test("payment terms are frozen at issue: a later settings change never changes the page, the hash, the contract or the deposit", async () => {
+  await fresh();
+  const { loadMoney } = await import("../lib/money-server.ts");
+  const v1 = (await proposalsRepo.listForProject(DEMO2))[0]!;
+  const draftId = ((await server.reviseFrom(DEMO2, v1.id, ADMIN)) as { proposalId: string }).proposalId;
+  const priced = patchFrom(await proposalsRepo.get(draftId), { increaseReason: "Your survey found a longer pipe run (DEMO)." });
+  assert.equal((await server.saveDraft(DEMO2, draftId, priced, ADMIN)).ok, true);
+  // Issued with no deposit (the shipped default).
+  const issuedResult = await server.issueDraft(DEMO2, draftId, ADMIN);
+  assert.equal(issuedResult.ok, true, JSON.stringify(issuedResult));
+  const issued = (await proposalsRepo.get(draftId))!;
+  assert.deepEqual(issued.terms, { depositPct: 0, depositTiming: "on-acceptance", balanceDueDays: 7, methods: ["bank-transfer", "card"], cancellationDays: 14 });
+  // The full terms text is frozen with it, and emailed in full.
+  assert.ok(issued.termsText && issued.termsText.length >= 10, "the terms text is on the record");
+  assert.deepEqual(issued.termsText!.map((t) => t.id).slice(0, 3), ["who", "price", "survey"]);
+  assert.ok(issued.termsText!.some((t) => t.id === "liability" && /limited to the price you paid us/.test(t.items.join(" "))));
+  const before = (await server.loadCustomerProposal(DEMO2))!;
+  assert.deepEqual(before.proposal.termsText, issued.termsText, "the customer sees the frozen text");
+  const issueMail = (await messagesRepo.listForProject(DEMO2)).find((m) => m.event === "proposal-issued" && m.channel === "email" && /version 2/.test(m.subject ?? ""));
+  assert.match(issueMail!.bodyText, /There's no deposit/);
+  assert.match(issueMail!.bodyText, new RegExp(`Our terms \\(version ${issued.termsVersion}\\)`, "i"));
+  assert.match(issueMail!.bodyText, /12\. Our responsibility to you/);
+
+  // The founders turn deposits on after it went out.
+  const live = mergeSettings(await settingsRepo.getValue(settingsRepo.PILOT_SETTINGS_KEY));
+  await settingsRepo.setValue(settingsRepo.PILOT_SETTINGS_KEY, mergeSettings({ ...live, payments: { ...live.payments, depositPct: 25, balanceDueDays: 30 } }), "test");
+
+  const after = (await server.loadCustomerProposal(DEMO2))!;
+  assert.equal(after.settings.payments.depositPct, 0, "the page still shows the terms it was issued on");
+  assert.equal(after.settings.payments.balanceDueDays, 7);
+  assert.equal(after.documentHash, before.documentHash, "same terms, same fingerprint");
+
+  const option = after.proposal.options[0]!;
+  const accepted = await server.acceptProposal(
+    draftId,
+    { optionId: option.id, name: "Jordan Okafor", earlyStartRequested: false, acknowledgedCancellationInfo: true, acknowledgedLossOfRight: false, documentHash: after.documentHash },
+    { customerId: DEMO2_CUSTOMER },
+    {},
+  );
+  assert.equal(accepted.ok, true);
+  const contract = (await listDocuments(DEMO2, { kind: "contract" }))[0]!;
+  const payments = (contract.snapshot as { payments: { depositPct: number; depositPence: number; balanceDueDays: number } }).payments;
+  // The terms they accepted travel with the contract, fingerprinted on the acceptance.
+  const { termsHash } = await import("../components/proposal/model.ts");
+  const acceptedRecord = (await proposalsRepo.get(draftId))!;
+  assert.equal(acceptedRecord.acceptance?.termsHash, await termsHash(issued));
+  assert.match(acceptedRecord.acceptance!.termsHash!, /^[0-9a-f]{64}$/);
+  const contractTerms = contract.snapshot as { termsText?: unknown; termsHash?: string };
+  assert.deepEqual(contractTerms.termsText, issued.termsText);
+  assert.equal(contractTerms.termsHash, acceptedRecord.acceptance?.termsHash);
+  assert.deepEqual([payments.depositPct, payments.depositPence, payments.balanceDueDays], [0, 0, 7], "the contract states the terms offered");
+  const confirmation = (await messagesRepo.listForProject(DEMO2)).find((m) => m.event === "proposal-accepted" && m.channel === "email");
+  assert.match(confirmation!.bodyText, /There's no deposit/);
+  assert.match(confirmation!.bodyText, /within 7 days of the invoice/);
+  assert.match(confirmation!.bodyText, /our terms are in full at the end of this email/);
+  assert.match(confirmation!.bodyText, /14\. The legal bits/);
+
+  // No deposit invoice can be raised on a contract that has none, whatever settings say now.
+  const money = (await loadMoney(DEMO2))!;
+  assert.equal(money.plans.deposit.available, false);
+  assert.match(money.plans.deposit.reason ?? "", /no deposit/);
+
+  // The other way round: a 25% contract keeps its deposit after settings drop to 0%,
+  // and the contract document's schedule wins over everything.
+  const { agreedTerms } = await import("../lib/money-server.ts");
+  const zero = mergeSettings({ ...live, payments: { ...live.payments, depositPct: 0 } });
+  assert.equal(agreedTerms(zero, { ...issued, terms: { ...issued.terms!, depositPct: 25 } }, undefined).payments.depositPct, 25);
+  const doc = { ...contract, snapshot: { ...(contract.snapshot as object), payments: { ...payments, depositPct: 10, depositPence: 12_300, balanceDueDays: 14 } } };
+  const fromDoc = agreedTerms(zero, issued, doc);
+  assert.deepEqual([fromDoc.payments.depositPct, fromDoc.payments.balanceDueDays], [10, 14]);
+});

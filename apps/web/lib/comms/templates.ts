@@ -11,12 +11,15 @@ import {
   effectiveTaxCode,
   isPlaceholderPhone,
   schedule2Missing,
+  settingsForProposal,
   type CommsEventId,
   type ContractType,
   type InvoiceKind,
   type Payment,
   type PilotSettings,
+  type ProposalTerms,
   type StaffRole,
+  type TermsSection,
 } from "@aircon/domain";
 import { brandedEmail, escapeHtml } from "../email.ts";
 import { fmtDate, fmtDay, fmtDayTime, money } from "../format.ts";
@@ -80,6 +83,13 @@ interface ProposalDetails {
   assumptions?: string[];
   /** The proposal's own warranty wording, which wins over settings. */
   warranty?: string | null;
+  /** The proposal's frozen guarantee lines (withSettingsWording), which win over settings. */
+  guarantees?: string[];
+  /** The payment terms and cancellation days the proposal was issued on, which win over settings. */
+  terms?: ProposalTerms;
+  /** The full terms text frozen on the proposal, printed in full at the end of the email. */
+  termsText?: TermsSection[];
+  termsVersion?: string;
 }
 
 /** What each event needs beyond the shared context. Optional fields are left out of the copy when absent. */
@@ -118,6 +128,10 @@ export interface CommsData {
     exclusions?: string[];
     assumptions?: string[];
     warranty?: string | null;
+    /** The proposal's frozen guarantee lines, terms and terms text (see ProposalDetails). */
+    guarantees?: string[];
+    terms?: ProposalTerms;
+    termsText?: TermsSection[];
     /** The early-start wording version the reply asks for. */
     earlyStartWordingVersion?: string;
   };
@@ -580,7 +594,8 @@ const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? o
  * REVIEW, with the cancellation wording (settings.legal.cancellationReviewed).
  */
 function preContractInfo(ctx: TemplateContext, x: ProposalDetails & { cancellation: string; validUntil?: string }): Block[] {
-  const { company, payments, warranty, tax } = ctx.settings;
+  // What the customer was offered: the proposal's frozen terms over today's settings.
+  const { company, payments, warranty, tax } = settingsForProposal(ctx.settings, x.terms ? { terms: x.terms } : null);
   const supply = x.contractType !== "install-only";
   const out: Block[] = [];
 
@@ -675,6 +690,11 @@ function preContractInfo(ctx: TemplateContext, x: ProposalDetails & { cancellati
   out.push({ h: "Guarantees and after-sales" });
   const g: Para[] = [];
   if (supply) g.push("We're under a legal duty to supply goods that conform with this contract.");
+  if (x.guarantees?.length) {
+    // Frozen with the proposal at issue: the same lines as its page and the contract.
+    g.push(...x.guarantees, "After handover we check in, and you can report a problem any time from your project page or by phone.");
+    out.push({ list: g });
+  } else {
   const manufacturer = x.warranty?.trim() || warranty.manufacturerSummary?.trim();
   if (manufacturer) g.push(`Manufacturer's warranty: ${manufacturer}`);
   const years = warranty.workmanshipYears;
@@ -686,6 +706,7 @@ function preContractInfo(ctx: TemplateContext, x: ProposalDetails & { cancellati
   g.push("After handover we check in, and you can report a problem any time from your project page or by phone.");
   g.push("None of this affects your legal rights.");
   out.push({ list: g });
+  }
 
   // (k), (x): complaints and dispute resolution.
   const complaints = company.complaintsProcess.trim();
@@ -699,6 +720,21 @@ function preContractInfo(ctx: TemplateContext, x: ProposalDetails & { cancellati
 }
 
 /** Part A and Part B, as the closing section of a contract email. */
+/** Our terms in full, as frozen on the proposal: the durable copy of the text that forms part of the contract. */
+function termsAppendix(termsText: TermsSection[] | undefined, version: string | undefined): Block[] {
+  if (!termsText?.length) return [];
+  return [
+    { h: `Our terms${version ? ` (version ${version})` : ""}` },
+    { small: "These are the terms that apply to this proposal and, if you accept it, to your contract. Please keep this email." },
+    ...termsText.flatMap((section, i): Block[] => [{ p: { strong: `${i + 1}. ${section.title}` } }, { list: section.items }]),
+  ];
+}
+
+/** The template context with a proposal's frozen terms laid over today's settings (settingsForProposal). */
+function asOffered(ctx: TemplateContext, terms: ProposalTerms | undefined): TemplateContext {
+  return terms ? { ...ctx, settings: settingsForProposal(ctx.settings, { terms }) } : ctx;
+}
+
 function cancellationAppendix(ctx: TemplateContext, contractType: ContractType | undefined): Block[] {
   const trader = traderOf(ctx.settings);
   const opts = { contractType: contractType ?? "supply-and-install", days: ctx.settings.scheduling.cancellationDays } as const;
@@ -832,7 +868,9 @@ const TEMPLATES: { [E in CommsEventId]: Renderer<E> } = {
     cta: "Open your project",
   }),
 
-  "proposal-issued": (ctx, d) => {
+  "proposal-issued": (live, d) => {
+    // The proposal's frozen terms over today's settings, for everything below.
+    const ctx = asOffered(live, d.terms);
     const options = d.optionCount && d.optionCount > 1 ? `, with ${d.optionCount} options to choose from` : "";
     return {
       subject: d.version > 1 ? `Your updated proposal is ready (version ${d.version})` : "Your proposal is ready",
@@ -856,6 +894,7 @@ const TEMPLATES: { [E in CommsEventId]: Renderer<E> } = {
           cancellation: cancellationSentence({ accepted: false, contractType: d.contractType }, ctx.settings.scheduling.cancellationDays),
         }),
         ...cancellationAppendix(ctx, d.contractType),
+        ...termsAppendix(d.termsText, d.termsVersion),
       ],
     };
   },
@@ -871,7 +910,8 @@ const TEMPLATES: { [E in CommsEventId]: Renderer<E> } = {
     cta: "Review your proposal",
   }),
 
-  "proposal-accepted": (ctx, d) => {
+  "proposal-accepted": (live, d) => {
+    const ctx = asOffered(live, d.terms);
     const { company, legal, scheduling } = ctx.settings;
     const contractType = d.contractType ?? "supply-and-install";
     const supply = contractType !== "install-only";
@@ -947,7 +987,9 @@ const TEMPLATES: { [E in CommsEventId]: Renderer<E> } = {
         { p: cancellation },
         ...startBlocks,
         { h: "What happens next" },
-        { p: "Choose your install dates from your project page. We'll then confirm the dates and your team by email. Your proposal and terms are on the same page." },
+        {
+          p: `Choose your install dates from your project page. We'll then confirm the dates and your team by email. Your proposal and your contract are in your documents there${d.termsText?.length ? ", and our terms are in full at the end of this email" : ""}.`,
+        },
       ],
       cta: "Choose your install dates",
       after: [
@@ -960,9 +1002,12 @@ const TEMPLATES: { [E in CommsEventId]: Renderer<E> } = {
           exclusions: d.exclusions,
           assumptions: d.assumptions,
           warranty: d.warranty,
+          ...(d.guarantees ? { guarantees: d.guarantees } : {}),
+          ...(d.terms ? { terms: d.terms } : {}),
           cancellation,
         }),
         ...cancellationAppendix(ctx, contractType),
+        ...termsAppendix(d.termsText, d.termsVersion ?? legal.termsVersion),
       ],
     };
   },

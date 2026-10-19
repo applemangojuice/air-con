@@ -50,11 +50,16 @@ function optionSummary(o: ProposalOption): OptionSummary {
   };
 }
 
+// The record's frozen wording and terms win over today's settings: the email
+// must say what the customer was offered.
 const recordDetails = (r: ProposalRecord) => ({
   inclusions: r.inclusions ?? [],
   exclusions: r.exclusions ?? [],
   assumptions: r.assumptions ?? [],
   warranty: r.warranty ?? null,
+  ...(r.guarantees?.length ? { guarantees: r.guarantees } : {}),
+  ...(r.terms ? { terms: r.terms } : {}),
+  ...(r.termsText?.length ? { termsText: r.termsText, termsVersion: r.termsVersion } : {}),
 });
 
 /**

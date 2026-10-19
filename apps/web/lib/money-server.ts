@@ -12,7 +12,9 @@ import {
   invoiceTotals,
   moneySummary,
   projectFees,
+  settingsForProposal,
   settleInvoice,
+  type ContractSnapshot,
   type DocumentRecord,
   type Invoice,
   type InvoiceKind,
@@ -105,6 +107,37 @@ function taxCodeFor(proposal: ProposalRecord | null, settings: PilotSettings): T
   return accepted?.pricing?.taxCode ?? effectiveTaxCode(settings);
 }
 
+/**
+ * The payment terms the customer agreed, as settings: the contract
+ * document's frozen payment schedule (its deposit percentage, deposit and
+ * balance due days), else the accepted proposal's frozen terms, else today's
+ * settings (a contract from before terms were frozen). Invoices are planned
+ * and dated on these, never on a settings change made after acceptance.
+ */
+export function agreedTerms(settings: PilotSettings, proposal: ProposalRecord | null, contract: DocumentRecord | undefined): PilotSettings {
+  const frozen = (contract?.snapshot as Partial<ContractSnapshot> | undefined)?.payments;
+  const base = settingsForProposal(settings, proposal);
+  if (!frozen || !Number.isFinite(frozen.depositPct)) return base;
+  return {
+    ...base,
+    payments: {
+      ...base.payments,
+      depositPct: frozen.depositPct,
+      depositTiming: frozen.depositTiming ?? base.payments.depositTiming,
+      balanceDueDays: Number.isFinite(frozen.balanceDueDays) ? frozen.balanceDueDays : base.payments.balanceDueDays,
+    },
+  };
+}
+
+/** The contract document in force (the newest final one). */
+const contractOf = (docs: DocumentRecord[]) => docs.filter((d) => d.kind === "contract" && d.status === "final").sort((a, b) => b.version - a.version)[0];
+
+/** The deposit the contract states, in pence, when its snapshot records one. */
+const contractDepositPence = (contract: DocumentRecord | undefined): number | undefined => {
+  const d = (contract?.snapshot as Partial<ContractSnapshot> | undefined)?.payments?.depositPence;
+  return typeof d === "number" && Number.isInteger(d) && d >= 0 ? d : undefined;
+};
+
 const live = (i: Invoice) => i.status !== "void" && i.status !== "draft";
 
 /** Accepted variations, from the issues list. */
@@ -117,8 +150,11 @@ export function planInvoices(input: {
   project: Project;
   invoices: Invoice[];
   issues: Issue[];
+  /** The agreed terms (agreedTerms), not today's settings. */
   settings: PilotSettings;
   taxCode: TaxCodeId;
+  /** The deposit the contract document states, when it records one: charged exactly. */
+  contractDepositPence?: number;
 }): MoneyView["plans"] {
   const { project: p, invoices, issues, settings, taxCode } = input;
   const issued = invoices.filter(live);
@@ -133,9 +169,9 @@ export function planInvoices(input: {
   let deposit: InvoicePlan;
   if (!contract) deposit = plan("deposit", [], "There's no accepted contract to take a deposit on.");
   else if (issued.some((i) => i.kind === "deposit")) deposit = plan("deposit", [], "A deposit invoice has already been issued.");
-  else if (settings.payments.depositPct <= 0) deposit = plan("deposit", [], "Deposits are off in settings (0%). Set a percentage there to ask for one.");
+  else if (settings.payments.depositPct <= 0) deposit = plan("deposit", [], "The contract's payment terms have no deposit (0%), so there's none to ask for.");
   else {
-    const amount = depositPence(contract, settings);
+    const amount = input.contractDepositPence && input.contractDepositPence > 0 ? input.contractDepositPence : depositPence(contract, settings);
     deposit = plan("deposit", [invoiceLineFromTotal(`Deposit (${settings.payments.depositPct}% of the contract price)`, amount, taxCode)]);
   }
 
@@ -213,6 +249,9 @@ export async function loadMoney(projectId: string): Promise<MoneyView | null> {
     listDocuments(projectId),
   ]);
   const taxCode = taxCodeFor(proposal, settings);
+  const contractDoc = contractOf(documents);
+  const agreed = agreedTerms(settings, proposal, contractDoc);
+  const deposit = contractDepositPence(contractDoc);
   return {
     project,
     settings,
@@ -220,7 +259,7 @@ export async function loadMoney(projectId: string): Promise<MoneyView | null> {
     payments,
     documents: documents.filter((d) => d.kind === "invoice" || d.kind === "receipt"),
     summary: moneySummary(invoices, payments, project.money.contractTotalPence),
-    plans: planInvoices({ project, invoices, issues, settings, taxCode }),
+    plans: planInvoices({ project, invoices, issues, settings: agreed, taxCode, ...(deposit !== undefined ? { contractDepositPence: deposit } : {}) }),
     taxCode,
     card: cardAvailability(),
     today: londonToday(),
@@ -259,12 +298,17 @@ const KIND_TITLE: Record<InvoiceKind, string> = {
 export async function issueInvoice(projectId: string, input: IssueInput, staff: StaffMember): Promise<Outcome<Invoice>> {
   const project = await loadProject(projectId);
   if (!project) return fail("Project not found.", 404);
-  const [settings, invoices, issues, proposal] = await Promise.all([
+  const [settings, invoices, issues, proposal, contractDoc] = await Promise.all([
     getSettings(),
     invoicesRepo.listForProject(projectId),
     issuesRepo.listForProject(projectId),
     proposalsRepo.acceptedForProject(projectId),
+    listDocuments(projectId, { kind: "contract" }).then(contractOf),
   ]);
+  // Planned and dated on the terms the customer agreed.
+  const agreed = agreedTerms(settings, proposal, contractDoc);
+  const agreedDeposit = contractDepositPence(contractDoc);
+  const planned = () => planInvoices({ project, invoices, issues, settings: agreed, taxCode, ...(agreedDeposit !== undefined ? { contractDepositPence: agreedDeposit } : {}) });
   if (input.requestId) {
     const again = invoices.find((i) => i.requestId === input.requestId);
     if (again) return { ok: true, value: again, message: `Invoice ${again.number} is issued.` };
@@ -290,13 +334,13 @@ export async function issueInvoice(projectId: string, input: IssueInput, staff: 
     lines = creditNoteLines(input.creditsInvoiceId ? `Credit against invoice ${invoices.find((i) => i.id === input.creditsInvoiceId)!.number}: ${reason}` : reason, amount, taxCode);
     extra = { ...extra, reason };
   } else if (input.kind === "variation") {
-    const plans = planInvoices({ project, invoices, issues, settings, taxCode });
+    const plans = planned();
     const v = plans.variation.variations?.find((x) => x.id === input.issueId);
     if (!v) return fail("Pick an accepted variation that isn't billed yet.");
     lines = [invoiceLineFromTotal(`Variation ${v.number}: ${v.title}`, v.totalPence, taxCode)];
     extra = { issueId: v.id };
   } else {
-    const plan = planInvoices({ project, invoices, issues, settings, taxCode })[input.kind];
+    const plan = planned()[input.kind];
     if (!plan.available) return fail(plan.reason ?? "Nothing to bill.");
     lines = plan.lines;
   }
@@ -309,7 +353,7 @@ export async function issueInvoice(projectId: string, input: IssueInput, staff: 
 
   const now = new Date().toISOString();
   const today = londonToday();
-  const dueOn = invoiceDueOn(today, input.kind, settings);
+  const dueOn = invoiceDueOn(today, input.kind, agreed);
   const invoice = await invoicesRepo.insertNumbered({
     id: crypto.randomUUID(),
     projectId,

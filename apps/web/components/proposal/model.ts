@@ -85,6 +85,8 @@ export function buildAcceptanceRecord(input: {
   cancellationNoticeVersion: string;
   earlyStartWordingVersion: string;
   documentsByEmailConsentAt?: string;
+  /** sha256 of the frozen terms text they were shown (termsHash). */
+  termsHash?: string;
 }): AcceptanceRecord {
   const { proposal, form } = input;
   const option = proposal.options.find((o) => o.id === form.optionId);
@@ -109,7 +111,13 @@ export function buildAcceptanceRecord(input: {
     contractType,
     earlyStartWordingVersion: input.earlyStartWordingVersion,
     ...(input.documentsByEmailConsentAt ? { documentsByEmailConsentAt: input.documentsByEmailConsentAt } : {}),
+    ...(input.termsHash ? { termsHash: input.termsHash } : {}),
   };
+}
+
+/** The fingerprint of the terms text a proposal carries (undefined when it carries none). */
+export async function termsHash(p: Pick<ProposalRecord, "termsText">): Promise<string | undefined> {
+  return p.termsText?.length ? sha256Hex(canonicalJson(p.termsText)) : undefined;
 }
 
 /** The record without its timestamp, as acceptanceErrors takes it. */

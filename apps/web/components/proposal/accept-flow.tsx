@@ -6,6 +6,7 @@ import { Button, Checkbox, Fieldset, Input } from "@/components/kit";
 import { money } from "@/lib/format";
 import { contractTypeLabel, earlyStartExplainer } from "./copy";
 import { CancellationDetails } from "./sections";
+import { TermsText } from "./terms-text";
 import type { ProposalPageData } from "./types";
 import type { AcceptedSummary } from "@/lib/proposal-server";
 
@@ -232,6 +233,9 @@ export function AcceptFlow({
         {step === 4 && (
           <div className="mt-5 space-y-5">
             <CancellationDetails data={data} summaryLabel="Your cancellation information and model form" />
+            {data.termsText?.length ? (
+              <TermsText sections={data.termsText} version={data.termsVersion} summary={`Our terms (version ${data.termsVersion}): they form part of your contract`} />
+            ) : null}
             <Checkbox
               label="I've read the cancellation information, including the model cancellation form"
               checked={readCancellation}

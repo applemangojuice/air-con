@@ -168,6 +168,7 @@ export default async function CustomerProposalPage({
     instantPricePence: Math.round((proposal.instantPriceGbp || 0) * 100),
     contractType,
     termsVersion: proposal.termsVersion,
+    ...(proposal.termsText?.length ? { termsText: proposal.termsText } : {}),
     media: loaded.media,
     ...(loaded.approvedBy ? { approvedBy: loaded.approvedBy } : {}),
     foundingPilot: loaded.foundingPilot,

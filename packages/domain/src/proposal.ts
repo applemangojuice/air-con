@@ -100,6 +100,15 @@ export interface AcceptanceRecord {
   earlyStartWordingVersion?: string;
   /** When they agreed to get the contract documents by email. */
   documentsByEmailConsentAt?: string;
+  /** sha256 of the canonical JSON of the terms text they were shown (ProposalRecord.termsText). */
+  termsHash?: string;
+}
+
+/** One numbered section of our terms, as text (the /terms page and the copy frozen on each proposal). */
+export interface TermsSection {
+  id: string;
+  title: string;
+  items: string[];
 }
 
 export interface ProposalRecord {
@@ -133,6 +142,19 @@ export interface ProposalRecord {
   contractType?: ContractType;
   /** Guarantee and after-sales statements, from settings while a draft (withSettingsWording), frozen at issue. */
   guarantees?: string[];
+  /**
+   * The payment terms and cancellation days this version was issued on
+   * (withSettingsWording), frozen at issue and covered by the document hash:
+   * the page, both contract emails, the contract and the deposit invoice
+   * all read these, never today's settings (settingsForProposal).
+   */
+  terms?: ProposalTerms;
+  /**
+   * The full text of our terms (termsVersion) as this version was issued:
+   * shown before acceptance, emailed, copied into the contract and covered
+   * by the document hash, so the text that applied can always be shown.
+   */
+  termsText?: TermsSection[];
   /** Internal notes for the team. Never shown to the customer. */
   internalNotes?: string;
   /** Bumped on every draft save, so two people editing can't silently overwrite each other. */
@@ -215,6 +237,43 @@ export function guaranteeLines(settings: PilotSettings, manufacturerText?: strin
   return out;
 }
 
+/** The payment terms a proposal is offered on (Schedule 2 (u), (j)) and its cancellation days. */
+export interface ProposalTerms {
+  depositPct: number;
+  depositTiming: PilotSettings["payments"]["depositTiming"];
+  balanceDueDays: number;
+  methods: PilotSettings["payments"]["methods"];
+  cancellationDays: number;
+}
+
+export function proposalTermsFrom(settings: PilotSettings): ProposalTerms {
+  const p = settings.payments;
+  return {
+    depositPct: p.depositPct,
+    depositTiming: p.depositTiming,
+    balanceDueDays: p.balanceDueDays,
+    methods: [...p.methods],
+    cancellationDays: settings.scheduling.cancellationDays,
+  };
+}
+
+/**
+ * Settings as a proposal was issued: today's settings with the proposal's
+ * frozen terms laid over them, so everything downstream of an issued or
+ * accepted proposal (its page, its emails, the contract, the deposit) says
+ * and charges what the customer was offered. A record without frozen terms
+ * (a draft, or one issued before terms were frozen) gets today's settings.
+ */
+export function settingsForProposal(settings: PilotSettings, record: Pick<ProposalRecord, "terms"> | null | undefined): PilotSettings {
+  const t = record?.terms;
+  if (!t) return settings;
+  return {
+    ...settings,
+    payments: { ...settings.payments, depositPct: t.depositPct, depositTiming: t.depositTiming, balanceDueDays: t.balanceDueDays, methods: [...t.methods] },
+    scheduling: { ...settings.scheduling, cancellationDays: Math.max(t.cancellationDays, 14) },
+  };
+}
+
 /**
  * A draft with its settings-derived wording (manufacturer's warranty,
  * guarantee lines, terms version) taken from the settings as they are now.
@@ -229,6 +288,7 @@ export function withSettingsWording(record: ProposalRecord, settings: PilotSetti
     warranty: settings.warranty.manufacturerSummary?.trim() || null,
     guarantees: guaranteeLines(settings),
     termsVersion: settings.legal.termsVersion,
+    terms: proposalTermsFrom(settings),
   };
 }
 

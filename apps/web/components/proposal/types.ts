@@ -1,4 +1,4 @@
-import type { ContractType, ProposalOption } from "@aircon/domain";
+import type { ContractType, ProposalOption, TermsSection } from "@aircon/domain";
 import type { ProposalMedia } from "@/lib/proposal-server";
 
 /**
@@ -40,6 +40,8 @@ export interface ProposalPageData {
   instantPricePence: number;
   contractType: ContractType;
   termsVersion: string;
+  /** The full terms text frozen on this version at issue (absent on drafts and older versions). */
+  termsText?: TermsSection[];
   media: Record<string, ProposalMedia>;
   approvedBy?: string;
   foundingPilot: boolean;

@@ -18,6 +18,7 @@ import {
   type VariationSnapshot,
 } from "@aircon/domain";
 import { AnnotatedImage } from "@/components/annotate/annotated-image";
+import { TermsText } from "@/components/proposal/terms-text";
 import { cancellationForm, cancellationInstructions, type TraderDetails } from "@/lib/comms/legal-text";
 import { fmtDate, money } from "@/lib/format";
 import { fmtInstant, num, plain } from "./format";
@@ -213,6 +214,8 @@ function AcceptanceBlock({ a }: { a: NonNullable<ContractSnapshot["acceptance"]>
 
 export function ContractDoc({ snap, ctx }: { snap: ContractSnapshot; ctx: DocContext }) {
   const o = snap.option;
+  // Frozen at acceptance alongside the typed fields (proposal-server createContractDocument).
+  const frozen = snap as ContractSnapshot & { cancellationInstructions?: { heading?: string; text: string }[]; cancellationForm?: string[] };
   const t = trader(ctx.company);
   const legal = { reviewed: ctx.legal.cancellationReviewed };
   const supply = snap.contractType !== "install-only";
@@ -315,7 +318,8 @@ export function ContractDoc({ snap, ctx }: { snap: ContractSnapshot; ctx: DocCon
         </DocSection>
       )}
       <DocSection title="Cancellation instructions" legal={legal} breakBefore>
-        {cancellationInstructions(t, { contractType: snap.contractType, days: ctx.cancellationDays }).map((p, i) => (
+        {/* The wording as given at acceptance when the contract froze it; today's otherwise (older contracts). */}
+        {(frozen.cancellationInstructions ?? cancellationInstructions(t, { contractType: snap.contractType, days: ctx.cancellationDays })).map((p, i) => (
           <div key={i}>
             {p.heading && <p className="mt-2 font-semibold text-ink-900">{p.heading}</p>}
             <p>{p.text}</p>
@@ -324,13 +328,24 @@ export function ContractDoc({ snap, ctx }: { snap: ContractSnapshot; ctx: DocCon
       </DocSection>
       <DocSection title="Model cancellation form" legal={legal}>
         <div className="space-y-3 rounded-xl border border-ink-900/40 p-4">
-          {cancellationForm(t).map((line, i) => (
+          {(frozen.cancellationForm ?? cancellationForm(t)).map((line, i) => (
             <p key={i} className={i > 3 && i < 8 ? "border-b border-dashed border-ink-300 pb-5" : ""}>
               {line}
             </p>
           ))}
         </div>
       </DocSection>
+      {snap.termsText?.length ? (
+        <DocSection title={`Our terms (version ${snap.termsVersion})`} legal={{ reviewed: ctx.legal.termsReviewed }} breakBefore>
+          <p>The terms you accepted, word for word as they were when your proposal was issued.</p>
+          <TermsText sections={snap.termsText} version={snap.termsVersion} open summary={`Our terms, version ${snap.termsVersion}`} />
+          {snap.termsHash && (
+            <p className="text-xs text-ink-500">
+              Fingerprint (sha256): <span className="break-all font-mono">{snap.termsHash}</span>
+            </p>
+          )}
+        </DocSection>
+      ) : null}
     </>
   );
 }

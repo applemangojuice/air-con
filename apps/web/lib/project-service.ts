@@ -5,6 +5,7 @@ import {
   createProject,
   currentStage,
   depositPence,
+  settingsForProposal,
   generateQuote,
   instantiateCompliance,
   isOpen,
@@ -455,7 +456,8 @@ export async function buildReadinessContext(project: Project, actor?: StaffMembe
       .filter((p) => p.status === "succeeded" && p.invoiceId && depositInvoices.has(p.invoiceId))
       .reduce((sum, p) => sum + p.amountPence, 0);
     return {
-      depositDuePence: contract > 0 ? depositPence(contract, settings) : 0,
+      // The deposit the customer agreed (the accepted proposal's frozen terms), not today's settings.
+      depositDuePence: contract > 0 ? depositPence(contract, settingsForProposal(settings, proposal?.status === "accepted" ? proposal : null)) : 0,
       depositPaidPence,
       outstandingPence: outstandingPence(invoices),
     };
