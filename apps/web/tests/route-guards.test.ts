@@ -139,6 +139,39 @@ test("every server action that takes a project id checks access to that project"
   assert.deepEqual(problems, []);
 });
 
+/**
+ * The customer's own screens (the portal, paying, proposal responses) open
+ * for the customer and for staff who see the customer side only
+ * (`customerSide: true`), never for a subcontractor or installer on the job;
+ * documents go through `mayViewDocument`. Contract §C, START-HERE step 8.
+ */
+test("every customer screen refuses staff who don't see the customer's prices", () => {
+  const surfaces = [
+    ...walk(join(APP, "p")),
+    join(APP, "api/pay/[invoiceId]/route.ts"),
+    join(APP, "api/proposals/_shared.ts"),
+    join(APP, "api/projects/route.ts"),
+    new URL("../lib/portal-server.ts", import.meta.url).pathname,
+  ].filter((f) => /\.(ts|tsx)$/.test(f));
+  const problems: string[] = [];
+  let calls = 0;
+  for (const f of surfaces) {
+    const src = readFileSync(f, "utf8");
+    for (const m of src.matchAll(/requireProjectAccess\(([^)]*)\)/g)) {
+      calls++;
+      // customerHomes only ever lets customers through (access.kind !== "customer" is skipped).
+      if (/allowCustomer: true/.test(m[1]!) && !/customerSide: true/.test(m[1]!) && !/access\.kind !== "customer"\) continue/.test(src.slice(m.index!, m.index! + 200))) {
+        problems.push(`${relative(APP, f)}: ${m[0]}`);
+      }
+    }
+  }
+  assert.ok(calls >= 8, `found the customer screens (${calls})`);
+  assert.deepEqual(problems, []);
+  const docPage = readFileSync(join(APP, "d/[id]/page.tsx"), "utf8");
+  assert.match(docPage, /mayViewDocument\(access, doc\)/, "/d/[id] decides with mayViewDocument");
+  assert.doesNotMatch(docPage, /access\.kind === "staff" \|\|/, "never 'any staff may see it'");
+});
+
 test("the extractor sees through destructured params and shared helpers", () => {
   const src = `
 async function run(id: string) { await requireStaff("projects.edit"); return id; }

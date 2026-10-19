@@ -3,7 +3,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { audit } from "@/lib/audit";
-import { isPlausibleEmail, normaliseEmail, safeNextPath, staffLanding } from "@/lib/auth/access";
+import { breakGlassLimits, isPlausibleEmail, normaliseEmail, safeNextPath, staffLanding } from "@/lib/auth/access";
 import { isDemoRoleKey } from "@/lib/auth/demo-staff";
 import { issueMagicLink } from "@/lib/auth/magic";
 import { breakGlassSession, ensureDemoStaff, setSession, staffSession } from "@/lib/auth/server";
@@ -16,17 +16,12 @@ import { getServiceClient } from "@/lib/supabase-server";
 
 /**
  * Staff sign-in actions. Server actions carry Next's own same-origin check;
- * the rate limits below are a brake on guessing and inbox flooding. They're
- * in-memory per instance (lib/rate-limit), so for break-glass the real
- * protection is the password itself: at least 20 characters or it's off.
+ * the rate limits below are a brake on guessing and inbox flooding, shared by
+ * every instance (lib/rate-limit-shared). For break-glass they're scoped to
+ * the caller's own network (`breakGlassLimits`), so nobody can lock the
+ * founders out; the real protection is the password itself: at least 20
+ * characters, never a template value, or it's off.
  */
-
-/** Break-glass: per address (IPv6 by /64), per email, and across everyone. */
-const BREAK_GLASS_LIMITS = {
-  perIp: { limit: 5, windowMs: 15 * 60_000 },
-  perEmail: { limit: 5, windowMs: 60 * 60_000 },
-  global: { limit: 20, windowMs: 60 * 60_000 },
-};
 
 export interface LinkState {
   status: "idle" | "sent" | "error";
@@ -78,7 +73,7 @@ export async function requestMagicLink(_prev: LinkState, form: FormData): Promis
     console.error("[login] magic link failed:", err);
     // Not a passing hiccup: the pilot migration hasn't been run (the banner above says how to fix it).
     const schema = await pilotSchemaStatus().catch(() => null);
-    if (schema?.missingTables.some((t) => t === "staff" || t === "login_tokens")) {
+    if ([...(schema?.missingTables ?? []), ...(schema?.deniedTables ?? [])].some((t) => t === "staff" || t === "login_tokens")) {
       return { status: "error", message: "Sign-in isn't set up on this database yet: its pilot migration hasn't been run (see the note above).", email };
     }
     return { status: "error", message: "We couldn't send a link just now. Please try again.", email };
@@ -99,14 +94,7 @@ export async function breakGlassSignIn(_prev: BreakGlassState, form: FormData): 
   const email = normaliseEmail(field(form, "email")).slice(0, 254);
   const password = String(form.get("password") ?? "");
   const ip = await clientIp();
-  const { perIp, perEmail, global } = BREAK_GLASS_LIMITS;
-  const limited = !(
-    await sharedRateLimits([
-      { key: "break-glass:all", limit: global.limit, windowMs: global.windowMs },
-      { key: `break-glass:${ip}`, limit: perIp.limit, windowMs: perIp.windowMs },
-      { key: `break-glass-email:${email}`, limit: perEmail.limit, windowMs: perEmail.windowMs },
-    ])
-  ).ok;
+  const limited = !(await sharedRateLimits(breakGlassLimits(ip, email))).ok;
   // Refusals over the limit aren't audited (that would let a flood write rows);
   // every attempt that's actually checked is.
   if (limited) {

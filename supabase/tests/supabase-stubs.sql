@@ -3,9 +3,16 @@
 --
 --  * `storage.buckets`: migrations insert their private buckets here.
 --  * `auth`: exists on every Supabase project; nothing of ours uses it yet.
---  * The three API roles, with Supabase's default grants on `public`, so the
---    tests can prove RLS (not missing grants) is what keeps anon out.
---    service_role bypasses RLS, exactly as on Supabase.
+--  * The three API roles, with Supabase's default grants on `public` as a
+--    project created today has them: usage on the schema, functions and
+--    sequences, but no longer tables (Supabase stopped exposing new tables to
+--    its API roles by default: new projects since 30 May 2026, existing ones
+--    from 30 October 2026). So every table the app uses must be granted by
+--    the migrations themselves (0014), and a missing grant fails here as it
+--    would on Supabase. service_role bypasses RLS, exactly as on Supabase.
+--    run-migrations.sh's second database models an older project instead:
+--    0001 to 0009 made while tables were still granted by default, then the
+--    switch, then the pilot upgrade.
 
 create extension if not exists pgcrypto;
 
@@ -37,6 +44,6 @@ end
 $$;
 
 grant usage on schema public to anon, authenticated, service_role;
-alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
+-- No "grant all on tables" default any more (see above).
 alter default privileges in schema public grant all on functions to anon, authenticated, service_role;
 alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;

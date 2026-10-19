@@ -11,11 +11,22 @@
  * Pure (no Node APIs): middleware and the edge runtime use it too.
  */
 
-/** The exact template strings that have shipped (compared case-insensitively). */
+/**
+ * The exact template strings that have shipped, in any version of
+ * `.env.example` (`git log -p -- apps/web/.env.example`), compared
+ * case-insensitively. Main's original template matters most: the live
+ * Vercel project was set up from it, so its `OPS_PASSWORD` (once a basic-auth
+ * password, now the key to the whole admin console) may still be it.
+ */
 const KNOWN_PLACEHOLDERS = new Set(
   [
     "generate-with-openssl-rand-hex-32",
     "at-least-twenty-random-characters",
+    // OPS_PASSWORD on main's first .env.example: 21 characters, so it passed the length check.
+    "pick-something-strong",
+    // LEADS_NOTIFY_EMAIL and ADMIN_EMAILS / EPC_API_EMAIL templates: nobody's inbox.
+    "you@dang.ac",
+    "you@example.com",
     "generate-a-long-random-string",
     "your-service-role-key",
     "https://your-project.supabase.co",
@@ -43,6 +54,8 @@ export function isPlaceholderValue(value: string | null | undefined): boolean {
   if (/^(your|generate|change|replace|paste)[-_ ]/i.test(v)) return true;
   if (/^(changeme|placeholder|example|todo|tbd|x{3,}|\.{3,})$/i.test(v)) return true;
   if (/your-project\.supabase\.co/i.test(v)) return true;
+  // A template domain anywhere: "Breeze <quotes@yourdomain.co.uk>", https://yourdomain.co.uk, hello@yourdomain.co.uk.
+  if (/(^|[@/.<\s])yourdomain\./i.test(v)) return true;
   return false;
 }
 
@@ -56,7 +69,11 @@ export function realEnv(env: Record<string, string | undefined>, key: string): s
 export const PLACEHOLDER_CHECKED_KEYS = [
   "SESSION_SECRET",
   "OPS_PASSWORD",
+  "ADMIN_EMAILS",
   "CRON_SECRET",
+  "EMAIL_FROM",
+  "LEADS_NOTIFY_EMAIL",
+  "NEXT_PUBLIC_APP_URL",
   "SUPABASE_URL",
   "SUPABASE_SERVICE_ROLE_KEY",
   "RESEND_API_KEY",

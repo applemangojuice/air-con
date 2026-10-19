@@ -53,7 +53,13 @@ says what to do instead. Approvals that need a professional are in
     - starting and ending a day, the on-my-way text, commissioning sign-off
       and handover sign-off need signal, because the server checks them;
     - anything waiting lives in that phone's browser: clearing its data or
-      using a private tab before it sends loses it.
+      using a private tab before it sends loses it;
+    - refrigerant (F-gas) and electrical (Part P) steps are checked against
+      the certificate on file on the day they reach the office, not the time
+      the phone says: a reading taken offline the day before a certificate
+      ran out and sent after it is refused until the office adds the renewed
+      certificate (the phone says so). Keep certificates renewed ahead of
+      their expiry.
 12. **No live location.** "On my way" sends the arrival time the installer
     picks; nothing tracks the van.
 13. **Barcode reading works on Android only.** In Chrome on Android a serial
@@ -125,6 +131,20 @@ says what to do instead. Approvals that need a professional are in
     database only). The app never deletes customer photos.
 31. **Roles are fixed** (admin, technical lead, surveyor, installer,
     electrician, plus "subcontractor"); there's no screen to customise what
-    each can do.
+    each can do. Installers and the electrician see the job in the field app
+    but, like subcontractors, never the family's own pages (prices, contract,
+    invoices); the commissioning certificate and handover pack open from
+    the job. Use **Customer view** from the office to see what the family
+    sees.
 32. **The phone video-walkthrough app** (`apps/mobile`) isn't part of the
     pilots and its endpoints are off on the live site.
+33. **Admin break-glass relies on its password.** Attempts are slowed per
+    network (5 a quarter hour) and every failure is logged, but there's no
+    site-wide cap any more: one would let a stranger lock you out on launch
+    day. So `OPS_PASSWORD` must be long and random (`openssl rand -base64
+    24`), and once email sign-in works you can remove it in Vercel.
+34. **Two dependency warnings remain** in `pnpm audit` after the Next.js
+    15.5.28 update, both inside Next itself and neither reachable here: its
+    bundled PostCSS (only ever runs on our own stylesheets, at build time)
+    and `sharp` (only for Next's image optimiser, which the app doesn't use;
+    Vercel serves images itself). They go when Next ships newer copies.

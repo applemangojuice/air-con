@@ -91,3 +91,28 @@ test("shared rate limits: the database's count decides across instances, and a m
   assert.equal((await sharedRateLimit(other, 2, 60_000)).ok, true, "the other limit was counted once, not dodged");
   assert.equal((await sharedRateLimit(other, 2, 60_000)).ok, false);
 });
+
+test("break-glass: a flood of junk attempts locks out only the network sending it, never a founder elsewhere", async () => {
+  const { breakGlassLimits } = await import("../lib/auth/access.ts");
+  const run = crypto.randomUUID().slice(0, 8);
+  const attacker = `203.0.113.${run.length}`;
+  const founderEmail = `founder-${run}@example.test`;
+  // Every key names the caller's network: nothing is shared with another one.
+  for (const { key } of breakGlassLimits(attacker, founderEmail)) assert.ok(key.includes(attacker), key);
+  // 21 junk tries from one network, some with the founder's own address.
+  const answers = { checked: 0, refused: 0 };
+  for (let i = 0; i < 21; i++) {
+    const email = i % 2 ? founderEmail : `junk-${i}-${run}@example.test`;
+    if ((await sharedRateLimits(breakGlassLimits(attacker, email))).ok) answers.checked++;
+    else answers.refused++;
+  }
+  assert.deepEqual(answers, { checked: 5, refused: 16 }, "the flooding network is slowed to 5 checked tries a quarter hour");
+  // The founder, from another network, with their own address: their attempt is checked.
+  assert.equal((await sharedRateLimits(breakGlassLimits(`198.51.100.${run.length}`, founderEmail))).ok, true);
+  // IPv6: the attacker's whole /64 counts as one network.
+  const v6 = (n: number) => `2001:db8:${run.length}:1::${n}`;
+  const { rateLimitIdentity } = await import("../lib/rate-limit.ts");
+  let ok = 0;
+  for (let n = 1; n <= 8; n++) if ((await sharedRateLimits(breakGlassLimits(rateLimitIdentity(v6(n)), `x${n}-${run}@example.test`))).ok) ok++;
+  assert.equal(ok, 5, "rotating addresses inside one /64 doesn't buy more tries");
+});

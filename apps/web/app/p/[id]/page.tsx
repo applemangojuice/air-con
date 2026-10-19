@@ -38,7 +38,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
   if (!UUID_RE.test(rawId)) notFound();
   const id = rawId.toLowerCase();
 
-  const [access, settings] = await Promise.all([requireProjectAccess(id, { allowCustomer: true }), getSettings()]);
+  const [access, settings] = await Promise.all([requireProjectAccess(id, { allowCustomer: true, customerSide: true }), getSettings()]);
   const phone = realPhone(settings.company.phone);
 
   if (!access) {

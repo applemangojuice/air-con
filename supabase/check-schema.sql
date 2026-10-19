@@ -8,11 +8,14 @@
 --     supabase/pilot-upgrade.sql (or the "Apply database upgrade" GitHub
 --     workflow), then run this again.
 --
--- What it checks: every table the migrations create (0001 to 0013), that
--- each one is locked to the server (row level security on), the columns the
--- pilot adds to older tables, the three photo and video stores with their
--- size and file-type limits, the shared sign-in counter, the guard that
--- freezes an accepted proposal, and the duplicate guards.
+-- What it checks: every table the migrations create (0001 to 0014), that
+-- each one is locked to the server (row level security on) and that the
+-- server can use it (the service role's select, insert, update and delete:
+-- Supabase stopped giving those to new tables by default in 2026, 0014 gives
+-- them), the columns the pilot adds to older tables, the three photo and
+-- video stores with their size and file-type limits, the shared sign-in
+-- counter, the guard that freezes an accepted proposal, and the duplicate
+-- guards.
 --
 -- The "Apply database upgrade" workflow runs it after every upgrade, and
 -- supabase/tests/run-migrations.sh proves it passes on a fully migrated
@@ -26,6 +29,8 @@ do $$
 declare
   missing text[] := '{}';
   t text;
+  p text;
+  lacking text[];
   c text;
   b text;
   i text;
@@ -52,11 +57,28 @@ declare
   -- 0013: one pilot number per household, one invoice per click.
   indexes text[] := array['projects_pilot_number_key', 'invoices_request_id_key', 'invoices_issue_key'];
 begin
+  if not exists (select 1 from pg_roles where rolname = 'service_role') then
+    missing := missing || 'the service_role role (is this a Supabase database?)'::text;
+  elsif not has_schema_privilege('service_role', 'public', 'usage') then
+    missing := missing || 'the server''s use of the public schema (0014)'::text;
+  end if;
+
   foreach t in array tables loop
     if to_regclass(format('public.%I', t)) is null then
       missing := missing || format('table %s', t);
     elsif not (select relrowsecurity from pg_class where oid = to_regclass(format('public.%I', t))) then
       missing := missing || format('row level security on %s (anyone with the public key could read it)', t);
+    elsif exists (select 1 from pg_roles where rolname = 'service_role') then
+      -- One privilege at a time: has_table_privilege with a list is true if any one is held.
+      lacking := '{}';
+      foreach p in array array['select', 'insert', 'update', 'delete'] loop
+        if not has_table_privilege('service_role', format('public.%I', t), p) then
+          lacking := lacking || p;
+        end if;
+      end loop;
+      if cardinality(lacking) > 0 then
+        missing := missing || format('the server''s use of table %s (%s, from 0014; without it the app gets "permission denied")', t, array_to_string(lacking, ', '));
+      end if;
     end if;
   end loop;
 
@@ -106,11 +128,11 @@ begin
     raise exception 'Missing % of what the app needs: %.', cardinality(missing), array_to_string(missing, '; ')
       using hint = 'Run supabase/pilot-upgrade.sql in the Supabase SQL Editor (or the "Apply database upgrade" GitHub workflow), then run this check again.';
   end if;
-  raise notice 'All present: % tables, % columns, % photo stores, the sign-in counter, the proposal guard and % duplicate guards.',
+  raise notice 'All present: % tables (each usable by the server), % columns, % photo stores, the sign-in counter, the proposal guard and % duplicate guards.',
     cardinality(tables), cardinality(columns), cardinality(buckets), cardinality(indexes);
 end
 $$;
 
-select 'All present: every table, column, photo store and safety check the app needs is in this database.' as result;
+select 'All present: every table (each usable by the server), column, photo store and safety check the app needs is in this database.' as result;
 
 commit;

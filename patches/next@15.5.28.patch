@@ -6,7 +6,7 @@ index 4376913076151ad78dcc4059ad4152fad25478da..56e0ff0f597d936093ef77ea39baac69
            break;
          case 5:
            resetHooksOnUnwind(unitOfWork);
-+          // Patched (patches/next@15.5.20.patch): a host component that suspended
++          // Patched (patches/next@15.5.28.patch): a host component that suspended
 +          // while reconciling its children during hydration (a lazy child: an RSC row
 +          // or a client chunk not loaded yet) has already claimed its DOM node and
 +          // moved the hydration cursor into it. Put the cursor back on that node so
@@ -26,7 +26,7 @@ index 755076a5cf15273f024c18fdc6a8805f1e36860b..2ebf627009bff214f23c3fa75e63d0ad
        break;
      case 5:
        resetHooksOnUnwind(next);
-+      // Patched (patches/next@15.5.20.patch): a host component that suspended
++      // Patched (patches/next@15.5.28.patch): a host component that suspended
 +      // while reconciling its children during hydration (a lazy child: an RSC row
 +      // or a client chunk not loaded yet) has already claimed its DOM node and
 +      // moved the hydration cursor into it. Put the cursor back on that node so
@@ -46,7 +46,7 @@ index 43d0363849598f796873fffaf33117d54b76de19..627ef52476090f3593b66e860a9d3b3d
            break;
          case 5:
            resetHooksOnUnwind(unitOfWork);
-+          // Patched (patches/next@15.5.20.patch): a host component that suspended
++          // Patched (patches/next@15.5.28.patch): a host component that suspended
 +          // while reconciling its children during hydration (a lazy child: an RSC row
 +          // or a client chunk not loaded yet) has already claimed its DOM node and
 +          // moved the hydration cursor into it. Put the cursor back on that node so
@@ -66,7 +66,7 @@ index 85185b07d38d122ada8ed308523b181da102ccad..7e9019e43205619ee3a1de18ba923abe
        break;
      case 5:
        resetHooksOnUnwind(next);
-+      // Patched (patches/next@15.5.20.patch): a host component that suspended
++      // Patched (patches/next@15.5.28.patch): a host component that suspended
 +      // while reconciling its children during hydration (a lazy child: an RSC row
 +      // or a client chunk not loaded yet) has already claimed its DOM node and
 +      // moved the hydration cursor into it. Put the cursor back on that node so

@@ -56,7 +56,7 @@ import { emailConfigured } from "./email";
 import { isDemoSeedId } from "./demo-seed/ids";
 import { healthReport } from "./health";
 import { isPlaceholderValue, placeholderKeys, realEnv } from "./env-placeholders";
-import { PILOT_UPGRADE, UPGRADE_HOW, checkPilotSchema, probeTable } from "./schema-check";
+import { PILOT_UPGRADE, UPGRADE_HOW, checkPilotSchema, probeTable, schemaProblems } from "./schema-check";
 import { MEDIA_CONTENT_TYPES, MEDIA_MAX_BYTES, safeMediaName, signedMediaUrls } from "./media-server";
 import { DAILY_JOB_IDS, DONE_STATUSES, dailyJobsFor, emptySummary, type DailyJob, type DailyOpsSummary } from "./ops-core-schedule";
 import { dispatch, londonToday } from "./project-service";
@@ -716,7 +716,7 @@ export async function goLiveChecks(): Promise<GoLiveCheck[]> {
   // The same GET probes as /ops/status and /api/health (schema-check), so a missing table can't pass here.
   const [report, schema] = await Promise.all([healthReport(), checkPilotSchema()]);
   if (backend === "supabase") {
-    const missing = [...schema.missingTables, ...schema.missingColumns];
+    const missing = schemaProblems(schema);
     const allOk = report.reachable && missing.length === 0 && schema.errors.length === 0 && report.tables.every((t) => t.ok);
     checks.push({
       id: "database",

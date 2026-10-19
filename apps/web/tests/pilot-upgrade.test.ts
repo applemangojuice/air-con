@@ -71,7 +71,30 @@ test("check-schema.sql lists every table the migrations create, and what the app
 });
 
 test("check-schema.sql can't change anything", () => {
-  const code = check.replace(/--[^\n]*/g, "");
+  // The one place it names privileges is the list it asks has_table_privilege about.
+  const privileges = "array['select', 'insert', 'update', 'delete']";
+  assert.ok(check.includes(privileges), "check-schema.sql checks the service role's privileges");
+  const code = check.replace(/--[^\n]*/g, "").replace(privileges, "");
   assert.match(code, /^\s*begin transaction read only;/m);
   assert.doesNotMatch(code, /\b(insert|update|delete|drop|alter|create|truncate|grant|revoke)\b/i);
+});
+
+test("every table a migration creates is granted to the service role, and to no other API role", () => {
+  // Supabase stopped granting new public tables to its API roles by default in 2026: a table
+  // without a grant answers "permission denied" even for the service-role key (0014's header).
+  const grantsAll = (sql: string) => /grant select, insert, update, delete on all tables in schema public to service_role;/i.test(sql);
+  const problems: string[] = [];
+  migrations.forEach((f, i) => {
+    const sql = read(`migrations/${f}`).replace(/--[^\n]*/g, "");
+    const later = migrations.slice(i).some((g) => grantsAll(read(`migrations/${g}`).replace(/--[^\n]*/g, "")));
+    for (const m of sql.matchAll(/create table (?:if not exists )?public\.(\w+)/gi)) {
+      const own = new RegExp(`grant select, insert, update, delete on (?:table )?public\\.${m[1]} to service_role;`, "i").test(sql);
+      if (!own && !later) problems.push(`${f}: ${m[1]} (add "grant select, insert, update, delete on table public.${m[1]} to service_role;")`);
+    }
+    if (/grant [^;]* to [^;]*\b(anon|authenticated)\b/i.test(sql)) problems.push(`${f}: grants something to anon or authenticated`);
+  });
+  assert.deepEqual(problems, []);
+  const bundle = upgrade.replace(/--[^\n]*/g, "");
+  assert.ok(grantsAll(bundle), "the one-paste upgrade carries the grants (a brand-new project's 0001 to 0009 tables too)");
+  assert.match(bundle, /grant usage on schema public to service_role;/);
 });

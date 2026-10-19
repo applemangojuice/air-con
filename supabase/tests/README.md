@@ -25,8 +25,13 @@ tail of the server log when it does.
 2. Loads `supabase-stubs.sql`: the parts of a Supabase project our
    migrations assume (`storage.buckets`, the `auth` schema, `pgcrypto`, the
    `anon` / `authenticated` / `service_role` roles and Supabase's default
-   grants on `public`).
-3. Applies every migration in lexical order, each in one transaction.
+   grants on `public` as a project created today has them: none on tables.
+   Supabase stopped granting new tables to its API roles by default in 2026
+   (new projects since 30 May, existing ones for tables made from 30
+   October), and a missing grant is "permission denied" even for the
+   service role, so the migrations grant it themselves (`0014`).
+3. Applies every migration in lexical order, each in one transaction;
+   before `0014` the service role can't read a table, after it, it can.
 4. Applies `0010_pilot_platform.sql` again on the fresh schema.
 5. Compares the migrated schema with `apps/web/lib/db/db-schema.generated.ts`
    (`schema-dump.sql` | `schema-sync.mjs --check`): every column, type,
@@ -44,10 +49,13 @@ tail of the server log when it does.
    `../pilot-upgrade.sql` is current with the migrations
    (`build-pilot-upgrade.sh --check`).
 9. On a second database shaped like production before the pilot (stubs
-   plus `0001` to `0009` only): `check-schema.sql` must fail and name what's
-   missing; `pilot-upgrade.sql` runs twice; `check-schema.sql` and
-   `sanity.sql` pass; one more run over real rows; then a run that stops
-   part-way (two households on one pilot number) must change nothing at all.
+   plus `0001` to `0009` only, made while tables were still granted by
+   default, then Supabase's switch to granting nothing): `check-schema.sql`
+   must fail and name what's missing; `pilot-upgrade.sql` runs twice;
+   `check-schema.sql` and `sanity.sql` pass; with grants taken away again
+   `check-schema.sql` names them and the bundle puts them back; one more run
+   over real rows; then a run that stops part-way (two households on one
+   pilot number) must change nothing at all.
 10. Stops the cluster and deletes the directory.
 
 ## The one-paste upgrade
@@ -83,8 +91,10 @@ checks both).
   frozen, and the only allowed update is to `superseded`. An accepted proposal
   that has been superseded stays frozen. A proposal that was never accepted
   isn't guarded. Deleting a project still cascades.
-- As `anon`, every table reads empty and writes are refused. As
-  `service_role`, everything is visible, as on Supabase.
+- As `anon`, every table reads empty (or is refused outright) and writes are
+  refused. As `service_role`, everything is visible, and every table in
+  `public` takes its select, insert, update and delete, through the
+  migrations' own grants.
 
 When you add a migration, add checks for it here. If it adds a unique
 constraint, a default or a guard the app depends on, mirror it in
@@ -111,7 +121,8 @@ The stack (`stack.sh`, everything in a temp dir, deleted on exit):
   `supabase-stubs.sql` and `compat/compat-roles.sql`; every migration then
   runs as `postgres`, which, as on Supabase (and in its SQL editor), is not a
   superuser: CREATEROLE, CREATEDB, BYPASSRLS, owner of `public`, allowed to
-  write `storage.buckets`. The roles are Supabase's: `anon`, `authenticated`,
+  write `storage.buckets`, and with Supabase's 2026 defaults (no table is
+  granted to the API roles unless a migration grants it). The roles are Supabase's: `anon`, `authenticated`,
   `service_role` (BYPASSRLS, so RLS-on-no-policies hides nothing from it) and
   an `authenticator` login role that PostgREST connects as and that can only
   switch to those three; Supabase's statement timeouts (8 s, anon 3 s).

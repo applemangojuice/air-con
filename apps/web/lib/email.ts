@@ -10,13 +10,14 @@ import { realEnv } from "./env-placeholders";
 
 export function emailConfigured(): boolean {
   // A template key (re_xxx) isn't a provider: stay honestly in demo mode.
-  return Boolean(realEnv(process.env, "RESEND_API_KEY") && process.env.EMAIL_FROM);
+  return Boolean(realEnv(process.env, "RESEND_API_KEY") && realEnv(process.env, "EMAIL_FROM"));
 }
 
-/** Where team-facing alerts go: LEADS_NOTIFY_EMAIL, else the from-address. */
+/** Where team-facing alerts go: LEADS_NOTIFY_EMAIL, else the from-address. A template inbox (you@dang.ac) is no inbox. */
 export function teamInbox(): string | null {
-  if (process.env.LEADS_NOTIFY_EMAIL) return process.env.LEADS_NOTIFY_EMAIL;
-  const from = process.env.EMAIL_FROM;
+  const leads = realEnv(process.env, "LEADS_NOTIFY_EMAIL");
+  if (leads) return leads;
+  const from = realEnv(process.env, "EMAIL_FROM");
   if (!from) return null;
   const match = from.match(/<([^>]+)>/);
   return match ? match[1] : from;
@@ -35,8 +36,8 @@ export function replyToAddress(value: string | null | undefined): string | undef
  * is a sending-only or no-reply address.
  */
 export async function sendEmail(to: string, subject: string, html: string, opts: { replyTo?: string } = {}): Promise<boolean> {
-  const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.EMAIL_FROM;
+  const apiKey = realEnv(process.env, "RESEND_API_KEY");
+  const from = realEnv(process.env, "EMAIL_FROM");
   if (!apiKey || !from) return false;
   const replyTo = replyToAddress(opts.replyTo);
   try {

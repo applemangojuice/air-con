@@ -15,6 +15,7 @@ import {
   isPlausibleEmail,
   isReservedDemoAddress,
   linkMayCarryToken,
+  mayViewDocument,
   linkMayShowOnScreen,
   maskEmail,
   parseAdminEmails,
@@ -22,6 +23,7 @@ import {
   safeNextPath,
   sameEmail,
   securityWarnings,
+  seesCustomerSide,
   taintedByDemo,
   staffCanAccessProject,
   staffHome,
@@ -149,6 +151,48 @@ test("decideProjectAccess: one null for every kind of no", () => {
     { kind: "customer", customerId: "cust-1" },
     "perm is the staff requirement; allowCustomer lets the owner in",
   );
+});
+
+test("the customer's own screens: subcontractors and installers on the job are 'not found', never shown prices", () => {
+  const base = { projectId: PROJECT_ID, project, allowCustomer: true, customerSide: true };
+  assert.equal(seesCustomerSide(admin), true);
+  assert.equal(seesCustomerSide(surveyor), true, "the office's surveyor sees the board and the customer side");
+  assert.equal(seesCustomerSide(sub), false, "a subcontractor never");
+  assert.equal(seesCustomerSide(subSurveyor), false, "nor an external surveyor");
+  assert.equal(seesCustomerSide(installer), false, "an installer sees the job, not the money");
+  assert.equal(seesCustomerSide(leaver), false);
+  // The subcontractor is on this job's crew: the field app opens it, the customer's screens don't.
+  assert.deepEqual(decideProjectAccess({ projectId: PROJECT_ID, project, session: staffSessionFor(sub), staff: sub, allowCustomer: true }), { kind: "staff", staff: sub });
+  assert.equal(decideProjectAccess({ ...base, session: staffSessionFor(sub), staff: sub }), null, "subcontractor on the crew: /p, /pay, /proposal, /documents are 404");
+  assert.equal(decideProjectAccess({ ...base, session: staffSessionFor(installer), staff: installer }), null, "installer on the crew: the same");
+  assert.equal(decideProjectAccess({ ...base, session: staffSessionFor(subSurveyor), staff: subSurveyor }), null, "external surveyor on the job: the same");
+  assert.deepEqual(decideProjectAccess({ ...base, session: staffSessionFor(admin), staff: admin }), { kind: "staff", staff: admin }, "the office's preview stays");
+  assert.deepEqual(decideProjectAccess({ ...base, session: customer, staff: null }), { kind: "customer", customerId: "cust-1" }, "the customer, of course");
+});
+
+test("documents: the crew opens only what it hands over; the customer only what's issued to them", () => {
+  const doc = (kind: Parameters<typeof mayViewDocument>[1]["kind"], over: { customerVisible?: boolean; status?: "draft" | "final" | "superseded" } = {}) => ({
+    kind,
+    customerVisible: over.customerVisible ?? true,
+    status: over.status ?? ("final" as const),
+  });
+  const subAccess = { kind: "staff" as const, staff: sub };
+  const installerAccess = { kind: "staff" as const, staff: installer };
+  const office = { kind: "staff" as const, staff: admin };
+  const cust = { kind: "customer" as const, customerId: "cust-1" };
+  for (const kind of ["proposal", "contract", "invoice", "receipt", "variation", "survey-report", "certificate"] as const) {
+    assert.equal(mayViewDocument(subAccess, doc(kind)), false, `subcontractor: no ${kind}`);
+    assert.equal(mayViewDocument(installerAccess, doc(kind)), false, `installer: no ${kind}`);
+    assert.equal(mayViewDocument(office, doc(kind)), true, `office: ${kind}`);
+    assert.equal(mayViewDocument(cust, doc(kind)), true, `customer: their ${kind}`);
+  }
+  assert.equal(mayViewDocument(subAccess, doc("handover-pack")), true, "the crew opens the handover pack it published");
+  assert.equal(mayViewDocument(installerAccess, doc("commissioning-certificate")), true);
+  assert.equal(mayViewDocument(subAccess, doc("handover-pack", { status: "draft" })), false, "never a draft");
+  assert.equal(mayViewDocument(subAccess, doc("handover-pack", { customerVisible: false })), false);
+  assert.equal(mayViewDocument(office, doc("contract", { status: "draft", customerVisible: false })), true, "the office sees drafts");
+  assert.equal(mayViewDocument(cust, doc("invoice", { status: "draft" })), false, "the customer never a draft");
+  assert.equal(mayViewDocument(null, doc("handover-pack")), false);
 });
 
 test("decideProjectAccess: a quote-owner grant opens only the project made from that quote", () => {
@@ -323,6 +367,28 @@ test("break-glass needs a long OPS_PASSWORD", () => {
   assert.equal(breakGlassEnabled({ OPS_PASSWORD: "p4".repeat(10) }), true);
   // The .env.example placeholder (33 characters, in the public repo) never turns it on.
   assert.equal(breakGlassEnabled({ OPS_PASSWORD: "at-least-twenty-random-characters" }), false);
+  // Nor main's original template (21 characters): the live Vercel project may still hold it.
+  assert.equal(breakGlassEnabled({ OPS_PASSWORD: "pick-something-strong" }), false);
+  assert.equal(breakGlassEnabled({ OPS_PASSWORD: "Pick-Something-Strong " }), false, "whatever the case and spacing");
+  const warnings = securityWarnings({ NODE_ENV: "production", OPS_PASSWORD: "pick-something-strong", SESSION_SECRET: "s".repeat(40) });
+  assert.ok(warnings.some((w) => /OPS_PASSWORD is still the \.env\.example placeholder/.test(w)), warnings.join(" | "));
+});
+
+test("main's template values count as not set too: a template inbox, admin or domain is nobody's", () => {
+  for (const v of ["pick-something-strong", "you@dang.ac", "you@example.com", "Breeze <quotes@yourdomain.co.uk>", "https://yourdomain.co.uk", "Dang It's Hot <hello@yourdomain.co.uk>"]) {
+    assert.equal(isPlaceholderValue(v), true, v);
+  }
+  // Real values on the real domain stay real.
+  for (const v of ["Dang, It's Hot <quotes@dang.ac>", "https://dang.ac", "hello@dang.ac", "jo@notyourdomain.co.uk"]) {
+    assert.equal(isPlaceholderValue(v), false, v);
+  }
+  assert.deepEqual(
+    placeholderKeys({ OPS_PASSWORD: "pick-something-strong", LEADS_NOTIFY_EMAIL: "you@dang.ac", ADMIN_EMAILS: "you@example.com", EMAIL_FROM: "Dang, It's Hot <quotes@dang.ac>" }),
+    ["OPS_PASSWORD", "ADMIN_EMAILS", "LEADS_NOTIFY_EMAIL"],
+    "named on /ops/launch and in the boot warnings",
+  );
+  assert.deepEqual(parseAdminEmails("you@example.com, Jo@Dang.ac"), ["jo@dang.ac"], "the template admin is dropped, the real one kept");
+  assert.equal(isAdminEmail("you@example.com", "you@example.com"), false);
 });
 
 test("template values from .env.example count as not set", () => {

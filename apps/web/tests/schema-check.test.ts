@@ -14,6 +14,9 @@ import { registerAppResolver } from "./helpers/resolve-app.ts";
 const MISSING = new Set(["staff", "login_tokens", "customers", "media", "surveys", "designs", "proposals", "catalogue_items", "catalogue_compatibility", "purchase_orders", "compliance_items", "install_jobs", "install_evidence", "issues", "time_entries", "invoices", "payments", "messages", "documents", "learnings", "settings", "audit_log"]);
 const PILOT_PROJECT_COLUMNS = ["schema_version", "customer_id", "pilot_number", "owner_staff_id", "next_action", "next_action_at", "value_pence", "blocked"];
 
+/** "denied": every table answers as on a Supabase project that granted nothing (42501 even for the service role). */
+let mode: "unmigrated" | "denied" = "unmigrated";
+
 function handler(req: IncomingMessage, res: ServerResponse) {
   const url = new URL(req.url ?? "/", "http://stub");
   if (url.pathname.startsWith("/storage/v1/bucket/")) {
@@ -22,6 +25,11 @@ function handler(req: IncomingMessage, res: ServerResponse) {
     return;
   }
   const table = url.pathname.replace("/rest/v1/", "");
+  if (mode === "denied") {
+    res.writeHead(403, { "content-type": "application/json" });
+    res.end(req.method === "HEAD" ? undefined : JSON.stringify({ code: "42501", message: `permission denied for table ${table}`, details: null, hint: null }));
+    return;
+  }
   if (table === "bodiless") {
     // A proxy in the way: 404 and nothing else.
     res.writeHead(404);
@@ -55,7 +63,9 @@ process.env.SUPABASE_SERVICE_ROLE_KEY = "stub-service-role-key-for-tests";
 delete process.env.DATA_BACKEND;
 registerAppResolver();
 
-const { checkPilotSchema, isMissingSchemaError, probeTable, resetSchemaStatusCache, staffTableMissing } = await import("../lib/schema-check.ts");
+const { checkPilotSchema, isMissingSchemaError, isPermissionDeniedError, needsUpgrade, probeTable, resetSchemaStatusCache, schemaProblems, staffTableMissing } = await import(
+  "../lib/schema-check.ts"
+);
 const { healthReport } = await import("../lib/health.ts");
 const { getServiceClient } = await import("../lib/supabase-server.ts");
 
@@ -105,4 +115,39 @@ test("isMissingSchemaError: missing tables and columns, never a network error", 
   assert.equal(isMissingSchemaError({ message: "TypeError: fetch failed" }), false);
   assert.equal(isMissingSchemaError({ code: "PGRST301", message: "JWT expired" }), false);
   assert.equal(isMissingSchemaError(null), false);
+});
+
+test("tables the server's key isn't granted (Supabase's 2026 default): needs the upgrade, never 'fine' or 'unreachable'", async () => {
+  mode = "denied";
+  try {
+    resetSchemaStatusCache();
+    const client = getServiceClient()!;
+    const probe = await probeTable(client, "staff");
+    assert.deepEqual([probe.ok, probe.missing, probe.denied], [false, true, true]);
+    assert.match(probe.error!, /isn't allowed to use "staff".*0014/);
+    const s = await checkPilotSchema();
+    assert.deepEqual(s.missingTables, [], "they're there");
+    assert.ok(s.deniedTables.includes("staff") && s.deniedTables.includes("projects"), s.deniedTables.join(", "));
+    assert.deepEqual(s.missingColumns, [], "no column is reported missing on a table the key can't read");
+    assert.deepEqual(s.errors, []);
+    assert.equal(needsUpgrade(s), true);
+    assert.ok(schemaProblems(s).includes("staff (there, but not granted to the server's key)"));
+    assert.equal(await staffTableMissing(), true, "break-glass falls back to the synthetic admin, so /ops/status opens");
+    const r = await healthReport();
+    assert.equal(r.reachable, true, "a database without grants isn't an unreachable one");
+    assert.equal(r.healthy, false);
+    assert.equal(r.tables.find((t) => t.table === "staff")!.missing, true);
+  } finally {
+    mode = "unmigrated";
+    resetSchemaStatusCache();
+  }
+});
+
+test("isPermissionDeniedError: 42501 and Postgres's words, nothing else", () => {
+  assert.equal(isPermissionDeniedError({ code: "42501", message: "permission denied for table staff" }), true);
+  assert.equal(isPermissionDeniedError({ message: "permission denied for table quote_requests" }), true);
+  assert.equal(isPermissionDeniedError({ code: "PGRST205", message: "Could not find the table" }), false);
+  assert.equal(isPermissionDeniedError({ message: "TypeError: fetch failed" }), false);
+  assert.equal(isPermissionDeniedError(null), false);
+  assert.equal(needsUpgrade({ checked: false, missingTables: ["staff"], missingColumns: [], deniedTables: [] }), false, "nothing checked, nothing claimed");
 });

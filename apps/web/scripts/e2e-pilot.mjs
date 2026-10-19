@@ -1378,6 +1378,18 @@ try {
       check("their own job opens", opened);
       check("on their own job, no margin or cost", !(await has(sub, /margin|£[\d,]+\.\d\d cost/i, "body")));
       await shot(sub, "L-subcontractor-job");
+      // The customer's own screens for that same job: the office sees the prices there; the subcontractor never does.
+      const subPid = sub.url().match(/jobs\/([0-9a-f-]{36})/)[1];
+      await go(admin, `/p/${subPid}/documents`);
+      const docHrefs = await admin.locator('main a[href^="/d/"]').evaluateAll((as) => as.map((a) => a.getAttribute("href")));
+      check("(the control) the office sees that job's customer documents, with prices", docHrefs.length >= 2 && (await go(admin, docHrefs[0])) && (await has(admin, /£\d/, "body")), docHrefs.length);
+      const leaks = [];
+      for (const path of [`/p/${subPid}`, `/p/${subPid}/pay`, `/p/${subPid}/proposal`, `/p/${subPid}/documents`, ...docHrefs]) {
+        await go(sub, path);
+        const body = await text(sub, "body");
+        if (/£\s?\d/.test(body) || /Acceptance record|Amount due|Balance invoice|Deposit invoice/i.test(body)) leaks.push(path);
+      }
+      check("…but on their own job the subcontractor sees no customer price, contract, invoice or receipt (/p, /pay, /proposal, /documents, every /d)", leaks.length === 0, leaks.join(", "));
     } else check("the subcontractor sees their assigned DEMO job", false);
 
     // Signed out, forged cookie.

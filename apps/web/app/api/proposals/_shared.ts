@@ -26,7 +26,7 @@ export async function customerGate<T>(
   const { id } = await params;
   const projectId = await projectIdOfProposal(id);
   if (!projectId) return { ok: false, response: json({ error: "Not found" }, 404) };
-  const access = await requireProjectAccess(projectId, { allowCustomer: true });
+  const access = await requireProjectAccess(projectId, { allowCustomer: true, customerSide: true });
   if (!access) return { ok: false, response: json({ error: "Not found" }, 404) };
   const raw = await request.json().catch(() => null);
   const parsed = opts.schema.safeParse(raw ?? {});

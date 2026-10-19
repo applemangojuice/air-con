@@ -95,7 +95,7 @@ export default async function CustomerProposalPage({
     );
   }
 
-  const access = await requireProjectAccess(id, { allowCustomer: true });
+  const access = await requireProjectAccess(id, { allowCustomer: true, customerSide: true });
   if (!access) notFound();
   const previewId = preview && UUID_RE.test(preview) && access.kind === "staff" && can(access.staff, "proposal.edit") ? preview : undefined;
   const loaded = await loadCustomerProposal(id, previewId ? { previewId } : {});

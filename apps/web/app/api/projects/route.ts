@@ -42,7 +42,7 @@ export async function POST(request: Request) {
   }
 
   // Already signed in as this project's customer (or staff who can see it): straight in.
-  const canOpen = Boolean(await requireProjectAccess(result.id, { allowCustomer: true }));
+  const canOpen = Boolean(await requireProjectAccess(result.id, { allowCustomer: true, customerSide: true }));
   let linkSent = false;
   let devLink: string | undefined;
   if (result.created && !canOpen) {

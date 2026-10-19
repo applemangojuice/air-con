@@ -538,14 +538,25 @@ $$;
 
 \echo '--- sanity: API roles'
 
--- anon has table grants (Supabase defaults) but RLS with no policies hides
--- every row; service_role bypasses RLS, as on Supabase.
+-- anon sees nothing: on a project created since Supabase's 2026 change it
+-- holds no table grants at all (permission denied); on an older one it holds
+-- the old default grants, and RLS with no policies hides every row. Either
+-- way, nothing. service_role bypasses RLS, and the migrations grant it every
+-- table (0014), as on Supabase.
 set role anon;
 do $$
+declare
+  t text;
+  n bigint;
 begin
-  assert (select count(*) from public.staff) = 0, 'anon must not see staff';
-  assert (select count(*) from public.proposals) = 0, 'anon must not see proposals';
-  assert (select count(*) from public.payments) = 0, 'anon must not see payments';
+  foreach t in array array['staff', 'proposals', 'payments', 'customers', 'invoices'] loop
+    begin
+      execute format('select count(*) from public.%I', t) into n;
+    exception when insufficient_privilege then
+      n := 0;
+    end;
+    assert n = 0, format('anon must not see %s', t);
+  end loop;
 end
 $$;
 select pg_temp.expect_error('anon cannot write', '42501', $sql$
@@ -558,6 +569,39 @@ do $$
 begin
   assert (select count(*) from public.staff) = 1, 'service_role should see staff';
   assert (select count(*) from public.install_evidence) = 1, 'service_role should see evidence';
+end
+$$;
+reset role;
+
+-- Every table in public, whichever migration made it: the service role can
+-- read and write it (0014), or the app gets 42501 "permission denied".
+do $$
+declare
+  r record;
+  p text;
+begin
+  for r in select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace
+           where n.nspname = 'public' and c.relkind in ('r', 'p') loop
+    foreach p in array array['select', 'insert', 'update', 'delete'] loop
+      assert has_table_privilege('service_role', format('public.%I', r.relname), p),
+        format('service_role has no %s on %s: a migration must grant it (see 0014)', p, r.relname);
+    end loop;
+  end loop;
+  -- The migrations give anon and authenticated nothing on the pilot's tables.
+  if not exists (select 1 from pg_default_acl where defaclnamespace = 'public'::regnamespace and defaclobjtype = 'r') then
+    assert not has_table_privilege('anon', 'public.staff', 'select'), 'anon must hold no grant on staff';
+    assert not has_table_privilege('authenticated', 'public.payments', 'select'), 'authenticated must hold no grant on payments';
+  end if;
+  raise notice 'ok: the service role can read and write every table, through the migrations'' own grants (0014)';
+end
+$$;
+
+-- A write as the service role, through the grant alone (not as a superuser).
+set role service_role;
+do $$
+begin
+  insert into public.audit_log (actor_kind, action, entity) values ('system', 'sanity.grant-check', 'test');
+  delete from public.audit_log where action = 'sanity.grant-check';
 end
 $$;
 reset role;

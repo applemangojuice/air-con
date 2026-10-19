@@ -32,8 +32,9 @@ import {
 import { DocSheet, DocToolbar } from "@/components/docs/shell";
 import { CustomerNav, PortalShell, StaffNav } from "@/components/portal/shell";
 import { LinkRequest } from "@/components/portal/sign-in";
+import { mayViewDocument, seesCustomerSide } from "@/lib/auth/access";
 import { requireProjectAccess } from "@/lib/auth/server";
-import { getDocument, isCustomerVisible } from "@/lib/documents-server";
+import { getDocument } from "@/lib/documents-server";
 import { documentPhotos } from "@/lib/portal-server";
 import { loadProject } from "@/lib/project-service";
 import { getSettings } from "@/lib/settings-server";
@@ -47,7 +48,8 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const viewerDocument = cache(async (id: string) => {
   const doc = await getDocument(id);
   const access = doc ? await requireProjectAccess(doc.projectId, { allowCustomer: true }) : null;
-  const allowed = Boolean(doc && access && (access.kind === "staff" || isCustomerVisible(doc)));
+  // The crew and subcontractors open only what they hand over, never the customer's prices (mayViewDocument).
+  const allowed = Boolean(doc && mayViewDocument(access, doc));
   return { doc, access, allowed };
 });
 
@@ -70,9 +72,11 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
 /**
  * One printable document (contract §G F1): the project's customer, for a
- * customer-visible, issued document; or a team member who can see the
- * project (drafts and superseded versions included, watermarked). Anyone
- * else gets the same sign-in page whether or not the document exists.
+ * customer-visible, issued document; a team member who sees the customer
+ * side (drafts and superseded versions included, watermarked); or someone on
+ * the job's crew, for the issued documents they hand over (the commissioning
+ * certificate, the handover pack), never one with the customer's prices.
+ * Anyone else gets the same sign-in page whether or not the document exists.
  * "Download PDF" is the browser's print, on A4 print styles.
  */
 export default async function DocumentPage({ params }: { params: Promise<{ id: string }> }) {
@@ -186,13 +190,24 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
       break;
   }
 
+  const office = access.kind === "staff" && seesCustomerSide(access.staff);
   const back =
-    access.kind === "staff"
-      ? { href: `/ops/projects/${doc.projectId}`, label: "Back to the command centre" }
-      : { href: `/p/${doc.projectId}/documents`, label: "All your documents" };
+    access.kind === "customer"
+      ? { href: `/p/${doc.projectId}/documents`, label: "All your documents" }
+      : office
+        ? { href: `/ops/projects/${doc.projectId}`, label: "Back to the command centre" }
+        : { href: `/field/jobs/${doc.projectId}`, label: "Back to the job" };
+  const right =
+    access.kind === "customer" ? (
+      <CustomerNav />
+    ) : office ? (
+      <StaffNav href={`/ops/projects/${doc.projectId}`} />
+    ) : (
+      <StaffNav href={`/field/jobs/${doc.projectId}`} label="Field app" />
+    );
 
   return (
-    <PortalShell right={access.kind === "staff" ? <StaffNav href={`/ops/projects/${doc.projectId}`} /> : <CustomerNav />}>
+    <PortalShell right={right}>
       <DocToolbar back={back} />
       <DocSheet doc={doc} company={company} customer={customer} issuedAt={header.issuedAt ?? doc.createdAt}>
         {wellFormed(doc) ? (

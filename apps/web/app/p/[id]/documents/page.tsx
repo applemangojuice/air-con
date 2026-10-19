@@ -36,7 +36,7 @@ export default async function DocumentsPage({ params }: { params: Promise<{ id: 
   const { id: rawId } = await params;
   if (!UUID_RE.test(rawId)) notFound();
   const id = rawId.toLowerCase();
-  const [access, settings] = await Promise.all([requireProjectAccess(id, { allowCustomer: true }), getSettings()]);
+  const [access, settings] = await Promise.all([requireProjectAccess(id, { allowCustomer: true, customerSide: true }), getSettings()]);
 
   if (!access) {
     return (

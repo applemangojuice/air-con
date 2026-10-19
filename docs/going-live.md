@@ -48,14 +48,20 @@ Git → Production Branch, normally `main`).
      `supabase/migrations/`, one at a time the same way, then
      `supabase/pilot-upgrade.sql`, then the check.
 
-   `pilot-upgrade.sql` is `0010` to `0013` in one go, and it says what each
+   `pilot-upgrade.sql` is `0010` to `0014` in one go, and it says what each
    does at the top. `0010` is the pilot platform itself: the staff and
    sign-in tables, every project record (surveys, designs, proposals,
    orders, invoices, payments, documents…) and the `project-media` bucket.
    **Without it nobody can sign in.** `0011` sets each storage bucket's size
    limit and file types; `0012` makes the sign-in limits count once for the
    whole site; `0013` makes the database refuse two households on one pilot
-   number and two invoices from one click. It all runs as one transaction,
+   number and two invoices from one click; `0014` grants the app's server key
+   (the service role) every table. Supabase stopped doing that by itself in
+   2026: a project created since 30 May 2026 grants a new table to nobody,
+   and from 30 October 2026 neither does an older one. Without `0014` such a
+   database answers "permission denied" to everything, even the service role:
+   nobody can sign in and nothing saves. `check-schema.sql` checks the server
+   can use every table. It all runs as one transaction,
    so if it stops, nothing changed. If it stops with "Two households share a
    pilot number", give one of them another number on its project page, then
    run it again. **Re-running it is always safe.** If you skip it the site

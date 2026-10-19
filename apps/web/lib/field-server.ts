@@ -74,7 +74,7 @@ import type {
   RiskFlag,
 } from "@/components/field/types";
 import { audit } from "./audit";
-import { isAssigned, staffCanAccessProject } from "./auth/access";
+import { isAssigned, seesCustomerSide, staffCanAccessProject } from "./auth/access";
 import { appUrl } from "./brand";
 import { crewLead } from "./comms/action-map";
 import { notify } from "./comms/outbox";
@@ -178,8 +178,8 @@ function meOf(staff: StaffMember, today: string): FieldMe {
   };
 }
 
-/** Prices are for staff who see money; subcontractors never do. */
-const seesPrices = (staff: StaffMember) => !staff.external && can(staff, "projects.view-all");
+/** Prices and priced documents in the field app: staff who see money, never subcontractors (the same rule as the customer's own screens, `seesCustomerSide`). */
+const seesPrices = (staff: StaffMember) => seesCustomerSide(staff);
 
 /* ------------------------------------------------------------------ */
 /* Small helpers                                                       */
@@ -865,12 +865,47 @@ export async function loadJobPack(projectId: string, staff: StaffMember): Promis
 
 const PERMANENT = (id: string, error: string): SyncResult => ({ id, ok: false, error, permanent: true });
 
-/** A capture time from the phone: trusted for the record, never in the future. */
-function captureTime(at: string): string {
-  const t = Date.parse(at);
+/**
+ * A capture time from the phone, kept for the record only: never in the
+ * future, and never before `notBefore` (the install's start, for a step that
+ * can't be done before day 1). It's the phone's claim, so it never decides
+ * who may record a step: see `qualifiedToRecord`.
+ */
+function captureTime(at: string, notBefore?: string): string {
   const now = Date.now();
-  if (!Number.isFinite(t)) return new Date(now).toISOString();
-  return new Date(Math.min(t, now)).toISOString();
+  const t = Date.parse(at);
+  let ms = Number.isFinite(t) ? Math.min(t, now) : now;
+  const floor = notBefore ? Date.parse(notBefore) : Number.NaN;
+  if (Number.isFinite(floor) && floor <= now) ms = Math.max(ms, floor);
+  return new Date(ms).toISOString();
+}
+
+/** The earliest a capture on this step can be dated: the install's start, except the RAMS read before setting off. */
+function captureFloor(project: Project, step: InstallStep): string | undefined {
+  if (step.evidence.some((e) => e.role === "rams")) return undefined;
+  return project.install.startedAt ?? project.install.days.map((d) => d.startedAt).filter((s): s is string => Boolean(s)).sort()[0];
+}
+
+/**
+ * The qualification gate for a step, decided on the server's own day (London
+ * today), never on the phone's capture time: a backdated `at` must not let
+ * someone whose F-gas or Part P certificate has lapsed record refrigerant or
+ * electrical work. A qualification has no start date, so current today means
+ * current on any earlier capture day too. A capture made offline before a
+ * certificate ran out and synced after it is refused with a plain reason.
+ */
+function qualifiedToRecord(
+  check: (onIso: string) => { ok: boolean; reason?: string },
+  at: string,
+): { ok: boolean; reason?: string } {
+  const today = londonToday();
+  const gate = check(today);
+  if (gate.ok) return gate;
+  const then = londonDateOf(at);
+  if (then < today && check(then).ok) {
+    return { ok: false, reason: `${gate.reason ?? "You can't record this step"}: your certificate on file isn't current today. Ask the office to add the renewed one, then capture again.` };
+  }
+  return gate;
 }
 
 /** Why recording on this step isn't possible right now, or null. */
@@ -915,8 +950,8 @@ async function syncEvidence(ctx: BatchContext, op: Extract<SyncOp, { type: "evid
   const step = job.runsheet.find((s) => s.evidence.some((e) => e.id === op.specId));
   const spec = step?.evidence.find((e) => e.id === op.specId);
   if (!step || !spec) return PERMANENT(op.id, "That step isn't on this job's runsheet any more.");
-  const at = captureTime(op.at);
-  const gate = canRecord(step, ctx.staff, at);
+  const at = captureTime(op.at, captureFloor(project, step));
+  const gate = qualifiedToRecord((on) => canRecord(step, ctx.staff, on), at);
   if (!gate.ok) return PERMANENT(op.id, gate.reason ?? "You can't record this step.");
   const refusal = recordingRefusal(project, step);
   if (refusal) return PERMANENT(op.id, refusal);
@@ -1043,8 +1078,8 @@ async function syncStatus(ctx: BatchContext, op: Extract<SyncOp, { type: "step-s
   const step = job.runsheet.find((s) => s.id === op.stepId);
   if (!step) return PERMANENT(op.id, "That step isn't on this job's runsheet any more.");
   if (job.stepStatuses.some((s) => s.id === op.id)) return { id: op.id, ok: true, duplicate: true };
-  const at = captureTime(op.at);
-  const gate = canSetOutcome(step, op.outcome, ctx.staff, at, op.reason);
+  const at = captureTime(op.at, captureFloor(project, step));
+  const gate = qualifiedToRecord((on) => canSetOutcome(step, op.outcome, ctx.staff, on, op.reason), at);
   if (!gate.ok) return PERMANENT(op.id, gate.reason ?? "You can't record that outcome.");
   const refusal = recordingRefusal(project, step);
   if (refusal) return PERMANENT(op.id, refusal);

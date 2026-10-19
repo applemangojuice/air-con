@@ -24,7 +24,7 @@ async function allowed(projectId: string, scope: string, limit: number): Promise
   const ip = rateLimitIdentity(h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || "unknown");
   if (!rateLimit(`${scope}:${ip}`, limit, 60_000).ok) return { error: "Too many tries just now. Wait a minute and try again." };
   if (!isUuid(projectId)) return { error: "This page isn't available." };
-  const access = await requireProjectAccess(projectId, { allowCustomer: true });
+  const access = await requireProjectAccess(projectId, { allowCustomer: true, customerSide: true });
   if (!access) return { error: "This page isn't available. Try signing in again." };
   const session = await getSession();
   return { who: access.kind === "staff" ? access.staff.name : session?.name || "Customer" };

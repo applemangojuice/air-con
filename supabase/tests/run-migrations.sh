@@ -10,8 +10,11 @@
 # Order of play:
 #   1. initdb + start (as the `postgres` OS user when run as root: postgres
 #      refuses to run as root)
-#   2. supabase-stubs.sql: storage/auth schemas, API roles, default grants
-#   3. supabase/migrations/*.sql in lexical order, each in one transaction
+#   2. supabase-stubs.sql: storage/auth schemas, API roles, default grants as
+#      a project created today has them (none on tables)
+#   3. supabase/migrations/*.sql in lexical order, each in one transaction;
+#      before 0014 the service role can't read a table (Supabase's 2026
+#      default), after it, it can
 #   4. 0010 again on the fresh schema: proves it's re-runnable
 #   4b. the schema against apps/web/lib/db/db-schema.generated.ts, which the
 #      local data backend enforces (UPDATE_SCHEMA=1 rewrites it from here)
@@ -23,9 +26,11 @@
 #   8. check-schema.sql (the read-only production check) passes
 #   9. supabase/pilot-upgrade.sql is current with the migrations, then, on a
 #      second database shaped like production before the pilot (0001 to 0009
-#      only): check-schema.sql fails naming what's missing, the bundle runs
-#      twice, check-schema.sql passes, sanity.sql passes, and a bundle that
-#      stops part-way changes nothing
+#      only, made while Supabase still granted tables by default, then its
+#      switch to granting nothing): check-schema.sql fails naming what's
+#      missing, the bundle runs twice, check-schema.sql passes, sanity.sql
+#      passes, a lost grant is named and put back by the bundle, and a bundle
+#      that stops part-way changes nothing
 #
 # Exits non-zero on the first SQL error (psql ON_ERROR_STOP).
 
@@ -121,7 +126,16 @@ if [[ ${#migrations[@]} == 0 ]]; then
   echo "run-migrations: no migrations in $MIGRATIONS" >&2
   exit 1
 fi
+GRANTS_MIGRATION="$MIGRATIONS/0014_service_role_grants.sql"
+[[ -f "$GRANTS_MIGRATION" ]] || { echo "run-migrations: $GRANTS_MIGRATION is missing" >&2; exit 1; }
 for f in "${migrations[@]}"; do
+  if [[ "$f" == "$GRANTS_MIGRATION" ]]; then
+    # Supabase's 2026 default, modelled by the stubs: a new table is granted to nobody.
+    "${PSQL[@]}" -d "$DB" -c "do \$\$ begin
+      assert not has_table_privilege('service_role', 'public.staff', 'select'), 'the stubs granted a table by default: they must model a project created today';
+    end \$\$;"
+    echo "    (before 0014 the service role can't read staff, as on a project created today)"
+  fi
   apply "$f"
 done
 
@@ -214,6 +228,8 @@ UPGRADE_DB=aircon_upgrade
 echo "==> pilot-upgrade.sql on a database shaped like production before the pilot (0001 to 0009)"
 "${PSQL[@]}" -d postgres -c "create database $UPGRADE_DB"
 "${PSQL[@]}" -d "$UPGRADE_DB" --single-transaction -f "$HERE/supabase-stubs.sql"
+# The live site's tables were made while Supabase still granted every new table to its API roles.
+"${PSQL[@]}" -d "$UPGRADE_DB" -c "alter default privileges in schema public grant all on tables to anon, authenticated, service_role;"
 original=0
 for f in "${migrations[@]}"; do
   name="$(basename "$f")"
@@ -226,6 +242,8 @@ if [[ $original -lt 10 ]]; then
   echo "run-migrations: expected the ten original migrations (0001 to 0009, both 0006), found $original" >&2
   exit 1
 fi
+# Then Supabase's switch (30 October 2026 for existing projects): tables made from now on are granted to nobody.
+"${PSQL[@]}" -d "$UPGRADE_DB" -c "alter default privileges in schema public revoke all on tables from anon, authenticated, service_role;"
 
 CHECK_ERR="$(mktemp "${PGTEST_TMP:-/tmp}/aircon-check.XXXXXX")"
 if "${PSQL[@]}" -d "$UPGRADE_DB" -o /dev/null -f "$CHECK_SCHEMA" 2>"$CHECK_ERR"; then
@@ -253,6 +271,27 @@ run_check "$UPGRADE_DB"
 
 echo "==> sanity checks on the upgraded database"
 PGOPTIONS="-c client_min_messages=notice" "${PSQL[@]}" -d "$UPGRADE_DB" -o /dev/null -f "$HERE/sanity.sql"
+
+echo "==> a table the server's key lost: check-schema.sql names it, the bundle puts it back"
+"${PSQL[@]}" -d "$UPGRADE_DB" -c "revoke insert, update on public.staff from service_role; revoke all on public.quote_requests from service_role;"
+GRANT_ERR="$(mktemp "${PGTEST_TMP:-/tmp}/aircon-grant.XXXXXX")"
+if "${PSQL[@]}" -d "$UPGRADE_DB" -o /dev/null -f "$CHECK_SCHEMA" 2>"$GRANT_ERR"; then
+  echo "run-migrations: check-schema.sql passed with the service role's grants revoked" >&2
+  rm -f "$GRANT_ERR"
+  exit 1
+fi
+for want in "the server's use of table staff (insert, update" "the server's use of table quote_requests (select, insert, update, delete"; do
+  if ! grep -qF "$want" "$GRANT_ERR"; then
+    echo "run-migrations: check-schema.sql didn't name \"$want\":" >&2
+    cat "$GRANT_ERR" >&2
+    rm -f "$GRANT_ERR"
+    exit 1
+  fi
+done
+rm -f "$GRANT_ERR"
+echo "    check-schema.sql named both"
+run_file "$UPGRADE_DB" "$UPGRADE"
+run_check "$UPGRADE_DB"
 
 echo "==> pilot-upgrade.sql again over real rows, then one that stops part-way changes nothing"
 run_file "$UPGRADE_DB" "$UPGRADE"

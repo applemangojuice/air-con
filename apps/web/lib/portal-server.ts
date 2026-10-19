@@ -965,7 +965,7 @@ export async function requirePortalCustomer(
   const limited = enforceRateLimit(request, `portal-${scope}`, limit, windowMs);
   if (limited) return limited;
   if (!isUuid(projectId)) return portalJson({ error: "Not found" }, 404);
-  const access = await requireProjectAccess(projectId, { allowCustomer: true });
+  const access = await requireProjectAccess(projectId, { allowCustomer: true, customerSide: true });
   if (!access) return portalJson({ error: "Not found" }, 404);
   if (access.kind === "staff") {
     return portalJson({ error: "This is the customer's own screen. Make changes from the project's command centre." }, 403);

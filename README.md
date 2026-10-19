@@ -78,8 +78,9 @@ a DEMO team member ("Load demo pilots" fills it with five fictional homes).
 To use Supabase, copy `apps/web/.env.example` to `apps/web/.env.local`, fill
 in your own values (they ship blank), run every file in
 `supabase/migrations/` from `0001` to `0009` against the project in order
-(both `0006` files), then `supabase/pilot-upgrade.sql` (`0010` to `0013` in
-one go).
+(both `0006` files), then `supabase/pilot-upgrade.sql` (`0010` to `0014` in
+one go; `0014` grants the service role every table, which Supabase no longer
+does by default).
 
 To load property data, follow [docs/loading-data.md](./docs/loading-data.md):
 demo mode (no setup), a one-click **GitHub Actions** workflow that imports and

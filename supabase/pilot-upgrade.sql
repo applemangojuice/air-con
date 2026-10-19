@@ -1,5 +1,5 @@
 -- =============================================================================
--- Dang, It's Hot: pilot upgrade (migrations 0010 to 0013, in one file)
+-- Dang, It's Hot: pilot upgrade (migrations 0010 to 0014, in one file)
 -- =============================================================================
 --
 -- Built by supabase/build-pilot-upgrade.sh from supabase/migrations. Don't
@@ -24,6 +24,8 @@
 --         sign-in emails and the break-glass password can't be dodged.
 --   0013  Stops two households sharing a pilot number, and stops a double
 --         click making two invoices.
+--   0014  Lets the app's server key use every table. Supabase stopped doing
+--         this by itself in 2026; without it, sign-in and saving fail.
 --
 -- SAFE TO RE-RUN
 --   Yes. Every step only adds what's missing ("create ... if not exists"),
@@ -837,6 +839,38 @@ create unique index if not exists invoices_request_id_key
 create unique index if not exists invoices_issue_key
   on public.invoices (project_id, (invoice->>'issueKey'))
   where invoice ? 'issueKey';
+
+-- =============================================================================
+-- 0014_service_role_grants.sql
+-- =============================================================================
+
+-- The server's access to its tables, granted explicitly (final pre-launch pass).
+--
+-- The app reaches the database only through Supabase's API (PostgREST) with
+-- the service-role key. Until 2026 every new table in `public` was granted to
+-- Supabase's API roles (anon, authenticated, service_role) by default, so no
+-- migration here granted anything. Supabase has since stopped doing that
+-- ("Tables not exposed to Data and GraphQL API automatically"): projects
+-- created since 30 May 2026 grant nothing on a new table, and existing
+-- projects stop granting tables made after 30 October 2026. A table without
+-- the grant answers 42501 "permission denied" even for the service role
+-- (which bypasses row level security, but still needs the privilege), so on
+-- such a project nobody could sign in and nothing could be saved.
+--
+-- This grants the service role what the app does to every table and
+-- sequence in `public`, whichever migration made it (the original site's
+-- 0001 to 0009 too, for a brand-new project), and nothing to anon or
+-- authenticated: row level security stays on with no policies, and the
+-- public key is never used. Grants are idempotent, so this is safe to re-run,
+-- and on an older project that already has them it changes nothing.
+--
+-- A later migration that creates a table grants it in the same file
+-- (apps/web/tests/pilot-upgrade.test.ts insists), and check-schema.sql
+-- checks the service role can use every table.
+
+grant usage on schema public to service_role;
+grant select, insert, update, delete on all tables in schema public to service_role;
+grant usage, select on all sequences in schema public to service_role;
 
 -- =============================================================================
 -- Done: every change above is saved together.

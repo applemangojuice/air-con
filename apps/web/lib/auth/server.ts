@@ -229,11 +229,13 @@ export async function requireStaffApi(req: Request, perm?: Permission): Promise<
  * `perm` when given. Customers: only with `allowCustomer`, and only their
  * own projects, or the project made from a quote this browser saved (the
  * funnel's quote-owner cookie). Anything else is null, which callers turn
- * into a 404.
+ * into a 404. `customerSide` marks the customer's own screens (the portal, its
+ * money, proposal responses): there staff need `seesCustomerSide` too, so a
+ * subcontractor or installer on the job gets the 404.
  */
 export async function requireProjectAccess(
   projectId: string,
-  opts: { perm?: Permission; allowCustomer?: boolean } = {},
+  opts: { perm?: Permission; allowCustomer?: boolean; customerSide?: boolean } = {},
 ): Promise<ProjectAccess | null> {
   const session = await getSession();
   const quoteGrant = opts.allowCustomer && session?.kind !== "staff" ? await quoteOwnerGrant() : [];

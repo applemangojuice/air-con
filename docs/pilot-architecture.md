@@ -181,9 +181,10 @@ type Session =
 **Staff bootstrap:** `ADMIN_EMAILS` (comma list). The first sign-in from
 such an email creates an admin `staff` row. Break-glass: when
 `OPS_PASSWORD` is set **and at least 20 characters**, `/login` also accepts
-an admin email plus that password. Limits per IP (IPv6 by /64), per email and
-globally; every checked failure is audited; the password and the admin
-lookup always both run.
+an admin email plus that password. Limits per network (IP, IPv6 by /64) and
+per email from that network, never a count shared across networks (§K38:
+it let anyone lock the admins out); every checked failure is audited; the
+password and the admin lookup always both run.
 
 **Demo sign-in** (`/login` "Try as…", one fictional DEMO account per role,
 `lib/auth/demo-staff.ts`): `demoLoginAllowed(env)` is true outside
@@ -1337,8 +1338,9 @@ changelog and the reasons, so nobody "fixes" a deliberate choice back.
     removed). `GET /auth/verify` is a confirm page, never an auto-submit
     (login CSRF, mail scanners). `safeNextPath` re-checks its normalised
     output (`/.//evil.com`). Production ignores a `SESSION_SECRET` under 32
-    characters and an `OPS_PASSWORD` under 20; break-glass has per-IP,
-    per-email and global limits and audits failures. Demo sign-in is refused
+    characters and an `OPS_PASSWORD` under 20; break-glass has per-IP
+    and per-email limits (scoped to the caller's network since §K38) and
+    audits failures. Demo sign-in is refused
     on a Supabase database without `DEMO_DEPLOYMENT=1`, and on any Supabase
     database holding real records whatever the flags say (`demoModeAllowed`),
     and staff rows a demo session writes are demo. `instrumentation.ts` logs all of this at boot.
@@ -1958,7 +1960,7 @@ changelog and the reasons, so nobody "fixes" a deliberate choice back.
       streaming in, and when a host element's child is one of those rows (or
       a client chunk still loading) React suspends, then replays the element
       without putting its hydration cursor back, so it fails on the
-      element's own first child. `patches/next@15.5.20.patch` (applied by
+      element's own first child. `patches/next@15.5.28.patch` (applied by
       pnpm, `pnpm-workspace.yaml`) restores the cursor in Next's vendored
       react-dom; drop it when Next ships a React with the fix. The field
       slot's barcode button is decided after mount, too (it read `window`
@@ -1984,3 +1986,62 @@ changelog and the reasons, so nobody "fixes" a deliberate choice back.
       `tests/helpers/rows.ts` like the rest.
     The route walk now lists `/ops/help` and `/field/help`, and counts the
     property book's numeric `/a/<uprn>` pages as one route.
+38. **Final pre-launch review (six findings, fixed before the first real
+    customers).**
+    - *Qualifications are judged on the server's day*: the field sync used the
+      phone's capture time (`op.at`) as the day an F-gas or Part P
+      certificate had to be current, so a lapsed engineer could record
+      refrigerant or electrical steps by backdating it. `syncEvidence` and
+      `syncStatus` now ask `canRecord` / `canSetOutcome` about London today
+      (`qualifiedToRecord`; a qualification has no start date, so current
+      today means current on any earlier capture day), and say plainly when
+      an offline capture made before an expiry arrives after it. The capture
+      time is still kept for the record, never before the install started
+      (`captureFloor`; the RAMS can be read before day 1).
+    - *The customer's side is the office's, not the crew's*: `/p/**`, paying,
+      proposal responses and the portal API take `customerSide: true`
+      (`decideProjectAccess`), so staff need `seesCustomerSide` (the
+      board-wide view: never a subcontractor, nor an installer or the
+      electrician) as well as the job; anyone else on the crew is "not
+      found" there. `/d/[id]` decides with `mayViewDocument`: the crew opens
+      only the issued documents it hands over (`CREW_DOCUMENT_KINDS`: the
+      commissioning certificate and the handover pack, with a "Back to the
+      job" link), never a proposal, contract, invoice, receipt or variation.
+      The field app's priced documents use the same rule. A static test
+      fails any customer screen without it.
+    - *Break-glass can't be locked by strangers*: its limits are scoped to
+      the caller's network (`breakGlassLimits`: 5 a quarter hour per IP, IPv6
+      by /64, and 5 an hour per email from that network). The shared global
+      count (20 an hour for everyone) and the cross-network per-email count
+      went: a few unauthenticated posts kept every admin out on launch day.
+      Guessing from many networks is bounded by the password (20+
+      characters, templates refused), and every checked failure is audited.
+    - *The service role's grants are the migrations' own* (migration
+      `0014_service_role_grants.sql`): Supabase stopped granting new
+      `public` tables to its API roles (new projects since 30 May 2026;
+      tables made on any project after 30 October 2026), and a missing grant
+      is 42501 even for the service role. 0014 grants it select, insert,
+      update and delete on every table (0001 to 0009 included, for a
+      brand-new project) and usage on the schema and sequences; anon and
+      authenticated get nothing. `check-schema.sql` checks every privilege;
+      `schema-check.ts` treats 42501 as "needs the upgrade" (`deniedTables`,
+      `needsUpgrade`), so `/login`, `/ops/launch`, `/api/health` and the boot
+      log say so and break-glass falls back to the synthetic admin. The test
+      harnesses (`supabase-stubs.sql`, `compat-roles.sql`) model today's
+      defaults (no table grants), the upgrade test models an older project
+      through the switch, and a later migration that creates a table must
+      grant it (`tests/pilot-upgrade.test.ts`).
+    - *Main's templates are templates*: `pick-something-strong` (main's
+      `OPS_PASSWORD`, 21 characters, so it passed the length check), the
+      `you@dang.ac` / `you@example.com` inboxes and any `yourdomain.` value
+      count as unset (`isPlaceholderValue`), for break-glass, the team inbox
+      (`teamInbox` falls back to `EMAIL_FROM`), `ADMIN_EMAILS` entries and
+      the launch and boot checks, which now name `ADMIN_EMAILS`,
+      `EMAIL_FROM`, `LEADS_NOTIFY_EMAIL` and `NEXT_PUBLIC_APP_URL` too.
+      `/login` says when break-glass is off because `OPS_PASSWORD` is a
+      template or too short; START-HERE step 4 says to edit the keys the old
+      site left and to generate a new `OPS_PASSWORD`.
+    - *Next.js 15.5.28* (was 15.5.20, before the July to October security
+      releases; the Server Actions denial of service among them), pinned
+      exactly because the hydration patch is keyed to the version
+      (`patches/next@15.5.28.patch`, applied unchanged).

@@ -34,7 +34,10 @@ is the longer one. Every picture here is fictional DEMO data.
    that phone for 30 days.
 
 Subcontractors only ever see the jobs they're on: no prices, no margins,
-no other families.
+no other families. On the crew's phones (installers, the electrician and any
+subcontractor) the family's own pages, with their prices, contract and
+invoices, stay closed; the commissioning certificate and the handover pack
+open from the job.
 
 ## 2. Your four tabs
 

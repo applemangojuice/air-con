@@ -53,7 +53,7 @@ export default async function PayPage({
   if (!isUuid(id)) notFound();
   const session = await getSession();
   if (!session) return <SignIn projectId={id} />;
-  const access = await requireProjectAccess(id, { allowCustomer: true });
+  const access = await requireProjectAccess(id, { allowCustomer: true, customerSide: true });
   if (!access) notFound();
   const project = await loadProject(id);
   if (!project) notFound();

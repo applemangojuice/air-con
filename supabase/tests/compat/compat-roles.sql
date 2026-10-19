@@ -7,8 +7,11 @@
 --    (CREATEROLE CREATEDB REPLICATION BYPASSRLS), owns the public schema and
 --    may write storage.buckets, so a migration that needs more than that
 --    fails here as it would in the SQL editor.
---  * Objects postgres creates in public are granted to the API roles by
---    default, as Supabase's default privileges do.
+--  * Functions and sequences postgres creates in public are granted to the
+--    API roles by default, as Supabase's default privileges do; tables are
+--    not, as on a project created since 30 May 2026 (and on every project
+--    for tables made after 30 October 2026), so the app works here only
+--    because the migrations grant the service role its tables (0014).
 --  * `authenticator`: the one login role PostgREST connects as. It has no
 --    rights of its own (noinherit) and switches to the role named in the
 --    request's JWT: anon, authenticated or service_role.
@@ -34,7 +37,6 @@ grant all on storage.buckets to postgres;
 grant usage on schema auth to postgres;
 grant anon, authenticated, service_role to postgres;
 
-alter default privileges for role postgres in schema public grant all on tables to anon, authenticated, service_role;
 alter default privileges for role postgres in schema public grant all on functions to anon, authenticated, service_role;
 alter default privileges for role postgres in schema public grant all on sequences to anon, authenticated, service_role;
 

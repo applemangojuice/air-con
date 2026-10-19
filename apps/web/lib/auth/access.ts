@@ -1,4 +1,4 @@
-import { can, type Permission, type StaffMember } from "@aircon/domain";
+import { can, type DocumentKind, type DocumentRecord, type Permission, type StaffMember } from "@aircon/domain";
 import { MIN_SESSION_SECRET_LENGTH, sessionSecretUsable, type CustomerSession, type Session } from "./session.ts";
 import { isPlaceholderValue, placeholderKeys, realEnv } from "../env-placeholders.ts";
 
@@ -59,6 +59,38 @@ export function customerCanAccessProject(
  */
 export type ProjectAccess = { kind: "staff"; staff: StaffMember } | { kind: "customer"; customerId: string };
 
+/**
+ * Staff who see the customer's side of a project as the office does: the
+ * portal, its prices, the contract, invoices, receipts and drafts. That's the
+ * board-wide view, which a subcontractor never holds (EXTERNAL_DENIED), and
+ * which installers and the electrician don't have either: the field app shows
+ * them the job, never the money (field-server's priced documents use this).
+ */
+export function seesCustomerSide(staff: Pick<StaffMember, "roles" | "external" | "active">): boolean {
+  return staff.active && !staff.external && can(staff, "projects.view-all");
+}
+
+/**
+ * The customer documents the crew hands over and opens from the field app
+ * (the commissioning certificate, the handover pack). Neither carries a price.
+ */
+export const CREW_DOCUMENT_KINDS: ReadonlySet<DocumentKind> = new Set<DocumentKind>(["commissioning-certificate", "handover-pack"]);
+
+/**
+ * May this viewer open this document (/d/[id])? The customer: their issued,
+ * customer-visible documents. Staff who see the customer side: everything on
+ * the project, drafts included. Anyone else on the job (the crew,
+ * subcontractors): only the issued documents the crew hands over, never a
+ * proposal, contract, invoice, receipt or variation.
+ */
+export function mayViewDocument(access: ProjectAccess | null, doc: Pick<DocumentRecord, "kind" | "customerVisible" | "status">): boolean {
+  if (!access) return false;
+  const issued = doc.customerVisible && doc.status !== "draft";
+  if (access.kind === "customer") return issued;
+  if (seesCustomerSide(access.staff)) return true;
+  return issued && CREW_DOCUMENT_KINDS.has(doc.kind);
+}
+
 /** Who acts through a quote-owner grant on a project no customer holds yet. */
 export function quoteActorId(quoteId: string): string {
   return `quote:${quoteId.toLowerCase()}`;
@@ -79,6 +111,13 @@ export function decideProjectAccess(input: {
   perm?: Permission;
   allowCustomer?: boolean;
   /**
+   * The customer's own screens (/p/**, paying, proposal responses): staff get
+   * in only when they see the customer side (`seesCustomerSide`), so a
+   * subcontractor or installer on the job is "not found" there, never shown
+   * the customer's prices, contract or invoices.
+   */
+  customerSide?: boolean;
+  /**
    * Quotes saved from this browser (lib/auth/quote-owner.ts). Opens the
    * project made from one of them, and nothing else: never the customer
    * record's other projects, since the email behind it is unverified.
@@ -89,6 +128,7 @@ export function decideProjectAccess(input: {
   if (!project) return null;
   if (session?.kind === "staff") {
     if (!staff || staff.id !== session.staffId) return null;
+    if (input.customerSide && !seesCustomerSide(staff)) return null;
     return staffCanAccessProject(staff, project, input.perm) ? { kind: "staff", staff } : null;
   }
   if (!input.allowCustomer) return null;
@@ -202,7 +242,8 @@ export function parseAdminEmails(raw: string | undefined): string[] {
   return (raw ?? "")
     .split(/[\s,;]+/)
     .map(normaliseEmail)
-    .filter((e) => e.includes("@"));
+    // A template address (you@example.com) is nobody's: it never makes an admin.
+    .filter((e) => e.includes("@") && !isPlaceholderValue(e));
 }
 
 /** Is this one of the ADMIN_EMAILS addresses (bootstrap admins)? */
@@ -291,6 +332,25 @@ export function taintedByDemo<T extends { demo?: boolean }>(record: T, by: { dem
 
 /** Break-glass passwords shorter than this are refused outright: it's one shared secret guarding admin. */
 export const MIN_BREAK_GLASS_PASSWORD = 20;
+
+/**
+ * The brakes on break-glass guessing, for one attempt from `ip` (IPv6 by its
+ * /64) with `email`. Every key is scoped to the caller's own network, so a
+ * flood of junk attempts only ever locks out the network sending it, never a
+ * founder signing in from anywhere else: break-glass is the way in on launch
+ * day, while the email domain verifies. There's deliberately no count shared
+ * across networks (it was 20 an hour for everyone, and 5 an hour per address):
+ * anyone could fill one with a few unauthenticated posts and keep every admin
+ * out. Guessing from many networks is bounded by the password itself: 20+
+ * characters, template values refused (`breakGlassEnabled`), every failure
+ * audited.
+ */
+export function breakGlassLimits(ip: string, email: string): { key: string; limit: number; windowMs: number }[] {
+  return [
+    { key: `break-glass:${ip}`, limit: 5, windowMs: 15 * 60_000 },
+    { key: `break-glass-email:${email}|${ip}`, limit: 5, windowMs: 60 * 60_000 },
+  ];
+}
 
 /** Is break-glass sign-in on? Only with an OPS_PASSWORD long enough to resist guessing. */
 export function breakGlassEnabled(env: Record<string, string | undefined>): boolean {

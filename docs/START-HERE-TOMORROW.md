@@ -120,6 +120,17 @@ These are the private settings the live site reads. You add each one in
 Vercel → your project → **Settings** → **Environment Variables**: type the
 **Key**, paste the **Value**, tick **Production**, click **Save**.
 
+**Some of these are already there from the old site**: probably
+`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `OPS_PASSWORD`, `EMAIL_FROM`,
+`NEXT_PUBLIC_APP_URL`, `CRON_SECRET`, `LEADS_NOTIFY_EMAIL` and
+`RESEND_API_KEY`. Vercel won't add a key twice, so for each one that's
+already in the list: click it → **Edit** → paste the new value → **Save**.
+Check each old value is real, not a template like `you@dang.ac` or
+`re_xxx`. **`OPS_PASSWORD` must be a new one you generate now** (see
+below): on the old site it was the shared password for the admin pages; now
+it opens the whole admin console, so the old one (and the old template
+`pick-something-strong`, which the app refuses) must go.
+
 | Key | What to put | Where it comes from |
 | --- | --- | --- |
 | `SUPABASE_URL` | The database address (probably already there) | Supabase → **Project Settings** → **API** → Project URL |
@@ -182,7 +193,10 @@ click **Admin break-glass** → type your `ADMIN_EMAILS` address and the
 `OPS_PASSWORD` → **Sign in**. You land on **Today**, as the admin (this also
 creates your account). It lasts 12 hours and every use is logged. Do steps 6
 to 10 while you wait, then sign in by email once Resend says **Verified**. The
-team and the families can't sign in until email works.
+team and the families can't sign in until email works. No **Admin
+break-glass** on `/login`, or a note that it's switched off? `OPS_PASSWORD`
+is missing, still a template value or shorter than 20 characters: back to
+step 4, edit it to a new one, redeploy.
 
 ## 6. Make the launch checklist green (10 minutes to read; the fixes are steps 7 to 9)
 

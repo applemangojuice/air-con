@@ -48,10 +48,10 @@ export function CustomerNav() {
 }
 
 /** Header link for the team: back to the command centre. */
-export function StaffNav({ href }: { href: string }) {
+export function StaffNav({ href, label = "Ops view" }: { href: string; label?: string }) {
   return (
     <Link href={href} className="inline-flex min-h-11 items-center rounded-full border border-line bg-white px-4 font-semibold text-ink-900 hover:border-ink-300">
-      Ops view
+      {label}
     </Link>
   );
 }

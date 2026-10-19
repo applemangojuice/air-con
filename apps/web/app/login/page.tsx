@@ -7,7 +7,7 @@ import { DEMO_ROLE_KEYS, DEMO_ROLE_LABEL } from "@/lib/auth/demo-staff";
 import { currentStaff } from "@/lib/auth/server";
 import { demoModeAllowed } from "@/lib/auth/demo-guard";
 import { appMode } from "@/lib/env-mode";
-import { PILOT_UPGRADE, pilotSchemaStatus } from "@/lib/schema-check";
+import { PILOT_UPGRADE, needsUpgrade, pilotSchemaStatus } from "@/lib/schema-check";
 import { demoSignIn } from "./actions";
 import { DemoSeedButton } from "./demo-seed";
 import { BreakGlassForm, MagicLinkForm } from "./forms";
@@ -49,11 +49,14 @@ export default async function LoginPage({ searchParams }: { searchParams: Search
   // Off on any database holding something real, whatever the flags say (lib/auth/demo-guard).
   const demoAllowed = await demoModeAllowed();
   const breakGlass = breakGlassEnabled(process.env);
+  // Set, but switched off (a template value, or a short password left from the old site's basic auth):
+  // say so here, where the founder is stuck on launch day, never what the value is.
+  const breakGlassOff = !breakGlass && Boolean(process.env.OPS_PASSWORD?.trim());
   const mode = appMode();
   // Supabase connected but the pilot migration never ran: say so here, where
   // everyone lands (every diagnostic page is behind this sign-in).
   const schema = mode.data === "supabase" ? await pilotSchemaStatus().catch(() => null) : null;
-  const notMigrated = Boolean(schema && (schema.missingTables.length > 0 || schema.missingColumns.length > 0));
+  const notMigrated = needsUpgrade(schema);
   // "Load demo pilots": anyone in development; on a demo deployment, admins only
   // (the route checks the same thing). Needs somewhere to put them.
   const canSeed =
@@ -163,6 +166,12 @@ export default async function LoginPage({ searchParams }: { searchParams: Search
             </p>
             <BreakGlassForm next={next} />
           </details>
+        )}
+        {breakGlassOff && !staff && (
+          <p className="mt-6 rounded-2xl border border-line bg-white p-4 text-sm text-ink-700">
+            Admin break-glass is switched off: <code className="font-mono text-xs">OPS_PASSWORD</code> is a template value or shorter than 20
+            characters. In Vercel, edit it to a new one (<code className="font-mono text-xs">openssl rand -base64 24</code>), then redeploy.
+          </p>
         )}
 
         <p className="mt-8 text-sm text-ink-500">

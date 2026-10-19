@@ -250,7 +250,7 @@ const DESIGN: DesignRecord = {
   createdAt: "2026-11-01T09:00:00.000Z",
 };
 
-async function seed(install: Project["install"]["status"]): Promise<Project> {
+async function seed(install: Project["install"]["status"], startedAt?: string): Promise<Project> {
   const db = requireDb();
   // Deleting the projects takes their jobs, evidence, issues, time, media and messages with them (on delete cascade).
   const cleared = await db.from("projects").delete().not("id", "is", null);
@@ -266,7 +266,12 @@ async function seed(install: Project["install"]["status"]): Promise<Project> {
   const project: Project = {
     ...base,
     booking: { ...base.booking, status: "booked", dates: ["2026-11-10", "2026-11-11", "2026-11-12"], startDate: "2026-11-10", crew: [{ staffId: INSTALLER.id, name: INSTALLER.name, role: "installer", external: false }, { staffId: FGAS.id, name: FGAS.name, role: "installer", external: false }] },
-    install: { ...base.install, status: install, days: install === "not-started" ? [] : [{ n: 1, date: "2026-11-10", status: "in-progress", startedAt: "2026-11-10T08:00:00.000Z" }] },
+    install: {
+      ...base.install,
+      status: install,
+      ...(startedAt ? { startedAt } : {}),
+      days: install === "not-started" ? [] : [{ n: 1, date: "2026-11-10", status: "in-progress", startedAt: startedAt ?? "2026-11-10T08:00:00.000Z" }],
+    },
   };
   await insertProjectRow(db, { id: PROJECT, quote_id: project.quoteId, schema_version: 2, project, install_on: "2026-11-10" });
   await installJobsRepo.save({
@@ -319,6 +324,45 @@ test("sync: gates hold on the server: qualifications, day not started, other peo
   await seed("not-started");
   const [early] = await field.processSyncBatch(INSTALLER, [{ type: "evidence", id: "ev-phone-0006", projectId: PROJECT, specId: "d1-arrival.met", at: AT }]);
   assert.match(!early!.ok ? early!.error : "", /Day 1 hasn't started/);
+});
+
+test("sync: a lapsed F-gas certificate can't be got round by backdating the phone's capture time", async () => {
+  await seed("in-progress");
+  const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString();
+  // Same person as FGAS (on the crew), but the certificate ran out two days ago.
+  const LAPSED: StaffMember = { ...FGAS, qualifications: [{ ...FGAS.qualifications[0]!, expiresOn: daysAgo(2).slice(0, 10) }] };
+  const pressure: SyncOp = { type: "evidence", id: "ev-phone-lapsed-1", projectId: PROJECT, specId: "d3-pressure-s-s.applied", value: 30, at: AT };
+  const [now] = await field.processSyncBatch(LAPSED, [pressure]);
+  assert.equal(now!.ok, false);
+  assert.match(!now!.ok ? now!.error : "", /F-gas engineer/);
+  // The identical reading dated before the expiry: still refused, and it says why.
+  const [backdated] = await field.processSyncBatch(LAPSED, [{ ...pressure, id: "ev-phone-lapsed-2", at: daysAgo(5) }]);
+  assert.equal(backdated!.ok, false);
+  assert.equal(!backdated!.ok && backdated!.permanent, true);
+  assert.match(!backdated!.ok ? backdated!.error : "", /F-gas engineer: your certificate on file isn't current today/);
+  // A pass outcome on the same gated step, backdated: refused too.
+  const [outcome] = await field.processSyncBatch(LAPSED, [{ type: "step-status", id: "st-phone-lapsed-1", projectId: PROJECT, stepId: "d3-pressure-s-s", outcome: "pass", at: daysAgo(5) }]);
+  assert.equal(outcome!.ok, false);
+  assert.match(!outcome!.ok ? outcome!.error : "", /F-gas engineer/);
+  assert.equal((await evidenceRepo.listForProject(PROJECT)).length, 0, "nothing was stored under the lapsed certificate");
+  assert.equal((await installJobsRepo.getForProject(PROJECT))!.stepStatuses.length, 0);
+  // Blocked is still open to them: saying "I can't" isn't doing the work.
+  const [blocked] = await field.processSyncBatch(LAPSED, [{ type: "step-status", id: "st-phone-lapsed-2", projectId: PROJECT, stepId: "d3-pressure-s-s", outcome: "blocked", reason: "My F-gas card has run out", at: AT }]);
+  assert.equal(blocked!.ok, true);
+});
+
+test("sync: a capture can't be dated before the install started (the RAMS, read before setting off, can)", async () => {
+  const startedAt = new Date(Date.now() - 3_600_000).toISOString();
+  await seed("in-progress", startedAt);
+  const week = new Date(Date.now() - 7 * 86_400_000).toISOString();
+  const [r] = await field.processSyncBatch(INSTALLER, [{ type: "evidence", id: "ev-phone-floor-1", projectId: PROJECT, specId: "d1-protection.floors", mediaId: MEDIA, at: week }]);
+  assert.equal(r!.ok, true);
+  const stored = (await evidenceRepo.listForProject(PROJECT)).find((e) => e.id === "ev-phone-floor-1")!;
+  assert.ok(Date.parse(stored.at) >= Date.parse(startedAt), "dated no earlier than day 1's start");
+  const [s] = await field.processSyncBatch(INSTALLER, [{ type: "step-status", id: "st-phone-floor-1", projectId: PROJECT, stepId: "d1-protection", outcome: "pass", at: week }]);
+  assert.equal(s!.ok, true);
+  const status = (await installJobsRepo.getForProject(PROJECT))!.stepStatuses.find((x) => x.id === "st-phone-floor-1")!;
+  assert.ok(Date.parse(status.at) >= Date.parse(startedAt));
 });
 
 test("sync: outcomes dedupe by id; Blocked raises one blocking issue however often it's retried", async () => {

@@ -42,7 +42,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ inv
   if (!isUuid(invoiceId)) return notFound();
   const invoice = await invoicesRepo.get(invoiceId);
   if (!invoice) return notFound();
-  const access = await requireProjectAccess(invoice.projectId, { allowCustomer: true });
+  const access = await requireProjectAccess(invoice.projectId, { allowCustomer: true, customerSide: true });
   if (!access) return notFound();
 
   const base = origin(request);

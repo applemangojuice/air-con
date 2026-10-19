@@ -10,8 +10,9 @@
  * reference against the certificate (`verifiedAt`) and the certificate is on
  * file (`mediaId`). Steps that legally need a certified person (refrigerant
  * work, notifiable electrics, commissioning sign-off) check
- * `meetsRequirement` against the date the work happens; customers are shown
- * only verified, current ones.
+ * `meetsRequirement` against the server's own day (London today) when the
+ * record reaches us, never a date the phone claims; customers are shown only
+ * verified, current ones.
  */
 
 /* ------------------------------------------------------------------ */

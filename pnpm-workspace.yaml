@@ -8,4 +8,4 @@ patchedDependencies:
   # a client chunk still loading): the page fails to hydrate (#418) and is
   # rendered again on the client. Slower data makes it likelier; the patch
   # puts the cursor back. See docs/pilot-architecture.md §K.
-  next@15.5.20: patches/next@15.5.20.patch
+  next@15.5.28: patches/next@15.5.28.patch

@@ -35,6 +35,9 @@ describe() {
     0013_unique_guards.sql)
       echo "Stops two households sharing a pilot number, and stops a double"
       echo "--         click making two invoices." ;;
+    0014_service_role_grants.sql)
+      echo "Lets the app's server key use every table. Supabase stopped doing"
+      echo "--         this by itself in 2026; without it, sign-in and saving fail." ;;
     *) return 1 ;;
   esac
 }
