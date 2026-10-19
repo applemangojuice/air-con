@@ -192,8 +192,10 @@ database only with `DEMO_DEPLOYMENT=1` too. The flags are a claim, so
 `demoModeAllowed()` (`lib/auth/demo-guard.ts`) checks it: on any Supabase
 database, in any environment, demo sign-in, the seed, simulated card
 payments and demo-stored emails counting as sent all stay off while the
-database holds a quote not from the seed, a customer on a non-reserved
-address or a non-DEMO staff row (a database that can't be asked is a no).
+database holds a quote not from the seed, a customer or a non-DEMO staff row
+on a non-reserved address (example.com, `.test` and `.invalid` are nobody's,
+§K37; a database that can't be asked, or a sample of 200 rows all reserved,
+is a no).
 Every place a demo account or demo behaviour reaches stored data uses it,
 not the env check. A staff row written by a demo
 session is itself `demo` (`taintedByDemo`), and demo rows stop working when
@@ -1961,3 +1963,24 @@ changelog and the reasons, so nobody "fixes" a deliberate choice back.
       react-dom; drop it when Next ships a React with the fix. The field
       slot's barcode button is decided after mount, too (it read `window`
       while rendering).
+37. **Where the go-live pack met the Supabase compatibility branch (final
+    pre-launch pass).** The two were built apart; run together on both
+    backends, they met in two places:
+    - *Demo deployments switched themselves off.* The demo guard (§C) counted
+      any quote not from the seed and any non-DEMO staff row as real, so on a
+      demo deployment the first New pilot (an ops quote for a DEMO family on
+      example.com), the first quote-form test or the first break-glass admin
+      on an example.com address turned demo sign-in, the seed and the demo
+      fallbacks off for good. The compat run's pilot walk lost "Try as…" at
+      the surveyor, and its route walk's seed answered 404. Quotes and staff
+      are now judged like customers already were: real only on an address a
+      real person could own (not example.com/.org/.net, `.example`, `.test`
+      or `.invalid`), with a sample of 200 rows per table, a full sample of
+      reserved addresses counting as real. The live business, whose
+      customers and admins use real addresses, is refused exactly as before.
+    - *A go-live test wrote a half row.* `tests/demo-guard.test.ts` inserted
+      a quote without its NOT NULL columns, which the schema-enforcing local
+      backend (§K36) now refuses as Postgres does; it uses
+      `tests/helpers/rows.ts` like the rest.
+    The route walk now lists `/ops/help` and `/field/help`, and counts the
+    property book's numeric `/a/<uprn>` pages as one route.

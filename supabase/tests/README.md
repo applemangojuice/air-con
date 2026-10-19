@@ -156,7 +156,11 @@ which is exactly what that existing switch declares, and the pilot walk needs
 it ("Try as…" for the whole team, and messages recorded as demo because no
 email provider is configured: a live deployment without email refuses to
 issue a proposal). No test-only escape hatch exists or is needed; the route
-walk signs in by break-glass.
+walk signs in by break-glass. The demo guard (`lib/auth/demo-guard.ts`) still
+looks at the database on every check, as it would on a real project: the
+walks only ever write reserved addresses (`@example.com`, the break-glass
+admin `compat.admin@example.com`), which are nobody's data, so the demo stays
+on; one real-looking address and demo sign-in would refuse itself here too.
 
 Ports and paths are overridable (see the headers of `stack.sh` and
 `run-compat-e2e.sh`); `KEEP=1` keeps the temp dir, `GATEWAY_LOG=1` logs every

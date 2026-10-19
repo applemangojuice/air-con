@@ -10,6 +10,13 @@ import { demoAllowedWithData, demoLoginAllowed, isReservedDemoAddress, type Real
  * address, a team member who isn't a DEMO account) never gets demo sign-in,
  * whatever the flags say: a demo admin can see and change everything.
  *
+ * "Real" means on an address a real person could own: a quote, customer or
+ * team member on a reserved address (example.com, .test, .invalid: RFC 2606,
+ * where the DEMO records live) is nobody's data, so a demo deployment stays a
+ * demo when someone tries New pilot, the quote form or break-glass on it with
+ * a made-up address. The demo seed's quotes (source 'demo') and the DEMO team
+ * (staff.demo) never count either.
+ *
  * The file and memory backends are a developer's own machine or a throwaway
  * demo, so the flags decide there. Without the flags nothing is asked (the
  * live business pays nothing for this). The answer is kept for a few
@@ -17,8 +24,8 @@ import { demoAllowedWithData, demoLoginAllowed, isReservedDemoAddress, type Real
  * a database that can't be asked (down, slow, not migrated) is a no.
  */
 
-/** Customers looked at per check. A demo has a handful; a database with more than this is never only demo. */
-export const CUSTOMER_SAMPLE = 200;
+/** Rows looked at per table per check. A demo has a handful; a table with more than this is never only demo. */
+export const RECORD_SAMPLE = 200;
 const TTL_MS = 15_000;
 const TIMEOUT_MS = 5_000;
 
@@ -31,20 +38,28 @@ function rows(name: string, r: Rows): Record<string, unknown>[] {
   return r.data as Record<string, unknown>[];
 }
 
+/**
+ * How many of these rows are on an address a real person could own. A full
+ * sample of reserved addresses could still hide a real one past it, so that
+ * counts as one.
+ */
+function realAmong(name: string, r: Rows): number {
+  const emails = rows(name, r).map((row) => String(row.email ?? ""));
+  const real = emails.filter((e) => !isReservedDemoAddress(e)).length;
+  return real || (emails.length >= RECORD_SAMPLE ? 1 : 0);
+}
+
 /** What's real on this database (pure reads, no writes). Throws when it can't tell. */
 export async function countRealRecords(client: SupabaseClient): Promise<RealRecords> {
   const [quotes, customers, staff] = await Promise.all([
-    client.from("quote_requests").select("id").neq("source", "demo").limit(1),
-    client.from("customers").select("email").limit(CUSTOMER_SAMPLE),
-    client.from("staff").select("id").eq("demo", false).limit(1),
+    client.from("quote_requests").select("email").neq("source", "demo").limit(RECORD_SAMPLE),
+    client.from("customers").select("email").limit(RECORD_SAMPLE),
+    client.from("staff").select("email").eq("demo", false).limit(RECORD_SAMPLE),
   ]);
-  const emails = rows("customers", customers).map((r) => String(r.email ?? ""));
-  const realCustomers = emails.filter((e) => !isReservedDemoAddress(e)).length;
   return {
-    quotes: rows("quote_requests", quotes).length,
-    // A full sample of DEMO addresses could still hide a real one past it: count that as real.
-    customers: realCustomers || (emails.length >= CUSTOMER_SAMPLE ? 1 : 0),
-    staff: rows("staff", staff).length,
+    quotes: realAmong("quote_requests", quotes),
+    customers: realAmong("customers", customers),
+    staff: realAmong("staff", staff),
   };
 }
 

@@ -14,12 +14,13 @@ process.env.DATA_BACKEND = "memory";
 delete process.env.SUPABASE_URL;
 delete process.env.SUPABASE_SERVICE_ROLE_KEY;
 registerAppResolver();
-const { countRealRecords, demoModeAllowed, resetDemoGuardCache, CUSTOMER_SAMPLE } = await import("../lib/auth/demo-guard.ts");
+const { countRealRecords, demoModeAllowed, resetDemoGuardCache, RECORD_SAMPLE } = await import("../lib/auth/demo-guard.ts");
 const { demoAllowedWithData, describeRealRecords } = await import("../lib/auth/access.ts");
 const { requireDb } = await import("../lib/supabase-server.ts");
 const { resetDemoData } = await import("../lib/demo-seed/index.ts");
 const { DEMO_STAFF } = await import("../lib/auth/demo-staff.ts");
 const staffRepo = await import("../lib/repo/staff.ts");
+const { quoteRow } = await import("./helpers/rows.ts");
 
 const NOW = "2026-10-18T10:00:00.000Z";
 const NONE = { quotes: 0, customers: 0, staff: 0 };
@@ -68,7 +69,11 @@ test("the demo seed and the DEMO team never count as real", async () => {
 
 test("one real quote, customer or team member is enough", async () => {
   const db = requireDb();
-  const quote = await db.from("quote_requests").insert({ source: "web", customer_name: "Made-up Person", postcode: "SW16 1AA" }).select().single();
+  const quote = await db
+    .from("quote_requests")
+    .insert(quoteRow({ source: "web", email: "made-up.person@pilot-home.co.uk", customer_name: "Made-up Person", postcode: "SW16 1AA" }))
+    .select()
+    .single();
   assert.equal(quote.error, null);
   assert.deepEqual(await countRealRecords(db), { ...NONE, quotes: 1 });
   await db.from("quote_requests").delete().eq("id", (quote.data as { id: string }).id);
@@ -89,12 +94,47 @@ test("one real quote, customer or team member is enough", async () => {
   assert.deepEqual(await countRealRecords(db), NONE, "back to demo only");
 });
 
-test("a database too full of customers to check counts as real", async () => {
+test("a quote, customer or team member on a reserved address is nobody's data", async () => {
+  // A demo deployment someone tries New pilot, the quote form or break-glass on, with made-up addresses.
   const db = requireDb();
-  const rows = Array.from({ length: CUSTOMER_SAMPLE }, (_, i) => ({ email: `demo.extra.${i}@example.com`, name: `DEMO Extra ${i}` }));
+  const quotes = await db
+    .from("quote_requests")
+    .insert([quoteRow({ source: "ops", email: "demo.pat@example.com" }), quoteRow({ source: "web", email: "e2e@pilot.test" })])
+    .select("id");
+  assert.equal(quotes.error, null);
+  const customer = await db.from("customers").insert({ email: "demo.pat@example.com", name: "Pat Example (DEMO)" }).select().single();
+  assert.equal(customer.error, null);
+  const admin = await staffRepo.insert(
+    { id: crypto.randomUUID(), email: "compat.admin@example.com", name: "Break-glass admin", roles: ["admin"], external: false, active: true, qualifications: [] },
+    null,
+  );
+  assert.ok(!admin.demo, "not a DEMO account, as break-glass makes");
+  assert.deepEqual(await countRealRecords(db), NONE);
+
+  // One real-looking address among them is enough again.
+  const real = await db.from("quote_requests").insert(quoteRow({ source: "ops", email: "first.household@pilot-home.co.uk" })).select("id").single();
+  assert.equal(real.error, null);
+  assert.deepEqual(await countRealRecords(db), { ...NONE, quotes: 1 });
+
+  const ids = [...((quotes.data ?? []) as { id: string }[]).map((q) => q.id), (real.data as { id: string }).id];
+  await db.from("quote_requests").delete().in("id", ids);
+  await db.from("customers").delete().eq("id", (customer.data as { id: string }).id);
+  await db.from("staff").delete().eq("id", admin.id);
+  assert.deepEqual(await countRealRecords(db), NONE, "back to demo only");
+});
+
+test("a table too full to check counts as real", async () => {
+  const db = requireDb();
+  const rows = Array.from({ length: RECORD_SAMPLE }, (_, i) => ({ email: `demo.extra.${i}@example.com`, name: `DEMO Extra ${i}` }));
   assert.equal((await db.from("customers").insert(rows)).error, null);
   assert.equal((await countRealRecords(db)).customers, 1, "a full page of DEMO addresses could hide a real one past it");
   await db.from("customers").delete().like("email", "demo.extra.%");
+
+  const quotes = Array.from({ length: RECORD_SAMPLE }, (_, i) => quoteRow({ source: "web", email: `demo.extra.${i}@example.com` }));
+  assert.equal((await db.from("quote_requests").insert(quotes)).error, null);
+  assert.equal((await countRealRecords(db)).quotes, 1, "the same for quotes");
+  await db.from("quote_requests").delete().like("email", "demo.extra.%");
+  assert.deepEqual(await countRealRecords(db), NONE);
 });
 
 test("demoModeAllowed: the flags decide on the local backends; nothing is asked without them", async () => {

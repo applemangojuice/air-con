@@ -235,9 +235,9 @@ export function demoLoginAllowed(env: Record<string, string | undefined>): boole
 
 /**
  * What a Supabase database holds that no demo put there (lib/auth/demo-guard.ts
- * looks): quotes that aren't the demo seed's, customers on an address a real
- * person could own, and staff who aren't DEMO accounts. Any one of them is
- * real people's data.
+ * looks): quotes that aren't the demo seed's, customers, and staff who aren't
+ * DEMO accounts, each on an address a real person could own (not a reserved
+ * one: isReservedDemoAddress). Any one of them is real people's data.
  */
 export interface RealRecords {
   quotes: number;

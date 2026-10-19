@@ -131,6 +131,7 @@ try {
     "/ops/collateral/one-pager",
     "/ops/design",
     "/ops/finance",
+    "/ops/help",
     "/ops/install",
     "/ops/intel",
     "/ops/launch",
@@ -148,6 +149,7 @@ try {
     "/ops/status",
     "/ops/templates",
     "/field",
+    "/field/help",
     "/field/jobs",
     "/field/issues",
     "/field/me",
@@ -182,7 +184,9 @@ try {
   const queue = [...STATIC, ...projects.flatMap((p) => perProject(p.id))];
   const SKIP = /^\/(api|auth|_next)\/|\/export$|^\/ops\/staff\/media|^\/login/;
   const ID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|DIH-[A-Z0-9-]+|demo-[a-z0-9-]+/gi;
-  const pattern = (path) => path.replace(ID, "[id]").replace(/\/day\/\d+/, "/day/[n]").replace(/\/areas\/[a-z0-9]+$/i, "/areas/[outcode]");
+  // The property book's /a/<uprn> pages have numeric ids: one route, like the rest.
+  const pattern = (path) =>
+    path.replace(ID, "[id]").replace(/^\/a\/\d+$/, "/a/[id]").replace(/\/day\/\d+/, "/day/[n]").replace(/\/areas\/[a-z0-9]+$/i, "/areas/[outcode]");
   const seen = new Set();
   const perPatternCount = new Map();
   const enqueue = (path) => {
