@@ -65,7 +65,9 @@ Click any card on the Board. One page has everything about that home:
   Compliance, Install, Handover, Money**, each with its main button.
 - **Issues, Time, Learnings, Documents, Messages, Activity**: the history.
 - **Admin** box: internal note, **Change pilot tag**, **Edit contact and
-  access**, **Close the project**, **Record a cancellation**.
+  access**, **Email them a sign-in link** (a fresh link to their project
+  page, to the email on the project), **Close the project**, **Record a
+  cancellation**.
 
 ![A project's command centre (fictional DEMO household)](../screenshots/guides/08-ops-command-centre-new.png)
 
@@ -340,7 +342,11 @@ status, channel and message type.
   that channel isn't set up (texts, until Twilio is). **Failed**: open it to
   see why. **Skipped**: deliberately not sent (for example, a family who
   stopped follow-up emails).
-- **Preview** shows exactly what went.
+- **Preview** shows exactly what went, except the sign-in link itself: it's
+  added only as the email goes out and is never stored, so a preview can't
+  open it. To see a family's page, use the project's **Customer view**; to
+  send them a new link, the project's **Admin** box → **Email them a sign-in
+  link**.
 - **Templates** tab: switch a message type off if you need to. Three can't
   be: the sign-in link, the proposal email and the contract confirmation
   (the law needs the last two to reach the family).

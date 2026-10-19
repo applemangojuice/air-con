@@ -124,7 +124,11 @@ Git → Production Branch, normally `main`).
 
 4. **First sign-in**: open `/login`, enter one of the `ADMIN_EMAILS`
    addresses, and click the emailed link. That creates your admin account.
-   Add the rest of the team on `/ops/staff`.
+   Add the rest of the team on `/ops/staff`. Email domain still verifying?
+   With `OPS_PASSWORD` set, **Admin break-glass** on `/login` (an
+   `ADMIN_EMAILS` address plus that password) creates the same admin account
+   for a 12-hour session, so the settings, staff and catalogue can be done
+   meanwhile.
 
 5. **Work down `/ops/launch`** until every row is green: the database and
    buckets, the secrets, email and its domain, the Schedule 2 company

@@ -14,7 +14,8 @@ why. The message list comes from the app's own message catalogue
   happens by accident.
 - Lost the email, or the link ran out? They go to your site's `/portal`
   page (or their project page), type their email and press **Email me a
-  sign-in link**. That link lasts 60 minutes.
+  sign-in link**. That link lasts 60 minutes. Or you send them one: the
+  project → **Admin** box → **Email them a sign-in link** (30 days).
 - Their email address is their identity: they only ever see their own home.
 - **Your homes** (`/portal`) lists every home they have with us.
 
@@ -186,7 +187,7 @@ to a family who pressed **Stop follow-up emails** or who cancelled.
 | --- | --- | --- |
 | **We've received your cancellation** | Email | When you record their cancellation: when it reached us, the refund and its deadline, collecting any equipment |
 | **Update: \<title\>** | Email | When you send an issue update by hand |
-| A fresh sign-in link | Email | When they ask for one on `/portal` |
+| A fresh sign-in link | Email | When they ask for one on `/portal`, or you press **Email them a sign-in link** on their project |
 
 ## Messages to the team
 

@@ -47,7 +47,7 @@ services (not checked).
 | `ADMIN_EMAILS` | Your email(s), comma separated. The first sign-in from one creates its admin account | You |
 | `NEXT_PUBLIC_APP_URL` | The live address, `https://…` with no slash at the end. Every link in every email | Your domain. Redeploy after changing |
 | `LEADS_NOTIFY_EMAIL` | Where team alerts and the morning email go. Recommended | A watched inbox |
-| `OPS_PASSWORD` | Optional break-glass: an admin email plus this password signs in for 12 hours when email is down. At least 20 characters | `openssl rand -base64 24` |
+| `OPS_PASSWORD` | Break-glass: an `ADMIN_EMAILS` address plus this password signs in for 12 hours when email is down. Recommended for launch day, while your email domain verifies. At least 20 characters, or it's off | `openssl rand -base64 24` |
 
 **Never set on the live site:** `ALLOW_DEMO_LOGIN`, `DEMO_DEPLOYMENT`,
 `DATA_BACKEND`, `LOCAL_DATA_DIR`, `LOCAL_MAX_ROWS`. They're for demos and a

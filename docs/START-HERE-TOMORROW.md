@@ -130,6 +130,7 @@ Vercel → your project → **Settings** → **Environment Variables**: type the
 | `EMAIL_FROM` | Who emails come from, e.g. `Dang It's Hot <hello@yourdomain.co.uk>` | A domain you've verified in resend.com → **Domains** |
 | `NEXT_PUBLIC_APP_URL` | The live address with `https://` and no slash at the end, e.g. `https://dang.ac` | Your domain |
 | `CRON_SECRET` | Another 64 random letters and numbers | You make it |
+| `OPS_PASSWORD` | A long password, at least 20 characters. It lets you sign in on launch day while your email domain is still verifying (step 5) | You make it (see below) |
 
 Strongly recommended: `LEADS_NOTIFY_EMAIL`, the inbox that gets team alerts
 and the 6am morning email. Without it they go to the `EMAIL_FROM` address.
@@ -138,7 +139,9 @@ and the 6am morning email. Without it they go to the `EMAIL_FROM` address.
 type `openssl rand -hex 32`, press Enter, copy the 64 characters it prints.
 Do it twice, one for each. No Mac? Use your password manager's generator
 set to 64 letters and numbers. A secret under 32 characters is ignored and
-nobody can sign in.
+nobody can sign in. For `OPS_PASSWORD`, `openssl rand -base64 24` (or 30
+characters from the password manager); keep it in the password manager. Under
+20 characters it's switched off.
 
 **Verifying your email domain in Resend** (do this first: it can take a few
 hours). resend.com → **Domains** → **Add domain** → type your domain → it
@@ -164,20 +167,33 @@ for **Ready**.
 3. Open the email "Your Dang, It's Hot sign-in link" → **Sign in** → on the
    page that opens, click **Continue as …**. The link works once and lasts
    20 minutes.
-4. You land on the **Board**. This first sign-in made your admin account.
-   You stay signed in on this device for 30 days.
+4. You land on **Today**, the office home page (the **Board** is in the top
+   menu). This first sign-in made your admin account. You stay signed in on
+   this device for 30 days.
 
 ![The team sign-in page](screenshots/guides/01-login.png)
 
 No email arriving? Check spam, then step 4: `RESEND_API_KEY`, `EMAIL_FROM`
-and a **Verified** domain in Resend.
+and a **Verified** domain in Resend. The login page says "Email isn't set up
+yet" when the keys are missing.
+
+**Email domain still verifying? Use break-glass, then carry on.** On `/login`
+click **Admin break-glass** → type your `ADMIN_EMAILS` address and the
+`OPS_PASSWORD` → **Sign in**. You land on **Today**, as the admin (this also
+creates your account). It lasts 12 hours and every use is logged. Do steps 6
+to 10 while you wait, then sign in by email once Resend says **Verified**. The
+team and the families can't sign in until email works.
 
 ## 6. Make the launch checklist green (10 minutes to read; the fixes are steps 7 to 9)
 
 Type `https://<your-domain>/ops/launch` into the address bar (it isn't in
-the menu; bookmark it). The top box, **Pilot go-live checklist**, checks
-everything live: red means fix before real customers, amber means you can go
-ahead knowingly, green is done. Each row has a **Fix** line and often a **Go there** link.
+the menu; bookmark it). The big box at the top says how many rows are left to
+fix. Under it, **Pilot go-live checklist** checks everything live: red means
+fix before real customers, amber means you can go ahead knowingly, green is
+done. Each row has a **Fix** line and often a **Go there** link. Two rows only
+appear when they matter ("Shared sign-in limits" once Supabase is connected,
+"No .env.example placeholder values" if a setting still holds a template
+value).
 
 ![The launch checklist (DEMO site, so most rows are red)](screenshots/guides/02-ops-launch.png)
 
@@ -196,13 +212,13 @@ ahead knowingly, green is done. Each row has a **Fix** line and often a **Go the
 | VAT position set | Proposals show (or don't show) VAT correctly | Step 7 |
 | A technical lead with a current F-gas certificate | Someone can sign designs and commissioning | Step 8 |
 | An electrician with Part P scheme membership | Bookings can be confirmed | Step 8 |
-| Catalogue: a priced, active unit in each tier | Standard and Quiet options can be costed | Step 9 |
+| Catalogue: a priced, active unit in each tier | Standard and Quiet options can be costed | Step 9. Stays amber until you've typed your own price on at least one Standard and one Premium unit: the research's few retail prices don't count |
 | Terms and cancellation wording reviewed | Amber until your solicitor has read them; proposals still go out, with a warning | Solicitor, then tick in Settings → Legal |
 | No DEMO data on the live system | No demo accounts or demo projects | Should be green. If not, delete `ALLOW_DEMO_LOGIN` / `DEMO_DEPLOYMENT` in Vercel and redeploy |
 
 Lower down, **Checked live, right now** repeats some of these, plus
 "Property intelligence has data" and "Analytics receiving events". Those two
-don't matter for the pilots.
+are marked **Optional** and don't matter for the pilots.
 
 ## 7. Settings: your company, money and VAT (30 minutes)
 
@@ -213,12 +229,15 @@ whenever you change anything.
 ![Settings, with the red box listing what's still missing](screenshots/guides/03-ops-settings.png)
 
 1. **Company**: Legal name, Trading name, Company number, **Phone** (a real
-   number: customers see it everywhere), **Email** (a watched inbox: every
+   number: customers see it everywhere; it starts as the placeholder
+   0800 000 000, which doesn't count), **Email** (a watched inbox: every
    customer email's "reply" goes here, and customers who want an early start
-   reply to it), **Geographic address** (a real street address), **Complaints
-   process** (how to complain and what happens, in plain words). Then the
-   F-gas company certificate, insurer and policy, and **Bank account name,
-   Sort code, Account number**.
+   reply to it; it starts as hello@dang.ac, so change it if that isn't
+   watched), **Geographic address** (a real street address), **Complaints
+   process** (how to complain and what happens, in plain words). If you offer
+   a workmanship guarantee, **Workmanship guarantee** says its conditions and
+   how to claim. Then the F-gas company certificate, insurer and policy, and
+   **Bank account name, Sort code, Account number**.
 2. **Review page link**: your page on an independent review site (for
    example Google or Trustpilot). Review requests only go out while this is
    set.
@@ -240,8 +259,10 @@ whenever you change anything.
    minutes), survey fee (£0), install block (3 days), working days, and
    **We finish within (weeks of acceptance)**: the finish-by promise that goes
    in every proposal.
-8. **Service area**: the postcode districts you cover. The pilot areas
-   (SW16, CR0, CR2, CR8) are already in.
+8. **Service area**: the postcode districts you cover. It starts with 16
+   South London districts (plus E3, in east London), including the pilot
+   areas SW16, CR0, CR2 and CR8. Delete any you don't cover: the website and the New pilot form
+   check postcodes against this list.
 9. **Warranty**: **Workmanship guarantee (years)** (type 0 if you offer none;
    blank means "not decided") and **Manufacturer warranty summary**, as you
    have it in writing. If both are blank, proposals are blocked. Nothing
@@ -272,16 +293,18 @@ and in date.
    or **Part P competent person scheme**, type the certificate or
    registration number, who issued it, and the expiry date.
 5. **Add to the team**.
-6. Open the person again (click their name): next to each qualification,
-   **Upload evidence** (a photo or PDF of the certificate), tick **I've
-   checked it against the certificate**, then **Save changes**. Until then
-   the badge says "Not verified: doesn't count yet".
+6. You land on their page. Next to each qualification, **Upload evidence**
+   (a photo or PDF of the certificate), tick **I've checked it against the
+   certificate**, then **Save changes**. Until then the badge says "Not
+   verified: doesn't count yet". (Later: **Staff** → click their name.)
 
 ![A qualification that counts: current, verified, evidence attached](screenshots/guides/05-ops-staff-qualifications.png)
 
-Do this for yourself too (you already exist as Admin: add your phone, bio,
-any other roles and your certificates), then each installer, the technical
-lead and the electrician. Each of them signs in at `/login` with their own
+Do this for yourself too (you already exist as Admin: **Staff** → your
+name. The app named you after your email address, e.g. "Jo" for
+jo@yourdomain.co.uk, so put your full name as customers should see it, then
+your phone, bio, any other roles and your certificates), then each
+installer, the technical lead and the electrician. Each of them signs in at `/login` with their own
 email, the same way you did; installers land on the field app.
 
 ## 9. Catalogue: load the researched units and add your prices (30 to 60 minutes)
@@ -292,7 +315,12 @@ email, the same way you did; installers land on the field app.
    has a price.
 2. For each model you'll actually fit: click it, then under **Buy cost**
    type your trade price in **Cost (£ ex VAT)**, the **Supplier**, **Price
-   seen on**, and a **Link to the price** or a **Note on the price**.
+   seen on**, and a **Link to the price** or a **Note on the price**. The
+   indoor and the outdoor unit are separate items and a proposal adds them
+   together. If your supplier quotes the pair as one price, put about a
+   quarter on the indoor unit and the rest on the outdoor unit, and say so in
+   the note. The few prices already there came from public retail websites
+   (some approximate): replace them with yours.
 3. Under **How sure we are**: once you've checked the figures against the
    manufacturer's datasheet, set **Confidence** to **Verified**, click
    **Checked today**, and add the datasheet under **Sources**.
@@ -310,9 +338,9 @@ email, the same way you did; installers land on the field app.
 
 ![The catalogue (DEMO items)](screenshots/guides/06-ops-catalogue.png)
 
-Go back to `/ops/launch`. Everything should now be green, apart from amber
-for texts (if you skipped Twilio) and legal review (until your solicitor
-signs off).
+Go back to `/ops/launch`. Once Supabase, email and `CRON_SECRET` are in,
+everything should be green, apart from amber for texts (if you skipped
+Twilio) and legal review (until your solicitor signs off).
 
 ## 10. Set up the four pilot households (5 minutes each)
 
@@ -323,18 +351,23 @@ signs off).
    or South Croydon / Sanderstead (CR2) before you type it.
 4. **The home**: house type, when it was built, bedrooms, layout,
    bathrooms, fuse board (or "Not sure yet"), own or rent. It's only for a
-   starting price; the survey measures everything.
+   starting price; the survey measures everything. The family does see this
+   starting price and a rough room plan on their page until the proposal
+   replaces it, so get the bedrooms and layout roughly right.
 5. **Pilot**: Number (1 to 4) and a **Label** that is an area or house type,
    never the address (e.g. "Owner's home", "Purley semi", "Croydon",
    "Pollards Hill"). Labels show on dashboards and exports.
-6. Tick **Email them a link to their project now**.
+6. Tick **Email them a link to their project now**. If email isn't set up
+   yet, nothing goes and the app says so; send it later from the project
+   (**Admin** box → **Email them a sign-in link**).
 7. **Set up the pilot**. You land on the project's page ("command centre").
 
 ![New pilot form (fictional DEMO household)](screenshots/guides/07-ops-new-pilot.png)
 
 Then, on the project page:
 
-8. **Owner**: pick yourself → **Set**.
+8. **Owner**: it's already you (whoever set the pilot up). To hand the home
+   to someone else, pick them → **Set**.
 9. **Survey** box → **Book it for the customer**: day, time, In person, the
    surveyor → **Book the survey**. (Or leave it: the family can pick a slot
    themselves from their link.)
@@ -342,15 +375,22 @@ Then, on the project page:
 ![A new pilot's command centre](screenshots/guides/08-ops-command-centre-new.png)
 
 Each family only ever sees their own home. Ticking the link box sends them
-an email; nobody gets a password.
+an email; nobody gets a password. To see exactly what the family sees, click
+**Customer view** at the top of the project (their buttons are switched off
+for you). Message previews on **Messages** never contain the real sign-in
+link: it's added only as the email goes out.
 
 ## 11. What each family gets, and does next
 
 1. **An email**: "Your link to your Dang, It's Hot project". Its **Sign in**
-   button opens their project page (it works once and lasts 30 days; any
-   later email from us carries a fresh one).
+   button opens a page with one button, **Continue as** and their email with
+   part of it hidden on purpose; they tap it and land on their project page. The link
+   works once and lasts 30 days; any later email from us carries a fresh one.
 2. **Their project page** shows one next step: **Book your home survey**
-   (about 90 minutes, free). They pick a slot, or see the one you booked.
+   (about 90 minutes, free). They pick at home or video, a day and a time, or
+   see the one you booked. Under the times they can tick **I'm happy to
+   receive my proposal and contract documents by email**: that records the
+   documents-by-email agreement (see below).
 3. **Booking confirmed** by email: date, time, what we'll check, what to
    have ready (fuse board and loft access).
 4. **The day before**, around 4pm: a reminder email, and a text if texts
@@ -431,9 +471,10 @@ instead.
 type → open the message → **Retry** (if it failed) or **Send again** (if it
 went but they can't find it). Fix a wrong email or mobile first (below).
 
-**A family's link has expired.** Ask them to open your site's `/portal`
-page, type their email and press **Email me a sign-in link**. Or resend any
-recent message: every email carries a fresh link.
+**A family's link has expired.** The project → **Admin** box → **Email them
+a sign-in link**. Or ask them to open your site's `/portal` page, type their
+email and press **Email me a sign-in link**. Or resend any recent message:
+every email carries a fresh link.
 
 **Fix a wrong entry**
 
