@@ -17,11 +17,14 @@ export function TermsText({
   summary?: string;
 }) {
   return (
-    <details open={open} className="group rounded-2xl border border-line bg-white p-4 text-sm print:border-0 print:p-0 [&[open]_summary]:mb-3">
-      <summary className="cursor-pointer font-semibold text-ink-900 marker:text-ink-500">
+    <details open={open} className="group rounded-2xl border border-line bg-white print:border-0">
+      <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-5 py-3 text-sm font-semibold text-ink-900 sm:px-6 [&::-webkit-details-marker]:hidden">
         {summary ?? `Read our terms (version ${version})`}
+        <span aria-hidden className="text-ink-500 transition group-open:rotate-180 print:hidden">
+          ▾
+        </span>
       </summary>
-      <div className="space-y-4 leading-relaxed text-ink-700">
+      <div className="space-y-4 border-t border-line px-5 py-4 text-sm leading-relaxed text-ink-700 sm:px-6">
         {sections.map((section, i) => (
           <section key={section.id} aria-labelledby={`terms-${section.id}`}>
             <h4 id={`terms-${section.id}`} className="font-semibold text-ink-900">

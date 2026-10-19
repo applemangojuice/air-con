@@ -25,7 +25,7 @@ const GROUPS: { title: string; kinds: DocumentKind[] }[] = [
   { title: "Your survey and proposal", kinds: ["survey-report", "proposal"] },
   { title: "Your contract", kinds: ["contract", "variation"] },
   { title: "Invoices and receipts", kinds: ["invoice", "receipt"] },
-  { title: "Handover and certificates", kinds: ["handover-pack", "commissioning-certificate"] },
+  { title: "Handover and certificates", kinds: ["handover-pack", "commissioning-certificate", "certificate"] },
 ];
 
 /**
@@ -62,7 +62,11 @@ export default async function DocumentsPage({ params }: { params: Promise<{ id: 
   if (!project) notFound();
   const right = access.kind === "staff" ? <StaffNav href={`/ops/projects/${id}`} /> : <CustomerNav />;
 
-  const groups = GROUPS.map((g) => ({ ...g, docs: (docs ?? []).filter((d) => g.kinds.includes(d.kind)) })).filter((g) => g.docs.length > 0);
+  const grouped = new Set(GROUPS.flatMap((g) => g.kinds));
+  // Every document the customer has, always: a kind no group names yet still shows, last.
+  const groups = [...GROUPS, { title: "Other documents", kinds: [] as DocumentKind[] }]
+    .map((g) => ({ ...g, docs: (docs ?? []).filter((d) => (g.kinds.length ? g.kinds.includes(d.kind) : !grouped.has(d.kind))) }))
+    .filter((g) => g.docs.length > 0);
 
   return (
     <PortalShell right={right} width="narrow">

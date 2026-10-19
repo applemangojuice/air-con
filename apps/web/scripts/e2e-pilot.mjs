@@ -1150,7 +1150,12 @@ try {
     await certForm.getByLabel(/^Certificate number/).fill("DEMO-EIC-0001");
     await certForm.getByLabel(/^Issued by/).fill("DEMO scheme");
     await certForm.getByRole("button", { name: "Add to their documents" }).click();
-    check("electrical certificate received, with its file", await waitFor(admin, /Certificate received and added to the customer's documents/));
+    // The form goes once it's saved; what stays is the status and the link to the certificate itself.
+    await ho.locator("a", { hasText: "Open it" }).waitFor({ timeout: 20_000 }).catch(() => {});
+    check(
+      "electrical certificate received, with its file",
+      (await ho.locator("a", { hasText: "Open it" }).count()) === 1 && /Electrical certificate\s*Received/i.test(await ho.innerText()),
+    );
     await ho.locator("summary").filter({ hasText: "Warranty registered" }).click();
     const warForm = ho.locator("form").filter({ has: admin.getByLabel(/^Registration reference/) });
     await warForm.getByLabel(/^Registration reference/).fill("DEMO-WR-0042");
