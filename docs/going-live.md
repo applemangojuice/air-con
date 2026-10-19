@@ -20,29 +20,43 @@ watches (Vercel → Project → Settings → Git → Production Branch).
 
 2. **Supabase**: create a project in **London (eu-west-2)**, the same place
    as the functions (if you pick another region, change `regions` in
-   `apps/web/vercel.json` to the Vercel region nearest it). Then run
-   **every** file in `supabase/migrations/` **in order**, in the Supabase SQL
-   editor (or `supabase db push`):
+   `apps/web/vercel.json` to the Vercel region nearest it). Then bring the
+   database up to date. Which way depends on where you start:
 
-   `0001` → `0002` → `0003` → `0004` → `0005` → **both** `0006` files
-   (`0006_draft_quotes.sql` and `0006_property_intelligence.sql`) → `0007` →
-   `0008` → `0009` → **`0010_pilot_platform.sql`** → **`0011_storage_limits.sql`**
-   → **`0012_rate_limits.sql`** → **`0013_unique_guards.sql`**.
+   - **The live database already runs the original site** (quotes,
+     projects: migrations `0001` to `0009`). Paste
+     **`supabase/pilot-upgrade.sql`** once:
+     1. supabase.com → your project → **SQL Editor** → **New query**.
+     2. Paste the whole file, click **Run**. If Supabase warns about a
+        "destructive operation", confirm: one line swaps in a fresh copy of
+        a safety check. No data goes.
+     3. "Success. No rows returned" means done.
+     4. New query → paste **`supabase/check-schema.sql`** → **Run**. It says
+        "All present", or names what's missing. It only reads.
+   - **A brand-new, empty project.** Run `0001` → `0002` → `0003` → `0004` →
+     `0005` → **both** `0006` files (`0006_draft_quotes.sql` and
+     `0006_property_intelligence.sql`) → `0007` → `0008` → `0009` from
+     `supabase/migrations/`, one at a time the same way, then
+     `supabase/pilot-upgrade.sql`, then the check.
 
-   `0010` is the pilot platform itself: the staff and sign-in tables, every
-   project record (surveys, designs, proposals, orders, invoices, payments,
-   documents…) and the `project-media` bucket. **Without it nobody can sign
-   in.** `0011` sets each storage bucket's size limit and file types (the
-   public photo upload takes photos only); `/api/health` and `/ops/status`
-   report a bucket without them. `0012` makes the sign-in limits count once
-   for the whole site rather than per server instance (`/ops/launch` shows
-   amber without it). `0013` makes the database refuse what two people
-   pressing the same button at once could otherwise both get: two households
-   on one pilot number, two invoices from one request, two invoices planned
-   on the same bill. If two households already share a pilot number it stops
-   and names them: give one another number, then run it again. Re-running a file is safe. If you skip one the
-   site looks connected but can't save; `/login` says so, and so do the
-   deploy logs (`[schema] The database is missing …`).
+   `pilot-upgrade.sql` is `0010` to `0013` in one go, and it says what each
+   does at the top. `0010` is the pilot platform itself: the staff and
+   sign-in tables, every project record (surveys, designs, proposals,
+   orders, invoices, payments, documents…) and the `project-media` bucket.
+   **Without it nobody can sign in.** `0011` sets each storage bucket's size
+   limit and file types; `0012` makes the sign-in limits count once for the
+   whole site; `0013` makes the database refuse two households on one pilot
+   number and two invoices from one click. It all runs as one transaction,
+   so if it stops, nothing changed. If it stops with "Two households share a
+   pilot number", give one of them another number on its project page, then
+   run it again. **Re-running it is always safe.** If you skip it the site
+   looks connected but can't save; `/login` says so, and so do the deploy
+   logs (`[schema] The database is missing …`).
+
+   Later upgrades, without the SQL editor: **GitHub → Actions → "Apply
+   database upgrade" → Run workflow** (`.github/workflows/apply-migrations.yml`;
+   the one-time setup, a `SUPABASE_DB_URL` secret, is at the top of that
+   file). It runs the same file, then the same check.
 
 3. **Environment variables** (Vercel → Project → Settings → Environment
    Variables, Production). `apps/web/.env.example` lists them all with their
@@ -132,18 +146,18 @@ watches (Vercel → Project → Settings → Git → Production Branch).
 
 | Symptom | Cause | Fix |
 | --- | --- | --- |
-| `/login` says "The database isn't set up for sign-in yet" | Supabase is connected but `0010_pilot_platform.sql` (or an earlier file) hasn't been run | Run the missing migrations in order (step 2), reload |
+| `/login` says "The database isn't set up for sign-in yet" | Supabase is connected but the pilot upgrade (or an earlier file) hasn't been run | Paste `supabase/pilot-upgrade.sql` into the SQL Editor (step 2), reload. `supabase/check-schema.sql` names anything still missing |
 | "We couldn't send a link just now" | Email isn't configured or the `EMAIL_FROM` domain isn't verified; the server log says which | Check `RESEND_API_KEY` / `EMAIL_FROM` and the domain in Resend |
 | Nobody can sign in, even with the right link | `SESSION_SECRET` missing, too short, or still a template value | Set it with `openssl rand -hex 32`, redeploy |
 | No admin account and no way to make one | `ADMIN_EMAILS` empty | Set it, redeploy, sign in with one of those addresses |
 | Quotes don't save; the funnel errors at the end | Supabase keys wrong, or migrations not run | Check `/api/health`, then `/ops/status` |
 | "Invalid path specified in URL" uploading photos | A storage bucket is missing | Migration `0001` creates survey photos, `0004` videos, `0010` project media |
-| A bucket shows "No file size or type limits" in `/api/health` | Migration `0011` hasn't been run | Run `0011_storage_limits.sql` |
+| A bucket shows "No file size or type limits" in `/api/health` | Migration `0011` hasn't been run | Run `supabase/pilot-upgrade.sql` (it includes `0011`) |
 | "mime type … is not supported" uploading | The file isn't a type the bucket stores | Photos (JPEG, PNG, WebP, HEIC), PDFs and MP4/.mov only (0011) |
 | Reminders, expiries and the digest never happen | `CRON_SECRET` missing (the crons answer 401) | Set it, redeploy |
-| `0013_unique_guards.sql` stops with "Two households share a pilot number" | Two projects were tagged with the same pilot number before 0013 | Change one on its project page (the Pilot box), then run 0013 again |
+| `pilot-upgrade.sql` (or `0013_unique_guards.sql`) stops with "Two households share a pilot number" | Two projects were tagged with the same pilot number before 0013 | Nothing was changed. Change one on its project page (the Pilot box), then run it again |
 | "We couldn't read the business settings just now, so nothing was saved" | The database didn't answer when an invoice, proposal, contract, receipt or booking needed the settings (pages show the defaults meanwhile; writes never use them) | Try again in a moment; if it keeps happening, check `/ops/status` |
-| `/ops/launch` shows "Shared sign-in limits" amber | Migration `0012` hasn't been run, so each server instance counts sign-in requests on its own | Run `0012_rate_limits.sql` |
+| `/ops/launch` shows "Shared sign-in limits" amber | Migration `0012` hasn't been run, so each server instance counts sign-in requests on its own | Run `supabase/pilot-upgrade.sql` (it includes `0012`) |
 | A refund made in Stripe doesn't appear on the money page | The webhook isn't sent `charge.refunded` | Add `charge.refunded` and `charge.refund.updated` to the endpoint in Stripe (step 3); Stripe resends recent events from its dashboard |
 | Pages feel slow (a second or more per click) | The functions and the database are far apart | Put Supabase and `regions` in `apps/web/vercel.json` in the same place (London by default) |
 | Property intelligence shows 0 | The property book hasn't been loaded | `/ops/intel` → **Seed sample book**, or the importer ([property-intelligence.md](./property-intelligence.md)) |

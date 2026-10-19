@@ -18,6 +18,12 @@
 #   7. 0013 again over real rows, then over data from before it: two households
 #      on one pilot number stop it with their names; a request that made two
 #      invoices keeps its key on the first
+#   8. check-schema.sql (the read-only production check) passes
+#   9. supabase/pilot-upgrade.sql is current with the migrations, then, on a
+#      second database shaped like production before the pilot (0001 to 0009
+#      only): check-schema.sql fails naming what's missing, the bundle runs
+#      twice, check-schema.sql passes, sanity.sql passes, and a bundle that
+#      stops part-way changes nothing
 #
 # Exits non-zero on the first SQL error (psql ON_ERROR_STOP).
 
@@ -170,4 +176,99 @@ apply "$UNIQUE_GUARDS"
   assert (select count(*) from pg_indexes where indexname in ('projects_pilot_number_key', 'invoices_request_id_key', 'invoices_issue_key')) = 3, '0013 indexes in place';
 end \$\$;"
 
-echo "==> all migration checks passed (${#migrations[@]} migrations)"
+CHECK_SCHEMA="$ROOT/supabase/check-schema.sql"
+UPGRADE="$ROOT/supabase/pilot-upgrade.sql"
+
+# The production check and the bundle carry their own begin/commit (so they
+# work pasted into the Supabase SQL editor), so they run without
+# --single-transaction.
+run_file() {
+  echo "    $(basename "$2")"
+  "${PSQL[@]}" -d "$1" -o /dev/null -f "$2"
+}
+# The check with notices on, so it says "All present".
+run_check() {
+  echo "    $(basename "$CHECK_SCHEMA")"
+  PGOPTIONS="-c client_min_messages=notice" "${PSQL[@]}" -d "$1" -o /dev/null -f "$CHECK_SCHEMA"
+}
+
+echo "==> check-schema.sql (read-only production check) on the fully migrated database"
+run_check "$DB"
+
+echo "==> pilot-upgrade.sql is current with supabase/migrations"
+bash "$ROOT/supabase/build-pilot-upgrade.sh" --check
+
+UPGRADE_DB=aircon_upgrade
+echo "==> pilot-upgrade.sql on a database shaped like production before the pilot (0001 to 0009)"
+"${PSQL[@]}" -d postgres -c "create database $UPGRADE_DB"
+"${PSQL[@]}" -d "$UPGRADE_DB" --single-transaction -f "$HERE/supabase-stubs.sql"
+original=0
+for f in "${migrations[@]}"; do
+  name="$(basename "$f")"
+  [[ "${name:0:4}" < "0010" ]] || continue
+  echo "    $name"
+  "${PSQL[@]}" -d "$UPGRADE_DB" --single-transaction -f "$f"
+  original=$((original + 1))
+done
+if [[ $original -lt 10 ]]; then
+  echo "run-migrations: expected the ten original migrations (0001 to 0009, both 0006), found $original" >&2
+  exit 1
+fi
+
+CHECK_ERR="$(mktemp "${PGTEST_TMP:-/tmp}/aircon-check.XXXXXX")"
+if "${PSQL[@]}" -d "$UPGRADE_DB" -o /dev/null -f "$CHECK_SCHEMA" 2>"$CHECK_ERR"; then
+  echo "run-migrations: check-schema.sql passed on a database without the pilot upgrade" >&2
+  rm -f "$CHECK_ERR"
+  exit 1
+fi
+for want in "table staff" "table rate_limits" "column projects.pilot_number" "photo store project-media" "duplicate guard invoices_issue_key"; do
+  if ! grep -q "$want" "$CHECK_ERR"; then
+    echo "run-migrations: check-schema.sql didn't name \"$want\":" >&2
+    cat "$CHECK_ERR" >&2
+    rm -f "$CHECK_ERR"
+    exit 1
+  fi
+done
+rm -f "$CHECK_ERR"
+echo "    check-schema.sql refused it, naming what's missing"
+
+echo "==> pilot-upgrade.sql, twice"
+run_file "$UPGRADE_DB" "$UPGRADE"
+run_file "$UPGRADE_DB" "$UPGRADE"
+
+echo "==> check-schema.sql after the upgrade"
+run_check "$UPGRADE_DB"
+
+echo "==> sanity checks on the upgraded database"
+PGOPTIONS="-c client_min_messages=notice" "${PSQL[@]}" -d "$UPGRADE_DB" -o /dev/null -f "$HERE/sanity.sql"
+
+echo "==> pilot-upgrade.sql again over real rows, then one that stops part-way changes nothing"
+run_file "$UPGRADE_DB" "$UPGRADE"
+# Something to put back (the shared sign-in counter), and two households on
+# one pilot number, so 0013 near the end stops the run.
+"${PSQL[@]}" -d "$UPGRADE_DB" -c "drop function public.rate_limit_hit(text, integer, integer);
+  drop table public.rate_limits;
+  drop index public.projects_pilot_number_key;
+  update public.projects set pilot_number = 1 where id = 'b0000000-0000-4000-8000-0000000000a1';"
+UPGRADE_ERR="$(mktemp "${PGTEST_TMP:-/tmp}/aircon-upgrade.XXXXXX")"
+if "${PSQL[@]}" -d "$UPGRADE_DB" -o /dev/null -f "$UPGRADE" 2>"$UPGRADE_ERR"; then
+  echo "run-migrations: pilot-upgrade.sql ran over two households on one pilot number" >&2
+  rm -f "$UPGRADE_ERR"
+  exit 1
+fi
+if ! grep -q "Two households share a pilot number" "$UPGRADE_ERR"; then
+  cat "$UPGRADE_ERR" >&2
+  rm -f "$UPGRADE_ERR"
+  exit 1
+fi
+rm -f "$UPGRADE_ERR"
+"${PSQL[@]}" -d "$UPGRADE_DB" -c "do \$\$ begin
+  assert to_regclass('public.rate_limits') is null, 'a stopped upgrade still created rate_limits (0012): it must be all or nothing';
+  assert (select count(*) from public.projects where pilot_number = 1) = 2, 'a stopped upgrade changed the projects';
+end \$\$;"
+echo "    stopped, naming both households, and changed nothing"
+"${PSQL[@]}" -d "$UPGRADE_DB" -c "update public.projects set pilot_number = 2 where id = 'b0000000-0000-4000-8000-0000000000a1';"
+run_file "$UPGRADE_DB" "$UPGRADE"
+run_check "$UPGRADE_DB"
+
+echo "==> all migration checks passed (${#migrations[@]} migrations, and the pilot upgrade bundle)"

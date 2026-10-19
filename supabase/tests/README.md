@@ -30,8 +30,27 @@ tail of the server log when it does.
 4. Applies `0010_pilot_platform.sql` again on the fresh schema.
 5. Runs `sanity.sql`.
 6. Applies `0010` a third time over the populated tables and checks no rows
-   were lost.
-7. Stops the cluster and deletes the directory.
+   were lost, then `0013` over data from before it.
+7. Runs `../check-schema.sql`, the read-only check the "Apply database
+   upgrade" workflow runs against production, and checks
+   `../pilot-upgrade.sql` is current with the migrations
+   (`build-pilot-upgrade.sh --check`).
+8. On a second database shaped like production before the pilot (stubs
+   plus `0001` to `0009` only): `check-schema.sql` must fail and name what's
+   missing; `pilot-upgrade.sql` runs twice; `check-schema.sql` and
+   `sanity.sql` pass; one more run over real rows; then a run that stops
+   part-way (two households on one pilot number) must change nothing at all.
+9. Stops the cluster and deletes the directory.
+
+## The one-paste upgrade
+
+`supabase/pilot-upgrade.sql` is every migration from `0010` on, in one
+transaction, for pasting into the Supabase SQL editor (or the
+`.github/workflows/apply-migrations.yml` button). Don't edit it: change the
+migration, then run `bash supabase/build-pilot-upgrade.sh`. A new migration
+also needs a plain-words line in that script's `describe()`, and any new
+table goes in `supabase/check-schema.sql` (`apps/web/tests/pilot-upgrade.test.ts`
+checks both).
 
 ## What `sanity.sql` checks
 
