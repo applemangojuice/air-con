@@ -105,6 +105,9 @@ export default async function JobPackPage({ params }: { params: Promise<{ projec
             Open the day {day} runsheet →
           </Link>
         )}
+        <Link href="/field/help" className="mt-3 inline-flex min-h-12 items-center text-base font-semibold text-accent-700 underline underline-offset-4">
+          Help: how a job day works
+        </Link>
       </header>
 
       {pack.jobProblem && (

@@ -37,6 +37,7 @@ const MORE = [
   { href: "/ops/analytics", label: "Analytics" },
   { href: "/ops/finance", label: "Finance" },
   { href: "/ops/status", label: "Status" },
+  { href: "/ops/help", label: "Help: daily routine" },
 ];
 
 const NAV_ITEM = "inline-flex min-h-10 items-center whitespace-nowrap rounded-full px-3 text-sm font-semibold transition";

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { QUALIFICATION_LABEL, REQUIREMENT_LABEL, ROLE_LABEL, meetsRequirement, qualificationStatus, type StepRequirement } from "@aircon/domain";
 import { Card, PageHeader } from "@/components/kit";
 import { SyncBadge } from "@/components/field/sync-badge";
@@ -21,6 +22,16 @@ export default async function FieldMePage() {
     <>
       <SyncBadge />
       <PageHeader eyebrow="Me" title={staff.name} subtitle={`${staff.roles.map((r) => ROLE_LABEL[r]).join(", ")}${staff.external ? " · subcontractor" : ""}`} />
+
+      <Link href="/field/help" className="mb-5 flex min-h-16 items-center justify-between gap-3 rounded-2xl border border-line bg-white px-4 py-3">
+        <span>
+          <span className="block text-lg font-semibold text-ink-900">Help: how a job day works</span>
+          <span className="block text-sm text-ink-500">On my way, evidence, issues, end of day, sync, sign-off, who to call</span>
+        </span>
+        <span aria-hidden className="text-ink-500">
+          →
+        </span>
+      </Link>
 
       <Card className="mb-5">
         <h2 className="font-display text-xl text-ink-900">What you can sign off</h2>
