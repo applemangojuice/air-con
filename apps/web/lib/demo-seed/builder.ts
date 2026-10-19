@@ -2031,7 +2031,7 @@ function buildProject(sc: Scenario, today: string, settings: PilotSettings, invo
   });
   story.facts.compliance = out.compliance.map(complianceView);
   story.facts.openIssues = [];
-  story.facts.money = { depositDuePence: depositPence, depositPaidPence: depositPence, outstandingPence: 0 };
+  story.facts.money = { depositDuePence: depositPence, depositPaidPence: depositPence, outstandingPence: 0, unbilledPence: 0 };
   story.act({ type: "project-closed" }, at(addDays(cal.d3!, 8), "09:30"), ADMIN);
 
   out.learnings.push(

@@ -848,7 +848,12 @@ export interface ReadinessContext {
   openIssues: { id: string; title: string; kind: string; severity: string; blocking: boolean; gate?: GateId }[];
   runsheet?: { complete: boolean; openExceptions: number; missing: number; blocked: number; walkthroughDone: boolean };
   commissioning?: { signed: boolean; signedBy?: string };
-  money?: { depositDuePence: number; depositPaidPence: number; outstandingPence: number };
+  /**
+   * Invoices and payments, reconciled. `unbilledPence` is what's agreed but
+   * on no invoice yet (the balance, accepted variations, change fees):
+   * money's stillToBillPence.
+   */
+  money?: { depositDuePence: number; depositPaidPence: number; outstandingPence: number; unbilledPence: number };
 }
 
 const gateIndex = (g: GateId) => GATE_IDS.indexOf(g);
@@ -1236,17 +1241,26 @@ export function blockersFor(project: Project, ctx: ReadinessContext, gate: GateI
       }
       if (!ctx.money) {
         block("money-unknown", "Invoices and payments haven't been reconciled.", "ops", "Check invoices and payments");
-      } else if (ctx.money.outstandingPence > 0) {
-        block("balance-outstanding", `${fmtPence(ctx.money.outstandingPence)} is still outstanding.`, "customer", "Pay your balance");
-      }
-      const contract = p.money.contractTotalPence;
-      if (contract !== undefined && p.money.invoicedPence < contract) {
-        warn(
-          "not-fully-invoiced",
-          `Invoiced ${fmtPence(p.money.invoicedPence)} of a ${fmtPence(contract)} contract.`,
-          "ops",
-          "Issue the balance invoice",
-        );
+      } else {
+        // Nothing agreed is left off an invoice: a job with nothing invoiced owes "nothing" until it's billed.
+        if (ctx.money.unbilledPence > 0) {
+          block(
+            "balance-not-invoiced",
+            `${fmtPence(ctx.money.unbilledPence)} of the agreed price isn't on an invoice yet (the balance, accepted variations or date change fees).`,
+            "ops",
+            "Issue the balance invoice",
+          );
+        }
+        if (ctx.money.outstandingPence > 0) {
+          block("balance-outstanding", `${fmtPence(ctx.money.outstandingPence)} is still outstanding.`, "customer", "Pay your balance");
+        } else if (ctx.money.outstandingPence < 0) {
+          warn(
+            "customer-in-credit",
+            `The customer is ${fmtPence(-ctx.money.outstandingPence)} in credit: refund it from the money page, or note why it stays.`,
+            "ops",
+            "Refund the credit",
+          );
+        }
       }
       if (p.handover.electricalCert === "pending") {
         block("electrical-cert-pending", "The electrical installation certificate hasn't arrived.", "electrician", "Upload the certificate");
@@ -1758,9 +1772,16 @@ const AFTER_CLOSE: ReadonlySet<ProjectAction["type"]> = new Set<ProjectAction["t
 const KIT_STATUSES: readonly KitStatus[] = ["not-ordered", "ordered", "confirmed", "dispatched", "delivered", "inspected"];
 const isWholePence = (n: number) => Number.isInteger(n);
 
-/** v1 fee bands, with the site visit now the survey. */
+/**
+ * What a customer pays to move a date. The survey is advertised as free and
+ * no-obligation, and before a contract there's no balance to add a fee to,
+ * so moving it is always free (v1's site-visit band is retired). The
+ * install keeps v1's bands: a week's notice is free, closer pays the
+ * short-notice fee the contract discloses (Schedule 2 (g)).
+ */
 export function rescheduleFeeGbp(kind: "survey" | "installation", daysNotice: number): number {
-  const bands = RESCHEDULE_FEES[kind === "survey" ? "site-visit" : "installation"];
+  if (kind === "survey") return 0;
+  const bands = RESCHEDULE_FEES.installation;
   for (const band of bands) {
     if (daysNotice >= band.minDaysNotice) return band.feeGbp;
   }

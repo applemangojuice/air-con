@@ -17,6 +17,7 @@ const SEV: Record<string, string> = {
 };
 
 const VARIATION: Record<string, { text: string; tone: string }> = {
+  draft: { text: "With the office to check the price: don't do this work yet", tone: "bg-amber-50 text-amber-900 border-amber-200" },
   proposed: { text: "Waiting for the customer's OK: don't do this work yet", tone: "bg-amber-50 text-amber-900 border-amber-200" },
   accepted: { text: "Customer approved: go ahead", tone: "bg-emerald-50 text-emerald-800 border-emerald-200" },
   declined: { text: "Customer declined: don't do this work", tone: "bg-red-50 text-red-800 border-red-200" },

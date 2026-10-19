@@ -59,6 +59,7 @@ export async function creditAction(projectId: string, _prev: ActionState, form: 
   if (!amount) return invalid("Enter the amount to credit, in pounds.");
   if (!reason) return invalid("Say why: it's printed on the credit note.");
   const target = form.get("invoiceId");
+  const purpose = z.enum(["correction", "reduction"]).safeParse(form.get("purpose"));
   return toState(
     await issueInvoice(
       projectId,
@@ -68,6 +69,7 @@ export async function creditAction(projectId: string, _prev: ActionState, form: 
         reason,
         requestId: requestId.data,
         ...(typeof target === "string" && isUuid(target) ? { creditsInvoiceId: target } : {}),
+        ...(purpose.success ? { creditPurpose: purpose.data } : {}),
       },
       staff,
     ),
@@ -116,9 +118,17 @@ export async function refundAction(projectId: string, _prev: ActionState, form: 
   if (!requestId.success || !parsed.success) return invalid("Check the method and the date.");
   if (!amount) return invalid("Enter the amount refunded, in pounds.");
   if (!reason) return invalid("Say why the money went back.");
+  const treatment = z.enum(["reduction", "correction", "owed"]).safeParse(form.get("treatment"));
   const result = await recordRefund(
     projectId,
-    { ...parsed.data, amountPence: amount, reason, requestId: requestId.data, ...(text(form, "reference", 120) ? { reference: text(form, "reference", 120) } : {}) },
+    {
+      ...parsed.data,
+      amountPence: amount,
+      reason,
+      requestId: requestId.data,
+      ...(treatment.success ? { treatment: treatment.data } : {}),
+      ...(text(form, "reference", 120) ? { reference: text(form, "reference", 120) } : {}),
+    },
     staff,
   );
   if (result.ok && result.value.duplicate) return { ok: true, message: "That refund was already recorded." };

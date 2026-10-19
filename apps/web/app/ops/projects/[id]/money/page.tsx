@@ -1,7 +1,17 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { INVOICE_KIND_LABEL, invoiceOutstanding, isInvoiceOverdue, type Invoice, type Payment } from "@aircon/domain";
+import {
+  CREDIT_PURPOSE_LABEL,
+  INVOICE_KIND_LABEL,
+  creditPurposeOf,
+  invoiceOutstanding,
+  isInvoiceOverdue,
+  refundableCreditPence,
+  type CreditPurpose,
+  type Invoice,
+  type Payment,
+} from "@aircon/domain";
 import { Badge, Card, EmptyState, Money, Section, Stat, StatusChip } from "@/components/kit";
 import { requireProjectAccess, requireStaff } from "@/lib/auth/server";
 import { fmtDate } from "@/lib/format";
@@ -61,7 +71,7 @@ export default async function MoneyPage({ params }: { params: Promise<{ id: stri
           label={s.outstandingPence < 0 ? "In credit" : "Outstanding"}
           value={<Money pence={Math.abs(s.outstandingPence)} />}
           tone={s.outstandingPence > 0 ? "warn" : "success"}
-          hint={s.outstandingPence < 0 ? "Overpaid: refund or credit it" : undefined}
+          hint={s.outstandingPence < 0 ? "Refund it from the credit note below, or it comes off their next invoice" : undefined}
         />
       </div>
 
@@ -126,8 +136,9 @@ export default async function MoneyPage({ params }: { params: Promise<{ id: stri
         <details className="mt-3 rounded-2xl border border-line bg-white px-4">
           <summary className="flex min-h-12 cursor-pointer items-center text-sm font-semibold text-ink-900">A credit note not tied to one invoice</summary>
           <div className="pb-4">
+            <p className="mb-1 text-sm text-ink-500">It sits on their account and comes off what they owe, oldest invoice first. Never more than the price, less earlier credits.</p>
             <ActionForm flash action={creditAction.bind(null, p.id)} submitLabel="Issue credit note" variant="secondary" confirm="Issue this credit note? It goes in the customer's documents.">
-              <CreditFields />
+              <CreditFields purpose="reduction" name="account" />
             </ActionForm>
           </div>
         </details>
@@ -231,7 +242,9 @@ function PlanCard({ plan, projectId }: { plan: InvoicePlan; projectId: string })
   );
 }
 
-function CreditFields({ max }: { max?: number }) {
+const PURPOSES: CreditPurpose[] = ["reduction", "correction"];
+
+function CreditFields({ max, purpose, name }: { max?: number; purpose: CreditPurpose; name: string }) {
   return (
     <div className="grid gap-3 sm:grid-cols-2">
       <div>
@@ -246,6 +259,62 @@ function CreditFields({ max }: { max?: number }) {
           <input name="reason" required maxLength={300} className={`${field} mt-1.5 font-normal`} />
         </label>
       </div>
+      <fieldset className="sm:col-span-2">
+        <legend className={label}>What is it for?</legend>
+        {PURPOSES.map((v) => (
+          <label key={v} className="flex min-h-11 items-start gap-2 py-1 text-sm text-ink-900">
+            <input type="radio" name="purpose" value={v} defaultChecked={v === purpose} className="mt-0.5 h-4 w-4 shrink-0 accent-accent-600" id={`purpose-${name}-${v}`} />
+            {CREDIT_PURPOSE_LABEL[v]}
+          </label>
+        ))}
+      </fieldset>
+    </div>
+  );
+}
+
+/** The refund form's fields; `treatment` only where a refund could leave the invoice owed again. */
+function RefundFields({ id, todayIso, treatment, max }: { id: string; todayIso: string; treatment: boolean; max?: number }) {
+  return (
+    <div className="grid gap-3 sm:grid-cols-2">
+      <div>
+        <label className={label} htmlFor={`ra-${id}`}>Amount refunded (£)</label>
+        <input id={`ra-${id}`} name="amount" inputMode="decimal" required defaultValue={max ? (max / 100).toFixed(2) : undefined} className={field} />
+      </div>
+      <div>
+        <label className={label} htmlFor={`ro-${id}`}>Date sent</label>
+        <input id={`ro-${id}`} name="refundedOn" type="date" required max={todayIso} defaultValue={todayIso} className={field} />
+      </div>
+      <div>
+        <label className={label} htmlFor={`rm-${id}`}>How</label>
+        <select id={`rm-${id}`} name="method" defaultValue="bank-transfer" className={`${field} pr-10`}>
+          <option value="bank-transfer">Bank transfer</option>
+          <option value="card">Card refund</option>
+          <option value="cash">Cash</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+      <div>
+        <label className={label} htmlFor={`rr-${id}`}>Reason</label>
+        <input id={`rr-${id}`} name="reason" required maxLength={300} className={field} />
+      </div>
+      {treatment && (
+        <fieldset className="sm:col-span-2">
+          <legend className={label}>Do they still owe it?</legend>
+          {(
+            [
+              ["reduction", "No, they keep it (goodwill, a snag, a cancellation): a credit note goes with the refund"],
+              ["correction", "No, it was invoiced in error: a credit note cancels it, and the balance bills the right figure"],
+              ["owed", "Yes, ask for it again (a payment that came back, say)"],
+            ] as const
+          ).map(([v, text]) => (
+            <label key={v} className="flex min-h-11 items-start gap-2 py-1 text-sm text-ink-900">
+              <input type="radio" name="treatment" value={v} defaultChecked={v === "reduction"} className="mt-0.5 h-4 w-4 shrink-0 accent-accent-600" />
+              {text}
+            </label>
+          ))}
+          <p className="mt-1 text-xs text-ink-500">Money they overpaid, or credit already on their account, needs no credit note and gets none.</p>
+        </fieldset>
+      )}
     </div>
   );
 }
@@ -269,6 +338,11 @@ function InvoiceRow({
   const credited = all.filter((c) => c.kind === "credit-note" && c.creditsInvoiceId === inv.id && c.status !== "void");
   const unfinished = inv.issuing === true;
   const todayIso = today;
+  // What account credit (credit notes on their own, overpayments) is covering on this one.
+  const ownOwed = Math.max(0, inv.totalPence - inv.paidPence + credited.filter((c) => c.status !== "draft").reduce((sum, c) => sum + c.totalPence - c.paidPence, 0));
+  const fromAccount = credit ? 0 : Math.max(0, ownOwed - owed);
+  const refundable = credit ? refundableCreditPence(inv, all) : 0;
+  const purpose = creditPurposeOf(inv);
 
   return (
     <Card as="li" padded={false}>
@@ -283,6 +357,7 @@ function InvoiceRow({
             {inv.issuedBy ? ` · by ${inv.issuedBy}` : ""}
           </p>
           {inv.reason && <p className="text-sm text-ink-700">{inv.reason}</p>}
+          {purpose && <p className="text-xs text-ink-500">{purpose === "reduction" ? "Money off the price: never billed again" : "A correction: the balance bills the right figure"}</p>}
           {credited.length > 0 && <p className="text-sm text-ink-700">Credited: {credited.map((c) => c.number).join(", ")}</p>}
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:justify-end">
@@ -298,10 +373,37 @@ function InvoiceRow({
           ) : null}
         </div>
       </div>
-      {!credit && (inv.paidPence !== 0 || owed > 0) && (
+      {!credit && (inv.paidPence !== 0 || owed > 0 || fromAccount > 0) && (
         <p className="px-5 pb-3 text-sm text-ink-700 sm:px-6">
-          Paid <Money pence={inv.paidPence} /> · left to pay <Money pence={owed} className="font-semibold" />
+          Paid <Money pence={inv.paidPence} />
+          {fromAccount > 0 && (
+            <>
+              {" "}
+              · <Money pence={fromAccount} /> covered by credit on their account
+            </>
+          )}{" "}
+          · left to pay <Money pence={owed} className="font-semibold" />
         </p>
+      )}
+      {credit && inv.paidPence < 0 && (
+        <p className="px-5 pb-3 text-sm text-ink-700 sm:px-6">
+          Refunded <Money pence={-inv.paidPence} />
+        </p>
+      )}
+      {credit && refundable > 0 && (
+        <div className="border-t border-line bg-surface/40 px-5 py-3 sm:px-6">
+          <details className="rounded-2xl border border-line bg-white px-4">
+            <summary className="flex min-h-12 cursor-pointer items-center text-sm font-semibold text-ink-900">
+              Refund this credit (<Money pence={refundable} /> can go back)
+            </summary>
+            <div className="pb-4">
+              <ActionForm flash action={refundAction.bind(null, projectId)} submitLabel="Record the refund" variant="secondary" confirm="Record this refund of their credit? It's shown to the customer on their timeline." resetOnSuccess>
+                <input type="hidden" name="invoiceId" value={inv.id} />
+                <RefundFields id={inv.id} todayIso={todayIso} treatment={false} max={refundable} />
+              </ActionForm>
+            </div>
+          </details>
+        </div>
       )}
       {unfinished && (
         <div className="mx-5 mb-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 sm:mx-6">
@@ -357,7 +459,7 @@ function InvoiceRow({
               <div className="pb-4">
                 <ActionForm flash action={creditAction.bind(null, projectId)} submitLabel="Issue credit note" variant="secondary" confirm={`Issue a credit note against ${inv.number}?`}>
                   <input type="hidden" name="invoiceId" value={inv.id} />
-                  <CreditFields max={owed} />
+                  <CreditFields max={owed} purpose="correction" name={inv.id} />
                 </ActionForm>
               </div>
             </details>
@@ -368,29 +470,7 @@ function InvoiceRow({
               <div className="pb-4">
                 <ActionForm flash action={refundAction.bind(null, projectId)} submitLabel="Record the refund" variant="secondary" confirm="Record this refund? It's shown to the customer on their timeline." resetOnSuccess>
                   <input type="hidden" name="invoiceId" value={inv.id} />
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div>
-                      <label className={label} htmlFor={`ra-${inv.id}`}>Amount refunded (£)</label>
-                      <input id={`ra-${inv.id}`} name="amount" inputMode="decimal" required className={field} />
-                    </div>
-                    <div>
-                      <label className={label} htmlFor={`ro-${inv.id}`}>Date sent</label>
-                      <input id={`ro-${inv.id}`} name="refundedOn" type="date" required max={todayIso} defaultValue={todayIso} className={field} />
-                    </div>
-                    <div>
-                      <label className={label} htmlFor={`rm-${inv.id}`}>How</label>
-                      <select id={`rm-${inv.id}`} name="method" defaultValue="bank-transfer" className={`${field} pr-10`}>
-                        <option value="bank-transfer">Bank transfer</option>
-                        <option value="card">Card refund</option>
-                        <option value="cash">Cash</option>
-                        <option value="other">Other</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className={label} htmlFor={`rr-${inv.id}`}>Reason</label>
-                      <input id={`rr-${inv.id}`} name="reason" required maxLength={300} className={field} />
-                    </div>
-                  </div>
+                  <RefundFields id={inv.id} todayIso={todayIso} treatment />
                 </ActionForm>
               </div>
             </details>

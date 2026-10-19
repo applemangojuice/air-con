@@ -25,6 +25,9 @@ import type { AcceptedSummary } from "@/lib/proposal-server";
 
 type Step = 1 | 2 | 3 | 4;
 
+const READ_ID = "accept-read-cancellation";
+const NAME_ID = "accept-full-name";
+
 const STEP_TITLE: Record<Step, string> = {
   1: "Choose your option",
   2: "Check your answers",
@@ -75,10 +78,26 @@ export function AcceptFlow({
   const nameOk = isFullName(name);
   const lossOk = !installOnly || !earlyStart || lossAck;
   const canSubmit = !readOnly && nameOk && readCancellation && lossOk && !busy;
+  // What's missing, said by the button (the errors themselves sit higher up, often off a phone's screen).
+  const missing = [
+    !readCancellation ? "tick the box to say you've read your cancellation information" : "",
+    !nameOk ? "type your first name and surname" : "",
+    !lossOk ? "go back a step to confirm you understand losing the right to cancel" : "",
+  ].filter(Boolean);
+  const missingSummary = missing.length ? `To accept, ${missing.join(" and ")}.` : "";
 
   async function submit() {
     setTouched(true);
-    if (!canSubmit) return;
+    if (!canSubmit) {
+      if (busy || readOnly) return;
+      // Take them to the first thing to fix, so the tap is never silent.
+      const target = document.getElementById(!readCancellation ? READ_ID : !nameOk ? NAME_ID : "");
+      if (target) {
+        target.scrollIntoView({ behavior: "smooth", block: "center" });
+        target.focus({ preventScroll: true });
+      }
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -237,6 +256,7 @@ export function AcceptFlow({
               <TermsText sections={data.termsText} version={data.termsVersion} summary={`Our terms (version ${data.termsVersion}): they form part of your contract`} />
             ) : null}
             <Checkbox
+              id={READ_ID}
               label="I've read the cancellation information, including the model cancellation form"
               checked={readCancellation}
               onChange={(e) => setReadCancellation(e.target.checked)}
@@ -248,6 +268,7 @@ export function AcceptFlow({
               </p>
             )}
             <Input
+              id={NAME_ID}
               label="Your full name"
               hint="Your first name and surname. Typing it here is your signature."
               autoComplete="name"
@@ -277,7 +298,10 @@ export function AcceptFlow({
               </dl>
             </div>
 
-            <div aria-live="polite" role="status" className="min-h-0">
+            <div aria-live="polite" role="status" className="min-h-0 space-y-3">
+              {touched && missingSummary && !readOnly && (
+                <p className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-900">{missingSummary}</p>
+              )}
               {error && (
                 <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-900">
                   <p className="font-medium">{error.message}</p>

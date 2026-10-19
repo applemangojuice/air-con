@@ -549,7 +549,20 @@ try {
     await book.click();
     check("survey booked, and the next step says how to get ready", await waitFor(customer, /Get ready for your survey/));
     check("the booking and the consent are on the timeline", (await has(customer, /You agreed to get your proposal, contract and cancellation information by email/)) && (await has(customer, /Home survey booked for/)));
+    check("the survey is free to move, as advertised (no short-notice fee)", (await has(customer, /Move my survey\s*Free to move/)) && !(await has(customer, /short-notice fee/)));
     await shot(customer, "B-booked");
+
+    // Reopening the used link: still signed in, they go straight back to their project, never the team sign-in.
+    await go(customer, `${ids.link}`);
+    check("a used link, still signed in: back to their project", new RegExp(`/p/${ids.pid}`).test(customer.url()) && !(await has(customer, /Team sign-in/, "body")), customer.url());
+    const stranger = await person("stranger", "phone");
+    await go(stranger, `${ids.link}`);
+    check(
+      "a used link, signed out: a customer page that offers a fresh link",
+      /\/portal\?link=expired/.test(stranger.url()) && (await has(stranger, /That link has expired or was already used/, "body")) && (await has(stranger, /Your email address/, "body")) && !(await has(stranger, /^Team sign-in$/m, "h1")),
+      stranger.url(),
+    );
+    await stranger.context().close();
   });
 
   const surveyor = await person("surveyor", "phone");
@@ -994,8 +1007,12 @@ try {
     sheet = installer.locator('[role="dialog"]').last();
     await sheet.getByLabel("The change, in a few words").fill("DEMO: 2 m more trunking round the bay");
     await sheet.getByLabel("Why it's needed (the customer reads this)").fill("The pipe run round the bay window is longer than measured, so it needs 2 m more trunking to stay neat.");
-    await sheet.getByLabel("Estimated price change, £ before VAT").fill("120");
-    await sheet.getByRole("button", { name: "Send for the customer's OK" }).click();
+    // A stray tap on the backdrop doesn't lose what's been written.
+    await installer.mouse.click(195, 20);
+    check("a half-written variation survives a tap on the backdrop", (await sheet.getByLabel("The change, in a few words").inputValue().catch(() => "")) === "DEMO: 2 m more trunking round the bay");
+    // The installer's estimate (£150) goes to the office first; the office corrects it to £120.
+    await sheet.getByLabel("Estimated price change, £ before VAT").fill("150");
+    await sheet.getByRole("button", { name: "Send to the office" }).click();
     await sheet.getByText(/Don't do this work until the customer approves it/).waitFor();
     await sheet.getByRole("button", { name: "Done" }).click();
     await installer.waitForTimeout(1500);
@@ -1007,6 +1024,17 @@ try {
     check("end-of-day update previewed with 2 photos", e1.picked === 2 && /There are 2 photos from today/.test(e1.preview), e1.preview.slice(-400));
     check("the issue's photo isn't offered for the customer's update", e1.offered.length >= 2 && !e1.offered.some((c) => /remote holder/.test(c)), e1.offered.join(" | "));
     check("day 1 closed, update recorded (demo mode)", /Day 1 closed/.test(e1.closed));
+
+    // The office checks the variation from site before the customer sees it.
+    await go(customer, `/p/${ids.pid}`);
+    check("the customer can't see an unchecked variation", !(await has(customer, /DEMO: 2 m more trunking/)));
+    await go(admin, `/ops/projects/${ids.pid}/issues`);
+    check("the office sees the variation waiting for them", await waitFor(admin, /variation from site is waiting for the office/));
+    const review = admin.locator("main form").filter({ has: admin.getByLabel("Price change, £ before VAT") });
+    check("…with the installer's estimate to check", (await review.getByLabel("Price change, £ before VAT").inputValue()) === "150.00");
+    await review.getByLabel("Price change, £ before VAT").fill("120");
+    await review.getByRole("button", { name: "Send to the customer for their OK" }).click();
+    check("the office sends it at the checked price", await waitFor(admin, /£120 before VAT · Waiting for the customer/));
 
     // The customer approves the variation and sees the day's update.
     await go(customer, `/p/${ids.pid}`);

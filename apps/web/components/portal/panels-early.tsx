@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { daysBetween, rescheduleFeeGbp, type Project } from "@aircon/domain";
+import type { Project } from "@aircon/domain";
 import { Checkbox } from "@/components/kit/form";
 import { fmtDay, fmtDayTime, gbp, money } from "@/lib/format";
 import {
@@ -240,8 +240,7 @@ function MoveSurvey({ data }: { data: PanelProps["data"] }) {
   const [open, setOpen] = useState(false);
   const [slot, setSlot] = useState<string | null>(null);
   if (!p.survey.scheduledFor) return null;
-  const notice = daysBetween(data.today, p.survey.scheduledFor);
-  const fee = rescheduleFeeGbp("survey", notice);
+  // The survey is free and no-obligation, so moving it is free too (rescheduleFeeGbp).
   const days = data.surveySlots.map((d) => ({ ...d, slots: d.slots.filter((s) => s.iso !== p.survey.scheduledFor) })).filter((d) => d.slots.length);
 
   if (!open) {
@@ -250,7 +249,7 @@ function MoveSurvey({ data }: { data: PanelProps["data"] }) {
         <Secondary onClick={() => setOpen(true)} disabled={readOnly}>
           Move my survey
         </Secondary>
-        <span className="text-sm text-ink-500">{fee > 0 ? `${gbp(fee)} short-notice fee` : "Free with a week's notice"}</span>
+        <span className="text-sm text-ink-500">Free to move</span>
       </div>
     );
   }
@@ -266,14 +265,7 @@ function MoveSurvey({ data }: { data: PanelProps["data"] }) {
       }}
     >
       <Sub>Move your survey</Sub>
-      {fee > 0 ? (
-        <Callout tone="warn" title={`A ${gbp(fee)} short-notice fee applies`}>
-          Your survey is {notice <= 0 ? "today" : `${notice} day${notice === 1 ? "" : "s"} away`}. Moving it with less than a week&apos;s notice adds {gbp(fee)} to
-          your final balance, because your surveyor&apos;s day is already planned.
-        </Callout>
-      ) : (
-        <p className="text-sm text-ink-500">It&apos;s more than a week away, so moving it is free.</p>
-      )}
+      <p className="text-sm text-ink-500">Moving it is free. Pick a new time and we&apos;ll let your surveyor know.</p>
       {days.length ? (
         <SlotPicker days={days} value={slot} onChange={setSlot} disabled={busy} legend="Pick a new day" />
       ) : (
@@ -282,7 +274,7 @@ function MoveSurvey({ data }: { data: PanelProps["data"] }) {
       <ActionFeedback error={error} message={message} />
       <div className="flex flex-col gap-2 sm:flex-row">
         <Primary type="submit" disabled={!slot} busy={busy} busyLabel="Moving your survey…">
-          {slot ? `Move to ${fmtDayTime(slot)}${fee > 0 ? ` (${gbp(fee)})` : ""}` : "Pick a new time"}
+          {slot ? `Move to ${fmtDayTime(slot)}` : "Pick a new time"}
         </Primary>
         <Secondary onClick={() => setOpen(false)}>Keep my current time</Secondary>
       </div>

@@ -119,6 +119,43 @@ export function staffLanding(
   return staff.external && opsConsole ? home : target;
 }
 
+/** Why a sign-in link didn't sign anyone in. */
+export type DeadLinkReason = "expired" | "missing" | "unavailable";
+
+/**
+ * Where a sign-in link that can't be used (expired, already used, cut
+ * short, or the database is down) sends someone. Customers never land on
+ * the staff sign-in page:
+ *  * still signed in as the link's own subject: wherever the link was going
+ *    (a customer reopening yesterday's "Review your proposal" email lands on
+ *    the proposal); signed in as anyone else: their own home;
+ *  * signed out: a customer page that says the link has expired and offers
+ *    a fresh one (/portal?link=…), or for a staff link, the team sign-in.
+ * `token` is what we know of the dead link (its kind, subject and `next`),
+ * null when it's unknown or there was none.
+ */
+export function deadLinkLanding(input: {
+  token: { kind: "staff" | "customer"; subjectId: string | null; email: string; next?: string } | null;
+  session: Session | null;
+  reason: DeadLinkReason;
+}): string {
+  const { token, session, reason } = input;
+  const own =
+    token && session && token.kind === session.kind
+      ? token.subjectId
+        ? token.subjectId === (session.kind === "staff" ? session.staffId : session.customerId)
+        : sameEmail(token.email, session.email)
+      : false;
+  if (session?.kind === "customer") {
+    const home = session.projectIds.length === 1 ? `/p/${session.projectIds[0]}` : "/portal";
+    return own ? safeNextPath(token?.next, home) : home;
+  }
+  if (session?.kind === "staff" && token?.kind !== "customer") {
+    return staffLanding({ roles: session.roles, external: session.external, active: true }, own ? token?.next : null);
+  }
+  return token?.kind === "staff" ? `/login?error=${reason}` : `/portal?link=${reason}`;
+}
+
 /**
  * A same-origin path to redirect to, or the fallback. Rejects absolute and
  * protocol-relative URLs, backslash tricks and control characters, so a

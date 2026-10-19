@@ -13,6 +13,9 @@ import {
   migrateProject,
   nextGate,
   outstandingPence,
+  stillToBillPence,
+  acceptedVariationsPence,
+  projectFees,
   runsheetProgress,
   surveyCompleteness,
   type Blocker,
@@ -460,6 +463,14 @@ export async function buildReadinessContext(project: Project, actor?: StaffMembe
       depositDuePence: contract > 0 ? depositPence(contract, settingsForProposal(settings, proposal?.status === "accepted" ? proposal : null)) : 0,
       depositPaidPence,
       outstandingPence: outstandingPence(invoices),
+      // What's agreed but on no invoice yet: the closed gate holds until it's billed.
+      unbilledPence: stillToBillPence({
+        contractTotalPence: project.money.contractTotalPence ?? (project.proposal.status === "accepted" ? project.proposal.contractTotalPence : undefined),
+        acceptedVariationsPence: acceptedVariationsPence(issues),
+        changeFeesPence: project.money.changeFeesPence,
+        surveyFeePaidPence: Math.round(projectFees(project).surveyPaidGbp * 100),
+        invoices,
+      }),
     };
   });
   if (money) ctx.money = money;

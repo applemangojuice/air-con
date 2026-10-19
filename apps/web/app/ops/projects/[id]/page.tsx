@@ -921,6 +921,7 @@ function IssueRow({ issue: i }: { issue: Issue }) {
       </div>
       <span className="flex flex-wrap gap-1.5">
         {i.blocking && <Badge tone="danger">Blocking</Badge>}
+        {i.variation?.status === "draft" && <Badge tone="warn">Variation to check and send</Badge>}
         <StatusChip status={i.status} />
       </span>
     </li>
@@ -971,7 +972,7 @@ function BlockerLinks({ blockers, projectId }: { blockers: string[]; projectId: 
     else if (c.startsWith("kit")) areas.set("kit", { href: `/ops/projects/${projectId}/kit`, label: "Kit" });
     else if (["no-fgas-engineer", "no-electrician", "no-tech-lead", "dates-not-chosen", "dates-inside-cancellation", "booking-not-confirmed"].includes(c))
       areas.set("booking", { href: `/ops/projects/${projectId}/booking`, label: "Booking" });
-    else if (c === "deposit-unpaid" || c === "balance-outstanding" || c === "money-unknown" || c === "not-fully-invoiced")
+    else if (["deposit-unpaid", "balance-outstanding", "money-unknown", "balance-not-invoiced", "customer-in-credit"].includes(c))
       areas.set("money", { href: `/ops/projects/${projectId}/money`, label: "Money" });
     else if (c === "issue") areas.set("issues", { href: `/ops/projects/${projectId}/issues`, label: "Issues" });
     else if (["runsheet-missing", "runsheet-incomplete", "exceptions-open", "install-not-started", "walkthrough-not-done", "commissioning-unsigned"].includes(c))

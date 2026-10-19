@@ -144,7 +144,7 @@ function ctx(today: string, over: Partial<ReadinessContext> = {}): ReadinessCont
     openIssues: [],
     runsheet: { complete: true, openExceptions: 0, missing: 0, blocked: 0, walkthroughDone: true },
     commissioning: { signed: true, signedBy: "Tess Lead" },
-    money: { depositDuePence: 0, depositPaidPence: 0, outstandingPence: 0 },
+    money: { depositDuePence: 0, depositPaidPence: 0, outstandingPence: 0, unbilledPence: 0 },
     ...over,
   };
 }
@@ -399,15 +399,18 @@ test("ops-book-survey books on the customer's behalf and can move a slot without
   assert.equal(p.survey.rescheduleFeesGbp, 0);
 });
 
-test("reschedule-survey: needs a booking, charges short notice to the customer only", () => {
+test("reschedule-survey: needs a booking, and is free to move", () => {
   refuses(fresh(), { type: "reschedule-survey", scheduledFor: T.slot }, T.book, {}, /no booked survey/);
   const booked = walk("book-survey");
   refuses(booked, { type: "reschedule-survey", scheduledFor: "2026-10-01T10:00:00.000Z" }, T.book, {}, /future/);
+  // The survey is free and no-obligation, so moving it is free too, however short the notice.
   const byCustomer = step(booked, { type: "reschedule-survey", scheduledFor: "2026-10-29T10:00:00.000Z" }, "2026-10-20T09:00:00.000Z");
-  assert.equal(byCustomer.survey.rescheduleFeesGbp, 25); // 2 days' notice
-  assert.equal(byCustomer.money.changeFeesPence, 2_500);
-  assert.equal(byCustomer.events.at(-1)!.feeGbp, 25);
-  assert.equal(projectFees(byCustomer).changeFeesGbp, 25);
+  assert.equal(byCustomer.survey.scheduledFor, "2026-10-29T10:00:00.000Z");
+  assert.equal(byCustomer.survey.rescheduleFeesGbp, 0); // 2 days' notice
+  assert.equal(byCustomer.money.changeFeesPence, 0);
+  assert.equal(byCustomer.events.at(-1)!.feeGbp, undefined);
+  assert.match(byCustomer.events.at(-1)!.label, /no fee/);
+  assert.equal(projectFees(byCustomer).changeFeesGbp, 0);
   const byUs = step(booked, { type: "reschedule-survey", scheduledFor: "2026-10-29T10:00:00.000Z" }, "2026-10-20T09:00:00.000Z", { actor: ADMIN });
   assert.equal(byUs.survey.rescheduleFeesGbp, 0);
   const early = step(booked, { type: "reschedule-survey", scheduledFor: "2026-11-05T10:00:00.000Z" }, "2026-10-01T09:00:00.000Z");
@@ -807,7 +810,7 @@ test("booking gate: F-gas, a Part P electrician, deposit, dates", () => {
 
   const deposit = mergeSettings({ payments: { depositPct: 20 } });
   assert.equal(severityOf(blockersFor(p, c({ settings: deposit }), "booking"), "deposit-unpaid"), "block");
-  const paidBySum = c({ settings: deposit, money: { depositDuePence: 129_000, depositPaidPence: 129_000, outstandingPence: 0 } });
+  const paidBySum = c({ settings: deposit, money: { depositDuePence: 129_000, depositPaidPence: 129_000, outstandingPence: 0, unbilledPence: 0 } });
   assert.equal(severityOf(blockersFor(p, paidBySum, "booking"), "deposit-unpaid"), undefined);
   const beforeKit = mergeSettings({ payments: { depositPct: 20, depositTiming: "before-kit-order" } });
   assert.equal(severityOf(blockersFor(p, c({ settings: beforeKit }), "booking"), "deposit-unpaid"), undefined);
@@ -1185,13 +1188,17 @@ test("handed-over gate lists each missing piece", () => {
 test("closed gate: money, electrical certificate, warranty, serious issues", () => {
   const p = walk("handover-signed");
   const c = (over: Partial<ReadinessContext>) => ctx(T.close, over);
-  assert.deepEqual(codes(blockersFor(p, c({ money: { depositDuePence: 0, depositPaidPence: 0, outstandingPence: 50_000 } }), "closed")), [
+  assert.deepEqual(codes(blockersFor(p, c({ money: { depositDuePence: 0, depositPaidPence: 0, outstandingPence: 50_000, unbilledPence: 0 } }), "closed")), [
     "balance-outstanding",
-    "not-fully-invoiced",
     "electrical-cert-pending",
     "warranty-not-registered",
   ]);
-  assert.equal(severityOf(blockersFor(p, c({}), "closed"), "not-fully-invoiced"), "warn");
+  // Nothing invoiced owes "nothing": what's agreed but unbilled holds the close too.
+  const unbilled = blockersFor(p, c({ money: { depositDuePence: 0, depositPaidPence: 0, outstandingPence: 0, unbilledPence: 612_300 } }), "closed");
+  assert.equal(severityOf(unbilled, "balance-not-invoiced"), "block");
+  assert.match(unbilled.find((b) => b.code === "balance-not-invoiced")!.message, /£6,123 of the agreed price isn't on an invoice yet/);
+  // A refund owed to the customer is shown, not silently closed over.
+  assert.equal(severityOf(blockersFor(p, c({ money: { depositDuePence: 0, depositPaidPence: 0, outstandingPence: -20_000, unbilledPence: 0 } }), "closed"), "customer-in-credit"), "warn");
   assert.equal(severityOf(blockersFor(p, c({ money: undefined }), "closed"), "money-unknown"), "block");
   const ready = walk("payment-recorded");
   assert.deepEqual(blockersFor(ready, c({}), "closed"), []);
@@ -1531,10 +1538,10 @@ test("createProject seeds a v2 project from the quote", () => {
   assert.equal(projectFees(paid).surveyPaidGbp, 0);
 });
 
-test("reschedule fees keep the v1 bands, with the site visit as the survey", () => {
+test("reschedule fees: the survey is always free to move; the install keeps the v1 bands", () => {
   assert.equal(rescheduleFeeGbp("survey", 7), 0);
-  assert.equal(rescheduleFeeGbp("survey", 6), 25);
-  assert.equal(rescheduleFeeGbp("survey", 0), 25);
+  assert.equal(rescheduleFeeGbp("survey", 6), 0);
+  assert.equal(rescheduleFeeGbp("survey", 0), 0);
   assert.equal(rescheduleFeeGbp("installation", 7), 0);
   assert.equal(rescheduleFeeGbp("installation", 1), 150);
   assert.equal(rescheduleFeeGbp("installation", -3), 150);

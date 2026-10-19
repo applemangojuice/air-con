@@ -1,8 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  accountCreditPence,
+  accountCreditUsedOn,
   applyPayment,
+  balanceLinesFor,
   buildBalanceInvoiceLines,
+  creditPurposeOf,
   creditNoteLines,
   depositInvoiceLines,
   depositPence,
@@ -14,7 +18,9 @@ import {
   isInvoiceOverdue,
   moneySummary,
   outstandingPence,
+  refundableCreditPence,
   settleInvoice,
+  stillToBillPence,
   type Invoice,
   type InvoiceLine,
   type Payment,
@@ -200,4 +206,84 @@ test("variationsBillableAlone: a balance invoice covers what was accepted before
   assert.deepEqual(variationsBillableAlone([v3], [own]).map((v) => v.id), [], "already billed on its own");
   const voided = { ...balance, status: "void" as const };
   assert.deepEqual(variationsBillableAlone([v1], [voided]).map((v) => v.id), ["v1"], "a void balance covers nothing");
+});
+
+/* Credit notes: correcting vs money off; credit on the account. */
+
+// DEMO 3's numbers: a £7,641.50 contract with a £1,528.30 deposit, paid.
+const CONTRACT = 764_150;
+const deposit = () => invoice({ id: "dep", number: "DIH-0003", kind: "deposit", totalPence: 152_830, paidPence: 152_830, status: "paid", issuedAt: "2026-10-01T09:00:00.000Z" });
+const credit = (over: Partial<Invoice> & { totalPence: number }) =>
+  invoice({ id: "cn", number: "DIH-0004", kind: "credit-note", issuedAt: "2026-10-05T09:00:00.000Z", ...over });
+const toBill = (invoices: Invoice[]) =>
+  stillToBillPence({ contractTotalPence: CONTRACT, acceptedVariationsPence: 0, changeFeesPence: 0, surveyFeePaidPence: 0, invoices });
+
+test("a goodwill credit is never billed back by the balance", () => {
+  assert.equal(toBill([deposit()]), 611_320);
+  const goodwill = credit({ totalPence: -20_000, reason: "Goodwill" });
+  assert.equal(creditPurposeOf(goodwill), "reduction", "older untied credit notes are money off");
+  assert.equal(toBill([deposit(), goodwill]), 611_320, "the balance still bills the price, not the price plus the credit");
+  const lines = balanceLinesFor({ contractTotalPence: CONTRACT, acceptedVariationsPence: 0, changeFeesPence: 0, surveyFeePaidPence: 0, invoices: [deposit(), goodwill], taxCode: "outside-scope" });
+  assert.deepEqual(lines.map((l) => [l.label, l.totalPence]), [["Contract price, as accepted", CONTRACT], ["Less: already invoiced", -152_830]]);
+  assert.equal(moneySummary([deposit(), goodwill], [], CONTRACT).toInvoicePence, 611_320, "still to invoice doesn't grow either");
+  // Once the balance is out, a later goodwill credit doesn't reopen it.
+  const balance = invoice({ id: "bal", number: "DIH-0005", kind: "balance", totalPence: 611_320, issuedAt: "2026-10-10T09:00:00.000Z" });
+  assert.equal(toBill([deposit(), balance, credit({ totalPence: -20_000, issuedAt: "2026-10-12T09:00:00.000Z" })]), 0);
+  assert.equal(toBill([deposit(), balance, credit({ totalPence: -20_000, creditsInvoiceId: "bal", creditPurpose: "reduction" })]), 0);
+  // ...and the credit is used against what's left: the customer pays the balance less the goodwill.
+  const all = [deposit(), balance, goodwill];
+  assert.equal(invoiceOutstanding(balance, all), 591_320);
+  assert.equal(outstandingPence(all), 591_320);
+});
+
+test("a correcting credit note is billed again, at the right figure", () => {
+  const wrong = credit({ totalPence: -152_830, creditsInvoiceId: "dep", reason: "Deposit raised in error" });
+  assert.equal(creditPurposeOf(wrong), "correction", "older credit notes against an invoice correct it");
+  const unpaidDeposit = { ...deposit(), paidPence: 0, status: "issued" as const };
+  assert.equal(toBill([unpaidDeposit, wrong]), CONTRACT, "the cancelled deposit goes back on the balance");
+  assert.equal(moneySummary([unpaidDeposit, wrong], [], CONTRACT).toInvoicePence, CONTRACT);
+  assert.equal(creditPurposeOf(credit({ totalPence: -100, creditPurpose: "correction" })), "correction", "an untied one can be marked as a correction");
+  assert.equal(creditPurposeOf(deposit()), null);
+});
+
+test("credit on the account is used against invoices, so a refund never reopens one", () => {
+  // Paid in full, then a £200 goodwill credit: the customer is in credit, nothing is owed anywhere.
+  const goodwill = credit({ totalPence: -20_000 });
+  let all = [deposit(), goodwill];
+  assert.equal(accountCreditPence(all), 20_000);
+  assert.equal(outstandingPence(all), -20_000);
+  assert.equal(invoiceOutstanding(all[0]!, all), 0);
+  assert.equal(refundableCreditPence(goodwill, all), 20_000, "the credit can be refunded");
+  // Refunded against the deposit (the old way): the credit covers it, so the deposit isn't owed again.
+  const refundedOnDeposit = { ...deposit(), paidPence: 132_830, status: "part-paid" as const };
+  all = [refundedOnDeposit, goodwill];
+  assert.equal(outstandingPence(all), 0);
+  assert.equal(invoiceOutstanding(refundedOnDeposit, all), 0, "not asked for again");
+  assert.equal(isInvoiceOverdue(refundedOnDeposit, all, "2026-12-01"), false);
+  assert.equal(refundableCreditPence(goodwill, all), 0, "nothing left to refund: it's covering the deposit");
+  // Refunded from the credit note itself: the credit's gone and so is the overpayment.
+  const refundedCredit = { ...goodwill, paidPence: -20_000, status: "paid" as const };
+  all = [deposit(), refundedCredit];
+  assert.equal(accountCreditPence(all), 0);
+  assert.equal(outstandingPence(all), 0);
+  assert.equal(invoiceOutstanding(all[0]!, all), 0);
+  assert.equal(refundableCreditPence(refundedCredit, all), 0);
+});
+
+test("account credit is used oldest invoice first, and per-invoice figures add up to what's owed", () => {
+  const a = invoice({ id: "a", number: "DIH-0001", kind: "deposit", totalPence: 10_000, issuedAt: "2026-10-01T09:00:00.000Z" });
+  const b = invoice({ id: "b", number: "DIH-0002", kind: "balance", totalPence: 40_000, issuedAt: "2026-10-10T09:00:00.000Z" });
+  const c = credit({ totalPence: -15_000 });
+  const all = [b, c, a];
+  assert.equal(invoiceOutstanding(a, all), 0);
+  assert.equal(invoiceOutstanding(b, all), 35_000);
+  assert.equal(invoiceOutstanding(a, all) + invoiceOutstanding(b, all), outstandingPence(all));
+  assert.deepEqual([accountCreditUsedOn(a, all), accountCreditUsedOn(b, all), accountCreditUsedOn(c, all)], [10_000, 5_000, 0]);
+  // A credit note against an invoice that's since been voided is account credit too.
+  const orphan = credit({ id: "cn2", totalPence: -5_000, creditsInvoiceId: "gone" });
+  assert.equal(accountCreditPence([a, orphan]), 5_000);
+  assert.equal(invoiceOutstanding(a, [a, orphan]), 5_000);
+  // An overpayment on one invoice counts towards the next.
+  const over = { ...a, paidPence: 12_000, status: "paid" as const };
+  assert.equal(invoiceOutstanding(b, [over, b]), 38_000);
 });

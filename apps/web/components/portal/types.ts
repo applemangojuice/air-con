@@ -6,6 +6,7 @@ import type {
   Project,
   ProjectStageId,
   StageInfo,
+  VariationStatus,
 } from "@aircon/domain";
 import type { EarliestReason, InstallBlock, SurveySlotDay } from "./schedule";
 
@@ -64,7 +65,7 @@ export interface HubIssue {
     priceDeltaNetPence: number;
     taxPence: number;
     totalDeltaPence: number;
-    status: "proposed" | "accepted" | "declined";
+    status: VariationStatus;
     decidedAt?: string;
     decidedBy?: string;
   };

@@ -73,6 +73,9 @@ export default async function TermsPage() {
             <li>Your online price is a real price, confirmed at a home survey. It only changes for a reason we put in writing.</li>
             <li>Nothing is agreed until you accept a written proposal. Getting a price or a survey commits you to nothing.</li>
             <li>
+              {s.scheduling.surveyFeeGbp > 0 ? "Moving your home survey" : "Your home survey is free, and moving it"} costs nothing, however short the notice.
+            </li>
+            <li>
               You can cancel without giving a reason: when we supply the equipment, until {days} days after the last
               of it is delivered to you.
             </li>

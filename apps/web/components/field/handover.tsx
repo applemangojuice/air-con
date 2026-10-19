@@ -1,17 +1,18 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { handoverSteps, stepView, type Blocker, type HandoverPackSnapshot } from "@aircon/domain";
 import { BlockerList } from "@/components/kit/blocker-list";
 import { newOpId } from "@/lib/field-outbox";
-import { uploadMedia } from "@/lib/media-client";
+import { MediaUploadError, uploadMedia } from "@/lib/media-client";
 import { fmtDate, whenLabel } from "./format";
 import { SignaturePad, type SignaturePadHandle } from "./signature-pad";
 import { StepCard } from "./step-card";
 import { HeaderTitle, SyncBadge } from "./sync-badge";
 import type { FieldJob } from "./types";
+import { useOnline } from "./use-online";
 import { useMergedJob, useRefreshOnSync } from "./use-outbox";
 
 /**
@@ -26,16 +27,20 @@ const BTN = "min-h-12 rounded-full px-5 font-semibold disabled:opacity-40";
 const PRIMARY = `${BTN} bg-accent-600 text-white shadow-sm hover:bg-accent-700`;
 const SECONDARY = `${BTN} border border-line bg-white text-ink-900 hover:bg-surface`;
 
-async function post(url: string, body: unknown): Promise<{ ok: true; data: Record<string, unknown> } | { ok: false; error: string; blockers?: Blocker[] }> {
+async function post(url: string, body: unknown): Promise<{ ok: true; data: Record<string, unknown> } | { ok: false; error: string; blockers?: Blocker[]; offline?: true }> {
   try {
     const res = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), cache: "no-store" });
     const data = (await res.json().catch(() => ({}))) as Record<string, unknown> & { error?: string; blockers?: Blocker[] };
     if (!res.ok) return { ok: false, error: data.error ?? `That didn't work (${res.status}).`, ...(data.blockers ? { blockers: data.blockers } : {}) };
     return { ok: true, data };
   } catch {
-    return { ok: false, error: "No connection. This step needs signal: try again in a minute." };
+    return { ok: false, error: "No connection. This step needs signal: try again in a minute.", offline: true };
   }
 }
+
+/** Said when the sign-off couldn't reach us: honest about what happened, and what happens next. */
+const NOT_SAVED_OFFLINE =
+  "Not saved: there's no signal. Keep this screen open: it saves by itself as soon as signal is back, or tap Sign off again. Their signature is kept.";
 
 function StepHeading({ n, title, done, children }: { n: number; title: string; done: boolean; children?: React.ReactNode }) {
   return (
@@ -139,6 +144,12 @@ export function Handover({ data, pack, missing }: { data: FieldJob; pack: Handov
   const [error, setError] = useState<string | null>(null);
   const [blockers, setBlockers] = useState<Blocker[]>([]);
   const pad = useRef<SignaturePadHandle>(null);
+  const online = useOnline();
+  // Signed, but there was no signal: it goes as soon as there is, while this screen is open.
+  const [waitingForSignal, setWaitingForSignal] = useState(false);
+  // The signature already uploaded (so a retry doesn't upload it again), until they sign again.
+  const uploaded = useRef<string | null>(null);
+  const signRef = useRef<() => Promise<void>>(async () => {});
 
   const refusal = header.installStatus === "not-started" ? "The install hasn't started." : null;
 
@@ -164,29 +175,52 @@ export function Handover({ data, pack, missing }: { data: FieldJob; pack: Handov
     if (!outcome) return setError("All good, or is there a snag?");
     const list = snags.filter((s) => s.text.trim().length >= 3);
     if (outcome === "snags" && list.length === 0) return setError("Write down each snag (a few words is fine).");
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      setWaitingForSignal(true);
+      return setError(NOT_SAVED_OFFLINE);
+    }
     setSigning(true);
     try {
-      let signatureMediaId: string | undefined;
-      const blob = await pad.current?.toBlob();
-      if (!blob) {
-        setSigning(false);
-        return setError("Ask them to sign in the box.");
+      let signatureMediaId = uploaded.current ?? undefined;
+      if (!signatureMediaId) {
+        const blob = await pad.current?.toBlob();
+        if (!blob) {
+          setSigning(false);
+          return setError("Ask them to sign in the box.");
+        }
+        const item = await uploadMedia(blob, { projectId: header.projectId, tag: "signature", source: "handover", fileName: "handover-signature.png", caption: `Handover signed by ${name.trim()}` });
+        signatureMediaId = item.id;
+        uploaded.current = item.id;
       }
-      const item = await uploadMedia(blob, { projectId: header.projectId, tag: "signature", source: "handover", fileName: "handover-signature.png", caption: `Handover signed by ${name.trim()}` });
-      signatureMediaId = item.id;
       const r = await post(`/api/field/jobs/${header.projectId}/handover`, { action: "sign", name: name.trim(), outcome, snags: outcome === "snags" ? list : [], signatureMediaId });
       if (!r.ok) {
-        setError(r.error);
+        setWaitingForSignal(Boolean(r.offline));
+        setError(r.offline ? NOT_SAVED_OFFLINE : r.error);
         setBlockers(r.blockers ?? []);
         return;
       }
+      setWaitingForSignal(false);
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "The signature didn't upload. Check the signal and try again.");
+      const offline = (err instanceof MediaUploadError && err.status === null) || (typeof navigator !== "undefined" && navigator.onLine === false);
+      setWaitingForSignal(offline);
+      setError(offline ? NOT_SAVED_OFFLINE : err instanceof Error ? `Not saved: ${err.message}` : "Not saved: the signature didn't upload. Tap Sign off again.");
     } finally {
       setSigning(false);
     }
   }
+  signRef.current = sign;
+
+  // Signal's back while they're still on this screen: finish the sign-off they already gave
+  // (once per return of signal, so a connection that only claims to be up isn't hammered).
+  const wasOnline = useRef(online);
+  const waitingRef = useRef(waitingForSignal);
+  waitingRef.current = waitingForSignal;
+  useEffect(() => {
+    const back = online && !wasOnline.current;
+    wasOnline.current = online;
+    if (back && waitingRef.current) void signRef.current();
+  }, [online]);
 
   return (
     <>
@@ -340,16 +374,24 @@ export function Handover({ data, pack, missing }: { data: FieldJob; pack: Handov
                   )}
                 </div>
               )}
-              <SignaturePad ref={pad} label="Customer signature" onChange={(empty) => setHasSig(!empty)} />
+              <SignaturePad
+                ref={pad}
+                label="Customer signature"
+                onChange={(empty) => {
+                  setHasSig(!empty);
+                  uploaded.current = null; // signed again: upload the new one
+                }}
+              />
               {error && (
-                <p role="alert" className="text-sm font-medium text-red-700">
+                <p role="alert" className={`rounded-2xl px-4 py-3 text-base font-semibold ${waitingForSignal ? "bg-amber-50 text-amber-900" : "bg-red-50 text-red-800"}`}>
                   {error}
                 </p>
               )}
               {blockers.length > 0 && <BlockerList blockers={blockers} />}
-              <button type="button" disabled={signing || !hasSig || !outcome || name.trim().length < 2} onClick={sign} className={`${PRIMARY} w-full`}>
-                {signing ? "Saving…" : "Sign off the handover"}
+              <button type="button" disabled={signing || !online || !hasSig || !outcome || name.trim().length < 2} onClick={sign} className={`${PRIMARY} w-full`}>
+                {signing ? "Saving…" : !online ? "Offline: sign-off needs signal" : "Sign off the handover"}
               </button>
+              {!online && !waitingForSignal && <p className="text-sm text-ink-700">They can still sign: it&apos;s kept on this screen until there&apos;s signal.</p>}
             </fieldset>
           </section>
         </div>

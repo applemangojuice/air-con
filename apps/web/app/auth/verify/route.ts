@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { audit } from "@/lib/audit";
-import { maskEmail, safeNextPath, sameEmail, staffLanding } from "@/lib/auth/access";
-import { consumeToken, peekToken, type TokenSubject } from "@/lib/auth/magic";
+import { deadLinkLanding, maskEmail, safeNextPath, sameEmail, staffLanding, type DeadLinkReason } from "@/lib/auth/access";
+import { consumeToken, deadTokenSubject, peekToken, type TokenSubject } from "@/lib/auth/magic";
 import { customerSession, sessionCookie, staffForToken, staffSession } from "@/lib/auth/server";
 import { SESSION_COOKIE, verifySession, type Session } from "@/lib/auth/session";
 import { BRAND } from "@/lib/brand";
@@ -25,6 +25,11 @@ import { getServiceClient } from "@/lib/supabase-server";
  *
  * POST exchanges the token for a session cookie and redirects to the
  * token's `next` path (same-origin only), or the person's home.
+ *
+ * A link that can't be used (used already, expired, cut short) never lands a
+ * customer on the team sign-in page: someone still signed in goes where the
+ * link was going, anyone else to a page that offers a fresh link
+ * (deadLinkLanding).
  */
 
 export const dynamic = "force-dynamic";
@@ -86,19 +91,34 @@ function redirectTo(request: NextRequest, path: string) {
   return NextResponse.redirect(new URL(path, request.url), { status: 303, headers: NO_STORE });
 }
 
+/** The signed-in session on this request, if any. */
+const currentSession = (request: NextRequest) => verifySession(request.cookies.get(SESSION_COOKIE)?.value);
+
+/**
+ * A link that didn't sign anyone in: still signed in, carry on; otherwise a
+ * page that explains (the customer's own, unless it was a staff link).
+ */
+async function deadLink(request: NextRequest, reason: DeadLinkReason, raw: string | null, known?: TokenSubject | null): Promise<NextResponse> {
+  let token: TokenSubject | null = known ?? null;
+  if (token === null && raw && reason === "expired") {
+    token = await deadTokenSubject(raw).catch(() => null);
+  }
+  return redirectTo(request, deadLinkLanding({ token, session: await currentSession(request), reason }));
+}
+
 export async function GET(request: NextRequest) {
   const token = request.nextUrl.searchParams.get("t");
-  if (!token) return redirectTo(request, "/login?error=missing");
-  if (!getServiceClient()) return redirectTo(request, "/login?error=unavailable");
+  if (!token) return deadLink(request, "missing", null);
+  if (!getServiceClient()) return deadLink(request, "unavailable", null);
   let subject: TokenSubject | null;
   try {
     subject = await peekToken(token);
   } catch (err) {
     console.error("[auth] token lookup failed:", err);
-    return redirectTo(request, "/login?error=unavailable");
+    return deadLink(request, "unavailable", null);
   }
-  if (!subject) return redirectTo(request, "/login?error=expired");
-  const current = await verifySession(request.cookies.get(SESSION_COOKIE)?.value);
+  if (!subject) return deadLink(request, "expired", token);
+  const current = await currentSession(request);
   return new NextResponse(confirmPage(token, subject, current), {
     status: 200,
     headers: { "content-type": "text/html; charset=utf-8", ...NO_STORE },
@@ -129,18 +149,20 @@ async function signedCookie(session: Parameters<typeof sessionCookie>[0]) {
 
 export async function POST(request: NextRequest) {
   if (!sameOrigin(request)) return new NextResponse("Forbidden", { status: 403 });
-  if (!getServiceClient()) return redirectTo(request, "/login?error=unavailable");
+  if (!getServiceClient()) return deadLink(request, "unavailable", null);
 
   const form = await request.formData().catch(() => null);
-  const raw = form?.get("t");
+  const field = form?.get("t");
+  const raw = typeof field === "string" ? field : null;
   let subject;
   try {
-    subject = await consumeToken(typeof raw === "string" ? raw : null);
+    subject = await consumeToken(raw);
   } catch (err) {
     console.error("[auth] token exchange failed:", err);
-    return redirectTo(request, "/login?error=unavailable");
+    return deadLink(request, "unavailable", null);
   }
-  if (!subject) return redirectTo(request, "/login?error=expired");
+  // Used a moment ago (a double tap), or since: carry on if still signed in.
+  if (!subject) return deadLink(request, raw ? "expired" : "missing", raw);
 
   if (subject.kind === "staff") {
     const staff = await staffForToken(subject);
@@ -154,10 +176,10 @@ export async function POST(request: NextRequest) {
   }
 
   const customer = subject.subjectId ? await customersRepo.get(subject.subjectId) : null;
-  if (!customer) return redirectTo(request, "/login?error=expired");
+  if (!customer) return redirectTo(request, "/portal?link=expired");
   const projectIds = await customersRepo.projectIdsFor(customer.id);
   const cookie = await signedCookie(customerSession(customer, projectIds));
-  if (!cookie) return redirectTo(request, "/login?error=unavailable");
+  if (!cookie) return redirectTo(request, "/portal?link=unavailable");
   const fallback = projectIds.length === 1 ? `/p/${projectIds[0]}` : "/portal";
   const res = redirectTo(request, safeNextPath(subject.next, fallback));
   res.cookies.set(cookie.name, cookie.value, cookie.options);

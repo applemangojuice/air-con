@@ -132,6 +132,7 @@ export function demoContext(s: DemoState, actor?: StaffMember): ReadinessContext
       depositDuePence: deposit?.totalPence ?? 0,
       depositPaidPence: deposit?.paidPence ?? 0,
       outstandingPence: Math.max(0, invoiced - paid),
+      unbilledPence: Math.max(0, (p.money.contractTotalPence ?? 0) - invoiced),
     },
   };
 }

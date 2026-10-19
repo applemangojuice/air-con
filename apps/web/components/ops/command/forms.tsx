@@ -532,6 +532,53 @@ export function IssueTransitionForm({ action, issueId, options }: { action: Acti
   );
 }
 
+/**
+ * A variation proposed on site waits here: the office checks the installer's
+ * estimate (and the words the customer reads), then sends it. Until then
+ * the customer can't see it.
+ */
+export function VariationSendForm({
+  action,
+  issueId,
+  title,
+  description,
+  netPence,
+  vatNote,
+}: {
+  action: Action;
+  issueId: string;
+  title: string;
+  description: string;
+  netPence: number;
+  vatNote: string;
+}) {
+  const id = useId();
+  return (
+    <ActionForm action={action}>
+      <input type="hidden" name="issueId" value={issueId} />
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="sm:col-span-2">
+          <L htmlFor={`${id}-t`}>The change, in a few words (the customer reads this)</L>
+          <input id={`${id}-t`} name="title" required minLength={3} maxLength={140} defaultValue={title} className={compactInput} />
+        </div>
+        <div className="sm:col-span-2">
+          <L htmlFor={`${id}-d`}>Why it&apos;s needed (the customer reads this)</L>
+          <textarea id={`${id}-d`} name="description" required rows={3} maxLength={2000} defaultValue={description} className={CONTROL} />
+        </div>
+        <div>
+          <L htmlFor={`${id}-p`} hint={vatNote}>
+            Price change, £ before VAT
+          </L>
+          <input id={`${id}-p`} name="pounds" inputMode="decimal" required defaultValue={(netPence / 100).toFixed(2)} className={compactInput} />
+        </div>
+        <div className="flex items-end">
+          <SubmitButton busyLabel="Sending…">Send to the customer for their OK</SubmitButton>
+        </div>
+      </div>
+    </ActionForm>
+  );
+}
+
 /* ------------------------------------------------------------------ */
 /* Time                                                                */
 /* ------------------------------------------------------------------ */

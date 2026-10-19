@@ -6,6 +6,7 @@ import {
   createIssue,
   defaultsForKind,
   isOpen,
+  sendVariationToCustomer,
   transitionIssue,
   variationAmounts,
   type Issue,
@@ -89,6 +90,40 @@ test("variations: priced with tax from the contract's rate, proposed, waiting fo
   assert.equal(v.variation?.totalDeltaPence, 18_000);
   assert.equal(v.history[0]!.note, "Variation proposed.");
   assert.equal(isOpen(v), true);
+});
+
+test("a variation proposed on site waits for the office; sending it re-prices it and shows the customer", () => {
+  const draft = createIssue({
+    id: "v2",
+    projectId: "p1",
+    number: 4,
+    kind: "variation",
+    title: "2 m more trunking",
+    raisedBy: RAISER,
+    raisedAt: AT,
+    variation: { description: "The run round the bay is longer than measured.", priceDeltaNetPence: 18_000, taxRatePct: 0, officeReview: true },
+  });
+  assert.equal(draft.variation?.status, "draft");
+  assert.equal(draft.customerVisible, false, "the customer can't see an unchecked price");
+  assert.equal(draft.status, "open");
+  assert.equal(draft.ownerRole, "ops");
+  assert.match(draft.nextAction ?? "", /Check the price and send it to the customer/);
+  assert.match(draft.history[0]!.note, /office checks the price/);
+
+  const sent = sendVariationToCustomer(draft, { description: "  2 m of trunking round the bay window.  ", priceDeltaNetPence: 12_000, taxRatePct: 20 }, "DEMO Ada", "2026-11-10T12:00:00.000Z");
+  assert.equal(draft.variation?.status, "draft", "pure");
+  assert.equal(sent.variation?.status, "proposed");
+  assert.equal(sent.status, "awaiting-customer");
+  assert.equal(sent.customerVisible, true);
+  assert.equal(sent.ownerRole, "customer");
+  assert.equal(sent.variation?.description, "2 m of trunking round the bay window.");
+  assert.deepEqual([sent.variation?.priceDeltaNetPence, sent.variation?.taxPence, sent.variation?.totalDeltaPence], [12_000, 2_400, 14_400]);
+  assert.match(sent.history.at(-1)!.note, /sent to the customer at £120 before VAT \(estimated on site at £180\)/);
+
+  assert.throws(() => sendVariationToCustomer(sent, { description: "Again", priceDeltaNetPence: 1, taxRatePct: 0 }, "Ada", AT), /already gone to the customer/);
+  const withdrawn = transitionIssue(draft, "rejected", "Ada", "Not needed", AT);
+  assert.throws(() => sendVariationToCustomer(withdrawn, { description: "Trunking", priceDeltaNetPence: 1, taxRatePct: 0 }, "Ada", AT), /withdrawn/);
+  assert.throws(() => sendVariationToCustomer(draft, { description: " ", priceDeltaNetPence: 1, taxRatePct: 0 }, "Ada", AT), /Describe the change/);
 });
 
 test("transitionIssue: history appended, resolvedAt stamped once, reopening clears it, pure", () => {

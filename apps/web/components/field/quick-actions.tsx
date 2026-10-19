@@ -18,9 +18,10 @@ import { BlockerList } from "@/components/kit/blocker-list";
 import { getFieldOutbox, newOpId, type SyncOp } from "@/lib/field-outbox";
 import { prepareImage } from "@/lib/media-client";
 import { locate, nowIso, parseReading } from "./capture";
-import { editDraft, followDefaults, openDraft, type EndDayDraft } from "./end-day-draft";
+import { editDraft, followDefaults, isDirty, openDraft, reopenDraft, type EndDayDraft } from "./end-day-draft";
 import { londonDateOf, londonTime, telHref, fmtDay } from "./format";
 import { Sheet } from "./sheet";
+import { useOnline } from "./use-online";
 import type { FieldJob } from "./types";
 import { useOutboxState, type MergedJob } from "./use-outbox";
 
@@ -48,21 +49,6 @@ async function post<T>(url: string, body: unknown): Promise<{ ok: true; data: T 
   } catch {
     return { ok: false, error: "No connection. Try again when you have signal.", offline: true };
   }
-}
-
-function useOnline(): boolean {
-  const [online, setOnline] = useState(true);
-  useEffect(() => {
-    const set = () => setOnline(navigator.onLine !== false);
-    set();
-    window.addEventListener("online", set);
-    window.addEventListener("offline", set);
-    return () => {
-      window.removeEventListener("online", set);
-      window.removeEventListener("offline", set);
-    };
-  }, []);
-  return online;
 }
 
 /** Is this person's clock running on this job: the server's view plus clock events still on the phone. */
@@ -488,20 +474,23 @@ function IssueSheet({ open, onClose, data, variation }: { open: boolean; onClose
   const fileRef = useRef<HTMLInputElement>(null);
   const state = useOutboxState();
 
+  // Closing it without saving (a stray tap on the backdrop, Escape) keeps
+  // what was written for next time; only a saved issue starts afresh.
   useEffect(() => {
-    if (!open) {
+    if (!open && saved) {
       setKind(variation ? "variation" : "defect");
       setTitle("");
       setDetail("");
       setPounds("");
       setPhoto(null);
       setSaved(false);
-      setError(null);
       const d = defaultsForKind(variation ? "variation" : "defect");
       setSeverity(d.severity);
       setBlocking(d.blocking);
     }
-  }, [open, variation]);
+    if (!open) setError(null);
+  }, [open, variation, saved]);
+  const dirty = !saved && Boolean(title.trim() || detail.trim() || pounds.trim() || photo);
 
   function pick(k: IssueKind) {
     setKind(k);
@@ -561,10 +550,11 @@ function IssueSheet({ open, onClose, data, variation }: { open: boolean; onClose
     <Sheet
       open={open}
       onClose={onClose}
+      keepOnBackdrop={dirty}
       title={variation ? "Request a variation" : "Raise an issue"}
       description={
         variation
-          ? "A change to what was agreed. The customer approves or declines it in their portal, with its price."
+          ? "A change to what was agreed. The office checks your price, then the customer approves or declines it in their portal."
           : "The office hears about it as soon as it syncs. Blocking issues hold the job until they're sorted."
       }
       footer={
@@ -574,7 +564,7 @@ function IssueSheet({ open, onClose, data, variation }: { open: boolean; onClose
           </button>
         ) : (
           <button type="button" disabled={busy} onClick={save} className={`${PRIMARY} w-full`}>
-            {busy ? "Saving…" : variation ? "Send for the customer's OK" : "Raise it"}
+            {busy ? "Saving…" : variation ? "Send to the office" : "Raise it"}
           </button>
         )
       }
@@ -585,7 +575,11 @@ function IssueSheet({ open, onClose, data, variation }: { open: boolean; onClose
             Saved on the phone.{" "}
             {state.online ? "Sending now: check the badge at the top." : "It goes to the office when you're back in signal."}
           </p>
-          {variation && <p className="rounded-2xl bg-amber-50 px-4 py-3 text-base font-semibold text-amber-900">Don&apos;t do this work until the customer approves it. Its status shows under Issues.</p>}
+          {variation && (
+            <p className="rounded-2xl bg-amber-50 px-4 py-3 text-base font-semibold text-amber-900">
+              Don&apos;t do this work until the customer approves it. The office checks the price and sends it to them; its status shows under Issues.
+            </p>
+          )}
         </div>
       ) : (
         <div className="space-y-4">
@@ -621,7 +615,7 @@ function IssueSheet({ open, onClose, data, variation }: { open: boolean; onClose
               </label>
               <input id="issue-price" inputMode="decimal" value={pounds} onChange={(e) => setPounds(e.target.value)} className={`${INPUT} min-h-12 rounded-full`} placeholder="e.g. 180" aria-describedby="issue-price-hint" />
               <p id="issue-price-hint" className="mt-1.5 text-xs text-ink-500">
-                VAT is added from our settings if we charge it. Use a minus for a saving. The office can correct it before the customer decides.
+                VAT is added if we charge it. Use a minus for a saving. The customer doesn&apos;t see it until the office has checked it.
               </p>
             </div>
           )}
@@ -699,6 +693,10 @@ function EndDaySheet({ open, onClose, data, merged, n: liveN, clockEntryId }: { 
   const [photos, setPhotos] = useState<DayPhoto[] | null>(null);
   const [chosen, setChosen] = useState<string[]>([]);
   const [preview, setPreview] = useState<{ subject: string; text: string; mode: "live" | "demo"; to: string | null } | null>(null);
+  const [previewing, setPreviewing] = useState(false);
+  // A beat after the preview appears before "send" takes a tap: a double tap on "Preview" never sends.
+  const [sendReady, setSendReady] = useState(false);
+  const previewRef = useRef<HTMLDivElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [blockers, setBlockers] = useState<Blocker[]>([]);
@@ -734,21 +732,37 @@ function EndDaySheet({ open, onClose, data, merged, n: liveN, clockEntryId }: { 
     };
   }, [merged, data.header.today, data.header.totalDays, data.header.installStatus, n]);
 
-  // Filled once, when the sheet opens. A sync or refresh while it's open
-  // (new outbox items or acks, router.refresh) makes new defaults, and must
-  // never wipe what the installer typed, or change what was previewed.
+  // Filled when the sheet opens. A sync or refresh while it's open (new
+  // outbox items or acks, router.refresh) makes new defaults, and must never
+  // wipe what the installer typed, or change what was previewed. Closing it
+  // by accident (a stray tap on the backdrop) loses nothing: what they typed
+  // and the photos they picked are still there when it opens again, until
+  // the day is sent (or it's a different day).
+  const draftDay = useRef<number | null>(null);
+  const finished = stage === "sent" || stage === "learn" || stage === "finished";
   useEffect(() => {
     if (open) {
-      setDraft(openDraft(defaults));
+      if (draftDay.current !== liveN) {
+        draftDay.current = liveN;
+        setDraft(openDraft(defaults));
+        setStage("summary");
+        setChosen([]);
+      } else {
+        setDraft((d) => reopenDraft(d, defaults));
+      }
     } else {
-      setStage("summary");
+      if (finished) {
+        // Sent: the next time it opens is a fresh day.
+        draftDay.current = null;
+        setStage("summary");
+        setChosen([]);
+        setAnswers({});
+      }
       setPhotos(null);
-      setChosen([]);
       setPreview(null);
       setError(null);
       setBlockers([]);
       setEmailStatus(null);
-      setAnswers({});
     }
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
@@ -770,11 +784,27 @@ function EndDaySheet({ open, onClose, data, merged, n: liveN, clockEntryId }: { 
   }, [stage, photos, id, n]);
 
   async function loadPreview() {
+    if (previewing) return;
     setError(null);
+    setPreviewing(true);
     const r = await post<{ subject: string; text: string; mode: "live" | "demo"; to: string | null }>(`/api/field/jobs/${id}/day`, { action: "preview", n, text: message, photoCount: chosen.length });
+    setPreviewing(false);
     if (r.ok) setPreview(r.data);
     else setError(r.error);
   }
+
+  // The preview is what they're about to send: bring it into view (it sits below the photos), and hold
+  // the send button for a moment so the second tap of a double tap lands on nothing.
+  useEffect(() => {
+    if (!preview) {
+      setSendReady(false);
+      return;
+    }
+    previewRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    previewRef.current?.focus({ preventScroll: true });
+    const t = window.setTimeout(() => setSendReady(true), 900);
+    return () => window.clearTimeout(t);
+  }, [preview]);
 
   async function send() {
     setBusy(true);
@@ -833,12 +863,12 @@ function EndDaySheet({ open, onClose, data, merged, n: liveN, clockEntryId }: { 
           Back
         </button>
         {preview ? (
-          <button type="button" disabled={busy || !online} onClick={send} className={`${PRIMARY} flex-1`}>
+          <button key="send" type="button" disabled={busy || !online || !sendReady} onClick={send} className={`${BTN} flex-1 bg-emerald-700 text-white shadow-sm hover:bg-emerald-800`}>
             {!online ? "Offline: needs signal" : busy ? "Sending…" : `End day ${n} and send`}
           </button>
         ) : (
-          <button type="button" disabled={!online || !message.trim()} onClick={loadPreview} className={`${PRIMARY} flex-1`}>
-            {online ? "Preview the update" : "Offline: needs signal"}
+          <button key="preview" type="button" disabled={!online || !message.trim() || previewing} aria-busy={previewing || undefined} onClick={loadPreview} className={`${PRIMARY} flex-1`}>
+            {!online ? "Offline: needs signal" : previewing ? "Getting the preview…" : "Preview the update"}
           </button>
         )}
       </div>
@@ -862,7 +892,7 @@ function EndDaySheet({ open, onClose, data, merged, n: liveN, clockEntryId }: { 
     );
 
   return (
-    <Sheet open={open} onClose={onClose} title={`End day ${n}`} footer={footer} wide>
+    <Sheet open={open} onClose={onClose} title={`End day ${n}`} footer={footer} wide keepOnBackdrop={!finished && (isDirty(draft) || chosen.length > 0)}>
       <div aria-live="polite">
         {stage === "summary" && (
           <div className="space-y-4">
@@ -928,7 +958,7 @@ function EndDaySheet({ open, onClose, data, merged, n: liveN, clockEntryId }: { 
               <p className="mt-2 text-sm text-ink-700">{chosen.length} chosen</p>
             </fieldset>
             {preview && (
-              <div className="rounded-2xl border border-line bg-white p-4">
+              <div ref={previewRef} tabIndex={-1} className="scroll-mt-4 rounded-2xl border border-line bg-white p-4 outline-none">
                 <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Preview · {preview.to ? "email to the customer" : "no customer email on file"}</p>
                 <p className="mt-1 font-semibold text-ink-900">{preview.subject}</p>
                 <p className="mt-2 whitespace-pre-line text-sm text-ink-700">{preview.text.split("\n\n").slice(0, 5).join("\n\n")}</p>

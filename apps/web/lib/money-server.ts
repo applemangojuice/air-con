@@ -1,7 +1,10 @@
 import {
   INVOICE_KIND_LABEL,
-  buildBalanceInvoiceLines,
+  accountCreditUsedOn,
+  acceptedVariationsPence,
+  balanceLinesFor,
   creditNoteLines,
+  creditPurposeOf,
   depositPence,
   documentCompany,
   documentCustomer,
@@ -11,10 +14,13 @@ import {
   invoiceOutstanding,
   invoiceTotals,
   moneySummary,
+  outstandingPence,
   projectFees,
+  refundableCreditPence,
   settingsForProposal,
   settleInvoice,
   type ContractSnapshot,
+  type CreditPurpose,
   type DocumentRecord,
   type Invoice,
   type InvoiceKind,
@@ -175,24 +181,21 @@ export function planInvoices(input: {
     deposit = plan("deposit", [invoiceLineFromTotal(`Deposit (${settings.payments.depositPct}% of the contract price)`, amount, taxCode)]);
   }
 
-  // Balance
+  // Balance: price-reduction credit notes (goodwill) are never billed back;
+  // they stay on the account and come off what the customer pays.
   const variations = acceptedVariations(issues);
-  const variationsPence = variations.reduce((s, i) => s + (i.variation?.totalDeltaPence ?? 0), 0);
-  const alreadyInvoiced = issued.filter((i) => i.kind !== "survey-fee").reduce((s, i) => s + i.totalPence, 0);
   const balance = !contract
     ? plan("balance", [], "There's no accepted contract to bill.")
     : plan(
         "balance",
-        buildBalanceInvoiceLines({
+        balanceLinesFor({
           contractTotalPence: contract,
-          acceptedVariationsPence: variationsPence,
+          acceptedVariationsPence: acceptedVariationsPence(issues),
           changeFeesPence: p.money.changeFeesPence,
-          alreadyInvoicedPence: alreadyInvoiced,
-          taxCode,
           // A paid survey fee counts off the price, as promised (contract §K19).
-          ...(projectFees(p).surveyPaidGbp > 0
-            ? { credits: [{ label: "Home survey fee, already paid", pence: Math.round(projectFees(p).surveyPaidGbp * 100) }] }
-            : {}),
+          surveyFeePaidPence: Math.round(projectFees(p).surveyPaidGbp * 100),
+          invoices: issued,
+          taxCode,
         }),
         undefined,
       );
@@ -276,10 +279,12 @@ export interface IssueInput {
   expectedTotalPence?: number;
   /** Variation invoices: which variation. */
   issueId?: string;
-  /** Credit notes: how much, why, and (optionally) the invoice it credits. */
+  /** Credit notes: how much, why, what it's for, and (optionally) the invoice it credits. */
   amountPence?: number;
   reason?: string;
   creditsInvoiceId?: string;
+  /** Default: a correction when it's against an invoice, money off the price when it isn't. */
+  creditPurpose?: CreditPurpose;
   /** The form's one-off id: a double click returns the first invoice. */
   requestId?: string;
   notes?: string;
@@ -330,9 +335,24 @@ export async function issueInvoice(projectId: string, input: IssueInput, staff: 
         return fail(`${left > 0 ? `Only ${money(left)} is` : "Nothing is"} left unpaid on ${target.number}. For money already paid, record a refund instead.`);
       }
       extra = { creditsInvoiceId: target.id };
+    } else {
+      // On its own: never more than was ever charged or agreed, less earlier credits (a £20,000 typo for £200 is refused).
+      const agreedPence =
+        (project.money.contractTotalPence ?? 0) + acceptedVariationsPence(issues) + project.money.changeFeesPence;
+      const chargedPence = invoices.filter((i) => live(i) && i.kind !== "credit-note").reduce((s, i) => s + i.totalPence, 0);
+      const creditedPence = -invoices.filter((i) => live(i) && i.kind === "credit-note").reduce((s, i) => s + i.totalPence, 0);
+      const ceiling = Math.max(0, Math.max(agreedPence, chargedPence) - creditedPence);
+      if (amount > ceiling) {
+        return fail(
+          ceiling > 0
+            ? `That's more than this project's price less earlier credits (${money(ceiling)} at most). Check the amount.`
+            : "There's nothing on this project to credit yet.",
+        );
+      }
     }
+    const purpose: CreditPurpose = input.creditPurpose ?? (input.creditsInvoiceId ? "correction" : "reduction");
     lines = creditNoteLines(input.creditsInvoiceId ? `Credit against invoice ${invoices.find((i) => i.id === input.creditsInvoiceId)!.number}: ${reason}` : reason, amount, taxCode);
-    extra = { ...extra, reason };
+    extra = { ...extra, reason, creditPurpose: purpose };
   } else if (input.kind === "variation") {
     const plans = planned();
     const v = plans.variation.variations?.find((x) => x.id === input.issueId);
@@ -587,7 +607,12 @@ async function applyNow(paymentId: string, actor: ActorInput): Promise<{ warning
       // Leave appliedAt unset: a retry finishes the job.
       return { warning: `Recorded, but the project's totals didn't update (${r.error}). Try again in a minute: it finishes where it stopped.` };
     }
-    if (invoice && invoice.status === "paid" && payment.amountPence > 0) {
+    // Paid: by this payment, or with account credit covering the rest (invoiceOutstanding).
+    const cleared =
+      invoice !== null &&
+      payment.amountPence > 0 &&
+      (invoice.status === "paid" || (live(invoice) && invoiceOutstanding(invoice, await invoicesRepo.listForProject(payment.projectId)) === 0));
+    if (invoice && cleared) {
       if (invoice.kind === "deposit" && r.project.booking.depositStatus !== "paid") {
         const d = await dispatch(payment.projectId, { type: "deposit-paid", amountPence: invoice.totalPence }, actor);
         if ("error" in d) warnings.push(`the deposit wasn't marked paid (${d.error})`);
@@ -699,20 +724,63 @@ export async function recordManualPayment(
   );
 }
 
-/** A refund we made: a negative payment against the invoice it came from, with the reason. */
+/**
+ * What a refund means for the invoice it's recorded against, when it would
+ * otherwise leave that invoice asking to be paid again:
+ *  * "reduction" (the default): they keep it, so a credit note for it goes
+ *    with the refund (goodwill, a snag, a cancellation);
+ *  * "correction": it was invoiced in error; the credit note cancels it and
+ *    the balance bills the right figure;
+ *  * "owed": they still owe it (a payment bounced back, say): no credit
+ *    note, and the invoice is open again.
+ * A refund of money they overpaid, or of credit already on the account,
+ * needs no credit note whichever is picked, and gets none.
+ */
+export type RefundTreatment = CreditPurpose | "owed";
+
+/**
+ * A refund we made: a negative payment against the invoice it came from (or
+ * the account credit note it pays out), with the reason.
+ */
 export async function recordRefund(
   projectId: string,
-  input: { invoiceId: string; amountPence: number; method: Payment["method"]; reference?: string; refundedOn: string; reason: string; requestId: string },
+  input: {
+    invoiceId: string;
+    amountPence: number;
+    method: Payment["method"];
+    reference?: string;
+    refundedOn: string;
+    reason: string;
+    requestId: string;
+    treatment?: RefundTreatment;
+  },
   staff: StaffMember,
-): Promise<Outcome<{ payment: Payment; duplicate: boolean }>> {
+): Promise<Outcome<{ payment: Payment; duplicate: boolean; creditNote?: Invoice }>> {
   const invoice = await invoicesRepo.get(input.invoiceId);
   if (!invoice || invoice.projectId !== projectId) return fail("That invoice isn't on this project.", 404);
   if (!input.reason.trim()) return fail("Say why the money went back.");
   if (!(input.amountPence > 0)) return fail("Enter the amount refunded.");
-  if (input.amountPence > invoice.paidPence) return fail(`Only ${money(invoice.paidPence)} has been paid on ${invoice.number}.`);
+  const before = await invoicesRepo.listForProject(projectId);
+  if (invoice.kind === "credit-note") {
+    // Paying out credit on the account: never more than is left on it, or than they're in credit overall.
+    const refundable = refundableCreditPence(invoice, before);
+    if (input.amountPence > refundable) {
+      const inCredit = Math.max(0, -outstandingPence(before));
+      return fail(
+        refundable > 0
+          ? `Only ${money(refundable)} of ${invoice.number} can be refunded: the rest is covering what they owe.`
+          : inCredit > 0
+            ? `${invoice.number} has nothing left to refund.`
+            : `The customer isn't in credit: ${invoice.number} is covering what they owe.`,
+      );
+    }
+  } else if (input.amountPence > invoice.paidPence) {
+    return fail(`Only ${money(invoice.paidPence)} has been paid on ${invoice.number}.`);
+  }
   const today = londonToday();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.refundedOn) || input.refundedOn > today) return fail("The refund date must be today or earlier.");
-  return recordPayment(
+  const owedBefore = invoiceOutstanding(invoice, before);
+  const recorded = await recordPayment(
     {
       projectId,
       invoiceId: invoice.id,
@@ -728,6 +796,35 @@ export async function recordRefund(
     },
     staff,
   );
+  if (!recorded.ok || invoice.kind === "credit-note" || (input.treatment ?? "reduction") === "owed") return recorded;
+
+  // The refund reopened the invoice: unless they still owe it, a credit note
+  // for the part that isn't overpayment or account credit, so nobody asks for it again.
+  const after = await invoicesRepo.listForProject(projectId);
+  const fresh = after.find((i) => i.id === invoice.id) ?? invoice;
+  const reopened = Math.min(input.amountPence, invoiceOutstanding(fresh, after) - owedBefore);
+  if (reopened <= 0) return recorded;
+  const credited = await issueInvoice(
+    projectId,
+    {
+      kind: "credit-note",
+      amountPence: reopened,
+      reason: `Refunded: ${input.reason.trim()}`,
+      creditsInvoiceId: invoice.id,
+      creditPurpose: input.treatment === "correction" ? "correction" : "reduction",
+      requestId: `refund-credit:${input.requestId}`,
+    },
+    staff,
+  );
+  if (!credited.ok) {
+    return { ...recorded, warning: `Refund recorded, but the credit note for it wasn't issued (${credited.error}): issue one against ${invoice.number} so it isn't asked for again.` };
+  }
+  return {
+    ...recorded,
+    value: { ...recorded.value, creditNote: credited.value },
+    message: `Refund recorded, with credit note ${credited.value.number} against ${invoice.number}, so it isn't asked for again.`,
+    ...(credited.warning ? { warning: credited.warning } : {}),
+  };
 }
 
 /**
@@ -805,11 +902,14 @@ export async function recordStripePayment(facts: {
   return result;
 }
 
-/** Invoices the customer still owes something on, with what's left on each. */
-export function payableInvoices(invoices: Invoice[]): (Invoice & { owedPence: number })[] {
+/**
+ * Invoices the customer still owes something on, with what's left on each
+ * (after any credit on their account, which `creditPence` says).
+ */
+export function payableInvoices(invoices: Invoice[]): (Invoice & { owedPence: number; creditPence: number })[] {
   return invoices
     .filter((i) => live(i) && i.kind !== "credit-note")
-    .map((i) => ({ ...i, owedPence: invoiceOutstanding(i, invoices) }))
+    .map((i) => ({ ...i, owedPence: invoiceOutstanding(i, invoices), creditPence: accountCreditUsedOn(i, invoices) }))
     .filter((i) => i.owedPence > 0);
 }
 

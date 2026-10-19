@@ -249,7 +249,7 @@ function InvoiceCard({
   projectId,
   reach,
 }: {
-  inv: Invoice & { owedPence: number };
+  inv: Invoice & { owedPence: number; creditPence: number };
   overdue: boolean;
   doc?: { id: string };
   bank?: { accountName: string; sortCode: string; accountNumber: string };
@@ -272,7 +272,9 @@ function InvoiceCard({
         </div>
         <p className="mt-2 font-display text-4xl text-ink-900">{formatMoney(inv.owedPence)}</p>
         <p className="mt-1 text-sm text-ink-500">
-          {partPaid ? `Still to pay, of ${formatMoney(inv.totalPence)} in all,` : "To pay"}
+          {partPaid
+            ? `Still to pay, of ${formatMoney(inv.totalPence)} in all${inv.creditPence > 0 ? ` (${formatMoney(inv.creditPence)} of your credit is taken off)` : ""},`
+            : "To pay"}
           {inv.dueOn ? ` by ${fmtDate(inv.dueOn)}` : ""}.{" "}
           {doc && (
             <Link href={`/d/${doc.id}`} className="font-semibold text-accent-700 underline">

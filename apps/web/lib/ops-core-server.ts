@@ -8,6 +8,9 @@ import {
   kitSummary,
   migrateProject,
   outstandingPence,
+  stillToBillPence,
+  acceptedVariationsPence,
+  projectFees,
   pilotMetrics,
   readiness,
   runsheetProgress,
@@ -278,6 +281,14 @@ export function contextFromRecords(
       depositDuePence: contract > 0 ? depositPence(contract, settings) : 0,
       depositPaidPence,
       outstandingPence: outstandingPence(invoices),
+      // What's agreed but on no invoice yet: the closed gate holds until it's billed.
+      unbilledPence: stillToBillPence({
+        contractTotalPence: project.money.contractTotalPence ?? (project.proposal.status === "accepted" ? project.proposal.contractTotalPence : undefined),
+        acceptedVariationsPence: acceptedVariationsPence(issues),
+        changeFeesPence: project.money.changeFeesPence,
+        surveyFeePaidPence: Math.round(projectFees(project).surveyPaidGbp * 100),
+        invoices,
+      }),
     };
   });
   if (money) ctx.money = money;

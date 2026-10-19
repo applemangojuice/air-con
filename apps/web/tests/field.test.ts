@@ -361,16 +361,36 @@ test("sync: time entries and issues are idempotent too; a stop before its start 
   assert.equal(bad!.ok, false);
 });
 
-test("variations: priced, customer-visible, waiting for the customer", async () => {
-  await seed("in-progress");
+test("variations from site wait for the office, then go to the customer at the checked price", async () => {
+  const seeded = await seed("in-progress");
+  // A customer to email.
+  await requireDb().from("projects").update({ project: { ...seeded, customer: { ...seeded.customer, email: "demo.customer@example.com" } } }).eq("id", PROJECT);
   const v: SyncOp = { type: "issue", id: "7f7f7f7f-cccc-4ccc-8ccc-00000000f60c", projectId: PROJECT, kind: "variation", title: "Condensate pump in the bedroom", severity: "medium", blocking: false, mediaIds: [], variation: { description: "No fall to the outside: a pump is needed.", priceDeltaNetPence: 18_000 }, at: AT };
   const [r] = await field.processSyncBatch(INSTALLER, [v]);
   assert.equal(r!.ok, true);
   const [issue] = await issuesRepo.listForProject(PROJECT);
-  assert.equal(issue!.status, "awaiting-customer");
-  assert.equal(issue!.customerVisible, true);
-  assert.equal(issue!.variation?.status, "proposed");
+  assert.equal(issue!.variation?.status, "draft");
+  assert.equal(issue!.customerVisible, false, "an estimate from site never reaches the customer unchecked");
+  assert.equal(issue!.status, "open");
   assert.equal(issue!.variation?.totalDeltaPence, 18_000, "not VAT registered by default: no tax");
+  const messages = async () => (await requireDb().from("messages").select("*")).data as { event: string }[];
+  assert.ok(!(await messages()).some((m) => m.event === "variation-approval"), "no email to the customer yet");
+  assert.ok((await messages()).some((m) => m.event === "team-alert"), "the office hears about it");
+
+  const { sendVariation } = await import("../lib/variation-server.ts");
+  const refusedSub = await sendVariation(PROJECT, issue!.id, { description: "Pump", priceDeltaNetPence: 1 }, SUB);
+  assert.equal(refusedSub.ok, false, "subcontractors can't send prices");
+  const office = staffMember("aa000000-0000-4000-8000-0000000000f9", { roles: ["admin"] });
+  const sent = await sendVariation(PROJECT, issue!.id, { description: "No fall to the outside, so a condensate pump is needed.", priceDeltaNetPence: 15_000 }, office);
+  assert.equal(sent.ok, true);
+  const after = (await issuesRepo.get(issue!.id))!;
+  assert.equal(after.variation?.status, "proposed");
+  assert.equal(after.variation?.priceDeltaNetPence, 15_000, "the office's price, not the estimate");
+  assert.equal(after.customerVisible, true);
+  assert.equal(after.status, "awaiting-customer");
+  assert.ok((await messages()).some((m) => m.event === "variation-approval"), "now the customer is asked");
+  const again = await sendVariation(PROJECT, issue!.id, { description: "Again", priceDeltaNetPence: 1 }, office);
+  assert.equal(again.ok, false, "sent once");
 });
 
 test("end of day: an issue's photo is never offered for the customer's update, nor accepted", async () => {

@@ -5,6 +5,7 @@ import {
   MIN_BREAK_GLASS_PASSWORD,
   breakGlassEnabled,
   customerCanAccessProject,
+  deadLinkLanding,
   decideProjectAccess,
   decideStaffGate,
   demoLoginAllowed,
@@ -382,4 +383,29 @@ test("securityWarnings: what the boot log shouts about in production", () => {
   assert.match(all, /break-glass sign-in is off/);
   assert.match(securityWarnings({ NODE_ENV: "production", SESSION_SECRET: strong, ALLOW_DEMO_LOGIN: "1" }).join(), /DEMO sign-in is ON/);
   assert.match(securityWarnings({ NODE_ENV: "production" }).join(), /SESSION_SECRET is not set/);
+});
+
+test("a dead sign-in link never sends a customer to the team sign-in page", () => {
+  const customer: CustomerSession = { kind: "customer", customerId: "c-1", email: "demo.alex@example.com", name: "DEMO Alex", projectIds: ["p-1"], exp: 0 };
+  const both: CustomerSession = { ...customer, projectIds: ["p-1", "p-2"] };
+  const staffSession: StaffSession = { kind: "staff", staffId: "s-1", email: "demo.ops@demo.dang.invalid", name: "DEMO Ops", roles: ["admin"], external: false, exp: 0 };
+  const theirs = { kind: "customer" as const, subjectId: "c-1", email: "demo.alex@example.com", next: "/p/p-1/proposal" };
+  const someoneElses = { ...theirs, subjectId: "c-2", next: "/p/p-9/proposal" };
+  const staffLink = { kind: "staff" as const, subjectId: "s-1", email: "demo.ops@demo.dang.invalid", next: "/ops/projects/p-1" };
+
+  // Still signed in: straight to where the link was going (yesterday's "Review your proposal").
+  assert.equal(deadLinkLanding({ token: theirs, session: customer, reason: "expired" }), "/p/p-1/proposal");
+  assert.equal(deadLinkLanding({ token: { ...theirs, next: "//evil.example" }, session: customer, reason: "expired" }), "/p/p-1", "never off-site");
+  // Someone else's link, or an unknown one: their own home, not the other link's page.
+  assert.equal(deadLinkLanding({ token: someoneElses, session: customer, reason: "expired" }), "/p/p-1");
+  assert.equal(deadLinkLanding({ token: null, session: both, reason: "expired" }), "/portal");
+  // Signed out: a customer page that explains and offers a fresh link.
+  assert.equal(deadLinkLanding({ token: theirs, session: null, reason: "expired" }), "/portal?link=expired");
+  assert.equal(deadLinkLanding({ token: null, session: null, reason: "missing" }), "/portal?link=missing");
+  assert.equal(deadLinkLanding({ token: null, session: null, reason: "unavailable" }), "/portal?link=unavailable");
+  // Staff links keep the team sign-in; a signed-in team member goes on to their page.
+  assert.equal(deadLinkLanding({ token: staffLink, session: null, reason: "expired" }), "/login?error=expired");
+  assert.equal(deadLinkLanding({ token: staffLink, session: staffSession, reason: "expired" }), "/ops/projects/p-1");
+  assert.equal(deadLinkLanding({ token: null, session: staffSession, reason: "expired" }), "/ops");
+  assert.equal(deadLinkLanding({ token: theirs, session: staffSession, reason: "expired" }), "/portal?link=expired", "a customer's link opened by staff");
 });

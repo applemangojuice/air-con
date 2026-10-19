@@ -54,7 +54,11 @@ export interface Issue {
     priceDeltaNetPence: number;
     taxPence: number;
     totalDeltaPence: number;
-    status: "proposed" | "accepted" | "declined";
+    /**
+     * draft: proposed on site, with the office to check the price (the
+     * customer can't see it yet); proposed: sent, waiting for the customer.
+     */
+    status: VariationStatus;
     decidedAt?: string;
     decidedBy?: string;
     /** The customer's agreement to pay, as they gave it (accepted variations from the portal). */
@@ -64,6 +68,15 @@ export interface Issue {
   resolvedAt?: string;
   history: { at: string; by: string; note: string; status?: IssueStatus }[];
 }
+
+export type VariationStatus = "draft" | "proposed" | "accepted" | "declined";
+
+export const VARIATION_STATUS_LABEL: Record<VariationStatus, string> = {
+  draft: "With the office to check",
+  proposed: "Waiting for the customer",
+  accepted: "Accepted",
+  declined: "Declined",
+};
 
 /**
  * The durable record of a customer agreeing to a priced change: what they
@@ -244,20 +257,27 @@ export function createIssue(input: {
   ownerRole?: Issue["ownerRole"];
   gate?: Issue["gate"];
   nextAction?: string;
-  variation?: { description: string; priceDeltaNetPence: number; taxRatePct: number };
+  /**
+   * `officeReview`: a variation proposed on site (an installer's estimate)
+   * waits for the office to check its price; only then does the customer see
+   * it (sendVariationToCustomer).
+   */
+  variation?: { description: string; priceDeltaNetPence: number; taxRatePct: number; officeReview?: boolean };
 }): Issue {
   const d = defaultsForKind(input.kind);
   const title = input.title.trim();
   if (!title) throw new Error("An issue needs a title.");
   const detail = input.detail?.trim();
+  const review = Boolean(input.variation?.officeReview);
   const variation = input.variation
     ? {
         description: input.variation.description.trim() || title,
         ...variationAmounts(input.variation.priceDeltaNetPence, input.variation.taxRatePct),
-        status: "proposed" as const,
+        status: review ? ("draft" as const) : ("proposed" as const),
       }
     : undefined;
-  const status: IssueStatus = variation ? "awaiting-customer" : "open";
+  const toCustomer = Boolean(variation) && !review;
+  const status: IssueStatus = toCustomer ? "awaiting-customer" : "open";
   return {
     id: input.id,
     projectId: input.projectId,
@@ -269,13 +289,65 @@ export function createIssue(input: {
     status,
     blocking: input.blocking ?? d.blocking,
     ...(input.gate ? { gate: input.gate } : {}),
-    ownerRole: input.ownerRole ?? d.ownerRole,
-    ...(input.nextAction?.trim() ? { nextAction: input.nextAction.trim() } : {}),
+    ownerRole: review ? "ops" : (input.ownerRole ?? d.ownerRole),
+    ...(input.nextAction?.trim() ? { nextAction: input.nextAction.trim() } : review ? { nextAction: OFFICE_REVIEW_ACTION } : {}),
     raisedBy: input.raisedBy,
     raisedAt: input.raisedAt,
     mediaIds: [...new Set(input.mediaIds ?? [])],
-    customerVisible: variation ? true : (input.customerVisible ?? d.customerVisible),
+    customerVisible: review ? false : variation ? true : (input.customerVisible ?? d.customerVisible),
     ...(variation ? { variation } : {}),
-    history: [{ at: input.raisedAt, by: input.raisedBy.name, note: variation ? "Variation proposed." : "Raised.", status }],
+    history: [
+      {
+        at: input.raisedAt,
+        by: input.raisedBy.name,
+        note: review ? "Variation proposed on site. The office checks the price before the customer sees it." : variation ? "Variation proposed." : "Raised.",
+        status,
+      },
+    ],
   };
+}
+
+const OFFICE_REVIEW_ACTION = "Check the price and send it to the customer. Don't do the work until they approve.";
+export const CUSTOMER_DECIDES_ACTION = "Customer to approve or decline in their portal. Don't do the work until they approve.";
+
+/**
+ * The office has checked a variation proposed on site: it goes to the
+ * customer with the price as corrected (re-priced at the contract's tax
+ * rate), customer-visible, waiting for their yes or no. Only a draft,
+ * still-open variation can be sent; anything else throws.
+ */
+export function sendVariationToCustomer(
+  issue: Issue,
+  input: { title?: string; description: string; priceDeltaNetPence: number; taxRatePct: number },
+  by: string,
+  now: string,
+): Issue {
+  if (issue.kind !== "variation" || !issue.variation) throw new Error("That isn't a variation.");
+  if (issue.variation.status !== "draft") throw new Error("That variation has already gone to the customer.");
+  if (!isOpen(issue)) throw new Error("That variation was withdrawn. Reopen it first.");
+  if (!Number.isFinite(input.priceDeltaNetPence)) throw new Error("Enter the price change.");
+  const description = input.description.trim();
+  if (description.length < 3) throw new Error("Describe the change for the customer.");
+  const title = input.title?.trim() || issue.title;
+  const amounts = variationAmounts(input.priceDeltaNetPence, input.taxRatePct);
+  const changed = amounts.priceDeltaNetPence !== issue.variation.priceDeltaNetPence;
+  const next: Issue = JSON.parse(JSON.stringify(issue)) as Issue;
+  next.title = title;
+  next.status = "awaiting-customer";
+  next.customerVisible = true;
+  next.ownerRole = "customer";
+  delete next.ownerStaffId;
+  delete next.ownerName;
+  next.nextAction = CUSTOMER_DECIDES_ACTION;
+  next.variation = { description, ...amounts, status: "proposed" };
+  next.history = [
+    ...(next.history ?? []),
+    {
+      at: now,
+      by: by.trim() || "Unknown",
+      note: `Checked and sent to the customer at ${gbp(amounts.priceDeltaNetPence)}${amounts.priceDeltaNetPence < 0 ? " off" : ""} before VAT${changed ? ` (estimated on site at ${gbp(issue.variation.priceDeltaNetPence)})` : ""}.`,
+      status: "awaiting-customer",
+    },
+  ];
+  return next;
 }

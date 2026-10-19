@@ -212,6 +212,18 @@ async function liveToken(raw: string | null | undefined, now: Date) {
 }
 
 /**
+ * What we know of a token that can't sign anyone in (already used, or
+ * expired but not yet swept away): its kind, subject and landing page, so a
+ * dead link can still send someone somewhere sensible (deadLinkLanding).
+ * Null when it was never ours.
+ */
+export async function deadTokenSubject(raw: string | null | undefined): Promise<TokenSubject | null> {
+  if (!raw || raw.length > 200 || !/^[A-Za-z0-9_-]+$/.test(raw)) return null;
+  const row = await tokensRepo.findByHash(await hashToken(raw));
+  return row ? { kind: row.subjectKind, subjectId: row.subjectId, email: row.email, ...(row.nextPath ? { next: row.nextPath } : {}) } : null;
+}
+
+/**
  * Who a token would sign in, without spending it: for the confirm page,
  * which says "Continue as j***@example.com" before anything happens.
  */

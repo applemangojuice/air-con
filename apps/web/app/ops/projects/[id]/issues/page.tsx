@@ -4,6 +4,7 @@ import {
   GATE_LABEL,
   ISSUE_KIND_LABEL,
   ROLE_LABEL,
+  VARIATION_STATUS_LABEL,
   can,
   isOpen,
   type Issue,
@@ -11,14 +12,15 @@ import {
 } from "@aircon/domain";
 import { Badge, StatusChip } from "@/components/kit/badge";
 import { EmptyState, PageHeader } from "@/components/kit/layout";
-import { Disclosure, IssueTransitionForm, RaiseIssueForm } from "@/components/ops/command/forms";
+import { Disclosure, IssueTransitionForm, RaiseIssueForm, VariationSendForm } from "@/components/ops/command/forms";
 import { fmtInstant } from "@/components/ops/command/model";
 import { requireStaff } from "@/lib/auth/server";
-import { fmtDate } from "@/lib/format";
+import { fmtDate, money } from "@/lib/format";
+import { contractTaxRatePct } from "@/lib/variation-server";
 import { issueKindDefaults } from "@/lib/ops-core-server";
 import { loadProject } from "@/lib/project-service";
 import * as issuesRepo from "@/lib/repo/issues";
-import { raiseIssueAction, transitionIssueAction } from "../actions";
+import { raiseIssueAction, sendVariationAction, transitionIssueAction } from "../actions";
 
 export const metadata: Metadata = { title: "Issues · ops", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -57,6 +59,10 @@ export default async function ProjectIssuesPage({ params }: { params: Promise<{ 
   const [project, issues] = await Promise.all([loadProject(id), issuesRepo.listForProject(id)]);
   if (!project) notFound();
   const canEdit = can(staff, "projects.edit");
+  const canPrice = can(staff, "proposal.issue") && !staff.external;
+  const drafts = issues.filter((i) => i.variation?.status === "draft" && isOpen(i));
+  const taxRatePct = drafts.length ? await contractTaxRatePct(id) : 0;
+  const vatNote = taxRatePct > 0 ? `(${taxRatePct}% VAT is added)` : "(no VAT is charged on this contract)";
   const defaults = issueKindDefaults();
   const open = issues.filter(isOpen);
   const done = issues.filter((i) => !isOpen(i));
@@ -69,6 +75,15 @@ export default async function ProjectIssuesPage({ params }: { params: Promise<{ 
         title="Issues"
         subtitle={`${open.length} open, ${done.length} done. Blocking issues hold their gate until resolved.`}
       />
+      {drafts.length > 0 && (
+        <p role="status" className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <span className="font-semibold">
+            {drafts.length === 1 ? "A variation from site is" : `${drafts.length} variations from site are`} waiting for the office.
+          </span>{" "}
+          The customer can&apos;t see {drafts.length === 1 ? "it" : "them"} yet: check the price, then send {drafts.length === 1 ? "it" : "them"} for their OK.
+          {!canPrice && " Someone who can issue prices (admin or technical lead) sends it."}
+        </p>
+      )}
       {canEdit && (
         <section className="mb-6 rounded-2xl border border-line bg-white p-4 sm:p-5">
           <Disclosure summary="Raise an issue" open={issues.length === 0}>
@@ -112,8 +127,22 @@ export default async function ProjectIssuesPage({ params }: { params: Promise<{ 
                       {i.resolution && <p className="mt-1 text-sm text-emerald-800">Resolution: {i.resolution}</p>}
                       {i.variation && (
                         <p className="mt-1 text-sm text-ink-700">
-                          Variation: {i.variation.description} ({i.variation.status})
+                          Variation: {i.variation.description} · {money(i.variation.priceDeltaNetPence)} before VAT
+                          {i.variation.taxPence ? `, ${money(i.variation.totalDeltaPence)} with VAT` : ""} · {VARIATION_STATUS_LABEL[i.variation.status]}
                         </p>
+                      )}
+                      {i.variation?.status === "draft" && isOpen(i) && canPrice && (
+                        <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50/60 p-3">
+                          <p className="mb-2 text-sm font-semibold text-ink-900">Check it, then send it to the customer</p>
+                          <VariationSendForm
+                            action={sendVariationAction.bind(null, id)}
+                            issueId={i.id}
+                            title={i.title}
+                            description={i.variation.description}
+                            netPence={i.variation.priceDeltaNetPence}
+                            vatNote={vatNote}
+                          />
+                        </div>
                       )}
                       {i.history.length > 0 && (
                         <Disclosure summary={`History (${i.history.length})`} className="mt-2">
@@ -130,7 +159,11 @@ export default async function ProjectIssuesPage({ params }: { params: Promise<{ 
                       )}
                       {canEdit && (
                         <div className="mt-3 border-t border-line pt-3">
-                          <IssueTransitionForm action={transitionIssueAction.bind(null, id)} issueId={i.id} options={NEXT[i.status] ?? []} />
+                          <IssueTransitionForm
+                            action={transitionIssueAction.bind(null, id)}
+                            issueId={i.id}
+                            options={(NEXT[i.status] ?? []).filter((o) => !(o.value === "awaiting-customer" && i.variation?.status === "draft"))}
+                          />
                         </div>
                       )}
                     </li>

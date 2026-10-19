@@ -9,6 +9,7 @@ import type {
   Severity,
   StaffMember,
   StaffRole,
+  VariationStatus,
 } from "@aircon/domain";
 
 /**
@@ -99,7 +100,7 @@ export interface FieldIssue {
   raisedBy: string;
   customerVisible: boolean;
   /** Variation decision; the money only for staff who may see prices. */
-  variation?: { status: "proposed" | "accepted" | "declined"; totalDeltaPence?: number; description: string };
+  variation?: { status: VariationStatus; totalDeltaPence?: number; description: string };
   mediaUrls: string[];
   customerName?: string;
 }

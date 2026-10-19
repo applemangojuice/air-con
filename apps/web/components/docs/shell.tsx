@@ -198,32 +198,77 @@ export function Bullets({ items }: { items: string[] }) {
   );
 }
 
-/** A plain table that scrolls inside itself on a phone (never the page) and prints whole. */
+/**
+ * A plain table on paper and on wider screens. On a phone, where a table's
+ * last columns (the amount, the serial number) would sit off to the right,
+ * each row is a little card instead: its first cell as the heading, a
+ * right-aligned last column (the money) beside it, and the other columns as
+ * labelled lines underneath. Nothing has to be swiped into view.
+ */
 export function Table({ head, rows, align }: { head: string[]; rows: ReactNode[][]; align?: ("left" | "right")[] }) {
+  const last = head.length - 1;
+  const amountCol = last > 0 && align?.[last] === "right" ? last : -1;
+  const filled = (c: ReactNode) => c !== undefined && c !== null && c !== "" && c !== false;
   return (
-    <div className="-mx-1 overflow-x-auto px-1 print:overflow-visible">
-      <table className="w-full min-w-[28rem] border-collapse text-sm print:min-w-0">
-        <thead>
-          <tr className="border-b-2 border-ink-900/80 text-left">
-            {head.map((h, i) => (
-              <th key={h} scope="col" className={`py-2 pr-3 font-semibold text-ink-900 ${align?.[i] === "right" ? "text-right" : ""}`}>
-                {h}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r, ri) => (
-            <tr key={ri} className="border-b border-line align-top">
-              {r.map((c, ci) => (
-                <td key={ci} className={`py-2 pr-3 ${align?.[ci] === "right" ? "text-right tabular-nums" : ""}`}>
-                  {c}
-                </td>
+    <>
+      <div className="sm:hidden print:hidden">
+        {amountCol > 0 && (
+          <div className="flex justify-between gap-3 border-b-2 border-ink-900/80 pb-1.5 text-xs font-semibold uppercase tracking-wide text-ink-500">
+            <span>{head[0]}</span>
+            <span>{head[amountCol]}</span>
+          </div>
+        )}
+        <ul className={`divide-y divide-line text-sm ${amountCol > 0 ? "" : "border-t-2 border-ink-900/80"}`}>
+          {rows.map((r, ri) => {
+            const rest = r.map((c, ci) => [ci, c] as const).filter(([ci, c]) => ci !== 0 && ci !== amountCol && filled(c));
+            return (
+              <li key={ri} className="py-2.5">
+                <div className="flex items-start justify-between gap-3">
+                  <span className="min-w-0 break-words font-medium text-ink-900">
+                    {amountCol < 0 && head[0] ? <span className="sr-only">{head[0]}: </span> : null}
+                    {r[0]}
+                  </span>
+                  {amountCol > 0 && <span className="shrink-0 text-right font-semibold tabular-nums text-ink-900">{r[amountCol]}</span>}
+                </div>
+                {rest.length > 0 && (
+                  <dl className="mt-1 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-0.5 text-ink-700">
+                    {rest.map(([ci, c]) => (
+                      <div key={ci} className="contents">
+                        <dt className="text-ink-500">{head[ci]}</dt>
+                        <dd className={`min-w-0 break-words ${align?.[ci] === "right" ? "tabular-nums" : ""}`}>{c}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+      <div className="hidden overflow-x-auto sm:block print:block print:overflow-visible">
+        <table className="w-full border-collapse text-sm">
+          <thead>
+            <tr className="border-b-2 border-ink-900/80 text-left">
+              {head.map((h, i) => (
+                <th key={h} scope="col" className={`py-2 pr-3 font-semibold text-ink-900 ${align?.[i] === "right" ? "text-right" : ""}`}>
+                  {h}
+                </th>
               ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody>
+            {rows.map((r, ri) => (
+              <tr key={ri} className="border-b border-line align-top">
+                {r.map((c, ci) => (
+                  <td key={ci} className={`py-2 pr-3 ${align?.[ci] === "right" ? "text-right tabular-nums" : ""}`}>
+                    {c}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
   );
 }

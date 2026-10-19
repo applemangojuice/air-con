@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { OfflineGuard } from "@/components/field/offline-guard";
 import { ModeBanner } from "@/components/kit/mode-banner";
 import { NavLink } from "@/components/kit/nav-link";
 import { Mark } from "@/components/site/logo";
@@ -14,7 +15,10 @@ import { Mark } from "@/components/site/logo";
  *  * #field-sync-badge: the offline outbox's "3 unsynced" badge (F6).
  *
  * Bottom tabs: Today, Jobs, Issues, Me. The wall is middleware; pages call
- * requireStaff themselves.
+ * requireStaff themselves. With no signal, OfflineGuard keeps links from
+ * dropping the crew onto the browser's "No internet" page (there's no
+ * service worker: plan §3 leaves full offline out, the outbox covers
+ * capture).
  */
 
 export const metadata: Metadata = {
@@ -66,6 +70,7 @@ export default function FieldLayout({ children }: { children: ReactNode }) {
       </header>
 
       <main className="mx-auto w-full max-w-xl flex-1 px-4 pb-28 pt-5">{children}</main>
+      <OfflineGuard />
 
       <nav aria-label="Field" className="no-print fixed inset-x-0 bottom-0 z-40 border-t border-line bg-white pb-[env(safe-area-inset-bottom)]">
         <ul className="mx-auto grid max-w-xl grid-cols-4">

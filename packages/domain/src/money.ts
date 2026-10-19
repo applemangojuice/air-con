@@ -1,3 +1,4 @@
+import type { Issue } from "./issues.ts";
 import { TAX_CODES, type PilotSettings, type TaxCodeId } from "./settings.ts";
 
 /**
@@ -25,6 +26,20 @@ export const INVOICE_KIND_LABEL: Record<InvoiceKind, string> = {
   "survey-fee": "Survey fee",
   "change-fee": "Date change fee",
   "credit-note": "Credit note",
+};
+
+/**
+ * What a credit note is for, which decides whether the balance bills it again:
+ *  * "correction" cancels an amount invoiced in error, so the balance still
+ *    bills the right figure (a wrong deposit, a duplicate invoice);
+ *  * "reduction" takes money off the price (goodwill, a snag, a refund the
+ *    customer keeps), so it's never billed back.
+ */
+export type CreditPurpose = "correction" | "reduction";
+
+export const CREDIT_PURPOSE_LABEL: Record<CreditPurpose, string> = {
+  correction: "Cancels an amount invoiced in error (the balance still bills the right figure)",
+  reduction: "Money off the price: goodwill, a snag, a refund they keep (never billed again)",
 };
 
 export interface InvoiceLine {
@@ -56,6 +71,8 @@ export interface Invoice {
   creditsInvoiceId?: string;
   /** Credit notes: why. */
   reason?: string;
+  /** Credit notes: what it's for (creditPurposeOf reads older ones without it). */
+  creditPurpose?: CreditPurpose;
   createdAt?: string;
   createdBy?: string;
   /** Who issued it. */
@@ -150,9 +167,10 @@ export function depositPence(contractTotalPence: number, settings: PilotSettings
 
 /**
  * The balance invoice: the contract, plus accepted variations and date
- * change fees, less everything already invoiced (deposits, earlier
- * invoices, credit notes count against it). Each part is its own line, so
- * the customer sees how the number was reached. Nothing to bill: [].
+ * change fees, less everything already invoiced towards the price
+ * (deposits, earlier invoices, correcting credit notes: see
+ * invoicedTowardsPricePence). Each part is its own line, so the customer
+ * sees how the number was reached. Nothing to bill: [].
  */
 export function buildBalanceInvoiceLines(input: {
   contractTotalPence: number;
@@ -224,6 +242,65 @@ export function settleInvoice(invoice: Invoice, payments: Pick<Payment, "invoice
 
 const counts = (i: Pick<Invoice, "status">) => i.status !== "draft" && i.status !== "void";
 
+/** A credit note's purpose: as recorded, else (older ones) a credit against an invoice corrects it and one on its own reduces the price. */
+export function creditPurposeOf(inv: Pick<Invoice, "kind" | "creditPurpose" | "creditsInvoiceId">): CreditPurpose | null {
+  if (inv.kind !== "credit-note") return null;
+  return inv.creditPurpose ?? (inv.creditsInvoiceId ? "correction" : "reduction");
+}
+
+/**
+ * What's been invoiced towards the agreed price, for working out what's
+ * still to bill: every live invoice except survey fees (the balance credits
+ * a paid one separately) and price-reduction credit notes (money off the
+ * price is never billed back). A correcting credit note does count: what
+ * it cancelled is billed again, at the right figure.
+ */
+export function invoicedTowardsPricePence(invoices: Invoice[]): number {
+  return invoices
+    .filter((i) => counts(i) && i.kind !== "survey-fee" && creditPurposeOf(i) !== "reduction")
+    .reduce((sum, i) => sum + i.totalPence, 0);
+}
+
+/** Accepted variations' total (VAT included), from the issues list. */
+export function acceptedVariationsPence(issues: Pick<Issue, "kind" | "variation">[]): number {
+  return issues
+    .filter((i) => i.kind === "variation" && i.variation?.status === "accepted")
+    .reduce((sum, i) => sum + (i.variation?.totalDeltaPence ?? 0), 0);
+}
+
+/**
+ * The balance invoice's lines as things stand: the contract, accepted
+ * variations and change fees, less what's been invoiced towards the price,
+ * with a paid survey fee taken off as promised (contract §K19).
+ */
+export function balanceLinesFor(input: {
+  contractTotalPence: number;
+  acceptedVariationsPence: number;
+  changeFeesPence: number;
+  surveyFeePaidPence: number;
+  invoices: Invoice[];
+  taxCode: TaxCodeId;
+}): InvoiceLine[] {
+  return buildBalanceInvoiceLines({
+    contractTotalPence: input.contractTotalPence,
+    acceptedVariationsPence: input.acceptedVariationsPence,
+    changeFeesPence: input.changeFeesPence,
+    alreadyInvoicedPence: invoicedTowardsPricePence(input.invoices),
+    taxCode: input.taxCode,
+    ...(input.surveyFeePaidPence > 0 ? { credits: [{ label: "Home survey fee, already paid", pence: input.surveyFeePaidPence }] } : {}),
+  });
+}
+
+/**
+ * What's agreed but not yet on any invoice (the balance, accepted
+ * variations, change fees): 0 when everything is billed, or there's no
+ * contract. The closed gate holds on it.
+ */
+export function stillToBillPence(input: Omit<Parameters<typeof balanceLinesFor>[0], "taxCode" | "contractTotalPence"> & { contractTotalPence?: number }): number {
+  if (!input.contractTotalPence || input.contractTotalPence <= 0) return 0;
+  return Math.max(0, invoiceTotals(balanceLinesFor({ ...input, contractTotalPence: input.contractTotalPence, taxCode: "outside-scope" })).totalPence);
+}
+
 /**
  * What's left to pay across a project's invoices: issued totals less what's
  * been paid, credit notes included. Negative means the customer is in credit.
@@ -232,17 +309,80 @@ export function outstandingPence(invoices: Invoice[]): number {
   return invoices.filter(counts).reduce((sum, i) => sum + (i.totalPence - i.paidPence), 0);
 }
 
-/**
- * What's still due on one invoice, after its payments and any credit notes
- * raised against it. Never below zero; drafts, void invoices and credit
- * notes owe nothing.
- */
-export function invoiceOutstanding(invoice: Invoice, all: Invoice[]): number {
-  if (!counts(invoice) || invoice.kind === "credit-note" || invoice.totalPence <= 0) return 0;
+/** An invoice that asks for money (not a credit note, a draft or void). */
+const asksForMoney = (i: Invoice) => counts(i) && i.kind !== "credit-note" && i.totalPence > 0;
+
+/** One invoice on its own: its total less its payments and the credit notes against it (negative: overpaid). */
+function ownBalance(invoice: Invoice, all: Invoice[]): number {
   const credited = all
     .filter((c) => c.kind === "credit-note" && counts(c) && c.creditsInvoiceId === invoice.id)
     .reduce((sum, c) => sum + (c.totalPence - c.paidPence), 0);
-  return Math.max(0, invoice.totalPence - invoice.paidPence + credited);
+  return invoice.totalPence - invoice.paidPence + credited;
+}
+
+/**
+ * Credit on the customer's account: credit notes not set against an
+ * invoice (less anything refunded on them), and anything paid over an
+ * invoice. It's used against what they owe, oldest invoice first.
+ */
+export function accountCreditPence(all: Invoice[]): number {
+  let credit = 0;
+  for (const i of all) {
+    if (!counts(i)) continue;
+    if (i.kind === "credit-note") {
+      const target = i.creditsInvoiceId ? all.find((t) => t.id === i.creditsInvoiceId) : undefined;
+      if (!target || !asksForMoney(target)) credit -= i.totalPence - i.paidPence;
+    } else if (i.totalPence > 0) {
+      const own = ownBalance(i, all);
+      if (own < 0) credit -= own;
+    }
+  }
+  return Math.max(0, credit);
+}
+
+const byAge = (a: Invoice, b: Invoice) =>
+  (a.issuedAt ?? a.createdAt ?? "").localeCompare(b.issuedAt ?? b.createdAt ?? "") || a.number.localeCompare(b.number);
+
+/**
+ * What's still due on one invoice: its total, after its payments, any
+ * credit notes raised against it, and the account's credit (credit notes on
+ * their own, overpayments), used against the oldest invoices first. So the
+ * per-invoice figures add up to what the customer really owes, and a credit
+ * never leaves an invoice asking to be paid twice. Never below zero; drafts,
+ * void invoices and credit notes owe nothing.
+ */
+export function invoiceOutstanding(invoice: Invoice, all: Invoice[]): number {
+  if (!asksForMoney(invoice)) return 0;
+  const own = Math.max(0, ownBalance(invoice, all));
+  if (own === 0) return 0;
+  let credit = accountCreditPence(all);
+  if (credit === 0 || !all.some((i) => i.id === invoice.id)) return own;
+  for (const i of all.filter(asksForMoney).sort(byAge)) {
+    const owed = Math.max(0, ownBalance(i, all));
+    const used = Math.min(owed, credit);
+    if (i.id === invoice.id) return owed - used;
+    credit -= used;
+  }
+  return own;
+}
+
+/** How much of the account's credit is being used against this invoice (0 when none). */
+export function accountCreditUsedOn(invoice: Invoice, all: Invoice[]): number {
+  if (!asksForMoney(invoice)) return 0;
+  return Math.max(0, Math.max(0, ownBalance(invoice, all)) - invoiceOutstanding(invoice, all));
+}
+
+/**
+ * How much of an account credit note can be refunded: what's left on it,
+ * and never more than the customer is in credit overall (credit that's
+ * covering an unpaid invoice isn't theirs to take back as money).
+ */
+export function refundableCreditPence(creditNote: Invoice, all: Invoice[]): number {
+  if (creditNote.kind !== "credit-note" || !counts(creditNote)) return 0;
+  const target = creditNote.creditsInvoiceId ? all.find((t) => t.id === creditNote.creditsInvoiceId) : undefined;
+  if (target && asksForMoney(target)) return 0; // set against its invoice: refund that invoice instead
+  const left = -(creditNote.totalPence - creditNote.paidPence);
+  return Math.max(0, Math.min(left, -outstandingPence(all)));
 }
 
 /**
@@ -286,11 +426,12 @@ export function moneySummary(
   const refundedPence = -payments.filter((p) => p.status === "refunded").reduce((sum, p) => sum + p.amountPence, 0);
   const contract = contractTotalPence !== undefined && contractTotalPence > 0 ? contractTotalPence : null;
   const contractKinds = new Set(live.filter((i) => i.kind === "deposit" || i.kind === "balance").map((i) => i.id));
+  // Correcting credit notes cancel contract invoicing (to bill again); money off the price doesn't.
   const contractInvoiced = live
     .filter(
       (i) =>
         contractKinds.has(i.id) ||
-        (i.kind === "credit-note" && (!i.creditsInvoiceId || contractKinds.has(i.creditsInvoiceId))),
+        (creditPurposeOf(i) === "correction" && (!i.creditsInvoiceId || contractKinds.has(i.creditsInvoiceId))),
     )
     .reduce((sum, i) => sum + i.totalPence, 0);
   return {

@@ -23,9 +23,26 @@ type SearchParams = Promise<Record<string, string | string[] | undefined>>;
  * homes", each with its stage and the one next step. Signed out: an email
  * box for a sign-in link, answered the same way whoever asks.
  */
+/** Why a sign-in link sent them here (auth/verify's deadLinkLanding). */
+const LINK_PROBLEM: Record<string, { title: string; body: string }> = {
+  expired: {
+    title: "That link has expired or was already used",
+    body: "Each link in our emails works once, to keep your project private. Enter your email below and we'll send you a fresh one.",
+  },
+  missing: {
+    title: "That link was cut short",
+    body: "Part of it went missing on the way (it happens when a link wraps across lines). Enter your email below and we'll send you a fresh one.",
+  },
+  unavailable: {
+    title: "Signing in isn't working right now",
+    body: "That's on our side, not yours. Please try your link again in a few minutes.",
+  },
+};
+
 export default async function PortalPage({ searchParams }: { searchParams: SearchParams }) {
   const sp = await searchParams;
   const signedOut = sp.signedOut === "1";
+  const linkProblem = typeof sp.link === "string" ? LINK_PROBLEM[sp.link] : undefined;
   const [session, settings] = await Promise.all([getSession(), getSettings()]);
   const homes = session?.kind === "customer" ? await customerHomes() : null;
   const phone = realPhone(settings.company.phone);
@@ -115,6 +132,12 @@ export default async function PortalPage({ searchParams }: { searchParams: Searc
           You&apos;re signed out.
         </p>
       )}
+      {linkProblem && (
+        <div role="alert" className="mb-6 rounded-2xl border border-accent-100 bg-accent-50 px-4 py-3 text-[15px] text-ink-900">
+          <p className="font-semibold">{linkProblem.title}</p>
+          <p className="mt-1 leading-relaxed text-ink-700">{linkProblem.body}</p>
+        </div>
+      )}
       {session?.kind === "staff" && (
         <p role="note" className="mb-6 rounded-2xl border border-sage-200 bg-sage-50 px-4 py-3 text-sm text-sage-900">
           You&apos;re signed in as a team member.{" "}
@@ -144,6 +167,14 @@ export default async function PortalPage({ searchParams }: { searchParams: Searc
           <span className="mt-1 block text-sm text-ink-500">Play through a DEMO project, start to finish.</span>
         </Link>
       </div>
+      {session?.kind !== "staff" && (
+        <p className="mt-6 text-center text-sm text-ink-500">
+          On our team or one of our installers?{" "}
+          <Link href="/login" className="font-semibold text-ink-700 underline underline-offset-2">
+            Team sign-in
+          </Link>
+        </p>
+      )}
     </PortalShell>
   );
 }

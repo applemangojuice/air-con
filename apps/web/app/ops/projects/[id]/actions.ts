@@ -31,6 +31,7 @@ import { requireStaff } from "@/lib/auth/server";
 import { recordCancellation } from "@/lib/cancellation-server";
 import { recordCertificate } from "@/lib/certificates-server";
 import { resend } from "@/lib/comms/outbox";
+import { sendVariation } from "@/lib/variation-server";
 import { dispatch, loadProject, pilotNumberHolder } from "@/lib/project-service";
 import * as issuesRepo from "@/lib/repo/issues";
 import * as learningsRepo from "@/lib/repo/learnings";
@@ -402,6 +403,7 @@ export async function transitionIssueAction(projectId: string, fd: FormData): Pr
   if (!issue || issue.projectId !== projectId) return refused("Issue not found.");
   const to = parsed.data.to as IssueStatus;
   if ((to === "resolved" || to === "rejected") && !parsed.data.note) return refused("Say how it was resolved (or why it's rejected).");
+  if (to === "awaiting-customer" && issue.variation?.status === "draft") return refused("Check the price and send it to the customer first: they can't see it yet.");
   let next: Issue;
   try {
     next = transitionIssue(issue, to, staff.name, parsed.data.note, new Date().toISOString());
@@ -417,6 +419,29 @@ export async function transitionIssueAction(projectId: string, fd: FormData): Pr
   }
   refresh(projectId);
   return done(`Issue #${issue.number} is now ${to.replace("-", " ")}.`);
+}
+
+const sendVariationSchema = z.object({
+  issueId: uuid,
+  title: text(140).pipe(z.string().min(3, "Give the change a short title.")),
+  description: text(2000).pipe(z.string().min(3, "Describe the change for the customer.")),
+  pounds: z
+    .string()
+    .trim()
+    .regex(/^-?£?\d{1,6}(\.\d{1,2})?$/, "Enter the price change in pounds, like 120 or -40.50."),
+});
+
+/** The office checked a variation proposed on site: it goes to the customer, at this price. */
+export async function sendVariationAction(projectId: string, fd: FormData): Promise<ActionResult> {
+  const staff = await requireStaff("proposal.issue");
+  if (!uuid.safeParse(projectId).success) return refused("Project not found.");
+  const parsed = sendVariationSchema.safeParse({ issueId: field(fd, "issueId"), title: field(fd, "title"), description: field(fd, "description"), pounds: field(fd, "pounds") });
+  if (!parsed.success) return refused(firstIssue(parsed.error));
+  const pence = Math.round(Number(parsed.data.pounds.replace("£", "")) * 100);
+  const result = await sendVariation(projectId, parsed.data.issueId, { title: parsed.data.title, description: parsed.data.description, priceDeltaNetPence: pence }, staff);
+  if (!result.ok) return refused(result.error);
+  refresh(projectId);
+  return done(result.message ?? "Sent to the customer.");
 }
 
 /* ------------------------------------------------------------------ */

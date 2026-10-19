@@ -3,8 +3,6 @@ import {
   ISSUE_KIND_LABEL,
   LINK_PLACEHOLDER,
   LEARNING_PROMPTS,
-  TAX_CODES,
-  effectiveTaxCode,
   blockersFor,
   buildCommissioningRecord,
   can,
@@ -81,7 +79,7 @@ import { renderMessage, templateContext } from "./comms/templates";
 import { createDocument, currentDocument, listDocuments } from "./documents-server";
 import { appMode } from "./env-mode";
 import type { SyncOp, SyncResult } from "./field-outbox";
-import { fmtDate, londonDateOf } from "./format";
+import { fmtDate, londonDateOf, money } from "./format";
 import { signedMediaUrls } from "./media-server";
 import { buildReadinessContext, dispatch, loadProject, londonToday } from "./project-service";
 import { db, isUniqueViolation, isUuid, must, nowIso, type Row } from "./repo/base";
@@ -98,6 +96,7 @@ import * as purchaseOrdersRepo from "./repo/purchaseOrders";
 import * as surveysRepo from "./repo/surveys";
 import * as timeRepo from "./repo/time";
 import { getSettings } from "./settings-server";
+import { contractTaxRatePct } from "./variation-server";
 import { getServiceClient } from "./supabase-server";
 
 /**
@@ -918,14 +917,23 @@ async function alertTeam(project: Project, issue: Issue): Promise<void> {
     await notify("team-alert", {
       projectId: project.id,
       data: {
-        title: `${issue.blocking ? "Blocking issue" : "Issue"} #${issue.number}: ${issue.title}`,
+        title:
+          issue.variation?.status === "draft"
+            ? `Variation #${issue.number} to check and send: ${issue.title}`
+            : `${issue.blocking ? "Blocking issue" : "Issue"} #${issue.number}: ${issue.title}`,
         ...(issue.detail ? { detail: issue.detail } : {}),
         lines: [
+          ...(issue.variation?.status === "draft"
+            ? [
+                `Estimated on site at ${money(issue.variation.priceDeltaNetPence)} before VAT. The customer hasn't seen it: check the price on the project's Issues page and send it to them.`,
+              ]
+            : []),
           `${ISSUE_KIND_LABEL[issue.kind]}, ${issue.severity}${issue.blocking ? ", holding the job" : ""}`,
           `Raised by ${issue.raisedBy.name}`,
           ...(issue.mediaIds.length ? [`${issue.mediaIds.length} photo${issue.mediaIds.length === 1 ? "" : "s"} attached`] : []),
         ],
-        urgent: issue.blocking || issue.severity === "critical" || issue.kind === "safety",
+        // A variation holds the crew until the office has checked it and the customer has said yes.
+        urgent: issue.blocking || issue.severity === "critical" || issue.kind === "safety" || issue.variation?.status === "draft",
       },
       discriminator: `issue:${issue.id}`,
     });
@@ -955,16 +963,8 @@ async function raiseIssue(
     if (existing.projectId !== project.id) throw new FieldError("That issue belongs to another job.", 409);
     return { issue: existing, created: false };
   }
-  const settings = await getSettings();
-  // A variation is priced on the contract's own tax treatment (the accepted
-  // option's code), not whatever settings say today; settings only when
-  // there's no accepted contract on record.
-  let taxCode = effectiveTaxCode(settings);
-  if (input.variation) {
-    const accepted = await proposalsRepo.acceptedForProject(project.id).catch(() => null);
-    const option = accepted?.acceptance ? accepted.options.find((o) => o.id === accepted.acceptance!.optionId) : undefined;
-    if (option?.pricing.taxCode && TAX_CODES[option.pricing.taxCode]) taxCode = option.pricing.taxCode;
-  }
+  // A variation is priced on the contract's own tax treatment (variation-server).
+  const taxRatePct = input.variation ? await contractTaxRatePct(project.id) : 0;
   const issue = createIssue({
     id: input.id,
     projectId: project.id,
@@ -979,14 +979,15 @@ async function raiseIssue(
     ...(input.blocking !== undefined ? { blocking: input.blocking } : {}),
     // Raised during the install: it holds install complete (and, before day 1, ready to install).
     ...(project.install.status !== "not-started" ? { gate: "install-complete" as const } : {}),
+    // An estimate from site: the office checks the price before the customer sees it (variation-server).
     ...(input.variation
       ? {
           variation: {
             description: input.variation.description,
             priceDeltaNetPence: input.variation.priceDeltaNetPence,
-            taxRatePct: TAX_CODES[taxCode]?.ratePct ?? 0,
+            taxRatePct,
+            officeReview: true,
           },
-          nextAction: "Customer to approve or decline in their portal. Don't do the work until they approve.",
         }
       : {}),
   });
@@ -994,24 +995,6 @@ async function raiseIssue(
   if (saved.created) {
     await audit({ actor: staff, action: "issue.raise", entity: "issue", entityId: issue.id, detail: { projectId: project.id, kind: issue.kind, blocking: issue.blocking } });
     await alertTeam(project, saved.issue);
-    if (saved.issue.variation) {
-      try {
-        // The customer approves or declines in the portal (F1's /api/portal/variations); an accepted
-        // variation is billed on its own or picked up by the balance invoice (F5's planInvoices).
-        await notify("variation-approval", {
-          projectId: project.id,
-          data: {
-            title: saved.issue.title,
-            description: saved.issue.variation!.description,
-            totalDeltaPence: saved.issue.variation!.totalDeltaPence,
-            issueNumber: saved.issue.number,
-          },
-          discriminator: saved.issue.id,
-        });
-      } catch (err) {
-        console.error("[field] variation-approval failed:", err);
-      }
-    }
   }
   return saved;
 }

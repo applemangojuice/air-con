@@ -517,7 +517,7 @@ Gate rules (`block` unless noted; codes are stable, per-item rules add
 | **install-complete** | Install started. Runsheet exists, `complete`, `openExceptions === 0`. Compliance tagged this gate. |
 | **commissioned** | Install complete; `commissioning.signed`. Compliance tagged this gate. |
 | **handed-over** | Commissioned, pack published, signoff recorded, walkthrough done. Compliance tagged this gate. |
-| **closed** | Handed over. `ctx.money` present (`money-unknown`) with `outstandingPence === 0`; invoiced < contract → **warn**. Electrical cert received or not required; warranty registered. Compliance tagged this gate. No open high or critical issue (blocking or not). |
+| **closed** | Handed over. `ctx.money` present (`money-unknown`) with `outstandingPence === 0` and `unbilledPence === 0` (`balance-not-invoiced`: what's agreed but on no invoice); customer in credit → **warn** (§K30). Electrical cert received or not required; warranty registered. Compliance tagged this gate. No open high or critical issue (blocking or not). |
 
 Scope of compliance items and issues:
 - **Compliance:** items tagged `survey-complete`, `proposal-issue`,
@@ -539,7 +539,7 @@ signatures record the verified `ctx.actor.name`, never a typed `by`.
 | Action | Payload | Guard (reducer) |
 | --- | --- | --- |
 | `book-survey` (customer) / `ops-book-survey` | `{ scheduledFor, mode, surveyor? }` | survey not in progress or submitted; customer can't re-book (moves instead); slot in future |
-| `reschedule-survey` | `{ scheduledFor }` | survey booked; fee by notice (customer only) |
+| `reschedule-survey` | `{ scheduledFor }` | survey booked; always free (§K30) |
 | `assign-surveyor` | `{ staffId, name }` | – |
 | `surveyor-on-my-way` | `{ etaMinutes, by }` | survey booked |
 | `survey-started` | `{ by }` | survey booked |
@@ -1207,7 +1207,7 @@ other event is sent by its owner with `notify`.
 | `handover-ready` | `handover-pack-published` |
 | `certificate-issued` | `electrical-cert-updated` → received, or `warranty-registered`, after the pack is out |
 | `invoice-issued`, `payment-received` | F5 server code |
-| `variation-approval` | F6 when a variation is proposed |
+| `variation-approval` | when the office sends a variation proposed on site (`lib/variation-server.ts`, §K30) |
 | `issue-update` | Manual from ops |
 | `survey-reminder`, `install-prep`, `install-day-before`, `proposal-reminder`, `check-in-7d`, `feedback-30d`, `review-request`, `seasonal-check`, `service-reminder` | F7 daily-ops cron (follow-ups skip opted-out customers; the review request only while `company.reviewUrl` is set) |
 | `magic-link` | Auth |
@@ -1533,3 +1533,49 @@ changelog and the reasons, so nobody "fixes" a deliberate choice back.
     - *End-of-day sheet*: the installer's summary and update are theirs once
       typed (`components/field/end-day-draft.ts`); a sync or refresh only
       fills untouched fields, and nothing changes after the preview.
+30. **Hardening review, batch 2 (before the first real customers).**
+    - *Dead sign-in links*: a used or expired link never lands a customer on
+      the team sign-in page (`deadLinkLanding`): still signed in, they go where
+      the link was going (`deadTokenSubject` reads a spent token's `next`);
+      signed out, `/portal?link=expired` explains and offers a fresh link.
+      Staff links keep `/login?error=…`.
+    - *Survey moves are free*: the survey is advertised "Free · no
+      obligation" and there's no balance before a contract, so
+      `rescheduleFeeGbp("survey")` is 0 whatever the notice. The install keeps
+      its week's-notice band, disclosed in Schedule 2 (g).
+    - *Field variations wait for the office*: a variation proposed on site is
+      a `draft` (customer can't see it, owner ops, urgent team alert). Someone
+      with `proposal.issue` (never a subcontractor) checks the price and words
+      on the project's Issues page and sends it (`sendVariationToCustomer`),
+      which re-prices it at the contract's tax rate and only then emails
+      `variation-approval`. Matches plan §4 (variation → owner → customer).
+    - *Credit notes have a purpose*: `correction` (cancels an amount invoiced
+      in error; the balance bills the right figure) or `reduction` (money off
+      the price: goodwill, a snag, a refund they keep; never billed back).
+      Older ones: against an invoice → correction, on their own → reduction.
+      The balance, "still to invoice" and the closed gate count invoicing
+      towards the price without reductions (`invoicedTowardsPricePence`). A
+      credit on its own is capped at the price less earlier credits.
+    - *Account credit is used against invoices*: `invoiceOutstanding` takes
+      credit notes on their own and overpayments off the oldest invoices
+      first, so the pay page, overdue flags and card payments never ask for
+      money already credited. A credit note on its own can be refunded
+      (`refundableCreditPence`: never more than they're in credit). A refund
+      recorded against an invoice that would leave it owed again issues a
+      credit note with it, unless the office says they still owe it.
+    - *Closed means billed*: the closed gate blocks on `unbilledPence`
+      (`stillToBillPence`: the balance, accepted variations and change fees
+      not on any invoice), not just on what's outstanding on issued ones; a
+      customer in credit is a warning to refund.
+    - *Field resilience*: with no signal, links in the field app stay on the
+      current screen and say why (`OfflineGuard`); there's still no service
+      worker (plan: no full offline). The handover sign-off is disabled
+      offline, says plainly when it wasn't saved, keeps the signature and
+      finishes by itself when signal returns. Form sheets ignore backdrop taps
+      while something is half-written and keep drafts across a close. "End
+      day and send" is a different button from "Preview" and waits a beat
+      after the preview appears, so a double tap can't send unseen.
+    - *Phones*: document tables become stacked rows below `sm` (amount beside
+      the label, other columns as labelled lines); the accept button, tapped
+      with something missing, scrolls to and focuses the first thing to fix
+      and says what's missing beside the button.

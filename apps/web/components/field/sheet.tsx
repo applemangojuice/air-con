@@ -8,6 +8,10 @@ import { createPortal } from "react-dom";
  * modal dialog with a title, Escape and the backdrop to close, focus moved
  * in on open and back to the opener on close, and the page behind kept
  * still. Big close target for gloved thumbs.
+ *
+ * `keepOnBackdrop`: a sheet with something half-written in it ignores taps
+ * on the dimmed backdrop (easy to hit with a glove while scrolling, or when
+ * tapping away the keyboard); its close button and Escape still close it.
  */
 export function Sheet({
   open,
@@ -17,6 +21,7 @@ export function Sheet({
   children,
   footer,
   wide = false,
+  keepOnBackdrop = false,
 }: {
   open: boolean;
   onClose: () => void;
@@ -25,6 +30,7 @@ export function Sheet({
   children: ReactNode;
   footer?: ReactNode;
   wide?: boolean;
+  keepOnBackdrop?: boolean;
 }) {
   const id = useId();
   const panel = useRef<HTMLDivElement>(null);
@@ -67,7 +73,7 @@ export function Sheet({
   if (!open || typeof document === "undefined") return null;
   return createPortal(
     <div className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center">
-      <button type="button" aria-label="Close" tabIndex={-1} onClick={onClose} className="absolute inset-0 bg-ink-950/45" />
+      <button type="button" aria-label="Close" tabIndex={-1} onClick={keepOnBackdrop ? undefined : onClose} className="absolute inset-0 bg-ink-950/45" />
       <div
         ref={panel}
         role="dialog"
