@@ -48,6 +48,15 @@ export const PILOT_COLUMNS: { table: string; columns: string[] }[] = [
 /** The migration that creates them, for every message that says how to fix it. */
 export const PILOT_MIGRATION = "supabase/migrations/0010_pilot_platform.sql";
 
+/** The one-paste upgrade (0010 onwards, in one transaction) the founders' guide uses. */
+export const PILOT_UPGRADE = "supabase/pilot-upgrade.sql";
+
+/**
+ * How to bring a Supabase database up to date, in the same words as
+ * START-HERE-TOMORROW.md step 3, for every screen and log that says so.
+ */
+export const UPGRADE_HOW = `In Supabase → SQL Editor, paste and run ${PILOT_UPGRADE} (safe to run again; a brand-new, empty project first needs 0001 to 0009 from supabase/migrations, both 0006 files), then run supabase/check-schema.sql: it should say "All present".`;
+
 type ErrorLike = { code?: string | null; message?: string | null } | null | undefined;
 
 /**

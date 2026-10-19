@@ -1,6 +1,6 @@
 import { demoLoginAllowed, describeRealRecords, securityWarnings } from "./lib/auth/access";
 import { realRecordsNow } from "./lib/auth/demo-guard";
-import { PILOT_MIGRATION, checkPilotSchema } from "./lib/schema-check";
+import { UPGRADE_HOW, checkPilotSchema } from "./lib/schema-check";
 import { dataBackend } from "./lib/supabase-server";
 
 /**
@@ -28,7 +28,7 @@ export function bootChecks(): void {
       if (!s.checked) return;
       if (s.missingTables.length || s.missingColumns.length) {
         console.error(
-          `[schema] The database is missing ${[...s.missingTables, ...s.missingColumns].join(", ")}: run supabase/migrations in order (${PILOT_MIGRATION} is the pilot platform). Until then nobody can sign in and pilot records can't be saved.`,
+          `[schema] The database is missing ${[...s.missingTables, ...s.missingColumns].join(", ")}. ${UPGRADE_HOW} Until then nobody can sign in and pilot records can't be saved.`,
         );
       } else if (s.errors.length) {
         console.error(`[schema] Couldn't check the database at boot: ${s.errors[0]}`);

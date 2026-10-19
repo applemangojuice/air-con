@@ -20,6 +20,7 @@ import {
   readiness,
   runsheetProgress,
   schedule2Missing,
+  stillResearchPrice,
   surveyCompleteness,
   transitionIssue,
   type Blocker,
@@ -55,7 +56,7 @@ import { emailConfigured } from "./email";
 import { isDemoSeedId } from "./demo-seed/ids";
 import { healthReport } from "./health";
 import { isPlaceholderValue, placeholderKeys, realEnv } from "./env-placeholders";
-import { PILOT_MIGRATION, checkPilotSchema, probeTable } from "./schema-check";
+import { PILOT_UPGRADE, UPGRADE_HOW, checkPilotSchema, probeTable } from "./schema-check";
 import { MEDIA_CONTENT_TYPES, MEDIA_MAX_BYTES, safeMediaName, signedMediaUrls } from "./media-server";
 import { DAILY_JOB_IDS, DONE_STATUSES, dailyJobsFor, emptySummary, type DailyJob, type DailyOpsSummary } from "./ops-core-schedule";
 import { dispatch, londonToday } from "./project-service";
@@ -728,7 +729,7 @@ export async function goLiveChecks(): Promise<GoLiveCheck[]> {
           : !allOk
             ? `Some checks failed: ${[...schema.errors, ...report.tables.filter((t) => !t.ok).map((t) => `${t.table}: ${t.error ?? "error"}`)].slice(0, 4).join("; ")}.`
             : "Every pilot table and column is there.",
-      fix: `Run every file in supabase/migrations in order (0001 to 0013, both 0006 files) in the Supabase SQL editor; ${PILOT_MIGRATION} is the pilot platform. Then reload this page.`,
+      fix: `${UPGRADE_HOW} Then reload this page.`,
       href: "/ops/status",
     });
   } else {
@@ -740,7 +741,7 @@ export async function goLiveChecks(): Promise<GoLiveCheck[]> {
         backend === "none"
           ? "No database: nothing saves."
           : `Using the local ${backend} backend. Fine for trying things out; real customers need Supabase (local files don't survive a Vercel deploy).`,
-      fix: "Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in Vercel, run every migration 0001 to 0013 in order, redeploy.",
+      fix: `Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in Vercel. ${UPGRADE_HOW} Then redeploy.`,
     });
   }
   const buckets = report.buckets.filter((b) => !b.ok);
@@ -750,7 +751,7 @@ export async function goLiveChecks(): Promise<GoLiveCheck[]> {
       label: "Storage buckets",
       level: "red",
       detail: `Missing: ${buckets.map((b) => b.bucket).join(", ")}. Photo uploads fail without them.`,
-      fix: "Migration 0010 creates project-media; 0001 and 0004 the survey buckets.",
+      fix: `${UPGRADE_HOW} (0010 creates project-media; 0001 and 0004 the survey buckets.)`,
     });
   }
 
@@ -765,7 +766,7 @@ export async function goLiveChecks(): Promise<GoLiveCheck[]> {
       detail: limits.ok
         ? "Sign-in and portal link limits are counted once for the whole site."
         : "Not there yet, so each server instance counts sign-in requests on its own: a flood of sign-in emails is only lightly slowed.",
-      fix: "Run supabase/migrations/0012_rate_limits.sql in the Supabase SQL editor, then reload this page.",
+      fix: `Run ${PILOT_UPGRADE} in the Supabase SQL Editor (it includes 0012), then reload this page.`,
     });
   }
 
@@ -915,13 +916,24 @@ export async function goLiveChecks(): Promise<GoLiveCheck[]> {
   const catalogue = getServiceClient() ? await catalogueRepo.listActive().catch(() => []) : [];
   const priced = (tier: "standard" | "premium") =>
     catalogue.filter((i) => (i.kind === "indoor" || i.kind === "outdoor") && i.tier === tier && i.costPence !== null && (demoMode || !i.id.startsWith("demo-")));
-  const tiersMissing = (["standard", "premium"] as const).filter((tier) => priced(tier).length === 0);
+  const tiers = ["standard", "premium"] as const;
+  const tiersMissing = tiers.filter((tier) => priced(tier).length === 0);
+  // Loading the researched catalogue prices a few units with public retail prices (some
+  // approximate). They make a tier look priced; until someone types a trade price, say so.
+  const { RESEARCHED_CATALOGUE } = await import("@aircon/domain/catalogue-data");
+  const seed = new Map(RESEARCHED_CATALOGUE.map((i) => [i.id, i]));
+  const researchOnly = tiers.filter((tier) => priced(tier).length > 0 && priced(tier).every((i) => stillResearchPrice(i, seed)));
   checks.push({
     id: "catalogue",
     label: "Catalogue: a priced, active unit in each tier",
-    level: tiersMissing.length === 0 ? "green" : tiersMissing.length === 2 ? "red" : "amber",
-    detail: tiersMissing.length === 0 ? "Standard and premium options can be costed." : `No priced ${tiersMissing.join(" or ")} equipment yet: those options can't be costed.`,
-    fix: "Catalogue → enter supplier costs for the units you'll fit.",
+    level: tiersMissing.length === 2 ? "red" : tiersMissing.length === 1 || researchOnly.length > 0 ? "amber" : "green",
+    detail:
+      tiersMissing.length > 0
+        ? `No priced ${tiersMissing.join(" or ")} equipment yet: those options can't be costed.`
+        : researchOnly.length > 0
+          ? `The only ${researchOnly.join(" and ")} prices are the research's public retail prices (some approximate), not your trade prices. Proposals would be costed on them.`
+          : "Standard and premium options can be costed.",
+    fix: "Catalogue → open each unit you'll fit → type your trade price under Buy cost → Save changes.",
     href: "/ops/catalogue",
   });
 

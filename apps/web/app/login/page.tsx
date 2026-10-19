@@ -7,7 +7,7 @@ import { DEMO_ROLE_KEYS, DEMO_ROLE_LABEL } from "@/lib/auth/demo-staff";
 import { currentStaff } from "@/lib/auth/server";
 import { demoModeAllowed } from "@/lib/auth/demo-guard";
 import { appMode } from "@/lib/env-mode";
-import { PILOT_MIGRATION, pilotSchemaStatus } from "@/lib/schema-check";
+import { PILOT_UPGRADE, pilotSchemaStatus } from "@/lib/schema-check";
 import { demoSignIn } from "./actions";
 import { DemoSeedButton } from "./demo-seed";
 import { BreakGlassForm, MagicLinkForm } from "./forms";
@@ -77,9 +77,9 @@ export default async function LoginPage({ searchParams }: { searchParams: Search
           <div className="mt-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-900" role="alert">
             <p className="font-semibold">The database isn&apos;t set up for sign-in yet.</p>
             <p className="mt-1">
-              Supabase is connected, but the pilot platform&apos;s migration hasn&apos;t been run. In the Supabase SQL editor, run every file in{" "}
-              <code className="font-mono text-xs">supabase/migrations</code> in order, ending with{" "}
-              <code className="font-mono text-xs">{PILOT_MIGRATION.split("/").pop()}</code>, then reload this page.
+              Supabase is connected, but the pilot platform&apos;s upgrade hasn&apos;t been run. In Supabase → SQL Editor, paste and run{" "}
+              <code className="font-mono text-xs">{PILOT_UPGRADE}</code> (a brand-new, empty project first needs 0001 to 0009 from{" "}
+              <code className="font-mono text-xs">supabase/migrations</code>), then reload this page.
               {breakGlass ? " Until then, an admin email with the break-glass password opens /ops/status to check." : ""}
             </p>
           </div>

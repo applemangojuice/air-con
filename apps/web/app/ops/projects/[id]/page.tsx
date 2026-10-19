@@ -41,6 +41,7 @@ import {
   CloseForm,
   ConsentForm,
   ContactForm,
+  CustomerLinkForm,
   Disclosure,
   LearningForm,
   LearningStatusForm,
@@ -74,6 +75,7 @@ import {
   raiseIssueAction,
   resendMessageAction,
   setContactAction,
+  sendCustomerLinkAction,
   setLearningStatusAction,
   setNextActionAction,
   setOwnerAction,
@@ -121,7 +123,14 @@ export default async function CommandCentrePage({
   const { id } = await params;
   const sp = await searchParams;
   const justCreated = sp.created === "1";
-  const linkNote = sp.link === "sent" ? " A link to their project is on its way to them." : sp.link === "unsent" ? " No link was sent: email isn't set up, so check Messages before telling them to expect one." : "";
+  const linkNote =
+    sp.link === "sent"
+      ? " A link to their project is on its way to them."
+      : sp.link === "noemail"
+        ? " No link was sent: email isn't set up yet. Once it is, use Admin → Email them a sign-in link on this page (booking their survey sends them a link too)."
+        : sp.link === "unsent"
+          ? " The link didn't go: check Messages before telling them to expect one, then use Admin → Email them a sign-in link."
+          : "";
   const areaNote = sp.area === "outside" ? " Their postcode is outside the service area in Settings." : "";
   if (!UUID_RE.test(id)) notFound();
   const project = await loadProject(id);
@@ -913,6 +922,11 @@ export default async function CommandCentrePage({
               <Disclosure summary="Edit contact and access">
                 <ContactForm action={bind(setContactAction)} current={p.customer} />
               </Disclosure>
+              {!p.closure.closed && p.customer.email && (
+                <Disclosure summary="Email them a sign-in link">
+                  <CustomerLinkForm action={bind(sendCustomerLinkAction)} email={p.customer.email} />
+                </Disclosure>
+              )}
               {!p.closure.closed && p.proposal.status === "accepted" && (
                 <Disclosure summary="Record a cancellation">
                   <CancellationForm action={bind(cancellationAction)} today={today} />

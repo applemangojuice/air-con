@@ -28,10 +28,12 @@ import { done, refused, type ActionResult } from "@/components/ops/command/types
 import { londonToUtcIso, slotIso } from "@/components/ops/command/model";
 import { audit } from "@/lib/audit";
 import { earlyStartEvidenceFromForm, recordEarlyStartEvidence, surveyorClash } from "@/lib/booking-server";
+import { CUSTOMER_EMAIL_LINK_TTL_DAYS, issueMagicLink } from "@/lib/auth/magic";
 import { requireProjectAccess, requireStaff } from "@/lib/auth/server";
 import { recordCancellation } from "@/lib/cancellation-server";
 import { recordCertificate } from "@/lib/certificates-server";
 import { resend } from "@/lib/comms/outbox";
+import { emailConfigured } from "@/lib/email";
 import { sendVariation } from "@/lib/variation-server";
 import { DEMO_PILOT_FROM, dispatch, loadProject, pilotNumberHolder, pilotTakenMessage } from "@/lib/project-service";
 import * as issuesRepo from "@/lib/repo/issues";
@@ -298,6 +300,33 @@ export async function setContactAction(projectId: string, fd: FormData): Promise
   });
   if (!parsed.success) return refused(firstIssue(parsed.error));
   return run(projectId, { type: "set-customer-contact", ...parsed.data, email: parsed.data.email.toLowerCase() }, "Contact details saved.");
+}
+
+/**
+ * A fresh sign-in link to the family's own project page, emailed to the
+ * address on the project (never shown to us on a live site: the same rules
+ * and per-address limits as every sign-in link). For a household set up
+ * before email worked, or one that has lost its link.
+ */
+export async function sendCustomerLinkAction(projectId: string, _fd: FormData): Promise<ActionResult> {
+  const staff = await guard(projectId, "messages.send");
+  if (!staff) return notFound();
+  const project = await loadProject(projectId);
+  if (!project) return notFound();
+  const email = project.customer.email?.trim();
+  if (!email) return refused("There's no email on this project. Add one under Edit contact and access first.");
+  try {
+    const link = await issueMagicLink({ email, kind: "customer", next: `/p/${projectId}`, ttlMinutes: CUSTOMER_EMAIL_LINK_TTL_DAYS * 24 * 60 });
+    await audit({ actor: staff, action: "customer.link-sent", entity: "project", entityId: projectId, detail: { sent: link.sent } });
+    if (link.sent) return done(`A sign-in link to their project went to ${email}. It works once and lasts ${CUSTOMER_EMAIL_LINK_TTL_DAYS} days.`);
+    // Only on a developer's machine, or a demo site for a reserved address (lib/auth/access linkMayShowOnScreen).
+    if (link.devLink) return done("Email isn't set up here, so nothing was sent. Their link, for this screen only:", { detail: link.devLink });
+    if (!emailConfigured()) return refused("Email isn't set up yet, so nothing was sent. Once it is (START-HERE step 4), press this again.");
+    return refused("It didn't go: the email provider refused it, or too many links went to this address today. Check Messages, then try again later.");
+  } catch (err) {
+    console.error("[command] customer link failed:", err);
+    return refused("The link couldn't be sent just now. Nothing changed; try again in a moment.");
+  }
 }
 
 export async function closeProjectAction(projectId: string, fd: FormData): Promise<ActionResult> {

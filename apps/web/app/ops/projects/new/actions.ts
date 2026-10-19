@@ -5,6 +5,7 @@ import { buildDefaultConfig, generateQuote, isInServiceArea, type Survey } from 
 import { done, refused, type ActionResult } from "@/components/ops/command/types";
 import { audit } from "@/lib/audit";
 import { CUSTOMER_EMAIL_LINK_TTL_DAYS, issueMagicLink } from "@/lib/auth/magic";
+import { emailConfigured } from "@/lib/email";
 import { requireStaff } from "@/lib/auth/server";
 import { isValidUkPostcode, normalisePostcode } from "@/lib/format";
 import { DEMO_PILOT_FROM, createProjectForQuote, dispatch, pilotNumberHolder, pilotTakenMessage } from "@/lib/project-service";
@@ -165,9 +166,9 @@ export async function createPilotAction(fd: FormData): Promise<ActionResult> {
   if (outside) notes.push(`${postcode} is outside the service area in settings.`);
 
   let detail: string | undefined;
-  let linkState: "sent" | "unsent" | "none" = "none";
+  let linkState: "sent" | "unsent" | "noemail" | "none" = "none";
   if (d.sendLink) {
-    linkState = "unsent";
+    linkState = emailConfigured() ? "unsent" : "noemail";
     try {
       const link = await issueMagicLink({ email: d.email, kind: "customer", next: `/p/${id}`, ttlMinutes: CUSTOMER_EMAIL_LINK_TTL_DAYS * 24 * 60 });
       if (link.sent) {

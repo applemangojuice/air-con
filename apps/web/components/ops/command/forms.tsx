@@ -351,6 +351,21 @@ export function CancellationForm({ action, today }: { action: Action; today: str
   );
 }
 
+export function CustomerLinkForm({ action, email }: { action: Action; email?: string }) {
+  return (
+    <ActionForm action={action} confirm={email ? `Email a sign-in link to ${email}?` : undefined}>
+      <p className="text-xs text-ink-500">
+        A fresh link to their project page, emailed to {email ? <span className="font-semibold text-ink-700">{email}</span> : "their address"}. It works once and lasts 30 days. Every other email we send them carries one too.
+      </p>
+      <div className="mt-2">
+        <SubmitButton variant="secondary" busyLabel="Sending…">
+          Email the link
+        </SubmitButton>
+      </div>
+    </ActionForm>
+  );
+}
+
 export function CloseForm({ action, contracted = false }: { action: Action; contracted?: boolean }) {
   const id = useId();
   return (

@@ -21,6 +21,7 @@ import {
   parseCsv,
   planSeedMerge,
   singlePairFor,
+  stillResearchPrice,
   validateCombination,
   type CatalogueItem,
   type CompatibilityRule,
@@ -277,6 +278,24 @@ test("loading the researched seed keeps what's already there unless told to over
   const replace = planSeedMerge([priced], RESEARCHED_CATALOGUE, true);
   assert.equal(replace.replaced, 1);
   assert.equal(replace.upserts.find((i) => i.id === priced.id)!.costPence, null);
+});
+
+test("a researched retail price counts as ours only once someone has changed it", () => {
+  const seed = new Map(RESEARCHED_CATALOGUE.map((i) => [i.id, i]));
+  const pricedSeed = RESEARCHED_CATALOGUE.filter((i) => i.costPence !== null);
+  assert.ok(pricedSeed.length >= 6, "the seed carries the research's retail prices");
+  const sensira = pricedSeed.find((i) => i.kind === "indoor" && i.tier === "standard")!;
+  // Straight from the seed: still the research's price.
+  assert.equal(stillResearchPrice(sensira, seed), true);
+  // A new trade price, a new supplier, or a new date seen: ours.
+  assert.equal(stillResearchPrice({ ...sensira, costPence: sensira.costPence! - 1 }, seed), false);
+  assert.equal(stillResearchPrice({ ...sensira, costSource: { ...sensira.costSource, supplier: "DEMO Trade Supplier" } }, seed), false);
+  assert.equal(stillResearchPrice({ ...sensira, costSource: { ...sensira.costSource, observedAt: "2026-10-19" } }, seed), false);
+  // Unpriced, not in the seed, or unpriced in the seed: never a research price.
+  assert.equal(stillResearchPrice({ ...sensira, costPence: null }, seed), false);
+  assert.equal(stillResearchPrice({ ...sensira, id: "my-own-unit" }, seed), false);
+  const unpricedSeed = RESEARCHED_CATALOGUE.find((i) => i.costPence === null)!;
+  assert.equal(stillResearchPrice({ ...unpricedSeed, costPence: 12_000 }, seed), false);
 });
 
 test("rule and item validation says what's wrong in plain words", () => {

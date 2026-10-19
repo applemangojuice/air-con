@@ -25,6 +25,8 @@ interface Check {
   ok: boolean;
   detail: string;
   fix?: string;
+  /** Nice to have, never a reason to hold the pilots back: shown, not counted. */
+  optional?: boolean;
 }
 
 async function liveChecks(): Promise<{ checks: Check[]; score: number; total: number }> {
@@ -105,6 +107,7 @@ async function liveChecks(): Promise<{ checks: Check[]; score: number; total: nu
           ? `${String(propertyCount ?? 0).replace(/\B(?=(\d{3})+(?!\d))/g, ",")} properties in the book.`
           : "Empty — address prefill and per-address pages have nothing to serve.",
       fix: "Seed the sample book on /ops/intel, or run the EPC importer (docs/loading-data.md).",
+      optional: true,
     });
 
     const dayAgo = new Date(Date.now() - 24 * 3600_000).toISOString();
@@ -121,11 +124,12 @@ async function liveChecks(): Promise<{ checks: Check[]; score: number; total: nu
           ? `${eventCount} events in the last 24h.`
           : "No events in 24h — either no traffic yet, or the beacon isn't reaching the database.",
       fix: "Visit the site once and refresh; if still zero, check /ops/status for the analytics_events table.",
+      optional: true,
     });
   }
 
-  const score = checks.filter((c) => c.ok).length;
-  return { checks, score, total: checks.length };
+  const counted = checks.filter((c) => !c.optional);
+  return { checks, score: counted.filter((c) => c.ok).length, total: counted.length };
 }
 
 /** The launch-day items only a human can do, with the exact verification. */
@@ -144,7 +148,7 @@ const MANUAL: { label: string; how: string }[] = [
   },
   {
     label: "Run the automated funnel test against production",
-    how: "BASE_URL=https://your-domain pnpm --filter @aircon/web test:e2e — all seven checks green.",
+    how: "BASE_URL=https://your-domain pnpm --filter @aircon/web test:e2e — it ends with every check passed.",
   },
   {
     label: "Share preview looks right",
@@ -169,7 +173,11 @@ export default async function LaunchPage() {
       return null;
     }),
   ]);
-  const ready = score === total;
+  // The headline is the pilot checklist (what the founders' guide says to make green), not the
+  // older live score, which also counts marketing extras the pilots don't need.
+  const red = pilot ? pilot.filter((c) => c.level === "red").length : total - score;
+  const amber = pilot ? pilot.filter((c) => c.level === "amber").length : 0;
+  const ready = red === 0 && score === total;
 
   return (
     <main className="mx-auto w-full min-w-0 max-w-4xl px-4 py-10 sm:px-6">
@@ -191,28 +199,42 @@ export default async function LaunchPage() {
         }`}
       >
         <p className={`text-3xl font-display ${ready ? "text-sage-800" : "text-amber-800"}`}>
-          {score}/{total} automated checks green
+          {red > 0
+            ? `${red} to fix before real customers`
+            : score < total
+              ? `${total - score} live check${total - score === 1 ? "" : "s"} to fix`
+              : amber > 0
+                ? `Ready, with ${amber} to check`
+                : "Ready for real customers"}
         </p>
         <p className={`mt-1 text-sm ${ready ? "text-sage-700" : "text-amber-700"}`}>
           {ready
-            ? "The platform side is ready. Walk the manual list below and go."
-            : "Fix the red rows below first — each one is customer-visible."}
+            ? `The platform side is ready${amber > 0 ? ": the amber rows can go live knowingly" : ""}. Walk the human checks at the bottom and go.`
+            : "Work down the red rows below first: each one is customer-visible. Amber rows can go live knowingly."}
         </p>
       </div>
 
       <PilotChecklist checks={pilot} />
 
       <section className="mt-8">
-        <h2 className="mb-3 text-lg font-display">Checked live, right now</h2>
+        <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="text-lg font-display">Checked live, right now</h2>
+          <p className="text-sm text-ink-500">
+            {score} of {total} green
+          </p>
+        </div>
         <div className="divide-y divide-line rounded-2xl border border-line">
           {checks.map((c) => (
             <div key={c.label} className="flex items-start gap-3 px-4 py-3">
               <span
                 aria-hidden
-                className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${c.ok ? "bg-sage-500" : "bg-red-500"}`}
+                className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${c.ok ? "bg-sage-500" : c.optional ? "bg-ink-300" : "bg-red-500"}`}
               />
               <div className="min-w-0 flex-1">
-                <p className="font-semibold">{c.label}</p>
+                <p className="font-semibold">
+                  {c.label}
+                  {c.optional && <span className="ml-2 text-xs font-normal text-ink-500">Optional: the pilots don&apos;t need it</span>}
+                </p>
                 <p className="text-sm text-ink-500">{c.detail}</p>
                 {!c.ok && c.fix && <p className="mt-0.5 text-xs text-accent-700">{c.fix}</p>}
               </div>

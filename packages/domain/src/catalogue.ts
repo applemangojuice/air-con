@@ -408,6 +408,25 @@ export function planSeedMerge<T extends { id: string }>(existing: T[], seed: T[]
   return { upserts, added, kept, replaced };
 }
 
+type PricedFields = Pick<CatalogueItem, "id" | "costPence" | "costSource">;
+
+/**
+ * Whether an item's buy cost is still exactly the one the researched seed
+ * loaded with: a public retail price read off a web page (some of them
+ * approximate), not a price anyone here typed in from a supplier. Any edit
+ * to the cost, the supplier or the date it was seen makes it ours.
+ */
+export function stillResearchPrice(item: PricedFields, seed: ReadonlyMap<string, PricedFields>): boolean {
+  if (item.costPence === null) return false;
+  const researched = seed.get(item.id);
+  if (!researched || researched.costPence === null) return false;
+  return (
+    researched.costPence === item.costPence &&
+    (researched.costSource?.supplier ?? "") === (item.costSource?.supplier ?? "") &&
+    (researched.costSource?.observedAt ?? "") === (item.costSource?.observedAt ?? "")
+  );
+}
+
 /** What's wrong with a rule as typed into the editor (empty when it's fine). */
 export function compatibilityRuleErrors(rule: CompatibilityRule): string[] {
   const out: string[] = [];

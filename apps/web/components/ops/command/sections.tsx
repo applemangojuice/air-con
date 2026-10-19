@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { LINK_PLACEHOLDER } from "@aircon/domain";
 import { StatusChip } from "@/components/kit/badge";
 
 /**
@@ -86,6 +87,12 @@ export function MessageBody({ html, text, subject }: { html?: string; text: stri
         <p className="text-sm">
           <span className="text-ink-500">Subject: </span>
           <span className="font-semibold text-ink-900">{subject}</span>
+        </p>
+      )}
+      {(html ?? text).includes(LINK_PLACEHOLDER) && (
+        <p className="text-xs text-ink-500">
+          The sign-in link is added only when the email goes out and is never stored, so this preview can&apos;t open it. To
+          see a family&apos;s page, open their project → <span className="font-semibold">Customer view</span>.
         </p>
       )}
       {html ? (
