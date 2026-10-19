@@ -40,6 +40,11 @@ function statusLine(job: JobCardData, today: string): { text: string; tone: stri
     if (job.surveyStatus === "submitted") return { text: "Survey submitted", tone: "bg-emerald-50 text-emerald-800" };
     return { text: "Booked", tone: "bg-surface text-ink-700" };
   }
+  if (job.wrapUp) {
+    const { handover, endDay } = job.wrapUp;
+    const text = handover && endDay ? "Commissioned · hand over and end the day" : handover ? "Commissioned · hand over" : "Handed over · end the day";
+    return { text, tone: "bg-sage-50 text-sage-800" };
+  }
   if (job.handoverStatus === "handed-over") return { text: "Handed over", tone: "bg-emerald-50 text-emerald-800" };
   if (job.installStatus === "complete") return { text: "Install complete", tone: "bg-emerald-50 text-emerald-800" };
   if (job.dayStatus === "in-progress") return { text: `On site since ${londonTime(job.startedAt)}`, tone: "bg-sage-50 text-sage-800" };

@@ -14,6 +14,9 @@ export type EditableMedia = Pick<MediaItem, "id" | "annotations" | "annotationsV
   url: string | null;
 };
 
+/** Where this browser keeps an unsaved drawing of this photo (the version it was opened at). */
+export const mediaDraftKey = (media: Pick<EditableMedia, "id" | "annotationsVersion">) => `${media.id}:v${media.annotationsVersion}`;
+
 export async function saveAnnotations(
   media: Pick<EditableMedia, "id" | "annotationsVersion">,
   annotations: Annotation[],
@@ -56,7 +59,7 @@ export function MediaAnnotator({
       locked={media.locked}
       title={title}
       defaultTool={defaultTool}
-      draftKey={`${media.id}:v${media.annotationsVersion}`}
+      draftKey={mediaDraftKey(media)}
       onSave={async (annotations) => {
         const item = await saveAnnotations(media, annotations);
         onSaved(item);

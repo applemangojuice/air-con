@@ -3,6 +3,7 @@ import {
   accountCreditUsedOn,
   acceptedVariationsPence,
   balanceLinesFor,
+  balanceTimingProblem,
   creditNoteLines,
   creditPurposeOf,
   depositPence,
@@ -83,6 +84,11 @@ export interface InvoicePlan {
   totalPence: number;
   /** For variation invoices: the variations still to bill. */
   variations?: { id: string; number: number; title: string; totalPence: number }[];
+  /**
+   * Balance only: it's ready to bill but the contract says not yet (the
+   * install isn't finished). An admin may still issue it with a reason.
+   */
+  early?: boolean;
 }
 
 export interface MoneyView {
@@ -147,6 +153,17 @@ const contractDepositPence = (contract: DocumentRecord | undefined): number | un
 
 const live = (i: Invoice) => i.status !== "void" && i.status !== "draft";
 
+/**
+ * Cancelled by credit notes raised against it for its whole amount, with
+ * nothing paid on it: as good as never issued (a deposit raised at the wrong
+ * figure, then credited).
+ */
+export function creditedInFull(inv: Invoice, all: Invoice[]): boolean {
+  if (inv.kind === "credit-note" || inv.paidPence > 0) return false;
+  const credited = -all.filter((c) => live(c) && c.kind === "credit-note" && c.creditsInvoiceId === inv.id).reduce((sum, c) => sum + c.totalPence, 0);
+  return credited >= inv.totalPence;
+}
+
 /** Accepted variations, from the issues list. */
 function acceptedVariations(issues: Issue[]): Issue[] {
   return issues.filter((i) => i.kind === "variation" && i.variation?.status === "accepted");
@@ -172,10 +189,11 @@ export function planInvoices(input: {
     return { kind, available, ...(available ? {} : { reason: reason ?? "Nothing to bill." }), lines, totalPence: total, ...extra };
   };
 
-  // Deposit
+  // Deposit. One cancelled by a credit note for all of it, with nothing paid, doesn't count:
+  // the office can raise the right one (otherwise the booking would wait on it for ever).
   let deposit: InvoicePlan;
   if (!contract) deposit = plan("deposit", [], "There's no accepted contract to take a deposit on.");
-  else if (issued.some((i) => i.kind === "deposit")) deposit = plan("deposit", [], "A deposit invoice has already been issued.");
+  else if (issued.some((i) => i.kind === "deposit" && !creditedInFull(i, issued))) deposit = plan("deposit", [], "A deposit invoice has already been issued.");
   else if (settings.payments.depositPct <= 0) deposit = plan("deposit", [], "The contract's payment terms have no deposit (0%), so there's none to ask for.");
   else {
     const amount = input.contractDepositPence && input.contractDepositPence > 0 ? input.contractDepositPence : depositPence(contract, settings);
@@ -201,6 +219,13 @@ export function planInvoices(input: {
         undefined,
       );
   if (contract && !balance.available) balance.reason = "Everything on the contract is already invoiced.";
+  // The terms the customer agreed bill it once the installation is finished.
+  const notYet = balanceTimingProblem(p.install);
+  if (balance.available && notYet) {
+    balance.available = false;
+    balance.reason = notYet;
+    balance.early = true;
+  }
 
   // Variations not yet billed on their own (the balance picks them up otherwise).
   const unbilled = variationsBillableAlone(variations, issued);
@@ -289,6 +314,11 @@ export interface IssueInput {
   /** The form's one-off id: a double click returns the first invoice. */
   requestId?: string;
   notes?: string;
+  /**
+   * Balance only: an admin billing it before the installation is finished
+   * (the contract says after), and why. Audited and kept in the invoice's (internal) notes.
+   */
+  earlyReason?: string;
 }
 
 const KIND_TITLE: Record<InvoiceKind, string> = {
@@ -362,7 +392,13 @@ export async function issueInvoice(projectId: string, input: IssueInput, staff: 
     extra = { issueId: v.id };
   } else {
     const plan = planned()[input.kind];
-    if (!plan.available) return fail(plan.reason ?? "Nothing to bill.");
+    const early = input.earlyReason?.trim();
+    if (plan.early && early) {
+      if (!staff.roles.includes("admin")) return fail("Only an admin can bill the balance before the installation is finished.", 403);
+      extra = { notes: [`Billed before the installation finished: ${early}`, input.notes?.trim()].filter(Boolean).join(" · ") };
+    } else if (!plan.available) {
+      return fail(plan.early ? `${plan.reason} An admin can bill it early, with a reason.` : (plan.reason ?? "Nothing to bill."));
+    }
     lines = plan.lines;
   }
 
@@ -393,7 +429,13 @@ export async function issueInvoice(projectId: string, input: IssueInput, staff: 
     ...extra,
     issuing: true,
   });
-  await audit({ actor: staff, action: "invoice.issue", entity: "invoice", entityId: invoice.id, detail: { projectId, number: invoice.number, kind: invoice.kind, totalPence: invoice.totalPence } });
+  await audit({
+    actor: staff,
+    action: "invoice.issue",
+    entity: "invoice",
+    entityId: invoice.id,
+    detail: { projectId, number: invoice.number, kind: invoice.kind, totalPence: invoice.totalPence, ...(input.earlyReason?.trim() && input.kind === "balance" ? { earlyReason: input.earlyReason.trim() } : {}) },
+  });
   const finished = await finishIssue(invoice, staff);
   return {
     ok: true,

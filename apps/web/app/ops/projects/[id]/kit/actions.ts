@@ -52,7 +52,12 @@ export async function advanceAction(projectId: string, _prev: ActionState, form:
   if (reference) patch.reference = reference;
   if (tracking) patch.trackingRef = tracking;
   if (eta.data) patch.eta = eta.data;
-  return toState(await advanceOrder(projectId, id.data, to.data, staff, patch, text(form, "note", 500)), "Order updated.");
+  // Placing it before a "before-kit-order" deposit is paid: an admin, with a reason (the server checks both).
+  const depositOverride = text(form, "depositOverride", 300);
+  return toState(
+    await advanceOrder(projectId, id.data, to.data, staff, patch, text(form, "note", 500), depositOverride ? { depositOverride } : {}),
+    "Order updated.",
+  );
 }
 
 export async function cancelAction(projectId: string, _prev: ActionState, form: FormData): Promise<ActionState> {

@@ -14,6 +14,7 @@ import {
   createProject,
   currentStage,
   customerNextAction,
+  kitOrderDepositProblem,
   daysBetween,
   earliestInstallStart,
   earliestStartForKit,
@@ -859,7 +860,8 @@ test("booking gate: F-gas, a Part P electrician, deposit, dates", () => {
 
   const deposit = mergeSettings({ payments: { depositPct: 20 } });
   assert.equal(severityOf(blockersFor(p, c({ settings: deposit }), "booking"), "deposit-unpaid"), "block");
-  const paidBySum = c({ settings: deposit, money: { depositDuePence: 129_000, depositPaidPence: 129_000, outstandingPence: 0, unbilledPence: 0 } });
+  const paidMoney = { money: { depositDuePence: 129_000, depositPaidPence: 129_000, outstandingPence: 0, unbilledPence: 0 } };
+  const paidBySum = c({ settings: deposit, ...paidMoney });
   assert.equal(severityOf(blockersFor(p, paidBySum, "booking"), "deposit-unpaid"), undefined);
   const beforeKit = mergeSettings({ payments: { depositPct: 20, depositTiming: "before-kit-order" } });
   assert.equal(severityOf(blockersFor(p, c({ settings: beforeKit }), "booking"), "deposit-unpaid"), undefined);
@@ -868,6 +870,17 @@ test("booking gate: F-gas, a Part P electrician, deposit, dates", () => {
   assert.equal(severityOf(blockersFor(p, c({ settings: deposit, agreedPayments: agreedNone }), "booking"), "deposit-unpaid"), undefined, "contracted at 0%: no deposit now asked");
   const agreed20 = { depositPct: 20, depositTiming: "on-acceptance" as const, balanceDueDays: 7 };
   assert.equal(severityOf(blockersFor(p, c({ agreedPayments: agreed20 }), "booking"), "deposit-unpaid"), "block", "contracted at 20%, settings since set to 0%");
+
+  // "Before we order your equipment": no supplier order until it's paid, and nobody drills without it either way.
+  const kitTerms = { depositPct: 20, depositTiming: "before-kit-order" as const, balanceDueDays: 7 };
+  assert.match(kitOrderDepositProblem(p, c({ agreedPayments: kitTerms })) ?? "", /before we order the equipment/);
+  assert.equal(kitOrderDepositProblem(p, c({ agreedPayments: kitTerms, ...paidMoney })), null, "paid: order away");
+  assert.equal(kitOrderDepositProblem(p, c({ agreedPayments: agreed20 })), null, "on acceptance: the booking gate holds it instead");
+  assert.equal(kitOrderDepositProblem(p, c({ agreedPayments: agreedNone })), null);
+  assert.equal(severityOf(blockersFor(p, c({ agreedPayments: kitTerms }), "ready-to-install"), "deposit-unpaid"), "block");
+  assert.equal(severityOf(blockersFor(p, c({ agreedPayments: agreed20 }), "ready-to-install"), "deposit-unpaid"), "block");
+  assert.equal(severityOf(blockersFor(p, c({ agreedPayments: kitTerms, ...paidMoney }), "ready-to-install"), "deposit-unpaid"), undefined);
+  assert.equal(severityOf(blockersFor(p, c({ agreedPayments: agreedNone }), "ready-to-install"), "deposit-unpaid"), undefined);
 
   // No early start on supply-and-install: the kit has to land 15+ days before day 1.
   const noEarly = walk("crew-assigned", { early: false });
@@ -1600,6 +1613,11 @@ test("customerNextAction: one clear label per state", () => {
   assert.equal(label(walk("install-dates-set", { early: false })), null);
   const deposit = step(walk("proposal-accepted"), { type: "deposit-requested", amountPence: 129_000 }, T.dates, { actor: ADMIN });
   assert.deepEqual(customerNextAction(deposit), { label: "Pay your deposit", href: "/p/proj-1/pay" });
+  // Any other invoice (a balance billed early by an admin, a fee) waits until they've picked dates.
+  const early = step(walk("proposal-accepted"), { type: "invoice-issued", amountPence: 646_850 }, T.dates, { actor: ADMIN });
+  assert.equal(label(early), "Choose your install dates");
+  const picked = step(early, { type: "install-dates-set", startDate: INSTALL_DATES[0]!, dates: INSTALL_DATES }, T.dates);
+  assert.equal(label(picked), "Pay your invoice");
   assert.equal(label(walk("booking-confirmed")), "Get your home ready");
   let ready = walk("booking-confirmed");
   for (const item of ready.booking.prep.filter((i) => i.confirmable)) {

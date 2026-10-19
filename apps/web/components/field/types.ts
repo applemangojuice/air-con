@@ -54,6 +54,8 @@ export interface JobCard {
   progressPct?: number;
   installStatus?: Project["install"]["status"];
   handoverStatus?: Project["handover"]["status"];
+  /** Commissioned today, crew still on site: what's left (the handover, ending the day). */
+  wrapUp?: { handover: boolean; endDay: boolean };
   href: string;
 }
 

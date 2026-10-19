@@ -27,7 +27,7 @@ import {
 import { useHub } from "./controller";
 import type { PanelProps } from "./panel-types";
 import { SlotPicker } from "./pickers";
-import { arrivalTime, onMyWayFresh, proposalReadyBy } from "./view";
+import { PROPOSAL_LATE_LINE, arrivalTime, onMyWayFresh, proposalLate, proposalReadyBy } from "./view";
 
 /* ------------------------------------------------------------------ */
 /* Shared copy                                                         */
@@ -98,11 +98,12 @@ function RoughPlan({ project }: { project: Project }) {
         ))}
       </div>
       {project.roughPlan.pattern && (
+        // The pattern's own name ("Rear patio multi-split") is our shorthand; the customer gets the plain description.
         <div className="rounded-2xl bg-surface/70 p-4 text-[15px] leading-relaxed">
-          <p className="font-semibold text-ink-900">{project.roughPlan.pattern.label}</p>
+          <p className="font-semibold text-ink-900">How we&apos;d likely fit it</p>
           <p className="mt-1 text-ink-700">{project.roughPlan.pattern.summary}</p>
           <p className="mt-2 text-ink-700">
-            <span className="font-semibold">Pipe route:</span> {project.roughPlan.pattern.pipeRoute}
+            <span className="font-semibold">The pipes:</span> {project.roughPlan.pattern.pipeRoute}
           </p>
         </div>
       )}
@@ -303,11 +304,13 @@ export function SurveyPanel({ data, state, goTo }: PanelProps) {
 
   if (s.status === "submitted") {
     const readyBy = proposalReadyBy(p);
+    const late = proposalLate(p, data.today);
     const reportHref = report ? hub.hrefs.document(report.id) : null;
     return (
       <StageShell info={info} state={state}>
-        <Callout tone="good" title={readyBy ? `Survey done. Your proposal will be ready by ${fmtDay(readyBy)}.` : "Survey done."}>
+        <Callout tone="good" title={readyBy && !late ? `Survey done. Your proposal will be ready by ${fmtDay(readyBy)}.` : "Survey done."}>
           Thanks for having us. Next, we design your system from what we measured, and a qualified engineer signs it off before you see a price.
+          {late ? ` ${PROPOSAL_LATE_LINE}` : ""}
         </Callout>
         {report && (
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-white p-4">
@@ -531,7 +534,12 @@ export function ProposalPanel({ data, state, goTo, slots }: PanelProps) {
             {
               label: "Your proposal",
               done: false,
-              detail: readyBy && p.proposal.status === "not-issued" ? `Due by ${fmtDay(readyBy)}` : undefined,
+              detail:
+                readyBy && p.proposal.status === "not-issued"
+                  ? proposalLate(p, data.today)
+                    ? PROPOSAL_LATE_LINE
+                    : `Due by ${fmtDay(readyBy)}`
+                  : undefined,
             },
           ]}
         />

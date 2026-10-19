@@ -272,6 +272,84 @@ test("start → autosave with an optimistic check → submit, end to end", async
   assert.ok(!restart.ok && restart.status === 409);
 });
 
+test("no signal at the door: a draft prepared online starts on the phone, and the start reaches the server later", async () => {
+  const projectId = await newProject({ phone: "07700 900103" });
+  // "On my way" (signal in the car) gets the draft ready, without starting anything.
+  const sent = await survey.sendOnMyWay(projectId, 10, surveyor);
+  assert.ok(sent.ok && sent.prepared, "the on-my-way answer carries the prepared draft");
+  if (!sent.ok || !sent.prepared) return;
+  const prepared = sent.prepared;
+  assert.equal(prepared.record.status, "draft");
+  assert.equal(prepared.record.startedAt, undefined, "not started");
+  assert.equal(prepared.record.data.rooms[0]!.name, "Main bedroom", "prefilled like a normal start");
+  assert.equal((await loadProject(projectId))!.survey.status, "booked", "the customer sees nothing yet");
+  assert.equal((await timeRepo.openForStaff(surveyor.id))?.projectId === projectId, false, "no clock yet");
+  const twice = await survey.prepareSurveyDraft((await loadProject(projectId))!, surveyor);
+  assert.equal(twice?.record.id, prepared.record.id, "preparing again reuses it");
+
+  // The phone started at the door with no signal, and its autosave lands first when signal returns.
+  const startedOnPhone = new Date(Date.now() - 10 * 60_000).toISOString();
+  const edited = { ...prepared.record.data, wishes: { ...prepared.record.data.wishes, notes: "Started with no signal (DEMO)" } };
+  const saved = await survey.saveDraft(projectId, edited, prepared.updatedAt, surveyor);
+  assert.ok(saved.ok, "a prepared draft takes saves");
+  if (!saved.ok) return;
+
+  // Then the start is replayed with the phone's time.
+  const started = await survey.startSurvey(projectId, surveyor, { startedAt: startedOnPhone });
+  assert.ok(started.ok, !started.ok ? started.error : "");
+  if (!started.ok) return;
+  assert.equal(started.created, false);
+  assert.equal(started.draft.record.id, prepared.record.id);
+  assert.equal(started.draft.record.startedAt, startedOnPhone, "dated when it really began");
+  assert.equal(started.draft.updatedAt, saved.updatedAt, "the save token doesn't move, so the phone carries on saving");
+  assert.equal(started.draft.record.data.wishes.notes, "Started with no signal (DEMO)");
+  const project = (await loadProject(projectId))!;
+  assert.equal(project.survey.status, "in-progress");
+  const clock = await timeRepo.openForStaff(surveyor.id);
+  assert.equal(clock?.projectId, projectId);
+  assert.equal(clock?.startedAt, startedOnPhone, "the survey clock runs from the phone's start");
+  const next = await survey.saveDraft(projectId, edited, saved.updatedAt, surveyor);
+  assert.ok(next.ok, "the phone's next save isn't a conflict");
+
+  // The phone's time is bounded: never in the future, never more than 12 hours back.
+  const now = "2026-10-19T10:00:00.000Z";
+  assert.equal(survey.startedAtFrom("2026-10-19T09:40:00.000Z", now), "2026-10-19T09:40:00.000Z");
+  assert.equal(survey.startedAtFrom("2026-10-19T11:00:00.000Z", now), now);
+  assert.equal(survey.startedAtFrom("2026-10-18T21:00:00.000Z", now), now);
+  assert.equal(survey.startedAtFrom("junk", now), now);
+  assert.equal(survey.startedAtFrom(undefined, now), now);
+});
+
+test("the phone's pending start is sent once there's signal, and kept until then", async () => {
+  const { canStartOnPhone, pendingStart, replayPendingStart, setPendingStart } = await import("../components/field/survey/pending-start.ts");
+  const mem = new Map<string, string>();
+  const store = { getItem: (k: string) => mem.get(k) ?? null, setItem: (k: string, v: string) => void mem.set(k, v), removeItem: (k: string) => void mem.delete(k) } as unknown as Storage;
+  const id = "de300000-0000-4000-8000-00000000c0de";
+  assert.equal(await replayPendingStart(id, fetch, store), "none");
+  setPendingStart(id, "2026-10-19T09:40:00.000Z", store);
+  assert.equal(pendingStart(id, store), "2026-10-19T09:40:00.000Z");
+  const offline = (async () => {
+    throw new TypeError("Failed to fetch");
+  }) as unknown as typeof fetch;
+  assert.equal(await replayPendingStart(id, offline, store), "kept");
+  const busy = (async () => new Response("{}", { status: 503 })) as unknown as typeof fetch;
+  assert.equal(await replayPendingStart(id, busy, store), "kept");
+  let body = "";
+  const ok = (async (_url: string, init?: RequestInit) => {
+    body = String(init?.body ?? "");
+    return new Response("{}", { status: 200 });
+  }) as unknown as typeof fetch;
+  assert.equal(await replayPendingStart(id, ok, store), "sent");
+  assert.deepEqual(JSON.parse(body), { startedAt: "2026-10-19T09:40:00.000Z" });
+  assert.equal(pendingStart(id, store), null);
+  setPendingStart(id, "2026-10-19T09:40:00.000Z", store);
+  const submitted = (async () => new Response("{}", { status: 409 })) as unknown as typeof fetch;
+  assert.equal(await replayPendingStart(id, submitted, store), "dropped", "already submitted elsewhere: nothing to replay");
+  assert.equal(canStartOnPhone({ record: { status: "draft" } }), true);
+  assert.equal(canStartOnPhone({ record: { status: "draft", startedAt: "2026-10-19T09:00:00.000Z" } }), false);
+  assert.equal(canStartOnPhone(null), false);
+});
+
 test("documents consent in person, and stop-work issues raised once", async () => {
   const projectId = await newProject();
   const consent = await survey.recordDocumentsConsent(projectId, surveyor);

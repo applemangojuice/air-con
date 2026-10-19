@@ -8,6 +8,7 @@ import type { Contact, QuoteDraft } from "@/lib/quote-draft";
 import { personNameProblem } from "@/lib/person-name";
 import { MARKETING_CONSENT, OPERATIONAL_CONSENT, coverageFor, type PublicSettings } from "@/components/site/claims";
 import { OutOfArea } from "./out-of-area";
+import { postcodeOutcome } from "./postcode-outcome";
 import { Group, NumberRow, OptionCards, StepShell, TextField, inputCls } from "./ui";
 
 export interface StepProps {
@@ -167,9 +168,7 @@ export function AddressStep({
   const check = usePostcodeCheck(postcode, (geo) => setSurvey({ geo }));
   const formatOk = isValidUkPostcode(postcode);
   const { covered, outcode } = coverageFor(settings.serviceArea, postcode);
-  const known = formatOk && check.state !== "not-found" && check.state !== "checking" && check.state !== "idle";
-  const inArea = known && covered;
-  const outOfArea = known && !covered;
+  const { inArea, outOfArea, unverified, unknown } = postcodeOutcome(formatOk, check.state, covered);
   const intelMatches = useIntelAddresses(postcode, inArea);
   const addresses = useAddressList(postcode, inArea);
   const [manual, setManual] = useState(false);
@@ -186,9 +185,11 @@ export function AddressStep({
       ? ""
       : check.state === "checking"
         ? "Checking your postcode…"
-        : check.state === "not-found"
+        : unknown
           ? "We couldn't find that postcode. Check it and try again."
-          : covered
+          : unverified
+            ? `We cover ${outcode}. We couldn't look your exact postcode up (new ones take a while to reach the lists), so if it's right, carry on.`
+            : covered
             ? `Good news, we cover ${outcode}${district ? ` in ${district}` : ""}.`
             : `Sorry, we're not in ${district ?? outcode} yet.`;
 
@@ -214,7 +215,7 @@ export function AddressStep({
           <input
             {...c}
             aria-describedby={[c["aria-describedby"], "postcode-status"].filter(Boolean).join(" ")}
-            aria-invalid={check.state === "not-found" ? true : undefined}
+            aria-invalid={unknown ? true : undefined}
             className={`${inputCls} uppercase`}
             value={postcode}
             autoComplete="postal-code"
@@ -230,11 +231,11 @@ export function AddressStep({
       {/* One live region for the whole check: screen readers hear the outcome. */}
       <div id="postcode-status" aria-live="polite" className="-mt-4">
         {status && check.state === "checking" && <p className="text-sm text-ink-500">{status}</p>}
-        {status && check.state === "not-found" && <p className="text-sm font-medium text-red-700">{status}</p>}
+        {status && unknown && <p className="text-sm font-medium text-red-700">{status}</p>}
         {inArea && (
-          <div className="rounded-2xl border border-sage-200 bg-sage-50 p-4">
-            <p className="text-sm font-semibold text-sage-900">{status}</p>
-            <p className="mt-1 text-sm text-sage-800">
+          <div className={`rounded-2xl border p-4 ${unverified ? "border-amber-200 bg-amber-50" : "border-sage-200 bg-sage-50"}`}>
+            <p className={`text-sm font-semibold ${unverified ? "text-amber-900" : "text-sage-900"}`}>{status}</p>
+            <p className={`mt-1 text-sm ${unverified ? "text-amber-900" : "text-sage-800"}`}>
               A few taps about your home and your price appears. No salesperson, and nobody rings you to
               &ldquo;just follow up&rdquo;.
             </p>

@@ -1,6 +1,8 @@
 import {
+  PO_FLOW,
   advancePo,
   goodsDeliverBy,
+  kitOrderDepositProblem,
   kitCustomerSummary,
   kitSummary,
   poSchedule,
@@ -21,7 +23,7 @@ import {
   type StaffMember,
 } from "@aircon/domain";
 import { audit } from "./audit";
-import { dispatch, londonToday, loadProject } from "./project-service";
+import { dispatch, londonToday, loadProject, loadReadinessContext } from "./project-service";
 import { db, type Row } from "./repo/base";
 import * as catalogueRepo from "./repo/catalogue";
 import * as designsRepo from "./repo/designs";
@@ -138,6 +140,8 @@ export interface KitView {
   today: string;
   /** Open damage and missing-kit issues on this job. */
   kitIssues: Issue[];
+  /** The contract takes the deposit before anything is ordered, and it isn't paid: why ordering waits. */
+  depositHold: string | null;
 }
 
 /**
@@ -155,14 +159,16 @@ function scheduleFor(po: PurchaseOrder, project: Project, settings: PilotSetting
 export async function loadKit(projectId: string): Promise<KitView | null> {
   const project = await loadProject(projectId);
   if (!project) return null;
-  const [pos, settings, src, issues] = await Promise.all([
+  const [pos, settings, src, issues, ctx] = await Promise.all([
     purchaseOrdersRepo.listForProject(projectId),
     getSettings(),
     kitSource(projectId),
     issuesRepo.listForProject(projectId, { openOnly: true }),
+    loadReadinessContext(projectId),
   ]);
   const today = londonToday();
   return {
+    depositHold: ctx ? kitOrderDepositProblem(project, ctx) : null,
     project,
     orders: pos.map((po) => ({ ...po, schedule: scheduleFor(po, project, settings, today) })),
     summary: kitSummary(pos),
@@ -225,15 +231,39 @@ async function changePo(
   return { ok: true, value: res.value, ...(sync.warning ? { warning: sync.warning } : {}) };
 }
 
-export function advanceOrder(
+/** Statuses that mean the supplier has the order (money committed). */
+const ORDERED_FROM = PO_FLOW.indexOf("ordered");
+const isOrderedStatus = (s: PoStatus) => s !== "cancelled" && PO_FLOW.indexOf(s) >= ORDERED_FROM;
+
+/**
+ * Move an order on. Placing it with the supplier waits for the deposit when
+ * the contract takes it "before we order your equipment"
+ * (kitOrderDepositProblem); an admin can still place it, with a reason
+ * (`depositOverride`), which goes on the order's history and the audit log.
+ */
+export async function advanceOrder(
   projectId: string,
   poId: string,
   to: PoStatus,
   staff: StaffMember,
   patch?: Partial<PurchaseOrder>,
   note?: string,
+  opts: { depositOverride?: string } = {},
 ): Promise<Outcome<PurchaseOrder>> {
-  return changePo(projectId, poId, staff, `advance.${to}`, (po) => advancePo(po, to, staff.name, new Date().toISOString(), patch, note));
+  let historyNote = note;
+  if (isOrderedStatus(to)) {
+    const [current, project, ctx] = await Promise.all([purchaseOrdersRepo.get(poId), loadProject(projectId), loadReadinessContext(projectId)]);
+    const placing = current && current.projectId === projectId && !isOrderedStatus(current.status);
+    const problem = placing && project && ctx ? kitOrderDepositProblem(project, ctx) : null;
+    if (problem) {
+      const why = opts.depositOverride?.trim();
+      if (!why) return fail(`${problem} Take the deposit first (Money), or an admin can order anyway with a reason.`);
+      if (!staff.roles.includes("admin")) return fail("Only an admin can order before the deposit is paid.", 403);
+      historyNote = [`Ordered before the deposit was paid: ${why}`, note?.trim()].filter(Boolean).join(" · ");
+      await audit({ actor: staff, action: "purchasing.deposit-override", entity: "purchase_order", entityId: poId, detail: { projectId, reason: why } });
+    }
+  }
+  return changePo(projectId, poId, staff, `advance.${to}`, (po) => advancePo(po, to, staff.name, new Date().toISOString(), patch, historyNote));
 }
 
 export function updateOrder(projectId: string, poId: string, patch: Partial<PurchaseOrder>, staff: StaffMember): Promise<Outcome<PurchaseOrder>> {

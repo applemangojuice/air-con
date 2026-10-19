@@ -152,7 +152,8 @@ export function demoHubData(s: DemoState): HubData {
   const completedOn = p.install.completedAt?.slice(0, 10) ?? today;
   return {
     // The demo records every message and sends none: a text when there's a mobile, as the outbox would.
-    ...hubFacts(p, settings, today, p.customer.phone?.trim() ? "sms" : p.customer.email ? "email" : null),
+    // …and pays with the labelled card simulator.
+    ...hubFacts(p, settings, today, p.customer.phone?.trim() ? "sms" : p.customer.email ? "email" : null, { available: false, simulate: true }),
     project: customerSafeProject(p),
     today,
     nowIso,

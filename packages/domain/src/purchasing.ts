@@ -78,6 +78,8 @@ export interface PoLine {
   replacedQty?: number;
   /** On a replacement order: the original line it replaces. */
   replacesLineId?: string;
+  /** `unitCostPence` is the supplier's VAT-inclusive price (the catalogue's costSource.vatIncluded). Actual costs are always ex VAT. */
+  vatIncluded?: boolean;
 }
 
 export interface PurchaseOrder {
@@ -220,6 +222,7 @@ export function posFromDesign(
       label: item?.label ?? b.label,
       qty,
       unitCostPence: item ? item.costPence : null,
+      ...(item && item.costPence !== null && item.costSource?.vatIncluded ? { vatIncluded: true } : {}),
       receivedQty: 0,
       inspectedQty: 0,
       damagedQty: 0,

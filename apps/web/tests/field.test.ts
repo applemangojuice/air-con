@@ -409,3 +409,45 @@ test("end of day: an issue's photo is never offered for the customer's update, n
   );
   assert.equal((await mediaRepo.get(issuePhoto))!.customerVisible, false, "and it stays private");
 });
+
+test("Today keeps the job after commissioning while the crew still has the handover and the day to end", () => {
+  const base = createProject({
+    id: PROJECT,
+    quoteId: "6e6e6e6e-5555-4555-8555-00000000f605",
+    createdAt: "2026-11-01T09:00:00.000Z",
+    customerName: "DEMO Customer",
+    survey: DEMO_SURVEY,
+    quote: generateQuote(DEMO_SURVEY),
+  });
+  const TODAY = "2026-11-12";
+  const commissioned = (mut: (p: Project) => void = () => {}): Project => {
+    const p: Project = {
+      ...base,
+      booking: { ...base.booking, status: "booked", dates: ["2026-11-10", "2026-11-11", TODAY], startDate: "2026-11-10" },
+      install: {
+        status: "complete",
+        completedAt: `${TODAY}T15:00:00.000Z`,
+        days: [
+          { n: 1, date: "2026-11-10", status: "done", startedAt: "2026-11-10T08:00:00.000Z", endedAt: "2026-11-10T17:00:00.000Z", summary: "Day 1" },
+          { n: 2, date: "2026-11-11", status: "done", startedAt: "2026-11-11T08:00:00.000Z", endedAt: "2026-11-11T17:00:00.000Z", summary: "Day 2" },
+          // Closed by commissioning, no summary yet: the wrap-up day.
+          { n: 3, date: TODAY, status: "done", startedAt: `${TODAY}T08:00:00.000Z`, endedAt: `${TODAY}T15:00:00.000Z` },
+        ],
+      },
+      handover: { ...base.handover, status: "commissioned", commissionedAt: `${TODAY}T15:00:00.000Z` },
+    };
+    mut(p);
+    return p;
+  };
+  assert.deepEqual(field.wrapUpToday(commissioned(), TODAY), { handover: true, endDay: true });
+  assert.equal(field.installDateFor(commissioned(), TODAY), TODAY, "still on Today");
+  const handedOver = commissioned((p) => (p.handover = { ...p.handover, status: "handed-over", handedOverAt: `${TODAY}T16:00:00.000Z` }));
+  assert.deepEqual(field.wrapUpToday(handedOver, TODAY), { handover: false, endDay: true });
+  const allDone = commissioned((p) => {
+    p.handover = { ...p.handover, status: "handed-over", handedOverAt: `${TODAY}T16:00:00.000Z` };
+    p.install.days[2]!.summary = "All done";
+  });
+  assert.equal(field.wrapUpToday(allDone, TODAY), null);
+  assert.equal(field.installDateFor(allDone, TODAY), null, "everything's finished: off Today, into Recent");
+  assert.equal(field.installDateFor(commissioned(), "2026-11-13"), null, "the next day it's in Recent");
+});

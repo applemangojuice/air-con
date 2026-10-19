@@ -8,7 +8,8 @@ import { startSurvey } from "@/lib/survey-server";
  *
  * Starts the visit (survey-started on the project, which the customer
  * sees), creates the draft from the customer's own survey and starts the
- * survey clock. Idempotent: pressing it again resumes the draft.
+ * survey clock. Idempotent: pressing it again resumes the draft. Body
+ * (optional): { startedAt } when the phone started it with no signal.
  */
 
 export const runtime = "nodejs";
@@ -25,8 +26,11 @@ export async function POST(request: Request, { params }: Params): Promise<Respon
   if (!z.string().uuid().safeParse(projectId).success) return json({ error: "Not found" }, 404);
   const access = await requireProjectAccess(projectId, { perm: "survey.conduct" });
   if (!access || access.kind !== "staff") return json({ error: "Not found" }, 404);
+  // A start made on the phone with no signal, replayed: when it really began (startedAtFrom bounds it).
+  const body = (await request.json().catch(() => null)) as unknown;
+  const claimed = z.object({ startedAt: z.string().datetime().optional() }).safeParse(body ?? {});
   try {
-    const result = await startSurvey(projectId, staff);
+    const result = await startSurvey(projectId, staff, claimed.success && claimed.data.startedAt ? { startedAt: claimed.data.startedAt } : {});
     if (!result.ok) return json({ error: result.error, ...(result.blockers ? { blockers: result.blockers } : {}) }, result.status);
     const { record, updatedAt } = result.draft;
     return json({ record, updatedAt, completeness: surveyCompleteness(record.data), created: result.created }, result.created ? 201 : 200);

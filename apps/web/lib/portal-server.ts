@@ -35,6 +35,7 @@ import { createDocument, isCustomerVisible, listDocuments } from "./documents-se
 import { emailConfigured } from "./email";
 import { money } from "./format";
 import { signedMediaUrls } from "./media-server";
+import { cardAvailability } from "./money-server";
 import { dispatch, loadProject, londonToday } from "./project-service";
 import { isUuid, type Row } from "./repo/base";
 import * as customersRepo from "./repo/customers";
@@ -291,7 +292,7 @@ export async function loadHub(projectId: string, access: ProjectAccess): Promise
 
   return {
     // How "on the way" will reach them: the same rule the outbox sends by (lib/comms/on-the-way.ts).
-    ...hubFacts(project, settings, today, onTheWayChannel(raw.customer, { sms: smsConfigured(), email: emailConfigured() })),
+    ...hubFacts(project, settings, today, onTheWayChannel(raw.customer, { sms: smsConfigured(), email: emailConfigured() }), cardAvailability()),
     project,
     today,
     nowIso,

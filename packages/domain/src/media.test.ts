@@ -174,7 +174,11 @@ test("upload rules: iPhone .mov video is taken within the size limit; other form
   assert.equal(uploadContentType("", "clip.mov"), "video/quicktime");
   assert.equal(uploadContentType("image/JPG", "x"), "image/jpeg");
   assert.equal(mediaUploadProblem({ type: "video/mp4", name: "a.mp4", size: 1024 }), null);
-  assert.match(mediaUploadProblem({ type: "video/quicktime", name: "long.mov", size: MEDIA_MAX_BYTES + 1 }) ?? "", /too long/);
+  // The honest length (a phone's 1080p is 60-130 MB a minute), and the way round it.
+  const big = mediaUploadProblem({ type: "video/quicktime", name: "long.mov", size: MEDIA_MAX_BYTES + 1 }) ?? "";
+  assert.match(big, /too big to upload \(25 MB at most: about 20 seconds/);
+  assert.match(big, /take a photo instead/);
+  assert.doesNotMatch(big, /about a minute/);
   assert.match(mediaUploadProblem({ type: "video/webm", name: "a.webm", size: 10 }) ?? "", /MP4 or iPhone \.mov/);
   assert.match(mediaUploadProblem({ type: "image/gif", name: "a.gif", size: 10 }) ?? "", /can't be uploaded/);
   assert.equal(mediaUploadProblem({ type: "image/heic", name: "a.heic", size: 3_000_000 }), null);

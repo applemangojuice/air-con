@@ -14,7 +14,7 @@ import { AftercarePanel, HandoverPanel, InstallPanel } from "./panels-late";
 import { blockLabel } from "./schedule";
 import { ContactCard, DocumentsCard, PaymentsCard, UpdatesFeed } from "./side";
 import type { HubData } from "./types";
-import { defaultStage, stageForHash, waitingCopy } from "./view";
+import { defaultStage, stageForHash, toPayLine, waitingCopy } from "./view";
 
 /**
  * The customer hub (contract §G F1): one page for the whole journey.
@@ -69,7 +69,7 @@ function nextDetail(label: string, data: HubData): string | null {
     case "Pay your deposit":
     case "Pay your invoice":
     case "Pay your balance":
-      return data.money.outstandingPence > 0 ? `${money(data.money.outstandingPence)} to pay, by card or bank transfer.` : null;
+      return data.money.outstandingPence > 0 ? toPayLine(money(data.money.outstandingPence), data.payBy, data.company) : null;
     case "Agree to get your documents by email":
       return "We can only email your proposal and contract with your OK. One tick and we can send it.";
     case "Choose your install dates":
@@ -98,7 +98,7 @@ function NextStep({ data, go }: { data: HubData; go: (stage: ProjectStageId, anc
   const staff = hub.mode === "staff";
 
   if (!next) {
-    const w = waitingCopy(p, data.onTheWay);
+    const w = waitingCopy(p, data.onTheWay, data.today);
     return (
       <section aria-labelledby="next-title" className="rounded-3xl border border-line bg-white p-5 sm:p-7">
         <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">{staff ? "Customer's next step" : "Your next step"}</p>

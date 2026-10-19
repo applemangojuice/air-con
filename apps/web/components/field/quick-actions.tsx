@@ -18,7 +18,7 @@ import { BlockerList } from "@/components/kit/blocker-list";
 import { getFieldOutbox, newOpId, type SyncOp } from "@/lib/field-outbox";
 import { prepareImage } from "@/lib/media-client";
 import { locate, nowIso, parseReading } from "./capture";
-import { editDraft, followDefaults, isDirty, openDraft, reopenDraft, type EndDayDraft } from "./end-day-draft";
+import { editDraft, firstStep, followDefaults, isDirty, openDraft, reopenDraft, type EndDayDraft } from "./end-day-draft";
 import { londonDateOf, londonTime, telHref, fmtDay } from "./format";
 import { Sheet } from "./sheet";
 import { useOnline } from "./use-online";
@@ -816,7 +816,8 @@ function EndDaySheet({ open, onClose, data, merged, n: liveN, clockEntryId }: { 
       n,
       summary,
       customerText: message,
-      mediaIds: chosen,
+      // Photos only travel with a customer update.
+      mediaIds: message.trim() ? chosen : [],
       learnings: [],
       ...(clockEntryId ? { clockEntryId } : {}),
     });
@@ -830,7 +831,7 @@ function EndDaySheet({ open, onClose, data, merged, n: liveN, clockEntryId }: { 
     if (clockEntryId) await getFieldOutbox().enqueue({ type: "time-stop", id: newOpId(), projectId: id, entryId: clockEntryId, at: nowIso() }, "End of day: clock stopped");
     const s = r.data.email.status;
     setEmailStatus(
-      s === "sent" ? "Update emailed to the customer." : s === "demo" ? "Update recorded in demo mode: no email was actually sent." : s === "queued" ? "Update queued to send." : message.trim() ? "The update is on their portal; the email didn't go (check Messages in ops)." : "Day closed.",
+      s === "sent" ? "Update emailed to the customer." : s === "demo" ? "Update recorded in demo mode: no email was actually sent." : s === "queued" ? "Update queued to send." : message.trim() ? "The update is on their portal; the email didn't go (check Messages in ops)." : "No update went to the customer.",
     );
     setStage("sent");
     router.refresh();
@@ -846,11 +847,19 @@ function EndDaySheet({ open, onClose, data, merged, n: liveN, clockEntryId }: { 
     setStage("finished");
   }
 
+  const first = firstStep(draft);
   const footer =
     stage === "summary" ? (
-      <button type="button" onClick={() => setStage("photos")} disabled={!summary.trim()} className={`${PRIMARY} w-full`}>
-        Next: customer update
-      </button>
+      first === "end-quietly" ? (
+        // No customer update: the day closes without an email (and so without photos).
+        <button type="button" onClick={send} disabled={busy || !online} className={`${PRIMARY} w-full`}>
+          {!online ? "Offline: needs signal" : busy ? "Closing the day…" : `End day ${n} (no customer update)`}
+        </button>
+      ) : (
+        <button type="button" onClick={() => setStage("photos")} disabled={first === "needs-summary"} className={`${PRIMARY} w-full`}>
+          Next: customer update
+        </button>
+      )
     ) : stage === "photos" ? (
       <div className="flex gap-2">
         <button

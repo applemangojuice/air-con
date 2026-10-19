@@ -234,18 +234,24 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
                 </div>
               </div>
             ) : view.deposit.plan.available ? (
-              <ActionForm flash
-                action={requestDepositAction.bind(null, p.id)}
-                submitLabel={`Send the deposit invoice (${money(view.deposit.plan.totalPence)})`}
-                busyLabel="Issuing…"
-                confirm={`Issue a deposit invoice for ${money(view.deposit.plan.totalPence)} and email it to the customer?`}
-              >
-                <input type="hidden" name="expectedTotal" value={(view.deposit.plan.totalPence / 100).toFixed(2)} />
-                <p className="text-sm text-ink-700">
-                  {payments.depositPct}% of {money(p.money.contractTotalPence ?? 0)}: {money(view.deposit.plan.totalPence)}. The customer pays from their
-                  payment page; nothing is marked paid until the money has actually arrived.
-                </p>
-              </ActionForm>
+              <>
+                {view.deposit.credited && (
+                  <p className="mb-3 text-sm text-ink-700">Invoice {view.deposit.credited.number} was cancelled with a credit note, so send the right one now.</p>
+                )}
+                <ActionForm
+                  flash
+                  action={requestDepositAction.bind(null, p.id)}
+                  submitLabel={`Send the deposit invoice (${money(view.deposit.plan.totalPence)})`}
+                  busyLabel="Issuing…"
+                  confirm={`Issue a deposit invoice for ${money(view.deposit.plan.totalPence)} and email it to the customer?`}
+                >
+                  <input type="hidden" name="expectedTotal" value={(view.deposit.plan.totalPence / 100).toFixed(2)} />
+                  <p className="text-sm text-ink-700">
+                    {payments.depositPct}% of {money(p.money.contractTotalPence ?? 0)}: {money(view.deposit.plan.totalPence)}. The customer pays from their
+                    payment page; nothing is marked paid until the money has actually arrived.
+                  </p>
+                </ActionForm>
+              </>
             ) : (
               <p className="text-sm text-ink-500">{view.deposit.plan.reason}</p>
             )}

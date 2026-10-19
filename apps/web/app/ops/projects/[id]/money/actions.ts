@@ -42,6 +42,8 @@ export async function issueAction(projectId: string, _prev: ActionState, form: F
         ...(typeof issueId === "string" && isUuid(issueId) ? { issueId } : {}),
         requestId: requestId.data,
         ...(text(form, "notes", 500) ? { notes: text(form, "notes", 500) } : {}),
+        // Balance before the installation is finished: an admin, with a reason (the server checks both).
+        ...(kind.data === "balance" && text(form, "earlyReason", 300) ? { earlyReason: text(form, "earlyReason", 300) } : {}),
       },
       staff,
     ),

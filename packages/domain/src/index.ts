@@ -1,7 +1,7 @@
 export * from "./types.ts";
 export { canonicalJson, jsonbKeyOrder, sameJson } from "./json.ts";
 export { estimateRoomLoadWatts, selectCapacityKw } from "./heatload.ts";
-export { generateQuote, ENGINE_VERSION } from "./pricing.ts";
+export { generateQuote, customerChecks, ENGINE_VERSION } from "./pricing.ts";
 export { scoreConfidence } from "./confidence.ts";
 export * from "./intelligence.ts";
 export * from "./operations.ts";
@@ -22,6 +22,7 @@ export {
   buildPresetRoom,
   getArchetype,
   getPermutation,
+  permutationForLocation,
   suggestArchetypes,
   type HouseArchetype,
   type InstallPermutation,

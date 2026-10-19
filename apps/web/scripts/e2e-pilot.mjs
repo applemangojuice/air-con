@@ -621,8 +621,10 @@ try {
 
     // Living room: photo, drawing (indoor unit + pipe route), measurements.
     await m.getByLabel("Choose photo").setInputFiles(PHOTO);
-    await m.getByText("Mark up", { exact: true }).waitFor({ timeout: 30_000 });
-    await m.getByText("Mark up", { exact: true }).click();
+    // The uploaded tile (a photo still uploading can be drawn on too, but this walk draws on the stored one).
+    const uploadedTile = m.getByRole("button", { name: /^(?!Photo waiting).+: mark it up$/ });
+    await uploadedTile.waitFor({ timeout: 30_000 });
+    await uploadedTile.click();
     const dlg = surveyor.locator('[role="dialog"]').last();
     const img = dlg.locator("img").first();
     await img.waitFor();
@@ -661,7 +663,7 @@ try {
     await surveyor.getByRole("button", { name: /^Next room: Main bedroom/ }).click();
     await surveyor.waitForTimeout(400);
     await m.getByLabel("Choose photo").setInputFiles(PHOTO);
-    await m.getByText("Mark up", { exact: true }).waitFor({ timeout: 30_000 });
+    await m.getByRole("button", { name: /^(?!Photo waiting).+: mark it up$/ }).waitFor({ timeout: 30_000 });
     await m.getByLabel(/^Length/).fill("3.8");
     await m.getByLabel(/^Width/).fill("3.4");
     await m.getByLabel(/^Ceiling height/).fill("2.4");
@@ -677,7 +679,7 @@ try {
     await surveyor.waitForTimeout(400);
     await choose(m.getByLabel(/^Use this position/));
     await m.getByLabel("Choose photo").setInputFiles(PHOTO);
-    await m.getByText("Mark up", { exact: true }).waitFor({ timeout: 30_000 });
+    await m.getByRole("button", { name: /^(?!Photo waiting).+: mark it up$/ }).waitFor({ timeout: 30_000 });
     await m.getByLabel("Distance to the nearest neighbour's window").fill("6");
     await m.getByRole("button", { name: "Gravel soakaway under the unit" }).click();
     check("outdoor position complete", await waitFor(surveyor, /Nothing left to do here/));
@@ -921,6 +923,14 @@ try {
     await pay.getByLabel("Reference on the statement").fill("DEMO bank ref");
     await pay.getByRole("button", { name: "Record the payment" }).click();
     check("deposit bank transfer recorded", await waitFor(admin, /£[\d,]+ received · DIH-\d+[\s\S]*Bank transfer/));
+    // The contract bills the balance once the installation is finished: not offered before (an admin can, with a reason).
+    const why = admin.locator("details").filter({ hasText: "Why the others aren't available" });
+    check(
+      "the balance waits for the installation, as the contract says",
+      !(await admin.locator("main form").filter({ has: admin.locator('input[name="kind"][value="balance"]') }).getByRole("button", { name: "Issue and email" }).count()) &&
+        /Balance:\s*The contract bills the balance once the installation is finished/.test((await why.textContent()) ?? ""),
+    );
+    check("…an admin can still bill it early, with a reason", await has(admin, /Bill the balance before the installation is finished \(admin\)/));
     await go(admin, `/ops/projects/${ids.pid}/booking`);
     await admin.getByRole("button", { name: "Confirm booking and tell the customer" }).click();
     check("booking confirmed", await waitFor(admin, /BOOKING\s*Confirmed/));
@@ -1141,7 +1151,9 @@ try {
     const packHref = await installer.getByRole("link", { name: "Open their handover pack" }).getAttribute("href");
 
     // Commissioning closed day 3 with the install, but the crew is still here: they end the day
-    // (the customer's last update, learnings, and their clock).
+    // (the customer's last update, learnings, and their clock). Today still has the job.
+    await go(installer, `/field`);
+    check("after the handover, Today still shows the job until the day is ended", await waitFor(installer, /Handed over · end the day/), (await text(installer, "main")).slice(0, 400));
     await go(installer, `/field/jobs/${ids.pid}/day/3`);
     let sheet = await openActions(installer);
     check("after commissioning, Actions offers to end day 3 (and stop the clock)", /The install is complete\. End day 3 when you leave: it sends the customer's update and stops your clock/.test(await sheet.innerText()), await sheet.innerText());
@@ -1279,7 +1291,8 @@ try {
 
     await go(admin, `/ops/pilots`);
     check("pilot is in the comparison", await has(admin, new RegExp(`Pilot ${ids.pilotNumber}\\s*DEMO Streatham semi`)));
-    check("contract and revenue shown", (await has(admin, /Contract price\s*£[\d,]+/)) && (await has(admin, /Revenue \(net\)\s*£[\d,]+/)));
+    check("contract and revenue shown", (await has(admin, /Contract price\s*£[\d,]+/)) && (await has(admin, /Revenue \(net, after credits\)\s*£[\d,]+/)));
+    check("the VAT we can't reclaim is a cost of its own (not VAT registered)", await has(admin, /VAT we can't reclaim\s*£[\d,]+/));
     check("van-stock consumables aren't 'unplanned'", await has(admin, /Unplanned material lines\s*0/));
     check("the day 1 learning is listed", await has(admin, /core drilling through the bay took 40 minutes longer/));
     await shot(admin, "K-pilots", true);

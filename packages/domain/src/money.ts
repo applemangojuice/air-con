@@ -483,6 +483,19 @@ export function invoiceDueOn(issuedOnIso: string, kind: InvoiceKind, settings: P
   return addDays(issuedOnIso, Math.max(0, Math.round(settings.payments.balanceDueDays)));
 }
 
+/**
+ * The payment terms every proposal and contract print bill the balance "once
+ * the installation is finished", so the balance invoice waits for that. Null
+ * when it may be raised; otherwise why not, in the office's words. An admin
+ * can still bill it early, with a reason (money-server's `earlyReason`).
+ */
+export function balanceTimingProblem(install: { status: "not-started" | "in-progress" | "complete" }): string | null {
+  if (install.status === "complete") return null;
+  return install.status === "in-progress"
+    ? "The contract bills the balance once the installation is finished, and it's still under way."
+    : "The contract bills the balance once the installation is finished, and it hasn't started yet.";
+}
+
 /** Overdue on `todayIso`: something still owed past its due date. */
 export function isInvoiceOverdue(invoice: Invoice, all: Invoice[], todayIso: string): boolean {
   return Boolean(invoice.dueOn && invoice.dueOn.slice(0, 10) < todayIso.slice(0, 10) && invoiceOutstanding(invoice, all) > 0);

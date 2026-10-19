@@ -446,7 +446,9 @@ async function installCard(p: Project, today: string, date: string): Promise<Job
   const [survey, job] = await Promise.all([surveysRepo.currentForProject(p.id), installJobsRepo.loadForProject(p.id, p).catch(() => null)]);
   const { currentDay, totalDays } = dayState(p);
   const idx = p.booking.dates.indexOf(date);
-  const day = p.install.days.find((d) => d.date === date) ?? (currentDay && date === today ? p.install.days.find((d) => d.n === currentDay) : undefined);
+  // The latest day on that date (two days started on one date: the second is today's).
+  const day = p.install.days.filter((d) => d.date === date).at(-1) ?? (currentDay && date === today ? p.install.days.find((d) => d.n === currentDay) : undefined);
+  const wrapUp = date === today ? wrapUpToday(p, today) : null;
   const dayN = day?.n ?? (idx >= 0 ? idx + 1 : undefined);
   const kit = kitBadge(p);
   let progressPct: number | undefined;
@@ -481,6 +483,7 @@ async function installCard(p: Project, today: string, date: string): Promise<Job
     ...(progressPct !== undefined ? { progressPct } : {}),
     installStatus: p.install.status,
     handoverStatus: p.handover.status,
+    ...(wrapUp ? { wrapUp } : {}),
     href: dayN ? `/field/jobs/${p.id}/day/${dayN}` : `/field/jobs/${p.id}`,
   };
 }
@@ -508,11 +511,26 @@ function surveyCard(p: Project): JobCard {
   };
 }
 
-/** The install day this project has on `date`, or the day under way when it's today. */
-function installDateFor(p: Project, today: string): string | null {
+/**
+ * Commissioning completes the install and closes the day it's signed on, but
+ * the crew is still on site (§K28): the handover, and that day to end (the
+ * customer's update, learnings, their clock). What's left of it today, or
+ * null when nothing is (or the last day worked wasn't today).
+ */
+export function wrapUpToday(p: Project, today: string): { handover: boolean; endDay: boolean } | null {
+  if (p.install.status !== "complete") return null;
+  const lastWorked = p.install.days.filter((d) => d.startedAt).at(-1);
+  if (!lastWorked || lastWorked.date !== today) return null;
+  const left = { handover: p.handover.status !== "handed-over", endDay: Boolean(wrapUpDayOf(p)) };
+  return left.handover || left.endDay ? left : null;
+}
+
+/** The install day this project has today (a booked date, the day under way, or today's wrap-up after commissioning), else null. */
+export function installDateFor(p: Project, today: string): string | null {
   if (p.booking.status !== "booked") return null;
   if (p.install.days.some((d) => d.status === "in-progress")) return today;
-  return p.booking.dates.includes(today) && p.install.status !== "complete" ? today : null;
+  if (p.install.status !== "complete") return p.booking.dates.includes(today) ? today : null;
+  return wrapUpToday(p, today) ? today : null;
 }
 
 /**

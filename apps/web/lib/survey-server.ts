@@ -35,7 +35,7 @@ import { fmtDate } from "./format";
 import { renderMessage, templateContext } from "./comms/templates";
 import { appMode } from "./env-mode";
 import { listProjectMedia, type MediaWithUrl } from "./media-server";
-import { dispatch, loadProject } from "./project-service";
+import { dispatch, loadProject, londonToday } from "./project-service";
 import { db, isUuid, must, nowIso, type Row } from "./repo/base";
 import * as issuesRepo from "./repo/issues";
 import * as mediaRepo from "./repo/media";
@@ -388,14 +388,88 @@ async function stopSurveyClock(projectId: string, staff: StaffMember, at: string
 
 export type StartResult = { ok: true; draft: DraftState; created: boolean } | Fail;
 
+/** How far back a start recorded on the phone (no signal at the door) may be dated. */
+export const OFFLINE_START_MAX_HOURS = 12;
+
+/**
+ * When the visit really started: the phone's time when it started with no
+ * signal (replayed later), never in the future and never more than
+ * OFFLINE_START_MAX_HOURS back; otherwise now.
+ */
+export function startedAtFrom(claimed: string | undefined, now: string): string {
+  const at = claimed ? Date.parse(claimed) : NaN;
+  const t = Date.parse(now);
+  if (!Number.isFinite(at) || at > t || at < t - OFFLINE_START_MAX_HOURS * 3_600_000) return now;
+  return new Date(at).toISOString();
+}
+
+/** A fresh draft's data: the customer's own answers, the property record's designations, the office's notes. */
+async function freshDraftData(project: Project) {
+  const self = await loadSelfSurvey(project.quoteId).catch(() => null);
+  const constraints = await loadPropertyConstraints(project.customer.addressLine, project.customer.postcode);
+  let data = emptyMeasuredSurvey(self ?? undefined);
+  data = prefillFromPropertyIntel(data, constraints);
+  // The office may already hold access and parking notes: start from them.
+  if (project.customer.accessNotes) data.site.accessNotes = project.customer.accessNotes;
+  if (project.customer.parkingNotes) data.site.parkingNotes = project.customer.parkingNotes;
+  if (project.customer.phone) data.site.siteContactPhone = project.customer.phone;
+  return data;
+}
+
+/**
+ * Get the draft ready before the visit, while there's signal (opening the
+ * visit the day before or on the day, or sending "on my way"): a draft
+ * with no `startedAt`, so "Start survey" can begin on the phone at a door
+ * with no reception and tell the server when signal returns. Nothing is
+ * started: the customer sees nothing, no clock runs. Idempotent.
+ */
+export async function prepareSurveyDraft(project: Project, staff: StaffMember): Promise<DraftState | null> {
+  if (project.survey.status !== "booked") return null;
+  const existing = await loadDraft(project.id);
+  if (existing && existing.record.status === "draft") return existing;
+  const record: SurveyRecord = {
+    id: crypto.randomUUID(),
+    projectId: project.id,
+    version: (existing?.record.version ?? 0) + 1,
+    status: "draft",
+    data: await freshDraftData(project),
+    surveyor: project.survey.surveyor ?? { staffId: staff.id, name: staff.name },
+  };
+  const result = await surveysRepo.insertOrReuse(record);
+  if (result.created) await audit({ actor: staff, action: "survey.prepare", entity: "survey", entityId: record.id, detail: { projectId: project.id } });
+  return loadDraft(project.id);
+}
+
+/**
+ * Date a prepared draft's start (and who's doing it) without moving its
+ * save token: the phone may already be saving against it.
+ */
+async function markDraftStarted(draft: DraftState, staff: StaffMember, startedAt: string): Promise<DraftState> {
+  let current = draft;
+  for (let i = 0; i < 3 && !current.record.startedAt; i++) {
+    const { data: rows, error } = await db()
+      .from("surveys")
+      .update({ started_at: startedAt, surveyor: { staffId: staff.id, name: staff.name }, updated_at: current.updatedAt })
+      .eq("id", current.record.id)
+      .eq("updated_at", current.updatedAt)
+      .select("*");
+    if (!error && (rows ?? []).length) return { record: surveysRepo.fromRow((rows as Row[])[0]!), updatedAt: current.updatedAt };
+    const again = await loadDraft(draft.record.projectId);
+    if (!again || again.record.id !== draft.record.id) break;
+    current = again;
+  }
+  return current;
+}
+
 /**
  * "Start survey": tells the project (survey-started, which the customer
  * sees), creates the draft from the customer's own answers (and the
- * property record's designations), and starts the survey clock. Safe to
- * press twice or retry after a dropped connection: an in-progress survey
- * resumes its draft.
+ * property record's designations), or starts the one prepared earlier, and
+ * starts the survey clock. Safe to press twice or retry after a dropped
+ * connection: an in-progress survey resumes its draft. `startedAt` is the
+ * phone's time when it started with no signal and is replaying the start.
  */
-export async function startSurvey(projectId: string, staff: StaffMember): Promise<StartResult> {
+export async function startSurvey(projectId: string, staff: StaffMember, opts: { startedAt?: string } = {}): Promise<StartResult> {
   const project = await loadProject(projectId);
   if (!project) return fail(404, "Not found");
   if (project.survey.status === "not-booked") return fail(409, "This survey isn't booked yet, so it can't start. Ask the office to book it.");
@@ -415,28 +489,23 @@ export async function startSurvey(projectId: string, staff: StaffMember): Promis
   }
 
   const now = nowIso();
+  const startedAt = startedAtFrom(opts.startedAt, now);
   const existing = await loadDraft(projectId);
   let draft: DraftState;
   let created = false;
   if (existing && existing.record.status === "draft") {
-    draft = existing;
+    // Prepared before the visit (no start yet): this is its start.
+    draft = existing.record.startedAt ? existing : await markDraftStarted(existing, staff, startedAt);
+    if (!existing.record.startedAt) await audit({ actor: staff, action: "survey.start", entity: "survey", entityId: existing.record.id, detail: { projectId, prepared: true } });
   } else {
-    const self = await loadSelfSurvey(project.quoteId).catch(() => null);
-    const constraints = await loadPropertyConstraints(project.customer.addressLine, project.customer.postcode);
-    let data = emptyMeasuredSurvey(self ?? undefined);
-    data = prefillFromPropertyIntel(data, constraints);
-    // The office may already hold access and parking notes: start from them.
-    if (project.customer.accessNotes) data.site.accessNotes = project.customer.accessNotes;
-    if (project.customer.parkingNotes) data.site.parkingNotes = project.customer.parkingNotes;
-    if (project.customer.phone) data.site.siteContactPhone = project.customer.phone;
     const record: SurveyRecord = {
       id: crypto.randomUUID(),
       projectId,
       version: (existing?.record.version ?? 0) + 1,
       status: "draft",
-      data,
+      data: await freshDraftData(project),
       surveyor: { staffId: staff.id, name: staff.name },
-      startedAt: now,
+      startedAt,
     };
     const result = await surveysRepo.insertOrReuse(record);
     created = result.created;
@@ -445,7 +514,7 @@ export async function startSurvey(projectId: string, staff: StaffMember): Promis
     draft = loaded;
     if (created) await audit({ actor: staff, action: "survey.start", entity: "survey", entityId: record.id, detail: { projectId } });
   }
-  await startSurveyClock(projectId, staff, draft.record.startedAt ?? now);
+  await startSurveyClock(projectId, staff, draft.record.startedAt ?? startedAt);
   return { ok: true, draft, created };
 }
 
@@ -512,7 +581,9 @@ export async function onMyWayStatus(project: Project): Promise<{ etaMinutes: num
   return { etaMinutes: omw.etaMinutes, at: omw.at, text: statusOf(message, await whyNoText(project)) };
 }
 
-export type OnMyWayResult = { ok: true; etaMinutes: number; at: string; text: TextStatus; smsMode: "live" | "demo" } | Fail;
+export type OnMyWayResult =
+  | { ok: true; etaMinutes: number; at: string; text: TextStatus; smsMode: "live" | "demo"; /** The draft, ready for a start with no signal. */ prepared?: DraftState }
+  | Fail;
 
 /** Record that the surveyor's on the way and text the customer (via the outbox), then say honestly what happened. */
 export async function sendOnMyWay(projectId: string, etaMinutes: number, staff: StaffMember): Promise<OnMyWayResult> {
@@ -521,12 +592,18 @@ export async function sendOnMyWay(projectId: string, etaMinutes: number, staff: 
   const result = await dispatch(projectId, { type: "surveyor-on-my-way", etaMinutes: eta, by: staff.name }, staff);
   if ("error" in result) return fail(result.status, result.error, result.blockers);
   const status = await onMyWayStatus(result.project);
+  // There's signal now: get the draft ready, so "Start survey" works at the door even without it.
+  const prepared = await prepareSurveyDraft(result.project, staff).catch((err) => {
+    console.error(`[survey] couldn't prepare the draft on ${projectId}:`, err);
+    return null;
+  });
   return {
     ok: true,
     etaMinutes: eta,
     at: result.project.survey.onMyWay?.at ?? nowIso(),
     text: status?.text ?? { state: "not-sent", reason: "No text has been recorded for this." },
     smsMode: appMode().sms,
+    ...(prepared && !prepared.record.startedAt && prepared.record.status === "draft" ? { prepared } : {}),
   };
 }
 
@@ -817,8 +894,14 @@ export interface SurveyVisit {
 export async function loadSurveyVisit(projectId: string, staff: StaffMember): Promise<SurveyVisit | null> {
   const project = await loadProject(projectId);
   if (!project) return null;
+  // Opened online the day before or on the day: get the draft ready, so the start works at a door with no signal.
+  const day = project.survey.scheduledFor?.slice(0, 10);
+  const tomorrow = new Date(`${londonToday()}T12:00:00Z`);
+  tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+  const soon = Boolean(day && day <= tomorrow.toISOString().slice(0, 10));
+  const prepared = soon ? prepareSurveyDraft(project, staff).catch((err) => (console.error("[survey] prepare failed:", err), null)) : null;
   const [draft, self, media, onMyWay, issues] = await Promise.all([
-    loadDraft(projectId),
+    prepared ? prepared.then((d) => d ?? loadDraft(projectId)) : loadDraft(projectId),
     loadSelfSurvey(project.quoteId).catch(() => null),
     listProjectMedia(projectId, { expiresSec: SURVEY_MEDIA_URL_SECONDS }).catch((err) => {
       console.error("[survey] media list failed:", err);

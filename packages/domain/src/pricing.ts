@@ -183,6 +183,7 @@ export function generateQuote(survey: Survey): QuoteResult {
       });
     }
     if (survey.rooms.length > permutation.servesUpTo) {
+      // Ops wording: customers see customerChecks() instead.
       reviewFlags.push(
         `"${permutation.label}" serves up to ${permutation.servesUpTo} rooms and you asked for ${survey.rooms.length}, so we'll confirm the second outdoor unit position.`,
       );
@@ -220,4 +221,43 @@ export function generateQuote(survey: Survey): QuoteResult {
     confidence: scoreConfidence(survey),
     reviewFlags,
   };
+}
+
+/**
+ * What "Your surveyor will check" says to the customer, from a quote's
+ * review flags (which are written for the office: pattern names, "Pattern
+ * check:" items, narration notes). Pattern checks become one plain sentence
+ * about the outdoor unit; "serves up to N rooms" becomes the second outdoor
+ * unit's position (worded for how many the system shown has); notes from a video's
+ * narration stay in ops. Works on stored quotes, so it reads the strings.
+ */
+export function customerChecks(reviewFlags: readonly string[], opts: { outdoorUnits?: number } = {}): string[] {
+  const out: string[] = [];
+  const two = (opts.outdoorUnits ?? 1) >= 2;
+  let pattern = false;
+  let secondOutdoor = false;
+  for (const raw of reviewFlags) {
+    const flag = raw.trim();
+    if (!flag || /^From narration:/i.test(flag)) continue;
+    if (/^Pattern check:/i.test(flag)) {
+      pattern = true;
+      continue;
+    }
+    if (/serves up to \d+ rooms? and you asked for \d+/i.test(flag)) {
+      secondOutdoor = true;
+      continue;
+    }
+    out.push(flag.replace(/lets us lock this line in/i, "helps us firm up this line"));
+  }
+  if (secondOutdoor) {
+    out.unshift(two ? "Where your second outdoor unit goes." : "Whether your rooms need a second outdoor unit, and where it would go.");
+  }
+  if (pattern) {
+    out.unshift(
+      two || secondOutdoor
+        ? "The best spots for your outdoor units, and how the pipes and condensate run to them."
+        : "The best spot for your outdoor unit, and how the pipes and condensate run to it.",
+    );
+  }
+  return [...new Set(out)];
 }

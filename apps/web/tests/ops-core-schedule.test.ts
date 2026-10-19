@@ -211,3 +211,23 @@ test("an electrical certificate past its 30 days alerts the team, weekly, until 
   assert.ok(!jobsOf(done(completed, "received")).includes("paperwork-overdue"));
   assert.ok(DAILY_JOB_IDS.includes("paperwork-overdue"));
 });
+
+test("a proposal past the date we gave alerts the team the next day, then every few days, until it's issued", () => {
+  // Survey Mon 12 Oct: we said Thu 15 Oct.
+  const submitted = (mut: (p: Project) => void = () => {}) =>
+    project((p) => {
+      p.survey = { ...p.survey, status: "submitted", submittedAt: "2026-10-12T15:00:00.000Z" };
+      mut(p);
+    });
+  assert.ok(!jobsOf(submitted(), "2026-10-15").includes("proposal-late"), "the promised day itself: not late");
+  const first = dailyJobsFor(submitted(), "2026-10-16", DEFAULT_SETTINGS).find((j) => j.job === "proposal-late");
+  assert.ok(first && first.kind === "notify" && first.event === "team-alert");
+  assert.match((first.data as { title: string }).title, /Late: the proposal for Demo Person/);
+  assert.match((first.data as { lines: string[] }).lines[0]!, /by 2026-10-15.*1 day late/);
+  assert.equal(first.discriminator, "proposal-late:2026-10-15:1");
+  assert.ok(!jobsOf(submitted(), "2026-10-17").includes("proposal-late"), "not every day");
+  assert.ok(jobsOf(submitted(), "2026-10-19").includes("proposal-late"), "4 days late: the next alert");
+  assert.ok(!jobsOf(submitted((p) => (p.proposal = { ...p.proposal, status: "issued" })), "2026-10-19").includes("proposal-late"));
+  assert.ok(!jobsOf(submitted((p) => (p.proposal = { ...p.proposal, status: "changes-requested" })), "2026-10-19").includes("proposal-late"), "a revision has no promised date");
+  assert.ok(DAILY_JOB_IDS.includes("proposal-late"));
+});

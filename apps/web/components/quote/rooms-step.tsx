@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import {
   generateQuote,
+  permutationForLocation,
   type ExcludedRoom,
   type OutdoorLocation,
   type RoomType,
@@ -270,7 +271,13 @@ export function RoomsStep({
         >
           <OptionCards
             value={draft.survey.outdoor.location}
-            onChange={(location) => setSurvey({ outdoor: { ...draft.survey.outdoor, location } })}
+            // The install pattern follows the spot they pick, so its price and checks never describe the other one.
+            onChange={(location) =>
+              setSurvey({
+                outdoor: { ...draft.survey.outdoor, location },
+                permutationId: permutationForLocation(draft.survey.archetypeId, location)?.id,
+              })
+            }
             options={outdoorOptions.map((o) => ({ value: o, label: OUTDOOR_LABEL[o] ?? o }))}
           />
         </Group>

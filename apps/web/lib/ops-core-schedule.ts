@@ -1,6 +1,8 @@
 import {
   daysBetween,
   handoverDeadlines,
+  proposalOverdue,
+  proposalPromisedBy,
   reviewRequestDue,
   seasonalCheck,
   seasonalCheckDue,
@@ -37,7 +39,8 @@ export type DailyJobId =
   | "review-request"
   | "seasonal-check"
   | "service-reminder"
-  | "paperwork-overdue";
+  | "paperwork-overdue"
+  | "proposal-late";
 
 export const DAILY_JOB_IDS: DailyJobId[] = [
   "survey-reminder",
@@ -51,6 +54,7 @@ export const DAILY_JOB_IDS: DailyJobId[] = [
   "seasonal-check",
   "service-reminder",
   "paperwork-overdue",
+  "proposal-late",
 ];
 
 export const DAILY_JOB_LABEL: Record<DailyJobId, string> = {
@@ -65,10 +69,11 @@ export const DAILY_JOB_LABEL: Record<DailyJobId, string> = {
   "seasonal-check": "Change-of-season checks",
   "service-reminder": "Service reminders",
   "paperwork-overdue": "Overdue certificates (team alerts)",
+  "proposal-late": "Proposals past the date we gave (team alerts)",
 };
 
 type NotifyJob = Exclude<DailyJobId, "proposal-expired">;
-type NotifyEvent = Exclude<NotifyJob, "paperwork-overdue"> | "team-alert";
+type NotifyEvent = Exclude<NotifyJob, "paperwork-overdue" | "proposal-late"> | "team-alert";
 
 export type DailyJob =
   | {
@@ -106,6 +111,12 @@ export const SERVICE_REMINDER_DAYS_BEFORE = 30;
  * a week while one is overdue, until it's in.
  */
 export const PAPERWORK_ALERT_EVERY_DAYS = 7;
+/**
+ * The proposal date the customer was given (survey-complete email, hub):
+ * once it passes, the team hears the next day and every few days after,
+ * until it's issued. The hub says sorry instead of showing the old date.
+ */
+export const PROPOSAL_LATE_ALERT_EVERY_DAYS = 3;
 
 const dateOf = (iso: string) => iso.slice(0, 10);
 
@@ -225,6 +236,27 @@ export function dailyJobsFor(project: Project, todayIso: string, settings: Pilot
           urgent: true,
         },
         discriminator: `paperwork-overdue:${due}:${late}`,
+      });
+    }
+  }
+  if (live && proposalOverdue(p, today)) {
+    const by = proposalPromisedBy(p)!;
+    const late = daysBetween(by, today);
+    if ((late - 1) % PROPOSAL_LATE_ALERT_EVERY_DAYS === 0) {
+      jobs.push({
+        kind: "notify",
+        job: "proposal-late",
+        projectId: p.id,
+        event: "team-alert",
+        data: {
+          title: `Late: the proposal for ${p.customer.name || "a customer"}`,
+          lines: [
+            `We told them it would be with them by ${by}, and it isn't issued yet (${late} day${late === 1 ? "" : "s"} late).`,
+            "Their project page now says it's taking longer than we said, with an apology. Send it, or email them a new date.",
+          ],
+          urgent: late > PROPOSAL_LATE_ALERT_EVERY_DAYS,
+        },
+        discriminator: `proposal-late:${by}:${late}`,
       });
     }
   }

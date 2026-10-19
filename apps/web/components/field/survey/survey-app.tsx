@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import {
   SURVEY_SECTIONS,
@@ -12,15 +12,17 @@ import {
   type PhotoTag,
   type SurveySectionId,
 } from "@aircon/domain";
-import { MediaAnnotator } from "@/components/annotate/media-annotator";
-import type { ToolId } from "@/components/annotate/annotator";
+import { MediaAnnotator, mediaDraftKey, saveAnnotations } from "@/components/annotate/media-annotator";
+import { Annotator, drawingWaitingToSave, markAnnotationToSave, readAnnotationDraft, writeAnnotationDraft, type ToolId } from "@/components/annotate/annotator";
 import type { UploadedMedia } from "@/lib/media-client";
 import { SurveyContext, type SurveyCtx } from "./context";
 import { clearLocalDraft } from "./draft-store";
 import { ConsentSection, MissingList, SubmitSection, SubmittedScreen } from "./finish";
 import { SCREEN_LABEL, londonClock, useSurveyNav, type Nav, type ScreenId } from "./nav";
 import { OutdoorSection, PositionEditor } from "./outdoor";
-import { usePhotoQueue, type PhotoTarget } from "./photo-queue";
+import { queueDrawing, queuedDrawing, takeQueuedDrawing } from "./pending-drawings";
+import { canStartOnPhone, pendingStart, replayPendingStart, setPendingStart } from "./pending-start";
+import { usePhotoQueue, type PendingPhoto, type PhotoTarget } from "./photo-queue";
 import { RoomEditor, RoomsSection } from "./rooms";
 import { AssumptionsSection, ElectricsSection, HouseSection, PermissionsSection, RisksSection, SiteSection, WishesSection } from "./sections";
 import type { OnMyWayState, SurveyIssueTopic, SurveyMediaItem, VisitProps } from "./types";
@@ -250,7 +252,11 @@ export function SurveyApp(props: VisitProps) {
   const { project: initialProject, self, smsMode, canOpenOps } = props;
   const projectId = initialProject.id;
   const [project, setProject] = useState(initialProject);
-  const [draft, setDraft] = useState<ServerDraft | null>(props.draft && props.draft.record.status === "draft" ? props.draft : null);
+  // A draft the server prepared before the visit (no start yet) isn't started: "Start survey" starts it.
+  const [draft, setDraft] = useState<ServerDraft | null>(props.draft && props.draft.record.status === "draft" && props.draft.record.startedAt ? props.draft : null);
+  const [prepared, setPrepared] = useState<ServerDraft | null>(canStartOnPhone(props.draft) ? props.draft : null);
+  // Started on this phone with no signal: the server hears as soon as there's signal.
+  const [startPending, setStartPending] = useState(false);
   const [onMyWay, setOnMyWay] = useState<OnMyWayState | null>(props.onMyWay);
   const [sheet, setSheet] = useState(false);
   const [starting, setStarting] = useState(false);
@@ -263,6 +269,44 @@ export function SurveyApp(props: VisitProps) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
+  /** Begin on the phone from the prepared draft; the server is told when there's signal. */
+  const startOnPhone = useCallback(
+    (ready: ServerDraft, at: string) => {
+      setPendingStart(projectId, at);
+      setStartPending(true);
+      setDraft({ record: { ...ready.record, startedAt: at }, updatedAt: ready.updatedAt });
+      setProject((p) => ({ ...p, survey: { ...p.survey, status: "in-progress", startedAt: p.survey.startedAt ?? at } }));
+    },
+    [projectId],
+  );
+
+  // Back on a page that was started on this phone (and not yet told): carry on from the prepared draft.
+  useEffect(() => {
+    const at = pendingStart(projectId);
+    if (!at) return;
+    if (prepared && !draft) startOnPhone(prepared, at);
+    else if (draft) setStartPending(true);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Tell the server about a start made with no signal: now, when signal returns, and every so often.
+  useEffect(() => {
+    if (!startPending) return;
+    let stopped = false;
+    const replay = async () => {
+      if (typeof navigator !== "undefined" && navigator.onLine === false) return;
+      const r = await replayPendingStart(projectId);
+      if (!stopped && r !== "kept") setStartPending(false);
+    };
+    void replay();
+    window.addEventListener("online", replay);
+    const t = window.setInterval(replay, 30_000);
+    return () => {
+      stopped = true;
+      window.removeEventListener("online", replay);
+      window.clearInterval(t);
+    };
+  }, [startPending, projectId]);
+
   const start = async () => {
     setStarting(true);
     setStartError(null);
@@ -273,7 +317,13 @@ export function SurveyApp(props: VisitProps) {
       setDraft({ record: body.record, updatedAt: body.updatedAt });
       setProject((p) => ({ ...p, survey: { ...p.survey, status: "in-progress", startedAt: p.survey.startedAt ?? body.record!.startedAt } }));
     } catch (err) {
-      setStartError(err instanceof Error && err.message !== "Failed to fetch" ? err.message : "No signal, so the survey didn't start. Try again in a moment.");
+      const offline = !(err instanceof Error) || err.message === "Failed to fetch" || err.name === "TypeError";
+      if (offline && prepared) {
+        // No signal at the door: the draft is already on this phone, so start here.
+        startOnPhone(prepared, new Date().toISOString());
+      } else {
+        setStartError(err instanceof Error && !offline ? err.message : "No signal, so the survey didn't start. Try again in a moment.");
+      }
     } finally {
       setStarting(false);
     }
@@ -318,7 +368,18 @@ export function SurveyApp(props: VisitProps) {
           onOpenOnMyWay={() => setSheet(true)}
           resume={project.survey.status === "in-progress"}
         />
-        {sheet && <OnMyWaySheet projectId={projectId} phone={project.customer.phone} smsMode={smsMode} onClose={() => setSheet(false)} onSent={setOnMyWay} />}
+        {sheet && (
+          <OnMyWaySheet
+            projectId={projectId}
+            phone={project.customer.phone}
+            smsMode={smsMode}
+            onClose={() => setSheet(false)}
+            onSent={(state, ready) => {
+              setOnMyWay(state);
+              if (canStartOnPhone(ready)) setPrepared(ready!);
+            }}
+          />
+        )}
       </>
     );
   }
@@ -337,14 +398,21 @@ export function SurveyApp(props: VisitProps) {
   }
 
   return (
-    <SurveyFlow
-      key={draft.record.id}
-      {...props}
-      project={project}
-      setProject={setProject}
-      draft={draft}
-      onSubmitted={(s) => setSubmitted(s)}
-    />
+    <>
+      {startPending && (
+        <p role="status" className="mb-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          Started on this phone with no signal. Carry on: the office and the customer hear it&apos;s under way as soon as there&apos;s signal.
+        </p>
+      )}
+      <SurveyFlow
+        key={draft.record.id}
+        {...props}
+        project={project}
+        setProject={setProject}
+        draft={draft}
+        onSubmitted={(s) => setSubmitted(s)}
+      />
+    </>
   );
 }
 
@@ -365,7 +433,7 @@ function SurveyFlow({
   const draft = useSurveyDraft(projectId, initialDraft);
   const { nav, go } = useSurveyNav(`dih-survey-nav:${projectId}`);
   const [media, setMedia] = useState<Record<string, SurveyMediaItem>>(() => Object.fromEntries(initialMedia.map((m) => [m.id, m])));
-  const [annotating, setAnnotating] = useState<{ id: string; title: string; tool?: ToolId } | null>(null);
+  const [annotating, setAnnotating] = useState<{ id: string; title: string; tool?: ToolId; pending?: PendingPhoto } | null>(null);
   const [issues, setIssues] = useState(initialIssues);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -376,9 +444,51 @@ function SurveyFlow({
 
   /* ---------------- photos ---------------- */
 
+  // A drawing saved onto a stored photo: the media list takes the server's copy.
+  const applySaved = useCallback((item: Pick<SurveyMediaItem, "id" | "annotations" | "annotationsVersion" | "locked"> & { url?: string | null }) => {
+    setMedia((m) =>
+      m[item.id]
+        ? { ...m, [item.id]: { ...m[item.id]!, annotations: item.annotations, annotationsVersion: item.annotationsVersion, locked: item.locked, url: item.url ?? m[item.id]!.url } }
+        : m,
+    );
+  }, []);
+
+  /**
+   * Save a drawing kept on the phone onto its photo. With no signal it stays
+   * kept (the tile says "Drawing not saved yet") and goes when signal returns.
+   */
+  const pushDrawing = useCallback(
+    async (item: Pick<SurveyMediaItem, "id" | "annotationsVersion">, annotations: SurveyMediaItem["annotations"]) => {
+      const key = mediaDraftKey(item);
+      try {
+        const saved = await saveAnnotations(item, annotations);
+        writeAnnotationDraft(key, null);
+        applySaved(saved);
+        return true;
+      } catch {
+        // Kept, and still to be saved: the tile says so, and the next time there's signal it goes.
+        writeAnnotationDraft(key, annotations);
+        markAnnotationToSave(key);
+        return false;
+      }
+    },
+    [applySaved],
+  );
+
+  /** Queued photo (local id) → its media id once uploaded, for a drawing saved after the upload landed. */
+  const uploaded = useRef(new Map<string, string>());
+  const mediaRef = useRef(media);
+  mediaRef.current = media;
+
   const attach = useCallback(
-    (target: PhotoTarget, item: UploadedMedia) => {
+    (target: PhotoTarget, item: UploadedMedia, localId?: string) => {
       setMedia((m) => ({ ...m, [item.id]: { ...item, source: item.source } as SurveyMediaItem }));
+      if (localId) {
+        uploaded.current.set(localId, item.id);
+        // Drawn on while it waited to upload: it goes onto the photo now.
+        const drawing = takeQueuedDrawing(localId);
+        if (drawing) void pushDrawing(item, drawing);
+      }
       update((m) => {
         if (target.kind === "room") {
           if (!m.rooms.some((r) => r.id === target.roomId)) return m;
@@ -391,9 +501,25 @@ function SurveyFlow({
         return { ...m, electrics: { ...m.electrics, mediaIds: [...new Set([...m.electrics.mediaIds, item.id])] } };
       });
     },
-    [update],
+    [update, pushDrawing],
   );
   const queue = usePhotoQueue({ projectId, onUploaded: attach });
+
+  // Drawings kept on this phone to be saved (Save with no signal, or kept and closed): saved once there's signal.
+  const annotatingId = annotating?.id;
+  useEffect(() => {
+    const resync = () => {
+      if (typeof navigator !== "undefined" && navigator.onLine === false) return;
+      for (const m of Object.values(mediaRef.current)) {
+        if (m.locked || m.id === annotatingId || !drawingWaitingToSave(mediaDraftKey(m))) continue;
+        const kept = readAnnotationDraft(mediaDraftKey(m));
+        if (kept) void pushDrawing(m, kept);
+      }
+    };
+    resync();
+    window.addEventListener("online", resync);
+    return () => window.removeEventListener("online", resync);
+  }, [pushDrawing, annotatingId]);
   const uploading = queue.items.filter((p) => p.status !== "failed").length;
 
   const detachPhoto = useCallback(
@@ -464,6 +590,8 @@ function SurveyFlow({
     setSubmitting(true);
     setSubmitError(null);
     try {
+      // A start made with no signal goes first, so the visit is under way (and timed) before it's submitted.
+      if ((await replayPendingStart(projectId)) === "kept") throw new Error("Failed to fetch");
       const saved = await draft.flush();
       if (!saved && draft.state.kind === "conflict") throw new Error("Decide which copy to keep first (see the top of the screen).");
       const res = await fetch(`/api/field/survey/${projectId}/submit`, {
@@ -514,7 +642,11 @@ function SurveyFlow({
     queue,
     addPhotos: (files: File[], tag: PhotoTag, target: PhotoTarget) => void queue.add(files, tag, target),
     detachPhoto,
-    annotate: (id, title, tool) => setAnnotating({ id, title, tool }),
+    // A queued photo (local id) can be drawn on too: the drawing waits for its upload.
+    annotate: (id, title, tool) => {
+      const pending = media[id] ? undefined : queue.items.find((p) => p.localId === id);
+      setAnnotating({ id, title, tool, ...(pending ? { pending } : {}) });
+    },
     nav,
     go,
     issues,
@@ -666,14 +798,64 @@ function SurveyFlow({
           title={annotating.title}
           defaultTool={annotating.tool}
           onClose={() => setAnnotating(null)}
-          onSaved={(item) =>
-            setMedia((m) => ({
-              ...m,
-              [item.id]: { ...m[item.id]!, annotations: item.annotations, annotationsVersion: item.annotationsVersion, locked: item.locked, url: item.url ?? m[item.id]!.url },
-            }))
-          }
+          onSaved={applySaved}
+        />
+      )}
+      {annotating?.pending && (
+        <PendingAnnotator
+          photo={annotating.pending}
+          title={annotating.title}
+          tool={annotating.tool}
+          onClose={() => setAnnotating(null)}
+          onSave={async (list) => {
+            const localId = annotating.pending!.localId;
+            const mediaId = uploaded.current.get(localId);
+            const item = mediaId ? mediaRef.current[mediaId] : undefined;
+            // Uploaded while they drew: straight onto the photo (kept on the phone if that fails).
+            if (item) await pushDrawing(item, list);
+            else queueDrawing(localId, list);
+          }}
         />
       )}
     </SurveyContext.Provider>
+  );
+}
+
+/**
+ * The editor on a photo that hasn't uploaded yet: the phone's own copy, and
+ * "Save" keeps the drawing on the phone until the photo lands (then it's
+ * saved onto it). Saving never needs signal, so there's no separate kept
+ * draft. The blob is the queue's, so it survives the upload.
+ */
+function PendingAnnotator({
+  photo,
+  title,
+  tool,
+  onSave,
+  onClose,
+}: {
+  photo: PendingPhoto;
+  title: string;
+  tool?: ToolId;
+  onSave: (annotations: SurveyMediaItem["annotations"]) => Promise<void>;
+  onClose: () => void;
+}) {
+  const [src, setSrc] = useState<string | null>(null);
+  const [initial] = useState(() => queuedDrawing(photo.localId) ?? []);
+  useEffect(() => {
+    const u = URL.createObjectURL(photo.blob);
+    setSrc(u);
+    return () => URL.revokeObjectURL(u);
+  }, [photo.blob]);
+  if (!src) return null;
+  return (
+    <Annotator
+      src={src}
+      initial={initial}
+      title={`${title} (uploading)`}
+      defaultTool={tool}
+      onSave={onSave}
+      onClose={onClose}
+    />
   );
 }

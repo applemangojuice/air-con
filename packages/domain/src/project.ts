@@ -563,6 +563,25 @@ function addWorkingDays(iso: string, n: number, workingDays: number[] = MON_FRI)
   return d;
 }
 
+/**
+ * The day we told the customer their proposal would be with them (the
+ * survey-complete email, the hub): PROPOSAL_TURNAROUND_WORKING_DAYS after the
+ * survey was submitted. Null before the survey.
+ */
+export function proposalPromisedBy(project: Pick<Project, "survey">): string | null {
+  const at = project.survey.submittedAt;
+  return at ? addWorkingDays(dateOf(at), PROPOSAL_TURNAROUND_WORKING_DAYS) : null;
+}
+
+/**
+ * The promised day has gone (today is after it) and the first proposal still
+ * isn't issued. A revision after a change request carries no promised date.
+ */
+export function proposalOverdue(project: Pick<Project, "survey" | "proposal" | "closure">, todayIso: string): boolean {
+  const by = proposalPromisedBy(project);
+  return Boolean(by && !project.closure.closed && project.proposal.status === "not-issued" && dateOf(todayIso) > by);
+}
+
 /** Calendar months, clamped: 31 Jan + 1 month = 28 Feb (29 in a leap year). */
 function addMonths(iso: string, months: number): string {
   const [y, m, day] = dateOf(iso).split("-").map(Number) as [number, number, number];
@@ -924,6 +943,30 @@ export function isGatePassed(project: Project, gate: GateId): boolean {
   }
 }
 
+/**
+ * Has the contract's deposit been paid? Recorded as paid on the booking, or
+ * verified payments on deposit invoices covering what the contract asked.
+ */
+export function depositIsPaid(p: Pick<Project, "booking">, ctx: Pick<ReadinessContext, "money">): boolean {
+  return (
+    p.booking.depositStatus === "paid" ||
+    (ctx.money !== undefined && ctx.money.depositDuePence > 0 && ctx.money.depositPaidPence >= ctx.money.depositDuePence)
+  );
+}
+
+/**
+ * The contract takes the deposit "before we order your equipment"
+ * (depositTiming "before-kit-order"): until it's paid, nothing is ordered
+ * from a supplier. Null when ordering is fine; otherwise why not. An admin
+ * can still order, with a reason (purchasing-server advanceOrder).
+ */
+export function kitOrderDepositProblem(p: Pick<Project, "booking">, ctx: Pick<ReadinessContext, "money" | "agreedPayments" | "settings">): string | null {
+  const pay = ctx.agreedPayments ?? ctx.settings.payments;
+  if (!(pay.depositPct > 0) || pay.depositTiming !== "before-kit-order") return null;
+  if (depositIsPaid(p, ctx)) return null;
+  return "The contract takes the deposit before we order the equipment, and it hasn't been paid yet.";
+}
+
 /** The next gate the project has to clear, or null once closed. */
 export function nextGate(project: Project): GateId | null {
   if (project.closure.closed) return null;
@@ -1127,10 +1170,7 @@ export function blockersFor(project: Project, ctx: ReadinessContext, gate: GateI
       // The deposit the contract says, not today's settings.
       const pay = ctx.agreedPayments ?? s.payments;
       const depositRequired = pay.depositPct > 0 && pay.depositTiming === "on-acceptance";
-      const depositPaid =
-        p.booking.depositStatus === "paid" ||
-        (ctx.money !== undefined && ctx.money.depositDuePence > 0 && ctx.money.depositPaidPence >= ctx.money.depositDuePence);
-      if (depositRequired && !depositPaid) {
+      if (depositRequired && !depositIsPaid(p, ctx)) {
         block("deposit-unpaid", "The deposit hasn't been paid yet.", "customer", "Pay your deposit");
       }
       const start = p.booking.startDate;
@@ -1161,6 +1201,11 @@ export function blockersFor(project: Project, ctx: ReadinessContext, gate: GateI
     case "ready-to-install": {
       if (p.booking.status !== "booked") {
         block("booking-not-confirmed", "The booking isn't confirmed yet.", "ops", "Confirm the booking");
+      }
+      // Whichever the timing (on acceptance, or before the kit is ordered), an agreed deposit is paid before we drill.
+      const agreed = ctx.agreedPayments ?? s.payments;
+      if (agreed.depositPct > 0 && !depositIsPaid(p, ctx)) {
+        block("deposit-unpaid", "The deposit the contract asks for hasn't been paid yet.", "customer", "Pay your deposit");
       }
       const kit = ctx.kit;
       if (!kit || kit.requiredLines <= 0) {
@@ -3245,7 +3290,10 @@ export function customerNextAction(project: Project): { label: string; href?: st
   // Time-limited or money first: these hold everything else up.
   if (p.proposal.status === "issued") return { label: "Review your proposal", href: `${base}/proposal` };
   if (p.booking.depositStatus === "requested") return { label: "Pay your deposit", href: `${base}/pay` };
-  if (p.money.invoicedPence > p.money.paidPence) {
+  // Picking install dates comes before any other invoice: nothing else holds the booking up,
+  // and the balance isn't due under the contract until the installation is finished.
+  const needsDates = p.proposal.status === "accepted" && p.install.status === "not-started" && p.booking.dates.length === 0 && currentStage(p) === "booking";
+  if (p.money.invoicedPence > p.money.paidPence && !needsDates) {
     return {
       label: p.install.status === "complete" ? "Pay your balance" : "Pay your invoice",
       href: `${base}/pay`,

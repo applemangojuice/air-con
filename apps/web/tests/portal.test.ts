@@ -235,12 +235,48 @@ test("waitingCopy promises only the date the survey email gave", () => {
   assert.match(view.waitingCopy(p).body, /by Thu 22 Oct/);
 });
 
+test("an overdue proposal says sorry instead of repeating a date that's gone", () => {
+  const p = project();
+  p.survey.status = "submitted";
+  p.survey.submittedAt = "2026-10-12T15:00:00.000Z";
+  p.proposal.documentsByEmailConsent = { at: "2026-10-12T15:00:00.000Z", channel: "portal" };
+  assert.equal(view.proposalReadyBy(p), "2026-10-15");
+  assert.equal(view.proposalLate(p, "2026-10-15"), false);
+  assert.match(view.waitingCopy(p, null, "2026-10-15").body, /by Thu 15 Oct/);
+  assert.equal(view.proposalLate(p, "2026-10-19"), true);
+  const late = view.waitingCopy(p, null, "2026-10-19").body;
+  assert.doesNotMatch(late, /15 Oct/);
+  assert.match(late, /taking a little longer than we said\. Sorry/);
+  p.proposal.status = "issued";
+  assert.equal(view.proposalLate(p, "2026-10-19"), false);
+});
+
 test("waitingCopy promises a text on the way only when one will really go", () => {
   const promise = view.onTheWayPromise;
   assert.equal(promise("sms"), "We'll text you when we're on the way.");
   assert.equal(promise("email"), "We'll email you when we're on the way.");
   assert.equal(promise(null), "");
   assert.doesNotMatch(JSON.stringify(view.waitingCopy(project(), "email")), /text you/);
+});
+
+test("the hub's 'to pay' line names only the ways the pay page offers", () => {
+  const company = { tradingName: "DEMO", phone: null, email: "hello@demo.invalid" };
+  const bank = { accountName: "DEMO Ltd", sortCode: "00-00-00", accountNumber: "00000000" };
+  const withBank = mergeSettings({ ...DEFAULT_SETTINGS, company: { ...DEFAULT_SETTINGS.company, bank } });
+  const p = project();
+  // No bank details and no card: nothing to name, so say how to get the details.
+  const none = view.hubFacts(p, DEFAULT_SETTINGS, "2026-10-19", null).payBy;
+  assert.deepEqual(none, { card: false, bank: false });
+  assert.equal(view.toPayLine("£10.00", none, company), "£10.00 to pay. Email us at hello@demo.invalid and we'll give you our bank details.");
+  // The demo simulator counts as card; bank needs the account in settings.
+  const sim = view.hubFacts(p, DEFAULT_SETTINGS, "2026-10-19", null, { available: false, simulate: true }).payBy;
+  assert.equal(view.toPayLine("£10.00", sim, company), "£10.00 to pay, by card.");
+  const both = view.hubFacts(p, withBank, "2026-10-19", null, { available: true, simulate: false }).payBy;
+  assert.equal(view.toPayLine("£10.00", both, company), "£10.00 to pay, by card or bank transfer.");
+  const bankOnly = view.hubFacts(p, withBank, "2026-10-19", null).payBy;
+  assert.equal(view.toPayLine("£10.00", bankOnly, { ...company, phone: "020 0000 0000" }), "£10.00 to pay, by bank transfer.");
+  const noCardMethod = mergeSettings({ ...withBank, payments: { ...withBank.payments, methods: ["bank-transfer"] } });
+  assert.deepEqual(view.hubFacts(p, noCardMethod, "2026-10-19", null, { available: true, simulate: false }).payBy, { card: false, bank: true });
 });
 
 test("install plan: three named days by default, extra days in the middle", () => {

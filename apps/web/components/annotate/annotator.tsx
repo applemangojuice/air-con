@@ -33,7 +33,10 @@ import {
  * a dimension, and nothing here pretends to know what's inside a wall.
  *
  * Unsaved work is kept in this browser (localStorage, keyed by `draftKey`)
- * until it's saved, so a dropped signal or a closed tab never loses it.
+ * until it's saved, so a dropped signal or a closed tab never loses it. A
+ * failed save retries when signal returns; closing offers to keep the
+ * drawing on the phone (the survey saves it once online) or, explicitly, to
+ * discard it.
  * `locked` (an approved layout) shows the drawing read-only.
  */
 
@@ -124,6 +127,45 @@ export interface AnnotatorProps {
   onClose: () => void;
 }
 
+/** The unsaved drawing this browser keeps for `key`, if any (see draftKey). */
+export function readAnnotationDraft(key: string | undefined): Annotation[] | null {
+  return readDraft(key);
+}
+
+/** Keep (or, with null, forget) an unsaved drawing for `key` in this browser. */
+export function writeAnnotationDraft(key: string | undefined, annotations: Annotation[] | null): void {
+  writeDraft(key, annotations);
+}
+
+/**
+ * The surveyor asked for this kept drawing to be saved (they pressed Save
+ * with no signal, or kept it and closed): the survey saves it once online.
+ * A draft left by simply navigating away is only restored, never sent.
+ */
+export function drawingWaitingToSave(key: string | undefined): boolean {
+  if (!key || typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(`dih-annotate-save:${key}`) !== null;
+  } catch {
+    return false;
+  }
+}
+
+/** Ask for a kept drawing to be saved once there's signal (see drawingWaitingToSave). */
+export function markAnnotationToSave(key: string | undefined): void {
+  markWaitingToSave(key, true);
+}
+
+function markWaitingToSave(key: string | undefined, on: boolean): void {
+  if (!key || typeof window === "undefined") return;
+  try {
+    if (on) window.localStorage.setItem(`dih-annotate-save:${key}`, new Date().toISOString());
+    else window.localStorage.removeItem(`dih-annotate-save:${key}`);
+  } catch {
+    // storage blocked: it's restored when the photo is opened again instead
+  }
+}
+
 function readDraft(key: string | undefined): Annotation[] | null {
   if (!key || typeof window === "undefined") return null;
   try {
@@ -136,11 +178,19 @@ function readDraft(key: string | undefined): Annotation[] | null {
   }
 }
 
+/** Fired on window whenever a kept drawing is written or forgotten, so tiles can say "not saved yet". */
+export const ANNOTATION_DRAFT_EVENT = "dih-annotate-draft";
+
 function writeDraft(key: string | undefined, annotations: Annotation[] | null): void {
   if (!key || typeof window === "undefined") return;
   try {
-    if (annotations === null) window.localStorage.removeItem(`dih-annotate:${key}`);
-    else window.localStorage.setItem(`dih-annotate:${key}`, JSON.stringify({ annotations, at: new Date().toISOString() }));
+    const k = `dih-annotate:${key}`;
+    const had = window.localStorage.getItem(k) !== null;
+    if (annotations === null) {
+      window.localStorage.removeItem(k);
+      window.localStorage.removeItem(`dih-annotate-save:${key}`);
+    } else window.localStorage.setItem(k, JSON.stringify({ annotations, at: new Date().toISOString() }));
+    if (had !== (annotations !== null)) window.dispatchEvent(new Event(ANNOTATION_DRAFT_EVENT));
   } catch {
     // Storage full or blocked: the drawing is still in memory.
   }
@@ -178,6 +228,8 @@ function AnnotatorDialog({ src, width, height, initial, title, locked = false, d
     restored ? { tone: "info", text: "We kept your unsaved drawing from last time." } : null,
   );
   const [saving, setSaving] = useState(false);
+  // The last save failed (usually no signal): the close panel offers to keep it on this phone.
+  const [saveFailed, setSaveFailed] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
   const [natural, setNatural] = useState<{ w: number; h: number } | null>(width && height ? { w: width, h: height } : null);
   const [imgFailed, setImgFailed] = useState(false);
@@ -507,21 +559,49 @@ function AnnotatorDialog({ src, width, height, initial, title, locked = false, d
     try {
       await onSave(validateAnnotations(toSave));
       writeDraft(draftKey, null);
+      setSaveFailed(false);
       setStatus({ tone: "ok", text: "Saved." });
       onClose();
     } catch (err) {
       const message = err instanceof Error && err.message ? err.message : "Couldn't save. Check your signal and try again.";
-      setStatus({ tone: "error", text: `${message} Your drawing is kept on this phone.` });
+      setSaveFailed(true);
+      // They meant to save it: once there's signal the survey sends it, even if they close first.
+      writeDraft(draftKey, validateAnnotations(toSave));
+      markWaitingToSave(draftKey, true);
+      setStatus({
+        tone: "error",
+        text: draftKey
+          ? `${message} Your drawing is kept on this phone: it saves by itself when signal returns, or close and carry on.`
+          : `${message} Try again when you have signal.`,
+      });
     } finally {
       setSaving(false);
     }
   };
+
+  // Signal back after a failed save: try again by itself while the editor is open.
+  const saveRef = useRef(save);
+  saveRef.current = save;
+  useEffect(() => {
+    if (!saveFailed) return;
+    const retry = () => void saveRef.current();
+    window.addEventListener("online", retry);
+    return () => window.removeEventListener("online", retry);
+  }, [saveFailed]);
 
   const requestClose = () => {
     if (dirty && !locked) setConfirmClose(true);
     else onClose();
   };
 
+  /** Leave the editor with the drawing kept in this browser (it's there when the photo is opened again, and saves when signal returns). */
+  const keepAndClose = () => {
+    writeDraft(draftKey, list);
+    markWaitingToSave(draftKey, true);
+    onClose();
+  };
+
+  // Only an explicit "Discard changes" (on the panel that says they'll be lost) forgets the drawing.
   const discard = () => {
     writeDraft(draftKey, null);
     onClose();
@@ -703,8 +783,17 @@ function AnnotatorDialog({ src, width, height, initial, title, locked = false, d
 
         {confirmClose ? (
           <div className="space-y-3 p-3">
-            <p className="text-base font-semibold">Close without saving?</p>
-            <p className="text-sm text-white/75">Your changes to this drawing will be lost.</p>
+            <p className="text-base font-semibold">{saveFailed ? "It hasn't saved yet" : "Close without saving?"}</p>
+            <p className="text-sm text-white/75">
+              {draftKey
+                ? "Keep it on this phone and carry on: it's here when you open this photo again, and saves by itself when there's signal. Or throw these changes away."
+                : "Your changes to this drawing will be lost."}
+            </p>
+            {draftKey && (
+              <PanelButton onClick={keepAndClose} tone="accent">
+                Keep it on this phone and close
+              </PanelButton>
+            )}
             <div className="grid grid-cols-2 gap-2">
               <PanelButton onClick={() => setConfirmClose(false)}>Keep editing</PanelButton>
               <PanelButton onClick={discard} tone="danger">

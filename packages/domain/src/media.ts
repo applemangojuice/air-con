@@ -256,8 +256,20 @@ export const MEDIA_UPLOAD_CONTENT_TYPES = [
   "video/quicktime",
 ] as const;
 
-/** One file's ceiling (the same as the local storage route): about a minute of phone video. */
+/**
+ * One file's ceiling (the same as the local storage route). For video
+ * that's short: a phone filming 1080p uses roughly 60 to 130 MB a minute,
+ * so 25 MB is about 15 to 25 seconds. The copy says "about 20 seconds" and
+ * offers a photo instead (VIDEO_TOO_BIG).
+ */
 export const MEDIA_MAX_BYTES = 25 * 1024 * 1024;
+
+/** What a too-big video is told: the honest length, and the way round it. */
+export const VIDEO_TOO_BIG =
+  "That video is too big to upload (25 MB at most: about 20 seconds on most phones). Film a shorter clip, or take a photo instead (for a drain test, of the water coming out at the end).";
+
+/** The hint under a video slot, before they film. */
+export const VIDEO_LENGTH_HINT = "Keep it to about 20 seconds (25 MB at most), or take a photo instead.";
 
 /** The content type a file most likely is: its own, else from the extension (some browsers leave a video's blank). */
 export function uploadContentType(type: string | null | undefined, fileName = ""): string {
@@ -288,9 +300,7 @@ export function mediaUploadProblem(file: { type?: string | null; name?: string; 
       : "That kind of file can't be uploaded. Photos (JPEG, PNG, WebP, HEIC), PDFs and videos (MP4, .mov) only.";
   }
   if (typeof file.size === "number" && file.size > MEDIA_MAX_BYTES) {
-    return ct.startsWith("video/")
-      ? "That video is too long to upload (25 MB at most, about a minute). Record a shorter clip."
-      : "That file is too big (25 MB at most).";
+    return ct.startsWith("video/") ? VIDEO_TOO_BIG : "That file is too big (25 MB at most).";
   }
   return null;
 }

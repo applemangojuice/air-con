@@ -6,6 +6,7 @@ import { ModalPortal } from "@/components/annotate/modal-portal";
 import { fmtDate, fmtDayTime } from "@/lib/format";
 import { londonClock } from "./nav";
 import type { OnMyWayState, TextStatus, VisitProject } from "./types";
+import type { ServerDraft } from "./use-survey-draft";
 
 /**
  * Before the survey: the visit card (who, where, when, how to get in, what
@@ -201,7 +202,8 @@ interface OnMyWayProps {
   phone?: string;
   smsMode: "live" | "demo";
   onClose: () => void;
-  onSent: (state: OnMyWayState) => void;
+  /** `prepared`: the draft the server got ready, so the start works with no signal. */
+  onSent: (state: OnMyWayState, prepared?: ServerDraft) => void;
 }
 
 export function OnMyWaySheet(props: OnMyWayProps) {
@@ -261,11 +263,11 @@ function OnMyWayDialog({ projectId, phone, smsMode, onClose, onSent }: OnMyWayPr
         credentials: "same-origin",
         body: JSON.stringify({ etaMinutes: eta }),
       });
-      const body = (await res.json().catch(() => ({}))) as Partial<OnMyWayState> & { error?: string };
+      const body = (await res.json().catch(() => ({}))) as Partial<OnMyWayState> & { error?: string; prepared?: ServerDraft };
       if (!res.ok || !body.text) throw new Error(body.error ?? `Couldn't send (${res.status}).`);
       const state = { etaMinutes: body.etaMinutes ?? eta, at: body.at ?? new Date().toISOString(), text: body.text };
       setResult(state);
-      onSent(state);
+      onSent(state, body.prepared);
     } catch (err) {
       setError(err instanceof Error && err.message !== "Failed to fetch" ? err.message : "No signal, so nothing was sent. Try again, or call the customer.");
     } finally {

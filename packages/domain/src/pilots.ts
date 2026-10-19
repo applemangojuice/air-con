@@ -1,5 +1,6 @@
 import type { CostCategory, CostLine } from "./costing.ts";
 import type { Issue, IssueKind } from "./issues.ts";
+import { creditPurposeOf, type Invoice } from "./money.ts";
 import { PROJECT_STAGES, currentStage, daysBetween, type Project, type ProjectStageId } from "./project.ts";
 import type { ProposalOption, ProposalRecord } from "./proposal.ts";
 import type { PoLine, PurchaseOrder } from "./purchasing.ts";
@@ -141,7 +142,19 @@ export interface PilotMetrics {
   labourCostPence: number | null;
   /** Hours the install estimate covers: install, commissioning, handover and rework. */
   installLabourHours: number;
+  /**
+   * VAT on supplier costs we can't reclaim (not VAT registered): 20% on
+   * every order line, delivery and subcontract cost that isn't already a
+   * VAT-inclusive price, exactly as the estimate's "input-vat" line. Part of
+   * the actual cost. 0 when registered (or the settings don't say).
+   */
+  inputVatPence: number;
+  /** Money taken off the price after the contract (credit notes for a reduction: goodwill, a snag), net of VAT. Already out of revenue. */
+  reductionsPence: number;
 }
+
+/** The input VAT the estimate adds on supplier costs while we aren't registered (costing's INPUT_VAT_PCT). */
+const INPUT_VAT_PCT = 20;
 
 /** Labour estimates are in person-days; a day is this many hours. */
 export const HOURS_PER_DAY = 8;
@@ -173,11 +186,15 @@ export function chosenOption(proposal: ProposalRecord | undefined, project: Proj
   return byLabel ?? proposal.options[0];
 }
 
-/** A PO line's cost: actual when someone recorded it, else expected, else unknown (never £0). */
-function lineCost(line: PoLine): { pence: number; actual: boolean; known: boolean } {
-  if (typeof line.actualUnitCostPence === "number") return { pence: Math.round(line.actualUnitCostPence * line.qty), actual: true, known: true };
-  if (typeof line.unitCostPence === "number") return { pence: Math.round(line.unitCostPence * line.qty), actual: false, known: true };
-  return { pence: 0, actual: false, known: false };
+/**
+ * A PO line's cost: actual when someone recorded it (always ex VAT), else
+ * expected (a VAT-inclusive catalogue price when the line says so), else
+ * unknown (never £0). `gross`: the figure already includes VAT.
+ */
+function lineCost(line: PoLine): { pence: number; actual: boolean; known: boolean; gross: boolean } {
+  if (typeof line.actualUnitCostPence === "number") return { pence: Math.round(line.actualUnitCostPence * line.qty), actual: true, known: true, gross: false };
+  if (typeof line.unitCostPence === "number") return { pence: Math.round(line.unitCostPence * line.qty), actual: false, known: true, gross: line.vatIncluded === true };
+  return { pence: 0, actual: false, known: false, gross: false };
 }
 
 /** The hourly rate for one entry: surveys at the surveyor rate, the rest by the person's trade. */
@@ -211,9 +228,12 @@ export function pilotMetrics(input: {
   issues: Issue[];
   messagesSent: number;
   surveyDiff?: SelfSurveyDiffRow[];
-  settings?: Pick<PilotSettings, "pricing">;
+  /** `tax` says whether supplier VAT is a cost (not registered) or reclaimed (registered). */
+  settings?: Pick<PilotSettings, "pricing"> & Partial<Pick<PilotSettings, "tax">>;
   staffRoles?: Record<string, StaffRole[]>;
   surveyMinutes?: number;
+  /** The project's invoices: price-reduction credit notes come off revenue. */
+  invoices?: Invoice[];
 }): PilotMetrics {
   const { project: p, proposal } = input;
   const option = chosenOption(proposal, p);
@@ -232,15 +252,23 @@ export function pilotMetrics(input: {
   const contractPricePence = accepted ? (p.proposal.contractTotalPence ?? p.money.contractTotalPence ?? null) : null;
 
   // Revenue is net of VAT (VAT isn't ours): the accepted option's net price,
-  // plus accepted variations and date-change fees. Nothing until a contract.
+  // plus accepted variations and date-change fees, less money taken off the
+  // price since (reduction credit notes). Nothing until a contract.
   const issues = input.issues ?? [];
   const variationsNet = sum(
     issues.filter((i) => i.kind === "variation" && i.variation?.status === "accepted").map((i) => i.variation!.priceDeltaNetPence || 0),
   );
+  // Money off the price afterwards (a reduction credit note: goodwill, a snag) is
+  // revenue given up; a correction only fixes an invoicing slip, so it isn't.
+  const reductionsPence = -sum(
+    (input.invoices ?? [])
+      .filter((i) => i.status !== "void" && i.status !== "draft" && i.kind === "credit-note" && creditPurposeOf(i) === "reduction")
+      .map((i) => i.netPence || 0),
+  );
   let revenuePence = 0;
   if (contractPricePence !== null) {
     const base = pricing && accepted ? pricing.netPence : contractPricePence;
-    revenuePence = base + variationsNet + (p.money.changeFeesPence || 0);
+    revenuePence = base + variationsNet + (p.money.changeFeesPence || 0) - reductionsPence;
   }
 
   // Costs: purchase orders by the category the design's cost lines gave each
@@ -250,16 +278,26 @@ export function pilotMetrics(input: {
   for (const line of option?.costLines ?? []) {
     if (line.catalogueItemId) categoryByItem.set(line.catalogueItemId, line.category);
   }
+  // VAT, as the estimate treats it (buildCostLines): registered, every cost is
+  // ex VAT (a VAT-inclusive catalogue price is taken back to net); not
+  // registered, the VAT we pay suppliers is a cost (input VAT on every figure
+  // that doesn't already include it). Without tax settings, figures as recorded.
+  const registered = input.settings?.tax ? input.settings.tax.vatRegistered : undefined;
+  const vatOn = (pence: number, gross: boolean): number => (registered === false && !gross ? Math.round((pence * INPUT_VAT_PCT) / 100) : 0);
+  const asCost = (pence: number, gross: boolean): number => (registered === true && gross ? Math.round(pence / (1 + INPUT_VAT_PCT / 100)) : pence);
   let equipment = 0;
   let materials = 0;
   let subcontractFromPos = 0;
   let shipping = 0;
+  let inputVat = 0;
+  let subcontractVatFromPos = 0;
   let actualLines = 0;
   let expectedLines = 0;
   let unknownLines = 0;
   for (const po of input.purchaseOrders ?? []) {
     if (po.status === "cancelled") continue;
     shipping += po.shippingPence || 0;
+    inputVat += vatOn(po.shippingPence || 0, false);
     for (const line of po.lines ?? []) {
       const c = lineCost(line);
       if (!c.known) {
@@ -270,10 +308,15 @@ export function pilotMetrics(input: {
       }
       if (c.actual) actualLines++;
       else expectedLines++;
+      const cost = asCost(c.pence, c.gross);
       const category = (line.catalogueItemId && categoryByItem.get(line.catalogueItemId)) || "materials";
-      if (category === "equipment") equipment += c.pence;
-      else if (category === "subcontract") subcontractFromPos += c.pence;
-      else materials += c.pence;
+      if (category === "equipment") equipment += cost;
+      else if (category === "subcontract") {
+        subcontractFromPos += cost;
+        subcontractVatFromPos += vatOn(c.pence, c.gross);
+        continue;
+      } else materials += cost;
+      inputVat += vatOn(c.pence, c.gross);
     }
   }
   const costBasis: PilotMetrics["costBasis"] =
@@ -289,10 +332,10 @@ export function pilotMetrics(input: {
 
   // Subcontract work isn't bought on a PO: the proposal's expected figure
   // stands in until one is raised.
-  const expectedSubcontract = sum(
-    (option?.costLines ?? []).filter((l: CostLine) => l.category === "subcontract").map((l) => l.totalPence ?? 0),
-  );
+  const subcontractLines = (option?.costLines ?? []).filter((l: CostLine) => l.category === "subcontract");
+  const expectedSubcontract = sum(subcontractLines.map((l) => asCost(l.totalPence ?? 0, l.vatIncluded === true)));
   const subcontractCostPence = subcontractFromPos > 0 ? subcontractFromPos : expectedSubcontract;
+  inputVat += subcontractFromPos > 0 ? subcontractVatFromPos : sum(subcontractLines.map((l) => vatOn(l.totalPence ?? 0, l.vatIncluded === true)));
 
   // Time.
   const time = input.time ?? [];
@@ -317,7 +360,7 @@ export function pilotMetrics(input: {
   const labourHoursByKind = Object.fromEntries(Object.entries(byKind).map(([k, v]) => [k, hours(v)]));
   const labourCostPence = rates ? Math.round(labourCost) : null;
 
-  const actualCostPence = equipment + materials + subcontractCostPence + shipping + (labourCostPence ?? 0);
+  const actualCostPence = equipment + materials + subcontractCostPence + shipping + inputVat + (labourCostPence ?? 0);
   const estimatedCostPence = pricing && Number.isFinite(pricing.costPence) ? pricing.costPence : null;
   // Profit only on a cost we know: with a required line unpriced, or nothing
   // ordered at all, the kit's cost is missing, not £0.
@@ -426,6 +469,8 @@ export function pilotMetrics(input: {
     unknownCostLines: unknownLines,
     labourCostPence,
     installLabourHours: hours(installMinutes),
+    inputVatPence: inputVat,
+    reductionsPence,
   };
 }
 
@@ -455,11 +500,12 @@ export const PILOT_METRIC_ROWS: MetricRow[] = [
   { key: "instantPricePence", label: "Instant price", format: "money", better: null, group: "Price" },
   { key: "listPricePence", label: "List price", format: "money", better: null, group: "Price" },
   { key: "contractPricePence", label: "Contract price", format: "money", better: null, group: "Price" },
-  { key: "revenuePence", label: "Revenue (net)", format: "money", better: "higher", group: "Money", from: "handover" },
+  { key: "revenuePence", label: "Revenue (net, after credits)", format: "money", better: "higher", group: "Money", from: "handover" },
   { key: "equipmentCostPence", label: "Equipment cost", format: "money", better: "lower", group: "Money", from: "handover" },
   { key: "materialsCostPence", label: "Materials and delivery", format: "money", better: "lower", group: "Money", from: "handover" },
   { key: "subcontractCostPence", label: "Subcontract", format: "money", better: "lower", group: "Money", from: "handover" },
   { key: "labourCostPence", label: "Labour (logged hours at rates)", format: "money", better: "lower", group: "Money", from: "handover" },
+  { key: "inputVatPence", label: "VAT we can't reclaim", format: "money", better: "lower", group: "Money", from: "handover" },
   { key: "estimatedCostPence", label: "Estimated cost", format: "money", better: null, group: "Money" },
   { key: "actualCostPence", label: "Cost so far", format: "money", better: "lower", group: "Money", from: "handover" },
   { key: "grossProfitPence", label: "Gross profit", format: "money", better: "higher", group: "Money", from: "handover" },
@@ -542,6 +588,8 @@ const CSV_COLUMNS: Column[] = [
   { header: "materials_cost_gbp", value: (m) => pounds(m.materialsCostPence) },
   { header: "subcontract_cost_gbp", value: (m) => pounds(m.subcontractCostPence) },
   { header: "labour_cost_gbp", value: (m) => pounds(m.labourCostPence) },
+  { header: "unreclaimable_vat_gbp", value: (m) => pounds(m.inputVatPence) },
+  { header: "price_reductions_net_gbp", value: (m) => pounds(m.reductionsPence) },
   { header: "cost_basis", value: (m) => m.costBasis },
   { header: "order_lines_without_cost", value: (m) => m.unknownCostLines },
   { header: "estimated_cost_gbp", value: (m) => pounds(m.estimatedCostPence) },

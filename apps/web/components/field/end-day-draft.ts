@@ -49,3 +49,14 @@ export function reopenDraft(draft: EndDayDraft, defaults: EndDayTexts): EndDayDr
 export function isDirty(draft: EndDayDraft): boolean {
   return draft.touched.summary || draft.touched.message;
 }
+
+/**
+ * What the first screen's button does: with a customer update, on to the
+ * photos and the preview; with the update left empty (the hint says that
+ * closes the day quietly), straight to ending the day with no email and no
+ * photos. Nothing without the office summary.
+ */
+export function firstStep(draft: EndDayTexts): "photos" | "end-quietly" | "needs-summary" {
+  if (!draft.summary.trim()) return "needs-summary";
+  return draft.message.trim() ? "photos" : "end-quietly";
+}

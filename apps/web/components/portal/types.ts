@@ -113,6 +113,12 @@ export interface HubFacts {
    * The copy promises exactly this.
    */
   onTheWay: "sms" | "email" | null;
+  /**
+   * How they can actually pay on the pay page right now: card when Stripe
+   * (or the labelled demo simulator) is on, bank transfer when settings hold
+   * the account. The hub's "to pay" line names only these.
+   */
+  payBy: { card: boolean; bank: boolean };
 }
 
 export interface HubViewer {

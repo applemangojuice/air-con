@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useRef, useState } from "react";
-import { EVIDENCE_KIND_LABEL, NUMERIC_KINDS, windowText, type InstallStep, type SlotView } from "@aircon/domain";
+import { EVIDENCE_KIND_LABEL, NUMERIC_KINDS, VIDEO_LENGTH_HINT, windowText, type InstallStep, type SlotView } from "@aircon/domain";
 import { canScanBarcodes, capturePhoto, captureValue, locate, parseReading, readBarcode, uploadProblem } from "./capture";
 import { SignaturePad, type SignaturePadHandle } from "./signature-pad";
 import { Sheet } from "./sheet";
@@ -59,6 +59,7 @@ export function Slot({ projectId, step, slot, waiting, refused, imageUrl, disabl
   const [localUrl, setLocalUrl] = useState<string | null>(null);
   const [signing, setSigning] = useState(false);
   const file = useRef<HTMLInputElement>(null);
+  const photoFile = useRef<HTMLInputElement>(null);
   const scanFile = useRef<HTMLInputElement>(null);
   const pad = useRef<SignaturePadHandle>(null);
   const label = `${spec.label}${step.item ? `, ${step.item}` : ""}`;
@@ -173,7 +174,7 @@ export function Slot({ projectId, step, slot, waiting, refused, imageUrl, disabl
               // eslint-disable-next-line @next/next/no-img-element
               <img src={shownImage} alt={spec.label} className="h-36 w-full rounded-xl bg-surface object-cover" />
             ) : (
-              <p className="rounded-xl bg-surface px-3 py-2 text-sm text-ink-700">{spec.kind === "video" ? "Video" : "Photo"} captured{waiting ? ", uploading when there's signal" : ""}.</p>
+              <p className="rounded-xl bg-surface px-3 py-2 text-sm text-ink-700">{spec.kind === "video" ? "Captured" : "Photo captured"}{waiting ? ", uploading when there's signal" : ""}.</p>
             ))}
           {numeric && record?.value !== undefined && (
             <p className={`text-2xl font-semibold tabular-nums ${state === "exception" ? "text-red-800" : "text-ink-900"}`}>
@@ -223,6 +224,27 @@ export function Slot({ projectId, step, slot, waiting, refused, imageUrl, disabl
               <button type="button" disabled={disabled} onClick={() => file.current?.click()} className={needsCapture ? `${PRIMARY} w-full` : `${SECONDARY} w-full`}>
                 {busy ? "Saving on the phone…" : needsCapture ? (spec.kind === "video" ? "Film it" : "Take photo") : spec.kind === "video" ? "Film again" : "Retake"}
               </button>
+              {spec.kind === "video" && (
+                // Phone video is big: 25 MB is about 20 seconds. A photo of the result counts too.
+                <>
+                  <input
+                    ref={photoFile}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    className="sr-only"
+                    aria-label={`${spec.label}: take a photo instead`}
+                    onChange={(e) => {
+                      void onFile(e.target.files?.[0]);
+                      e.target.value = "";
+                    }}
+                  />
+                  <button type="button" disabled={disabled} onClick={() => photoFile.current?.click()} className={`${SECONDARY} mt-2 w-full`}>
+                    Take a photo instead
+                  </button>
+                  <p className="mt-1.5 text-xs text-ink-500">{VIDEO_LENGTH_HINT}</p>
+                </>
+              )}
             </>
           )}
 

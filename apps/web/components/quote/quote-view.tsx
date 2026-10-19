@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useState, type ReactNode } from "react";
-import type { QuoteResult as Quote } from "@aircon/domain";
+import { customerChecks, type QuoteResult as Quote } from "@aircon/domain";
 import { fmtDate, gbp } from "@/lib/format";
 import {
   BAND_COPY,
@@ -41,6 +41,7 @@ export function QuoteView({
   const band = BAND_COPY[quote.confidence.band];
   const vat = vatCopy(settings);
   const warranty = warrantyCopy(settings);
+  const checks = customerChecks(quote.reviewFlags, { outdoorUnits: quote.systems.length });
   const until = createdAt ? validUntil(settings, createdAt) : null;
   const finance = settings.finance.offered ? settings.finance : null;
 
@@ -141,14 +142,13 @@ export function QuoteView({
         </section>
       )}
 
-      {/* Review flags */}
-      {quote.reviewFlags.length > 0 && (
+      {/* What the survey confirms, in the customer's words (the engine's flags are written for the office) */}
+      {checks.length > 0 && (
         <section className="mt-4 rounded-2xl border border-line bg-surface p-4">
           <h2 className="text-sm font-bold">Your surveyor will check</h2>
           <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-ink-700">
-            {quote.reviewFlags.map((flag) => (
-              // The engine's older wording says "lock this line in"; nothing is locked before the survey.
-              <li key={flag}>{flag.replace(/lets us lock this line in/i, "helps us firm up this line")}</li>
+            {checks.map((check) => (
+              <li key={check}>{check}</li>
             ))}
           </ul>
         </section>

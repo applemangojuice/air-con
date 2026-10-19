@@ -29,7 +29,7 @@ import {
 import { bookingClashes, workingDatesFrom, type BookingClash } from "@/app/ops/calendar/calendar-model";
 import { audit } from "./audit";
 import { demoLoginAllowed } from "./auth/access";
-import { agreedTerms, issueInvoice, planInvoices, type InvoicePlan } from "./money-server";
+import { agreedTerms, creditedInFull, issueInvoice, planInvoices, type InvoicePlan } from "./money-server";
 import { listDocuments } from "./documents-server";
 import { loadOpsProjects } from "./ops-server";
 import { buildReadinessContext, dispatch, londonToday, loadProject } from "./project-service";
@@ -110,7 +110,8 @@ export interface BookingView {
   team: TeamMemberView[];
   crewClashes: BookingClash[];
   coverage: Record<StepRequirement, string[]>;
-  deposit: { plan: InvoicePlan; invoice?: Invoice };
+  /** `credited`: an earlier deposit invoice cancelled in full by a credit note, so a fresh one can go. */
+  deposit: { plan: InvoicePlan; invoice?: Invoice; credited?: Invoice };
   ctx: ReadinessContext;
 }
 
@@ -182,7 +183,10 @@ export async function loadBooking(projectId: string, staff: StaffMember): Promis
     taxCode,
     ...(typeof frozenDeposit === "number" && Number.isInteger(frozenDeposit) && frozenDeposit >= 0 ? { contractDepositPence: frozenDeposit } : {}),
   });
-  const depositInvoice = invoices.find((i) => i.kind === "deposit" && i.status !== "void" && i.status !== "draft");
+  // The deposit invoice in force: one credited in full (raised wrong, then cancelled) gives way to its replacement.
+  const liveDeposits = invoices.filter((i) => i.kind === "deposit" && i.status !== "void" && i.status !== "draft");
+  const depositInvoice = liveDeposits.find((i) => !creditedInFull(i, invoices));
+  const creditedDeposit = depositInvoice ? undefined : liveDeposits.at(-1);
   const cs = cancellationStatus(project, today, settings);
 
   return {
@@ -212,7 +216,7 @@ export async function loadBooking(projectId: string, staff: StaffMember): Promis
       ? bookingClashes({ projectId, dates, crew: project.booking.crew.map((c) => ({ staffId: c.staffId, name: c.name })) }, otherProjects)
       : [],
     coverage,
-    deposit: { plan: plans.deposit, ...(depositInvoice ? { invoice: depositInvoice } : {}) },
+    deposit: { plan: plans.deposit, ...(depositInvoice ? { invoice: depositInvoice } : {}), ...(creditedDeposit ? { credited: creditedDeposit } : {}) },
     ctx,
   };
 }

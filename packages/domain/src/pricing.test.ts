@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { generateQuote } from "./pricing.ts";
+import { customerChecks, generateQuote } from "./pricing.ts";
+import { permutationForLocation } from "./archetypes.ts";
 import type { Survey, SurveyRoom } from "./types.ts";
 
 function room(overrides: Partial<SurveyRoom> = {}): SurveyRoom {
@@ -89,4 +90,40 @@ test("the engine works out no finance: no APR, no monthly figures", () => {
   const quote = generateQuote(survey([room()]));
   assert.equal("finance" in quote, false);
   assert.doesNotMatch(JSON.stringify(quote), /apr|monthly/i);
+});
+
+test("customers see the surveyor's checks in plain words, never the office's pattern notes", () => {
+  // A 3-bed 1930s semi on the default back-wall spot, five rooms: two outdoor units.
+  const rooms = Array.from({ length: 5 }, (_, i) => room({ id: `r${i}`, name: `Room ${i + 1}` }));
+  const quote = generateQuote(survey(rooms, { archetypeId: "thirties-semi", permutationId: "rear-patio-multi" }));
+  assert.ok(quote.reviewFlags.some((f) => /^Pattern check:/.test(f)), "the office still gets its checks");
+  assert.ok(quote.reviewFlags.some((f) => /serves up to 4 rooms and you asked for 5/.test(f)));
+  const checks = customerChecks(quote.reviewFlags, { outdoorUnits: quote.systems.length });
+  assert.deepEqual(checks, [
+    "The best spots for your outdoor units, and how the pipes and condensate run to them.",
+    "Where your second outdoor unit goes.",
+  ]);
+  for (const c of checks) assert.doesNotMatch(c, /Pattern check|multi-split|you asked for|Rear patio/);
+
+  // One unit: singular; narration notes stay in ops; the older "lock this line in" is softened; other flags pass through.
+  assert.deepEqual(
+    customerChecks(["Pattern check: Patio drainage", "From narration: unsure about loft", "Electrics unconfirmed. A fuse board photo lets us lock this line in.", "Bedroom has no external wall, so the pipe route needs a design check."]),
+    [
+      "The best spot for your outdoor unit, and how the pipes and condensate run to it.",
+      "Electrics unconfirmed. A fuse board photo helps us firm up this line.",
+      "Bedroom has no external wall, so the pipe route needs a design check.",
+    ],
+  );
+  assert.deepEqual(customerChecks([]), []);
+});
+
+test("moving the outdoor unit moves the install pattern with it", () => {
+  assert.equal(permutationForLocation("thirties-semi", "ground-rear")?.id, "rear-patio-multi");
+  assert.equal(permutationForLocation("thirties-semi", "ground-side")?.outdoorLocation, "ground-side");
+  assert.equal(permutationForLocation("victorian-terrace", "ground-side"), undefined, "no side pattern for a terrace: the survey decides");
+  assert.equal(permutationForLocation(undefined, "ground-rear"), undefined);
+  // The side spot's quote carries no rear-patio checks.
+  const side = permutationForLocation("thirties-semi", "ground-side")!;
+  const quote = generateQuote(survey([room()], { archetypeId: "thirties-semi", permutationId: side.id, outdoor: { location: "ground-side", photos: [] } }));
+  assert.ok(!quote.reviewFlags.some((f) => /Patio/.test(f)));
 });

@@ -1720,3 +1720,70 @@ changelog and the reasons, so nobody "fixes" a deliberate choice back.
       decides both the on-my-way events' channel (`COMMS_EVENTS` fallback:
       email when a text can't reach them) and every promise in the portal and
       the booking and day-before emails.
+
+33. **Hardening review, batch 5 (before the first real customers).**
+    - *The balance follows the terms*: every proposal and contract bills the
+      balance "once the installation is finished", so `planInvoices` holds
+      the balance until `install.status` is complete (`balanceTimingProblem`,
+      plan `early`). An admin can bill it early with a reason (`earlyReason`:
+      audited, kept in the invoice's internal notes). The hub's next step puts
+      choosing install dates ahead of any invoice but a requested deposit, and
+      its "to pay" line names only the ways the pay page offers
+      (`HubFacts.payBy`, `toPayLine`: card when Stripe or the demo simulator
+      is on, bank transfer only with the account in settings).
+    - *Customers see plain words*: `/q` and the funnel result show
+      `customerChecks(reviewFlags)`: "Pattern check:" items become one
+      sentence about the outdoor unit, "serves up to N rooms" becomes the
+      second outdoor unit's position, narration notes stay in ops; the raw
+      flags stay on the ops quote page. Moving the outdoor unit in the funnel
+      moves the install pattern with it (`permutationForLocation`). The hub's
+      rough plan drops the pattern's internal name.
+    - *Unknown postcode in a covered outcode*: a 404 from postcodes.io (new
+      builds lag the ONS lists) is a soft note and they carry on
+      (`postcodeOutcome`); outside our area it still asks them to check it.
+    - *A promised proposal date that passes*: `proposalPromisedBy` /
+      `proposalOverdue` (domain); the hub says sorry instead of repeating the
+      old date (stage panel, survey-done callout, next-step card), and the
+      daily job `proposal-late` alerts the team the day after, then every
+      three days, until it's issued.
+    - *Today after commissioning*: `installDateFor` keeps the job on Today
+      while today's wrap-up is left (`wrapUpToday`: the handover, or ending
+      the day closed by commissioning), with "Commissioned · hand over and end
+      the day" / "Handed over · end the day" on the card.
+    - *Drawings with no signal*: a failed save retries when signal returns;
+      closing offers "Keep it on this phone and close" (only "Discard changes"
+      forgets it); tiles say "Drawing not saved yet", and the survey saves the
+      drawings they asked to save once it's online (a draft left by just
+      navigating away is only restored, never sent). A photo still uploading can be drawn on: the
+      drawing waits on the phone (`pending-drawings.ts`) and is saved onto the
+      photo when its upload lands.
+    - *A quiet end of day*: with the customer update left empty, the first
+      screen's button is "End day N (no customer update)", which closes the
+      day with no email and no photos, as the hint says (`firstStep`).
+    - *Starting a survey with no signal*: opening the visit online the day
+      before or on the day, or sending "on my way", prepares the draft
+      (`prepareSurveyDraft`: no `startedAt`, nothing the customer sees, no
+      clock). "Start survey" with no signal then starts on the phone; the
+      start (`/start` with the phone's `startedAt`, bounded by
+      `startedAtFrom`) is replayed when there's signal, and always before a
+      submit (`pending-start.ts`). Dating a prepared draft's start doesn't
+      move its save token, so the phone's autosave never conflicts.
+    - *Phone video is big*: 25 MB is about 20 seconds of 1080p, and the copy
+      says so (`VIDEO_TOO_BIG`); every video slot offers "Take a photo
+      instead" (a photo already fills the slot).
+    - *"Before we order your equipment" is enforced*: placing an order with a
+      supplier (`advanceOrder` to ordered or beyond) waits for the deposit
+      when the contract's timing is `before-kit-order`
+      (`kitOrderDepositProblem`); an admin can order with a reason (on the
+      order's history and the audit log). Raising the orders (planning) is
+      still fine. Ready-to-install blocks on an unpaid agreed deposit whatever
+      its timing.
+    - *A credited deposit gives way*: a deposit invoice credited in full with
+      nothing paid (`creditedInFull`) no longer stops a new one, so the
+      booking can't be stuck on it; the booking page says which was cancelled.
+    - *Pilot costs and VAT*: not VAT registered, the VAT paid to suppliers is
+      a cost (`inputVatPence`: 20% on order lines, delivery and subcontract
+      that aren't already VAT-inclusive, as the estimate's input-vat line);
+      registered, VAT-inclusive catalogue prices count net. Order lines and
+      cost lines carry `vatIncluded`. Revenue takes off price-reduction credit
+      notes (`reductionsPence`), never corrections. Both are CSV columns.

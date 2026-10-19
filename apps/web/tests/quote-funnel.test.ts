@@ -90,3 +90,17 @@ test("a stored draft is normalised: defaults filled, step kept, unsaved photos d
   assert.equal(normaliseDraft({ survey: "nope" }), null);
   assert.equal(normaliseDraft({ ...stored, step: -1 })!.step, undefined);
 });
+
+test("postcode step: an unknown postcode in an outcode we cover is a soft note, not a dead end", async () => {
+  const { postcodeOutcome } = await import("../components/quote/postcode-outcome.ts");
+  // A new build in SW16 that postcodes.io doesn't know yet: they carry on.
+  assert.deepEqual(postcodeOutcome(true, "not-found", true), { inArea: true, outOfArea: false, unverified: true, unknown: false });
+  // Outside our area, unknown: most likely a typo, so they check it (no waitlist for a postcode that may not exist).
+  assert.deepEqual(postcodeOutcome(true, "not-found", false), { inArea: false, outOfArea: false, unverified: false, unknown: true });
+  // Known, or the lookup unreachable: coverage alone decides.
+  assert.deepEqual(postcodeOutcome(true, "found", true), { inArea: true, outOfArea: false, unverified: false, unknown: false });
+  assert.deepEqual(postcodeOutcome(true, "offline", false), { inArea: false, outOfArea: true, unverified: false, unknown: false });
+  // Still typing, or checking: nothing yet.
+  assert.equal(postcodeOutcome(false, "found", true).inArea, false);
+  assert.equal(postcodeOutcome(true, "checking", true).inArea, false);
+});

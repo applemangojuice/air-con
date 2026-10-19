@@ -42,6 +42,8 @@ export interface CostLine {
   source?: string;
   catalogueItemId?: string;
   verified: boolean;
+  /** The supplier's VAT-inclusive price, used as it is (we aren't VAT registered, so no input VAT goes on top). */
+  vatIncluded?: boolean;
 }
 
 export interface LabourPlan {
@@ -248,6 +250,7 @@ export function buildCostLines(input: {
       totalPence: unit === null ? null : Math.round(line.qty * unit),
       ...(source ? { source } : {}),
       verified,
+      ...(grossLines.has(line.id) ? { vatIncluded: true } : {}),
     });
   };
 

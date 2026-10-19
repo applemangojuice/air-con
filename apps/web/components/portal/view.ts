@@ -15,8 +15,10 @@ import {
   type StaffMember,
   type StaffRole,
   PROPOSAL_TURNAROUND_WORKING_DAYS,
+  proposalOverdue,
+  proposalPromisedBy,
 } from "@aircon/domain";
-import { addWorkingDays, blockLabel, shortDay } from "./schedule.ts";
+import { blockLabel, shortDay } from "./schedule.ts";
 import type { HubFacts, PersonCard } from "./types.ts";
 import { realPhone } from "@/components/site/claims";
 
@@ -51,7 +53,13 @@ export function customerSafeProject(project: Project): Project {
 /* Facts from settings                                                 */
 /* ------------------------------------------------------------------ */
 
-export function hubFacts(project: Project, settings: PilotSettings, today: string, onTheWay: HubFacts["onTheWay"]): HubFacts {
+export function hubFacts(
+  project: Project,
+  settings: PilotSettings,
+  today: string,
+  onTheWay: HubFacts["onTheWay"],
+  card: { available: boolean; simulate: boolean } = { available: false, simulate: false },
+): HubFacts {
   const stages = Object.fromEntries(PROJECT_STAGES.map((s) => [s, stageInfo(s, settings, project)])) as HubFacts["stages"];
   const cs = cancellationStatus(project, today, settings);
   return {
@@ -78,7 +86,20 @@ export function hubFacts(project: Project, settings: PilotSettings, today: strin
     earlyStartWording: earlyStartWording(project.proposal.contractType),
     fees: { surveyShortNoticeGbp: rescheduleFeeGbp("survey", 0), installShortNoticeGbp: rescheduleFeeGbp("installation", 0) },
     onTheWay,
+    // The pay page's rules: card when it's on (or the demo simulator), bank only with the account in settings.
+    payBy: {
+      card: (card.available && settings.payments.methods.includes("card")) || card.simulate,
+      bank: settings.payments.methods.includes("bank-transfer") && Boolean(settings.company.bank),
+    },
   };
+}
+
+/** "£X to pay, by card or bank transfer.": only the ways the pay page really offers. */
+export function toPayLine(pence: string, payBy: HubFacts["payBy"], company: HubFacts["company"]): string {
+  if (payBy.card && payBy.bank) return `${pence} to pay, by card or bank transfer.`;
+  if (payBy.card) return `${pence} to pay, by card.`;
+  if (payBy.bank) return `${pence} to pay, by bank transfer.`;
+  return `${pence} to pay. ${company.phone ? `Call us on ${company.phone} or email ${company.email}` : `Email us at ${company.email}`} and we'll give you our bank details.`;
 }
 
 /** A staff member as the customer meets them: name, role, photo, bio and only the qualifications held today. */
@@ -125,22 +146,34 @@ export function defaultStage(project: Project): ProjectStageId {
 /** Working days we tell customers a proposal takes after the survey: the domain's one number (the survey-complete email uses it too). */
 export { PROPOSAL_TURNAROUND_WORKING_DAYS };
 
-/** When we said the proposal would arrive, or null before the survey. */
+/** When we said the proposal would arrive, or null before the survey (the domain's one rule). */
 export function proposalReadyBy(project: Project): string | null {
-  const at = project.survey.submittedAt;
-  return at ? addWorkingDays(at.slice(0, 10), PROPOSAL_TURNAROUND_WORKING_DAYS) : null;
+  return proposalPromisedBy(project);
 }
 
 /**
- * The calm line the "Your next step" card shows when customerNextAction is
- * null: what we're doing and when they'll hear. Never invents a date.
+ * The promised date has passed and the proposal still isn't with them (it's
+ * late on the day after the date we gave). The hub then says sorry instead
+ * of repeating a date in the past; ops gets an alert (proposal-late).
  */
+export function proposalLate(project: Project, today: string): boolean {
+  return proposalOverdue(project, today);
+}
+
+/** What the hub says once we've missed the date we gave. */
+export const PROPOSAL_LATE_LINE = "It's taking a little longer than we said. Sorry. We'll email you the moment it's ready.";
+
 /** The on-my-way promise in the words of the channel it'll really go by (HubFacts.onTheWay). */
 export function onTheWayPromise(onTheWay: HubFacts["onTheWay"]): string {
   return onTheWay === "sms" ? "We'll text you when we're on the way." : onTheWay === "email" ? "We'll email you when we're on the way." : "";
 }
 
-export function waitingCopy(project: Project, onTheWay: HubFacts["onTheWay"] = null): { title: string; body: string } {
+/**
+ * The calm line the "Your next step" card shows when customerNextAction is
+ * null: what we're doing and when they'll hear. Never invents a date, and
+ * never repeats one that has passed (`today`).
+ */
+export function waitingCopy(project: Project, onTheWay: HubFacts["onTheWay"] = null, today?: string): { title: string; body: string } {
   const p = project;
   if (p.closure.closed) {
     return p.closure.reason === "cancelled"
@@ -162,6 +195,7 @@ export function waitingCopy(project: Project, onTheWay: HubFacts["onTheWay"] = n
         p.design.status === "approved"
           ? "Your design has been signed off by our engineer. We're putting your proposal together."
           : "We're designing your system from the survey. A qualified engineer checks and signs it off before you see a price.";
+      if (today && proposalLate(p, today)) return { title: "We're working on your proposal", body: `${design} ${PROPOSAL_LATE_LINE}` };
       return { title: "We're working on your proposal", body: by ? `${design} It should be with you by ${shortDay(by)}.` : design };
     }
     case "booking":

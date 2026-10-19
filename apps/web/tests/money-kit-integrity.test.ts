@@ -40,7 +40,7 @@ const addDays = (iso: string, n: number) => {
 
 test("a part-applied payment retried later is counted on the project once", async () => {
   const id = await demo("DEMO 3");
-  const balance = await issueInvoice(id, { kind: "balance", requestId: rid() }, OFFICE);
+  const balance = await issueInvoice(id, { kind: "balance", requestId: rid(), earlyReason: "DEMO: billing before the install for the test" }, OFFICE);
   assert.ok(balance.ok, !balance.ok ? balance.error : "");
   const before = (await loadProject(id))!;
   const paid = await recordPayment(
@@ -68,7 +68,7 @@ test("a part-applied payment retried later is counted on the project once", asyn
 
 test("the console's 'owed to us' leaves out an invoice that was credited", async () => {
   const id = await demo("DEMO 3");
-  const balance = await issueInvoice(id, { kind: "balance", requestId: rid() }, OFFICE);
+  const balance = await issueInvoice(id, { kind: "balance", requestId: rid(), earlyReason: "DEMO: billing before the install for the test" }, OFFICE);
   assert.ok(balance.ok);
   const owing = await loadPulse();
   const line = owing.outstanding.invoices.find((i) => i.number === balance.value.number);
@@ -98,6 +98,36 @@ test("the deposit follows the contract's frozen terms, not a settings change mad
   const view = (await loadBooking(id, OFFICE))!;
   assert.equal(view.payments.depositPct, agreed.depositPct);
   assert.equal(view.paymentsAgreed, true);
+});
+
+test("the balance waits for the installation to finish, as the contract says; an admin can bill it early with a reason", async () => {
+  const id = await demo("DEMO 3");
+  const { loadMoney } = await import("../lib/money-server.ts");
+  const view = (await loadMoney(id))!;
+  assert.equal(view.plans.balance.available, false);
+  assert.equal(view.plans.balance.early, true);
+  assert.match(view.plans.balance.reason ?? "", /once the installation is finished/);
+  assert.ok(view.plans.balance.totalPence > 0, "the figure is still worked out, for the admin and 'still to invoice'");
+
+  const refused = await issueInvoice(id, { kind: "balance", requestId: rid() }, OFFICE);
+  assert.ok(!refused.ok && /once the installation is finished.*An admin can bill it early/.test(refused.error), !refused.ok ? refused.error : "");
+  const officeOnly: StaffMember = { ...OFFICE, id: "aa000000-0000-4000-8000-0000000000c2", roles: ["tech-lead"] };
+  const notAdmin = await issueInvoice(id, { kind: "balance", requestId: rid(), earlyReason: "Customer asked" }, officeOnly);
+  assert.ok(!notAdmin.ok && notAdmin.status === 403);
+
+  const early = await issueInvoice(id, { kind: "balance", requestId: rid(), earlyReason: "Customer asked to pay before the install (DEMO)" }, OFFICE);
+  assert.ok(early.ok, !early.ok ? early.error : "");
+  assert.match(early.value.notes ?? "", /Billed before the installation finished: Customer asked/);
+
+  // Once the install is finished it's an ordinary invoice.
+  const id2 = await demo("DEMO 3");
+  const p = (await loadProject(id2))!;
+  await saveProject({ ...p, install: { ...p.install, status: "complete", completedAt: new Date().toISOString() } });
+  const done = (await loadMoney(id2))!;
+  assert.equal(done.plans.balance.available, true);
+  assert.equal(done.plans.balance.early, undefined);
+  const normal = await issueInvoice(id2, { kind: "balance", requestId: rid() }, OFFICE);
+  assert.ok(normal.ok, !normal.ok ? normal.error : "");
 });
 
 /** DEMO 3 put back to "accepted, not booked, no early start, kit ordered but not here", for the date rules. */
@@ -176,3 +206,81 @@ function nextWeekday(iso: string): string {
   while ([0, 6].includes(new Date(`${d}T12:00:00Z`).getUTCDay())) d = addDays(d, 1);
   return d;
 }
+
+test("a deposit raised wrong and credited in full can be raised again, and paying it clears the booking", async () => {
+  const id = await demo("DEMO 3");
+  const { requireDb } = await import("../lib/supabase-server.ts");
+  const { loadMoney } = await import("../lib/money-server.ts");
+  const { loadBooking } = await import("../lib/booking-server.ts");
+  const { blockersFor } = await import("@aircon/domain");
+  // DEMO 3 back to "accepted, deposit not asked for yet".
+  await requireDb().from("payments").delete().eq("project_id", id);
+  await requireDb().from("invoices").delete().eq("project_id", id);
+  const p = (await loadProject(id))!;
+  await saveProject({ ...p, booking: { ...p.booking, depositStatus: "not-required", status: "not-booked" }, money: { ...p.money, invoicedPence: 0, paidPence: 0, paymentIds: [] } });
+
+  const first = await issueInvoice(id, { kind: "deposit", requestId: rid() }, OFFICE);
+  assert.ok(first.ok, !first.ok ? first.error : "");
+  assert.equal((await loadMoney(id))!.plans.deposit.available, false, "one deposit at a time");
+  // Raised wrong: cancel it in full.
+  const credit = await issueInvoice(id, { kind: "credit-note", amountPence: first.value.totalPence, reason: "Raised in error (DEMO)", creditsInvoiceId: first.value.id, creditPurpose: "correction", requestId: rid() }, OFFICE);
+  assert.ok(credit.ok, !credit.ok ? credit.error : "");
+  const after = (await loadMoney(id))!;
+  assert.equal(after.plans.deposit.available, true, "a fully credited deposit gives way to the right one");
+  const booking = (await loadBooking(id, OFFICE))!;
+  assert.equal(booking.deposit.invoice, undefined);
+  assert.equal(booking.deposit.credited?.id, first.value.id);
+
+  const second = await issueInvoice(id, { kind: "deposit", requestId: rid() }, OFFICE);
+  assert.ok(second.ok, !second.ok ? second.error : "");
+  const ctxBefore = (await loadReadinessContext(id))!;
+  assert.ok(blockersFor((await loadProject(id))!, ctxBefore, "booking").some((b) => b.code === "deposit-unpaid"));
+  const paid = await recordPayment(
+    { projectId: id, invoiceId: second.value.id, method: "bank-transfer", provider: "manual", providerRef: `manual:${rid()}`, amountPence: second.value.totalPence, status: "succeeded", receivedAt: new Date().toISOString() },
+    OFFICE,
+  );
+  assert.ok(paid.ok, !paid.ok ? paid.error : "");
+  const ctx = (await loadReadinessContext(id))!;
+  assert.equal(blockersFor((await loadProject(id))!, ctx, "booking").some((b) => b.code === "deposit-unpaid"), false, "the booking no longer waits on it");
+  assert.equal((await loadBooking(id, OFFICE))!.deposit.invoice?.id, second.value.id);
+});
+
+test("'before we order your equipment': nothing is placed with a supplier until the deposit's paid, unless an admin says why", async () => {
+  const id = await demo("DEMO 3");
+  const { requireDb } = await import("../lib/supabase-server.ts");
+  const { advanceOrder, generatePurchaseOrders, loadKit } = await import("../lib/purchasing-server.ts");
+  const documentsRepo = await import("../lib/repo/documents.ts");
+  // The contract (its frozen schedule) says the deposit comes before the kit is ordered; nothing paid, nothing ordered yet.
+  await requireDb().from("payments").delete().eq("project_id", id);
+  await requireDb().from("invoices").delete().eq("project_id", id);
+  await requireDb().from("purchase_orders").delete().eq("project_id", id);
+  const p = (await loadProject(id))!;
+  await saveProject({ ...p, booking: { ...p.booking, depositStatus: "not-required" }, money: { ...p.money, invoicedPence: 0, paidPence: 0, paymentIds: [] } });
+  const docs = await documentsRepo.listForProject(id);
+  const contract = docs.find((d) => d.kind === "contract")!;
+  const snap = contract.snapshot as { payments: Record<string, unknown> };
+  await requireDb().from("documents").update({ snapshot: { ...snap, payments: { ...snap.payments, depositPct: 20, depositTiming: "before-kit-order" } } }).eq("id", contract.id);
+  const proposalsRepo = await import("../lib/repo/proposals.ts");
+  const accepted = (await proposalsRepo.acceptedForProject(id))!;
+  // A contract is never edited: stand in a copy carrying these terms (the old one superseded).
+  await proposalsRepo.update({ ...accepted, status: "superseded" });
+  await proposalsRepo.insert({ ...accepted, id: crypto.randomUUID(), version: accepted.version + 1, terms: { ...accepted.terms!, depositPct: 20, depositTiming: "before-kit-order" } });
+
+  const raised = await generatePurchaseOrders(id, OFFICE);
+  assert.ok(raised.ok, !raised.ok ? raised.error : "raising the orders (planning) is fine");
+  if (!raised.ok) return;
+  const po = raised.value[0]!;
+  const kit = (await loadKit(id))!;
+  assert.match(kit.depositHold ?? "", /before we order the equipment/);
+  assert.ok((await advanceOrder(id, po.id, "approved", OFFICE)).ok, "approving it internally is fine");
+  const held = await advanceOrder(id, po.id, "ordered", OFFICE, { supplier: "DEMO Supplier" });
+  assert.ok(!held.ok && /deposit/.test(held.error), !held.ok ? held.error : "");
+  const tech: StaffMember = { ...OFFICE, id: "aa000000-0000-4000-8000-0000000000c3", roles: ["tech-lead"] };
+  const notAdmin = await advanceOrder(id, po.id, "ordered", tech, { supplier: "DEMO Supplier" }, undefined, { depositOverride: "Customer asked" });
+  assert.ok(!notAdmin.ok && notAdmin.status === 403);
+  const override = await advanceOrder(id, po.id, "ordered", OFFICE, { supplier: "DEMO Supplier" }, undefined, { depositOverride: "Supplier price ends Friday; customer paying Monday (DEMO)" });
+  assert.ok(override.ok, !override.ok ? override.error : "");
+  if (!override.ok) return;
+  assert.equal(override.value.status, "ordered");
+  assert.match(override.value.history.at(-1)!.note ?? "", /Ordered before the deposit was paid: Supplier price ends Friday/);
+});

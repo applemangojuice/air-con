@@ -508,7 +508,7 @@ export async function loadPilotRows(): Promise<{ rows: PilotRow[]; learnings: (L
   const [all, settings, learnings] = await Promise.all([loadAllProjects(), getSettings(), learningsRepo.list()]);
   const pilots = all.filter((p) => p.project.pilot);
   const ids = pilots.map((p) => p.project.id);
-  const [proposals, pos, time, issues, messages, surveys, quotes, staff] = await Promise.all([
+  const [proposals, pos, time, issues, messages, surveys, quotes, staff, invoices] = await Promise.all([
     rowsWhereIn("proposals", "project_id", ids).then((r) => r.map(proposalsRepo.fromRow)),
     rowsWhereIn("purchase_orders", "project_id", ids).then((r) => r.map(purchaseOrdersRepo.fromRow)),
     rowsWhereIn("time_entries", "project_id", ids).then((r) => r.map(timeRepo.fromRow)),
@@ -517,8 +517,11 @@ export async function loadPilotRows(): Promise<{ rows: PilotRow[]; learnings: (L
     rowsWhereIn("surveys", "project_id", ids).then((r) => r.map(surveysRepo.fromRow)),
     rowsWhereIn("quote_requests", "id", pilots.map((p) => p.project.quoteId), "id, survey"),
     staffRepo.list(),
+    // Credit notes that take money off the price come off revenue.
+    rowsWhereIn("invoices", "project_id", ids).then((r) => r.map(invoicesRepo.fromRow)),
   ]);
   const roles: Record<string, StaffRole[]> = Object.fromEntries(staff.map((s) => [s.id, s.roles]));
+  const invoicesBy = groupBy(invoices);
   const latestSurvey = latestBy(surveys);
   const posBy = groupBy(pos);
   const timeBy = groupBy(time);
@@ -553,6 +556,7 @@ export async function loadPilotRows(): Promise<{ rows: PilotRow[]; learnings: (L
       settings,
       staffRoles: roles,
       ...(survey?.minutes ? { surveyMinutes: survey.minutes } : {}),
+      invoices: invoicesBy.get(project.id) ?? [],
     });
     return {
       metrics,

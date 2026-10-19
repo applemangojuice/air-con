@@ -3,18 +3,58 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { PHOTO_TAG_LABEL, type PhotoTag } from "@aircon/domain";
 import { AnnotatedImage } from "@/components/annotate/annotated-image";
+import { ANNOTATION_DRAFT_EVENT, readAnnotationDraft } from "@/components/annotate/annotator";
+import { mediaDraftKey } from "@/components/annotate/media-annotator";
 import { MissingTag, fieldId } from "./controls";
+import { queuedDrawing } from "./pending-drawings";
 import type { PendingPhoto } from "./photo-queue";
 import type { SurveyMediaItem } from "./types";
 
 /**
+ * Which of these keys have a drawing kept on this phone (read after
+ * hydration, and again whenever one is kept or saved).
+ */
+function useKeptDrawings(keys: string[], has: (key: string) => boolean): Set<string> {
+  const [found, setFound] = useState<Set<string>>(() => new Set());
+  const signature = keys.join("|");
+  const hasRef = useRef(has);
+  hasRef.current = has;
+  useEffect(() => {
+    const list = signature ? signature.split("|") : [];
+    const check = () => setFound(new Set(list.filter((k) => hasRef.current(k))));
+    check();
+    window.addEventListener(ANNOTATION_DRAFT_EVENT, check);
+    window.addEventListener("storage", check);
+    return () => {
+      window.removeEventListener(ANNOTATION_DRAFT_EVENT, check);
+      window.removeEventListener("storage", check);
+    };
+  }, [signature]);
+  return found;
+}
+
+/**
  * Photos for one place in the survey (a room, an outdoor spot, the fuse
  * board): take one with the camera (or pick from the phone), watch it
- * upload, retry if it fails, tap to mark it up. A photo is only shown as
- * done once the server has it.
+ * upload, retry if it fails, tap to mark it up (even before it's uploaded).
+ * A photo is only shown as done once the server has it, and a drawing kept
+ * on the phone says it isn't saved yet.
  */
 
-function PendingThumb({ photo, onRetry, onRemove }: { photo: PendingPhoto; onRetry: () => void; onRemove: () => void }) {
+function PendingThumb({
+  photo,
+  drawn,
+  onRetry,
+  onRemove,
+  onAnnotate,
+}: {
+  photo: PendingPhoto;
+  /** A drawing is waiting to go up with it. */
+  drawn: boolean;
+  onRetry: () => void;
+  onRemove: () => void;
+  onAnnotate: () => void;
+}) {
   const [url, setUrl] = useState<string | null>(null);
   useEffect(() => {
     const u = URL.createObjectURL(photo.blob);
@@ -24,25 +64,34 @@ function PendingThumb({ photo, onRetry, onRemove }: { photo: PendingPhoto; onRet
   const failed = photo.status === "failed";
   const waiting = photo.status === "queued";
   return (
-    <li className="relative overflow-hidden rounded-2xl border border-line bg-surface">
-      <div className="aspect-square">
-        {/* eslint-disable-next-line @next/next/no-img-element -- a local object URL */}
-        {url && <img src={url} alt="Photo waiting to upload" className={`h-full w-full object-cover ${failed ? "opacity-60" : "opacity-80"}`} />}
-      </div>
-      <div className="absolute inset-x-0 bottom-0 bg-ink-950/75 px-2 py-1.5 text-xs font-semibold text-white">
-        {failed ? (
-          <span className="block">Not uploaded</span>
-        ) : waiting ? (
-          <span className="block">Waiting to upload</span>
-        ) : (
-          <>
-            <span className="block">Uploading {photo.progress ?? 0}%</span>
-            <span className="mt-1 block h-1 overflow-hidden rounded-full bg-white/30">
-              <span className="block h-full bg-white" style={{ width: `${photo.progress ?? 0}%` }} />
-            </span>
-          </>
-        )}
-      </div>
+    <li className="relative">
+      {/* Drawing works before the upload: it's kept on the phone and saved onto the photo once it lands. */}
+      <button
+        type="button"
+        onClick={onAnnotate}
+        className="block w-full rounded-2xl text-left outline-none focus-visible:ring-2 focus-visible:ring-accent-500"
+        aria-label={`Photo waiting to upload: ${drawn ? "edit your drawing" : "mark it up"}`}
+      >
+        <span className="relative block aspect-square overflow-hidden rounded-2xl border border-line bg-surface">
+          {/* eslint-disable-next-line @next/next/no-img-element -- a local object URL */}
+          {url && <img src={url} alt="" className={`h-full w-full object-cover ${failed ? "opacity-60" : "opacity-80"}`} />}
+          <span className="absolute inset-x-0 bottom-0 block bg-ink-950/75 px-2 py-1.5 text-xs font-semibold text-white">
+            {failed ? (
+              <span className="block">Not uploaded</span>
+            ) : waiting ? (
+              <span className="block">Waiting to upload</span>
+            ) : (
+              <>
+                <span className="block">Uploading {photo.progress ?? 0}%</span>
+                <span className="mt-1 block h-1 overflow-hidden rounded-full bg-white/30">
+                  <span className="block h-full bg-white" style={{ width: `${photo.progress ?? 0}%` }} />
+                </span>
+              </>
+            )}
+          </span>
+        </span>
+        <span className={`mt-1 block px-0.5 text-sm font-semibold ${drawn ? "text-amber-800" : "text-accent-700"}`}>{drawn ? "Drawing waits for upload" : "Mark up"}</span>
+      </button>
       {failed && (
         <div className="absolute inset-x-0 top-0 flex gap-1 p-1">
           <button type="button" onClick={onRetry} className="min-h-11 flex-1 rounded-full bg-white text-sm font-semibold text-ink-900 shadow">
@@ -119,7 +168,8 @@ export function PhotoStrip({
   onRemove: (mediaId: string) => void;
   onRetry: (localId: string) => void;
   onRemovePending: (localId: string) => void;
-  onAnnotate: (mediaId: string) => void;
+  /** A stored photo's media id, or a queued photo's local id. */
+  onAnnotate: (mediaIdOrLocalId: string) => void;
 }) {
   const id = useId();
   const [tag, setTag] = useState<PhotoTag>(tags[0] ?? "other");
@@ -136,6 +186,9 @@ export function PhotoStrip({
 
   const attached = mediaIds.map((m) => media[m]).filter((m): m is SurveyMediaItem => Boolean(m));
   const unknown = mediaIds.length - attached.length;
+  // Drawings kept on this phone: not saved onto the photo yet (no signal when they tried).
+  const unsaved = useKeptDrawings(attached.filter((m) => !m.locked).map(mediaDraftKey), (k) => readAnnotationDraft(k) !== null);
+  const waiting = useKeptDrawings(pending.map((p) => p.localId), (k) => queuedDrawing(k) !== null);
   const busy = pending.some((p) => p.status !== "failed");
 
   return (
@@ -179,7 +232,11 @@ export function PhotoStrip({
               >
                 <Thumb item={m} />
                 <span className="mt-1 block truncate px-0.5 text-xs text-ink-700">{PHOTO_TAG_LABEL[m.tag]}</span>
-                <span className="block px-0.5 text-sm font-semibold text-accent-700">{m.locked ? "Locked" : m.annotations.length ? "Edit drawing" : "Mark up"}</span>
+                {!m.locked && unsaved.has(mediaDraftKey(m)) ? (
+                  <span className="block px-0.5 text-sm font-semibold text-amber-800">Drawing not saved yet</span>
+                ) : (
+                  <span className="block px-0.5 text-sm font-semibold text-accent-700">{m.locked ? "Locked" : m.annotations.length ? "Edit drawing" : "Mark up"}</span>
+                )}
               </button>
               {!m.locked && (
                 <button
@@ -198,7 +255,14 @@ export function PhotoStrip({
             </li>
           ))}
           {pending.map((p) => (
-            <PendingThumb key={p.localId} photo={p} onRetry={() => onRetry(p.localId)} onRemove={() => onRemovePending(p.localId)} />
+            <PendingThumb
+              key={p.localId}
+              photo={p}
+              drawn={waiting.has(p.localId)}
+              onRetry={() => onRetry(p.localId)}
+              onRemove={() => onRemovePending(p.localId)}
+              onAnnotate={() => onAnnotate(p.localId)}
+            />
           ))}
           {unknown > 0 && (
             <li className="flex aspect-square items-center justify-center rounded-2xl border border-dashed border-line p-2 text-center text-xs text-ink-500">

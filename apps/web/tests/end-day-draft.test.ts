@@ -31,3 +31,10 @@ test("end of day: untouched fields follow the runsheet only on the first screen;
   const cleared = followDefaults(editDraft(d, "message", ""), later, true);
   assert.equal(cleared.message, "");
 });
+
+test("end of day: an empty customer update closes the day quietly, as the hint says", async () => {
+  const { firstStep } = await import("../components/field/end-day-draft.ts");
+  assert.equal(firstStep({ summary: "Done today: units hung.", message: "Today we hung the units." }), "photos");
+  assert.equal(firstStep({ summary: "Done today: units hung.", message: "   " }), "end-quietly");
+  assert.equal(firstStep({ summary: " ", message: "Anything" }), "needs-summary");
+});

@@ -109,6 +109,16 @@ export default async function KitPage({ params }: { params: Promise<{ id: string
         {p.booking.status !== "booked" && " (kit updates reach the customer once the booking is confirmed)"}
       </p>
 
+      {view.depositHold && (
+        <p role="alert" className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          {view.depositHold} Nothing can be ordered from a supplier until it is: raise the deposit on{" "}
+          <Link className="font-semibold underline" href={`/ops/projects/${p.id}/money`}>
+            Money
+          </Link>
+          .{staff.roles.includes("admin") ? " As an admin you can still order, with a reason." : ""}
+        </p>
+      )}
+
       {view.kitIssues.length > 0 && (
         <div role="alert" className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
           <p className="font-semibold">
@@ -152,7 +162,7 @@ export default async function KitPage({ params }: { params: Promise<{ id: string
 
       <div className="mt-8 space-y-6">
         {live.map((po) => (
-          <OrderCard key={po.id} po={po} projectId={p.id} staffName={staff.name} nowLocal={nowLocal} />
+          <OrderCard key={po.id} po={po} projectId={p.id} staffName={staff.name} nowLocal={nowLocal} depositHold={view.depositHold} isAdmin={staff.roles.includes("admin")} />
         ))}
       </div>
 
@@ -200,14 +210,21 @@ function OrderCard({
   projectId,
   staffName,
   nowLocal,
+  depositHold,
+  isAdmin,
 }: {
   po: PurchaseOrder & { schedule: { needOnSiteBy?: string; orderBy?: string; needFor?: "install" | "cancellation-period"; flags: PoFlag[] } };
   projectId: string;
   staffName: string;
   nowLocal: string;
+  /** The contract's deposit comes before ordering, and isn't paid. */
+  depositHold: string | null;
+  isAdmin: boolean;
 }) {
   const totals = poTotals(po);
   const next = NEXT[po.status];
+  // Placing the order waits for the deposit: only an admin, with a reason, can go ahead.
+  const held = Boolean(depositHold && next?.to === "ordered");
   const receiving = ["ordered", "confirmed", "dispatched"].includes(po.status);
   const checking = po.status === "delivered" || (receiving && po.lines.some((l) => l.receivedQty > l.inspectedQty));
   const damaged = po.lines.filter((l) => l.damagedQty - (l.replacedQty ?? 0) > 0);
@@ -324,10 +341,25 @@ function OrderCard({
 
       {/* The next step */}
       <div className="border-t border-line bg-surface/40 px-5 py-4 sm:px-6">
-        {next && (
-          <ActionForm flash action={advanceAction.bind(null, projectId)} submitLabel={next.label} variant={receiving ? "secondary" : "primary"} busyLabel="Saving…">
+        {held && !isAdmin && <p className="text-sm font-medium text-amber-900">Waiting for the deposit before this is ordered.</p>}
+        {next && (!held || isAdmin) && (
+          <ActionForm
+            flash
+            action={advanceAction.bind(null, projectId)}
+            submitLabel={held ? "Order before the deposit (admin)" : next.label}
+            variant={receiving || held ? "secondary" : "primary"}
+            busyLabel="Saving…"
+          >
             <input type="hidden" name="poId" value={po.id} />
             <input type="hidden" name="to" value={next.to} />
+            {held && (
+              <div className="mb-3">
+                <label className={label} htmlFor={`dep-${po.id}`}>
+                  Why order before the deposit is paid (kept on the order and in the audit log)
+                </label>
+                <input id={`dep-${po.id}`} name="depositOverride" required minLength={5} maxLength={300} className={field} />
+              </div>
+            )}
             {next.to === "ordered" && (
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>

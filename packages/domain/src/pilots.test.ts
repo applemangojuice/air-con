@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { buildCostLines, type OptionPricing } from "./costing.ts";
 import type { Issue } from "./issues.ts";
+import type { Invoice } from "./money.ts";
 import {
   HOURS_PER_DAY,
   LEARNING_PROMPTS,
@@ -312,10 +313,59 @@ test("a finished pilot: prices, revenue, costs by category and margin", () => {
       4 * (r.electricianDayPence / HOURS_PER_DAY),
   );
   assert.equal(m.labourCostPence, expectedLabour);
-  const costs = m.equipmentCostPence + m.materialsCostPence + m.subcontractCostPence + expectedLabour;
+  // Not VAT registered (the default): the 20% we pay suppliers on top is a cost, as the estimate's input-vat line.
+  assert.equal(m.inputVatPence, Math.round(0.2 * (m.equipmentCostPence + m.materialsCostPence + m.subcontractCostPence)));
+  const costs = m.equipmentCostPence + m.materialsCostPence + m.subcontractCostPence + m.inputVatPence + expectedLabour;
   assert.equal(m.actualCostPence, costs);
   assert.equal(m.grossProfitPence, m.revenuePence - costs);
   assert.equal(m.grossMarginPct, Math.round(((m.revenuePence - costs) / m.revenuePence) * 1000) / 10);
+});
+
+test("pilot costs treat VAT as the estimate does, and price reductions come off revenue", () => {
+  const registered = { ...DEFAULT_SETTINGS, tax: { ...DEFAULT_SETTINGS.tax, vatRegistered: true } };
+  // A catalogue price that already includes VAT (DEMO catalogue style), on an expected line.
+  const gross: PurchaseOrder = {
+    ...PO,
+    lines: [{ id: "g1", catalogueItemId: "demo-out-25", label: "Outdoor 2.5 kW", qty: 1, unitCostPence: 120_000, vatIncluded: true, receivedQty: 1, inspectedQty: 1, damagedQty: 0, serials: [], required: true }],
+    shippingPence: 0,
+  };
+  const notReg = pilotMetrics({ project: finishedProject(), proposal: proposal(), purchaseOrders: [gross], time: [], issues: [], messagesSent: 0, settings: DEFAULT_SETTINGS });
+  assert.equal(notReg.equipmentCostPence, 120_000, "what we paid, VAT and all");
+  assert.equal(notReg.inputVatPence, Math.round(0.2 * notReg.subcontractCostPence), "no VAT on top of a VAT-inclusive price; the electrician's day still carries it");
+  const reg = pilotMetrics({ project: finishedProject(), proposal: proposal(), purchaseOrders: [gross], time: [], issues: [], messagesSent: 0, settings: registered });
+  assert.equal(reg.equipmentCostPence, 100_000, "registered: the VAT is reclaimed, so the cost is net");
+  assert.equal(reg.inputVatPence, 0);
+  // Without tax settings, the figures stay as recorded.
+  assert.equal(pilotMetrics({ project: finishedProject(), proposal: proposal(), purchaseOrders: [gross], time: [], issues: [], messagesSent: 0 }).inputVatPence, 0);
+
+  // A goodwill credit (money off the price) is revenue given up; a correction isn't.
+  const credit = (over: Partial<Invoice>): Invoice => ({
+    id: `c-${Math.random()}`,
+    projectId: "11111111-de5e-4000-8000-000000000001",
+    number: "DIH-0009",
+    kind: "credit-note",
+    status: "issued",
+    lines: [],
+    netPence: -50_000,
+    taxPence: 0,
+    totalPence: -50_000,
+    paidPence: 0,
+    ...over,
+  } as Invoice);
+  const base = pilotMetrics({ project: finishedProject(), proposal: proposal(), purchaseOrders: [PO], time: [], issues: ISSUES, messagesSent: 0 });
+  const withCredits = pilotMetrics({
+    project: finishedProject(),
+    proposal: proposal(),
+    purchaseOrders: [PO],
+    time: [],
+    issues: ISSUES,
+    messagesSent: 0,
+    invoices: [credit({ creditPurpose: "reduction" }), credit({ creditPurpose: "correction", creditsInvoiceId: "inv-1" }), credit({ creditPurpose: "reduction", status: "void" })],
+  });
+  assert.equal(withCredits.reductionsPence, 50_000);
+  assert.equal(withCredits.revenuePence, base.revenuePence - 50_000);
+  assert.equal(withCredits.grossProfitPence, base.grossProfitPence! - 50_000);
+  assert.match(pilotsCsv([withCredits]), /unreclaimable_vat_gbp,price_reductions_net_gbp/);
 });
 
 test("a finished pilot: hours, days, durations and quality", () => {

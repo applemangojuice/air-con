@@ -37,7 +37,7 @@ const PLAN_ORDER = ["deposit", "balance", "variation", "survey-fee", "change-fee
  * paid without a payment record.
  */
 export default async function MoneyPage({ params }: { params: Promise<{ id: string }> }) {
-  await requireStaff("payments.record");
+  const staff = await requireStaff("payments.record");
   const { id } = await params;
   if (!isUuid(id)) notFound();
   const access = await requireProjectAccess(id, { perm: "payments.record" });
@@ -51,6 +51,9 @@ export default async function MoneyPage({ params }: { params: Promise<{ id: stri
   const live = invoices.filter((i) => i.status !== "void" && i.status !== "draft");
   const available = PLAN_ORDER.map((k) => view.plans[k]).filter((pl) => pl.available);
   const unavailable = PLAN_ORDER.map((k) => view.plans[k]).filter((pl) => !pl.available);
+  // The balance, ready but not due under the contract until the install is finished: an admin may still bill it, with a reason.
+  const early = view.plans.balance.early ? view.plans.balance : null;
+  const isAdmin = staff.roles.includes("admin");
   const card = view.card;
 
   return (
@@ -112,7 +115,9 @@ export default async function MoneyPage({ params }: { params: Promise<{ id: stri
       <Section className="mt-10" title="New invoice" description="Each one is issued at the figure shown, numbered from settings, emailed, and put in the customer's documents.">
         {available.length === 0 ? (
           <Card>
-            <p className="text-sm text-ink-500">Nothing to invoice right now.</p>
+            <p className="text-sm text-ink-500">
+              {early ? "Nothing to invoice yet. The balance follows once the installation is finished, as the contract says." : "Nothing to invoice right now."}
+            </p>
           </Card>
         ) : (
           <div className="grid gap-4 md:grid-cols-2">
@@ -121,6 +126,7 @@ export default async function MoneyPage({ params }: { params: Promise<{ id: stri
             ))}
           </div>
         )}
+        {early && isAdmin && <EarlyBalanceCard plan={early} projectId={p.id} />}
         {unavailable.length > 0 && (
           <details className="mt-3 rounded-2xl border border-line bg-white px-4">
             <summary className="flex min-h-12 cursor-pointer items-center text-sm font-semibold text-ink-900">Why the others aren&apos;t available</summary>
@@ -239,6 +245,45 @@ function PlanCard({ plan, projectId }: { plan: InvoicePlan; projectId: string })
         <input type="hidden" name="expectedTotal" value={(plan.totalPence / 100).toFixed(2)} />
       </ActionForm>
     </Card>
+  );
+}
+
+/**
+ * Admins only: the balance before the installation is finished. The
+ * customer's terms say "once the installation is finished", so this needs a
+ * reason (agreed with them, a stopped job…), which is audited.
+ */
+function EarlyBalanceCard({ plan, projectId }: { plan: InvoicePlan; projectId: string }) {
+  return (
+    <details className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4">
+      <summary className="flex min-h-12 cursor-pointer items-center text-sm font-semibold text-amber-900">
+        Bill the balance before the installation is finished (admin)
+      </summary>
+      <div className="pb-4 text-sm text-amber-900">
+        <p>
+          The customer&apos;s contract says the balance comes once the installation is finished. Only bill it now if they&apos;ve agreed, or the job has stopped. Total{" "}
+          <span className="font-semibold">
+            <Money pence={plan.totalPence} />
+          </span>
+          , due on the contract&apos;s terms from today.
+        </p>
+        <ActionForm
+          flash
+          action={issueAction.bind(null, projectId)}
+          submitLabel="Issue the balance early and email it"
+          variant="secondary"
+          busyLabel="Issuing…"
+          confirm="Issue the balance invoice before the installation is finished, and email it to the customer?"
+        >
+          <input type="hidden" name="kind" value="balance" />
+          <input type="hidden" name="expectedTotal" value={(plan.totalPence / 100).toFixed(2)} />
+          <label className={`${label} mt-3`}>
+            Why now (kept with the invoice and in the audit log)
+            <input name="earlyReason" required minLength={5} maxLength={300} className={`${field} mt-1.5 font-normal`} />
+          </label>
+        </ActionForm>
+      </div>
+    </details>
   );
 }
 
