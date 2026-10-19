@@ -1,36 +1,84 @@
 # Test results
 
 The latest real results of every automatic check, run on **19 October
-2026** on branch `claude/pilot-ops` (on top of commit `78303fe`, with the
-fixes from the founder's walk below). Every person, home and price the
+2026** on branch `claude/pilot-ops` at commit `e21f042` (the go-live pack
+merged with the Supabase compatibility work, plus the two fixes
+[below](#what-the-final-pass-found)). Everything was run **twice in a row,
+start to finish, and passed both times**. Every person, home and price the
 browser walks use is fictional and labelled DEMO.
 
-**Summary: everything passed.** 855 unit tests, the type check, the
-production build, every database migration check, 191 end-to-end pilot
-checks and 23 quote-form checks, plus a by-hand walk of
-[START-HERE-TOMORROW.md](../START-HERE-TOMORROW.md) on a fresh production
-build ([below](#the-founders-walk-start-here-followed-literally)).
+**Summary: everything passed, on both databases.** 868 unit tests, the type
+check, the production build, every database migration check (108
+assertions) and the upgrade file check; then the browser walks on **both**
+backends: on the local file database, 191 end-to-end pilot checks and 23
+quote-form checks; on a Supabase-shaped stack (Postgres 16, PostgREST and
+the Storage API, as a real Supabase project serves them), the same 191 and
+23, the property book importers over 3,000 homes, and 439 checks across 284
+screens, with no statement refused by the database.
 
-| Check | Command | Result | When (UTC) |
-| --- | --- | --- | --- |
-| Type check (domain, web, mobile) | `pnpm -r typecheck` | **Pass** (3 of 3 projects) | 14:49 |
-| Domain unit tests | `pnpm test` | **457 of 457 pass**, 0 fail (29 test files) | 14:49 to 14:50 |
-| Web unit tests | `pnpm test` | **398 of 398 pass**, 0 fail (47 test files) | 14:49 to 14:50 |
-| Production build | `pnpm --filter @aircon/web build` | **Pass**: compiled, 34 of 34 static pages generated | 14:50 to 14:52 |
-| Database migrations | `bash supabase/tests/run-migrations.sh` | **Pass**: 14 migrations and the pilot upgrade bundle; 108 sanity assertions | 14:52 |
-| End-to-end pilot walk | `pnpm --filter @aircon/web test:e2e:pilot` | **191 of 191 pass** | 14:52 to 14:57 |
-| End-to-end quote form walk | `pnpm --filter @aircon/web test:e2e` | **23 of 23 pass** | 14:57 |
+| Check | Command | Result | Round 1 (UTC) | Round 2 (UTC) |
+| --- | --- | --- | --- | --- |
+| Type check (domain, web, mobile) | `pnpm -r typecheck` | **Pass** (3 of 3 projects) | 17:18 | 17:39 to 17:40 |
+| Domain unit tests | `pnpm test` | **457 of 457 pass**, 0 fail (29 test files) | 17:18 to 17:19 | 17:40 |
+| Web unit tests | `pnpm test` | **411 of 411 pass**, 0 fail (49 test files) | 17:18 to 17:19 | 17:40 |
+| Production build | `pnpm --filter @aircon/web build` | **Pass**: compiled, 34 of 34 static pages generated | 17:19 to 17:20 | 17:40 to 17:41 |
+| Database migrations | `bash supabase/tests/run-migrations.sh` | **Pass**: 14 migrations and the pilot upgrade bundle; the local backend's schema matches; 108 sanity assertions | 17:20 | 17:41 |
+| Upgrade file is current | `bash supabase/build-pilot-upgrade.sh --check` | **Pass**: `pilot-upgrade.sql` is current (0010 to 0013) | 17:20 | 17:41 |
+| Pilot walk, **local file database** | `node scripts/e2e-pilot.mjs` | **191 of 191 pass** | 17:21 to 17:25 | 17:42 to 17:46 |
+| Quote form walk, **local file database** | `node scripts/e2e-funnel.mjs` | **23 of 23 pass** | 17:25 | 17:46 |
+| Pilot walk, **Supabase-shaped** | `bash supabase/tests/compat/run-compat-e2e.sh` | **191 of 191 pass** | 17:25 to 17:34 | 17:46 to 17:55 |
+| Quote form walk, **Supabase-shaped** | (same run) | **23 of 23 pass** | (same run) | (same run) |
+| Property book import, **Supabase-shaped** | (same run) | **Pass**: 3,000 homes, 900 in a conservation area, 3,000 classified (three times Max Rows) | (same run) | (same run) |
+| Every screen, **Supabase-shaped** | (same run) | **439 of 439 pass**: 284 pages over 212 routes, 141 requests with ids that aren't there, a NUL in the quote form, 4 CSV exports, 4 daily jobs | (same run) | (same run) |
+| Database and app logs, **Supabase-shaped** | (same run) | **Clean**: no statement refused by Postgres, no PostgREST or Storage error in the app's log | (same run) | (same run) |
 
-Set-up for the browser walks: a production build (`next start`) on the local
-file database, a fresh empty data folder for each walk, demo sign-in on,
-`SESSION_SECRET` of 40 characters, headless Chromium 1194. Node 22.22.0,
-pnpm 10.12.1, PostgreSQL 16.15 for the migration checks.
+Both rounds ran on the same commit with nothing changed in between. (One
+attempt between them, at 17:34, was stopped and isn't counted: the test
+machine's port was already taken by another program, so its browser walk
+reached the wrong server. The round after it is the one above.)
+
+Set-up for the local walks: a production build (`next start`) on the local
+file database (which now enforces the same schema Postgres does), a fresh
+empty data folder each round, demo sign-in on, `SESSION_SECRET` of 40
+characters, headless Chromium 1194. For the Supabase-shaped walks: the same
+build with **no** `DATA_BACKEND`, talking to the stack only through
+supabase-js with the service-role key, as a demo deployment
+(`ALLOW_DEMO_LOGIN=1 DEMO_DEPLOYMENT=1`), the route walk signing in by
+**Admin break-glass**. Node 22.22.0, pnpm 10.12.1, PostgreSQL 16.15,
+PostgREST 12.2.3.
+
+## What the final pass found
+
+The go-live pack and the Supabase compatibility work were built apart. Run
+together, the first pass on the merged code failed in two places, both
+fixed in `e21f042`:
+
+- **A demo site switched itself off on Supabase.** The safety check that
+  keeps demo sign-in away from real data counted *any* quote not from the
+  demo seed, and *any* team member who isn't a DEMO account, as real. So on
+  a demo deployment the first **New pilot** for a DEMO family (an
+  `example.com` address), the first quote-form test or a break-glass admin
+  on an `example.com` address turned demo sign-in off: the Supabase-shaped
+  pilot walk lost **Try as…** at the surveyor, and the demo pilots wouldn't
+  load. Quotes and team members are now judged the way customers already
+  were: real when they're on an address a real person could own. The live
+  business (real addresses) is refused exactly as before; new unit tests
+  check both.
+- **One unit test wrote half a row**, which the local database now refuses
+  the way Postgres does (1 of 410 web tests failed). It now writes a whole
+  one.
+
+The screen walk also now opens the two new help pages (`/ops/help`,
+`/field/help`) on Supabase.
 
 ## The end-to-end pilot walk, phase by phase
 
 One new pilot household taken from set-up to closed, in a real browser, by
 each person on their own device: the admin at a desk (1280 × 800), the
-family, the surveyor and the crew on phones (390 × 844).
+family, the surveyor and the crew on phones (390 × 844). The same 191 checks
+passed four times today: twice on the local file database and twice on the
+Supabase-shaped stack. Any page error in the browser (including the
+hydration warning below) or any server error fails the walk.
 
 | Phase | What it does | Checks | Passed |
 | --- | --- | --- | --- |
@@ -50,7 +98,7 @@ family, the surveyor and the crew on phones (390 × 844).
 
 ## The founder's walk (START-HERE, followed literally)
 
-Before the checks above, someone with fresh eyes followed
+Earlier on 19 October (before the final pass above), someone with fresh eyes followed
 [START-HERE-TOMORROW.md](../START-HERE-TOMORROW.md) steps 5 to 11 word for
 word, on a production build with an empty local database, the way the live
 site will look before email works: no demo sign-in, `ADMIN_EMAILS` set to
@@ -119,7 +167,9 @@ and: applies every migration in order; re-applies the pilot migrations on an
 empty and on a filled database (nothing changes); runs the sanity suite
 (every table takes a row, the accepted-proposal guard refuses edits, the
 public key can't read or write anything, the shared sign-in limit counts and
-resets); runs the read-only production check ("All present: 30 tables, 10
+resets); checks the local file database enforces exactly the schema the
+migrations make (every column, type, default, key and check); runs the
+read-only production check ("All present: 30 tables, 10
 columns, 3 photo stores, the sign-in counter, the proposal guard and 3
 duplicate guards"); then, on a second database shaped like the live site
 before the pilots (migrations 0001 to 0009), runs `supabase/pilot-upgrade.sql`
@@ -127,17 +177,32 @@ twice, checks it again, runs the sanity suite again, and proves a run that
 stops part-way changes nothing. 108 assertions across both sanity runs, all
 passed.
 
-## One intermittent warning
+## The Supabase-shaped run
 
-Earlier on 19 October (14:00 UTC, before the previous version of this
-page) one of three pilot walks failed 1 of 191 checks: its "no page errors"
-check caught a React hydration warning (#418) when the technical lead opened
-a project's compliance checklist in phase J. Every other check in that walk
-passed, and every walk since (14:07, 14:12, 14:20 and today's 14:52 run)
-passed 191 of 191. It means the page drew slightly differently on the
-server and in the browser that once; the page still worked. It's worth a
-developer looking at before it confuses someone (see
-`app/ops/projects/[id]/compliance/page.tsx`).
+`supabase/tests/compat/run-compat-e2e.sh` runs the production build against
+the same interfaces a real Supabase project serves, on this machine:
+Postgres 16 with Supabase's roles (every migration run as the
+non-superuser `postgres`, as in the SQL editor), PostgREST 12.2.3 with Max
+Rows 1000, and a gateway doing Supabase's key check, its "no UPDATE or
+DELETE without a filter" rule and the Storage API. The app has no
+`DATA_BACKEND`: it talks to it only through supabase-js with the
+service-role key. Then:
+
+| Walk | What it does | Round 1 | Round 2 |
+| --- | --- | --- | --- |
+| Pilot walk | The 191 checks above | **191 of 191** | **191 of 191** |
+| Quote form | The 23 checks below | **23 of 23** | **23 of 23** |
+| Property book | 3,000 sample homes imported, enriched and classified, three times what one database read returns | **3,000 / 900 / 3,000** | **3,000 / 900 / 3,000** |
+| Every screen | Break-glass sign-in, the 5 DEMO pilots loaded, 284 pages over 212 routes (every ops, field, customer and public screen, help pages included), 141 requests with ids that don't exist or aren't ids (a 404, never a crash), a NUL character in the quote form (saved without it), 4 CSV exports, 4 daily jobs | **439 of 439** | **439 of 439** |
+| Postgres log | Any statement the database refused | **None** | **None** |
+| App log | Any PostgREST or Storage error the app logged, even on a page that still rendered | **None** | **None** |
+
+**The hydration warning is gone.** Earlier on 19 October one pilot walk in
+three failed its "no page errors" check on a React hydration warning
+(#418), more often on Supabase's slower answers. The cause was a bug in the
+React that Next.js ships, now patched (`patches/next@15.5.20.patch`,
+architecture §K36). No browser walk in either round saw it (ten walks: two pilot walks, two
+quote-form walks and one screen walk per round).
 
 ## Not covered by these checks
 
@@ -145,9 +210,11 @@ developer looking at before it confuses someone (see
   not sent) and the DEMO card simulator, not Resend, Twilio or Stripe.
   After going live, send yourself a test email and walk the quote form once
   on the live site (`/ops/launch` lists it).
-- A real Supabase project: the walks use the local file database, which
-  mirrors Supabase's behaviour; the migration checks run the real SQL on a
-  real PostgreSQL.
+- A real Supabase project: the Supabase-shaped run uses the same database,
+  PostgREST version and Storage API calls, on this machine, but not
+  Supabase's own servers, their network delays or their photo storage.
+  After step 3 of START-HERE, `check-schema.sql` and `/ops/launch` check the
+  real one.
 - Real phones: the walks use a phone-sized Chromium, not Safari on an
   iPhone. Try the field app on each installer's own phone before day 1.
 
@@ -165,6 +232,10 @@ cd apps/web && DATA_BACKEND=file LOCAL_DATA_DIR=$(mktemp -d) ALLOW_DEMO_LOGIN=1 
 # …then, from the repository root, in another terminal:
 BASE_URL=http://localhost:3330 pnpm --filter @aircon/web test:e2e:pilot
 BASE_URL=http://localhost:3330 pnpm --filter @aircon/web test:e2e
+
+# The Supabase-shaped run: builds, starts the stack and the app, runs every walk, tears down.
+bash supabase/build-pilot-upgrade.sh --check
+bash supabase/tests/compat/run-compat-e2e.sh
 ```
 
 Use a fresh `LOCAL_DATA_DIR` for each pilot walk. Against the live site, only
