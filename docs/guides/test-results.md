@@ -1,13 +1,14 @@
 # Test results
 
 The latest real results of every automatic check, run on **19 October
-2026** on branch `claude/pilot-ops` at commit `069775e` (the go-live pack
-merged with the Supabase compatibility work, plus the six fixes from the
-final pre-launch review [below](#what-the-final-review-found)). Everything
-was run **twice, start to finish, and passed both times**. Every person,
-home and price the browser walks use is fictional and labelled DEMO.
+2026** on branch `claude/pilot-ops` at commit `9ef0a25` (the go-live pack
+merged with the Supabase compatibility work, the six fixes from the final
+pre-launch review [below](#what-the-final-review-found), and the nine from
+round 3 of that review [below](#what-round-3-found)). Everything was run
+**twice, start to finish, and passed both times**. Every person, home and
+price the browser walks use is fictional and labelled DEMO.
 
-**Summary: everything passed, on both databases.** 878 unit tests, the type
+**Summary: everything passed, on both databases.** 895 unit tests, the type
 check, the production build (Next.js 15.5.28), every database migration
 check (110 assertions) and the upgrade file check; then the browser walks on
 **both** backends: on the local file database, 193 end-to-end pilot checks
@@ -19,22 +20,24 @@ across 284 screens, with no statement refused by the database.
 
 | Check | Command | Result | Round 1 (UTC) | Round 2 (UTC) |
 | --- | --- | --- | --- | --- |
-| Type check (domain, web, mobile) | `pnpm -r typecheck` | **Pass** (3 of 3 projects) | 18:24 | 18:46 |
-| Domain unit tests | `pnpm test` | **457 of 457 pass**, 0 fail (29 test files) | 18:24 to 18:25 | 18:46 to 18:47 |
-| Web unit tests | `pnpm test` | **421 of 421 pass**, 0 fail (49 test files) | 18:24 to 18:25 | 18:46 to 18:47 |
-| Production build | `pnpm --filter @aircon/web build` | **Pass**: Next.js 15.5.28, compiled, 34 of 34 static pages generated | 18:26 to 18:27 | 18:47 to 18:48 |
-| Database migrations | `bash supabase/tests/run-migrations.sh` | **Pass**: 15 migrations and the pilot upgrade bundle; the local backend's schema matches; 110 sanity assertions | 18:18 | 18:48 |
-| Upgrade file is current | `bash supabase/build-pilot-upgrade.sh --check` | **Pass**: `pilot-upgrade.sql` is current (0010 to 0014) | 18:18 and 18:45 | 18:48 |
-| Pilot walk, **local file database** | `node scripts/e2e-pilot.mjs` | **193 of 193 pass** | 18:28 to 18:33 | 18:48 to 18:53 |
-| Quote form walk, **local file database** | `node scripts/e2e-funnel.mjs` | **23 of 23 pass** | 18:34 | 18:53 |
-| Pilot walk, **Supabase-shaped** | `bash supabase/tests/compat/run-compat-e2e.sh` | **193 of 193 pass** | 18:35 to 18:45 | 18:54 to 19:05 |
+| Type check (domain, web, mobile) | `pnpm -r typecheck` | **Pass** (3 of 3 projects) | 21:26 | 21:44 |
+| Domain unit tests | `pnpm test` | **457 of 457 pass**, 0 fail (29 test files) | 21:26 to 21:27 | 21:44 |
+| Web unit tests | `pnpm test` | **438 of 438 pass**, 0 fail (50 test files) | 21:26 to 21:27 | 21:44 |
+| Production build | `pnpm --filter @aircon/web build` | **Pass**: Next.js 15.5.28, compiled, 34 of 34 static pages generated | 21:27 to 21:28 | 21:44 to 21:46 |
+| Database migrations | `bash supabase/tests/run-migrations.sh` | **Pass**: 15 migrations and the pilot upgrade bundle; the local backend's schema matches; 110 sanity assertions | 21:28 | 21:46 |
+| Upgrade file is current | `bash supabase/build-pilot-upgrade.sh --check` | **Pass**: `pilot-upgrade.sql` is current (0010 to 0014) | 21:28 | 21:46 |
+| Pilot walk, **local file database** | `node scripts/e2e-pilot.mjs` | **193 of 193 pass** | 21:28 to 21:33 | 21:46 to 21:50 |
+| Quote form walk, **local file database** | `node scripts/e2e-funnel.mjs` | **23 of 23 pass** | 21:33 | 21:50 |
+| Pilot walk, **Supabase-shaped** | `bash supabase/tests/compat/run-compat-e2e.sh` | **193 of 193 pass** | 21:33 to 21:43 | 21:51 to 22:01 |
 | Quote form walk, **Supabase-shaped** | (same run) | **23 of 23 pass** | (same run) | (same run) |
 | Property book import, **Supabase-shaped** | (same run) | **Pass**: 3,000 homes, 900 in a conservation area, 3,000 classified (three times Max Rows) | (same run) | (same run) |
 | Every screen, **Supabase-shaped** | (same run) | **439 of 439 pass**: 284 pages over 212 routes, 141 requests with ids that aren't there, a NUL in the quote form, 4 CSV exports, 4 daily jobs | (same run) | (same run) |
 | Database and app logs, **Supabase-shaped** | (same run) | **Clean**: no statement refused by Postgres, no PostgREST or Storage error in the app's log | (same run) | (same run) |
 
-Round 1 ran on the working tree that became `069775e` (after it, only
-comments and these documents changed); round 2 ran on the commit itself.
+Both rounds ran on commit `9ef0a25` itself (only this document changed
+after it). Before that commit, the same walks also passed once on the
+working tree while the fixes were being made (193, 23, 3,000 / 900 / 3,000
+and 439 of 439).
 
 Set-up for the local walks: a production build (`next start`) on the local
 file database (which enforces the same schema Postgres does), a fresh
@@ -46,9 +49,71 @@ supabase-js with the service-role key, as a demo deployment
 **Admin break-glass**. Node 22.22.0, pnpm 10.12.1, PostgreSQL 16.15,
 PostgREST 12.2.3.
 
+## What round 3 found
+
+A third pass of the pre-launch review found nine more problems. All nine
+are fixed in `9ef0a25`, each with unit tests that fail without the fix
+(architecture §K39):
+
+- **Retrying a message after correcting a wrong email sent it to the old
+  (wrong) address again**, and the corrected address could never get it.
+  Customer messages now follow the project's contact when they're sent:
+  after a correction, **Retry**, **Send again** and the daily retry send the
+  same message to the new address (once per address) and never to the old
+  one, which stops being retried; a removed address gets nothing. Sending
+  the same message again for the new address works instead of saying
+  "duplicate". The pre-contract information and contract confirmation only
+  count when they reached the project's current email. START-HERE and the
+  admin guide say so. (New tests: a failed invoice email to a typo, the
+  address corrected, then Retry, the daily retry, a fresh send, and a
+  removed address; a resend never reaches the typo.)
+- **Removing a wrong email left its owner attached**: they could still sign
+  in to the household's page and were still sent its sign-in links.
+  Removing the email now detaches the project in the same save, and a
+  project's sign-in link only goes to the project's own current email.
+  (New test: the removed address loses the project at once, gets no link,
+  and can't claim it back.)
+- **A variation that takes money off, billed on its own, became a negative
+  "invoice" nothing treated as credit**, so the balance billed the full
+  price and the customer was overcharged by the reduction. It's now a credit
+  note tied to the variation, which comes off what they pay; no invoice can
+  have a negative total. (New tests: a −£40.50 variation billed before and
+  after the balance; the customer is asked for exactly the agreed price.)
+- **Issuing a proposal while a colleague's autosave landed** could email one
+  set of prices while the customer accepted another, and lose the
+  colleague's "Saved" edit. Issuing now locks the draft first (a
+  compare-and-set) and refuses if anyone saved since the issuer's screen
+  loaded; a save that arrives while it's being issued is refused. (New
+  test: thirteen interleavings, either order; whatever wins, the email, the
+  record and the frozen document carry the same prices.)
+- **Commissioning could be signed while the signer's own re-captured
+  readings were still on the phone**, so the certificate and F-gas record
+  kept the old values. **Sign** now waits (and says why) while anything for
+  the job is on the phone, and the server refuses a signature over a
+  reading the screen didn't show, naming it.
+- **When the phone's storage stopped accepting writes, captures were kept
+  only in memory while the app said they were safe.** Writes now wait for
+  the database to confirm them, a dropped connection is reopened and the
+  write retried, and otherwise the badge says **Keep open · N waiting** and
+  the capture says it isn't kept on the phone (the survey's photo queue too).
+- **Captures still waiting at sign-out were sent under the next person to
+  sign in on that phone.** Each capture now carries who made it and only
+  sends while they're signed in; the server refuses one that isn't the
+  signed-in person's; the Me page warns before signing out.
+- **A second crew phone ending a day a colleague had already ended got "Day
+  N hasn't started" and its owner's clock ran overnight**, inflating the
+  pilot's labour hours. It now stops that person's clock and says the day
+  was already ended. (New tests, including a clock across the night the
+  clocks go back, 25 October 2026.)
+- **Every queued reading, issue and clock tap waited behind whichever photo
+  or video was uploading, and uploads had no timeout.** Readings and issues
+  now go in their own lane (only one that uses a photo waits for it), sync
+  requests time out, and an upload with no progress for a minute is
+  aborted and retried.
+
 ## What the final review found
 
-A last review before the first real customers found six problems. All six
+The first pass of the last review before the first real customers found six problems. All six
 are fixed in `069775e`, each with tests that fail without the fix
 (architecture §K38):
 
@@ -260,6 +325,9 @@ pilot walks, two quote-form walks and one screen walk per round).
   real one.
 - Real phones: the walks use a phone-sized Chromium, not Safari on an
   iPhone. Try the field app on each installer's own phone before day 1.
+  Safari dropping the phone's storage, a weak link stalling an upload and
+  two phones racing are covered by unit tests (a fake IndexedDB, a fake
+  upload, concurrent server calls), not on real devices.
 
 ## Running them yourself (for a developer)
 
