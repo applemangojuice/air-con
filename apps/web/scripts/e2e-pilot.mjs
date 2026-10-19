@@ -786,7 +786,9 @@ try {
     check("the tech lead signs with their F-gas certificate", await has(tech, /Signing as DEMO Tess \(technical lead\), F-gas Category I DEMO-FGAS-0001/));
     await tech.getByRole("button", { name: /Approve and sign/ }).first().click();
     check("design approved and signed", await waitFor(tech, /Approved and signed\. Version \d+ is now the design/, 30_000));
-    check("after signing the studio is read-only (no 'changing an approved design' banner)", !(await has(tech, /You're changing an approved design/)) && (await has(tech, /Signed by DEMO Tess/)));
+    // The message shows before the page refreshes into the signed version: wait for the signature, then look.
+    const signedShown = await waitFor(tech, /Signed by DEMO Tess/, 30_000);
+    check("after signing the studio is read-only (no 'changing an approved design' banner)", signedShown && !(await has(tech, /You're changing an approved design/)));
     await shot(tech, "D-approved");
   });
 

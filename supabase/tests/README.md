@@ -28,10 +28,18 @@ tail of the server log when it does.
    grants on `public`).
 3. Applies every migration in lexical order, each in one transaction.
 4. Applies `0010_pilot_platform.sql` again on the fresh schema.
-5. Runs `sanity.sql`.
-6. Applies `0010` a third time over the populated tables and checks no rows
-   were lost.
-7. Stops the cluster and deletes the directory.
+5. Compares the migrated schema with `apps/web/lib/db/db-schema.generated.ts`
+   (`schema-dump.sql` | `schema-sync.mjs --check`): every column, type,
+   NOT NULL, default, key, unique constraint, foreign key and check. The
+   local data backend enforces that file, so it must be what the migrations
+   make. After a migration, regenerate it with
+   `UPDATE_SCHEMA=1 bash supabase/tests/run-migrations.sh` (and mirror any
+   new partial/expression unique index or check constraint in
+   `local-schema.ts`, which `tests/local-schema.test.ts` insists on).
+6. Runs `sanity.sql`.
+7. Applies `0010` a third time over the populated tables and checks no rows
+   were lost, then 0013 over data from before it.
+8. Stops the cluster and deletes the directory.
 
 ## What `sanity.sql` checks
 
@@ -62,3 +70,91 @@ tail of the server log when it does.
 When you add a migration, add checks for it here. If it adds a unique
 constraint, a default or a guard the app depends on, mirror it in
 `apps/web/lib/db/local-schema.ts` too.
+
+# The app on a Supabase-shaped stack (`compat/`)
+
+The app reaches its database only through supabase-js: PostgREST for tables
+(`/rest/v1`) and the Storage API (`/storage/v1`), with the service-role key.
+`compat/` runs it against those same APIs on this machine, so what would
+break on a real Supabase project breaks here first:
+
+```sh
+bash supabase/tests/compat/run-compat-e2e.sh                 # build, stack, every walk, tear down
+SKIP_BUILD=1 ONLY="pilot routes" bash supabase/tests/compat/run-compat-e2e.sh
+bash supabase/tests/compat/stack.sh                          # just the stack, until Ctrl-C
+```
+
+The stack (`stack.sh`, everything in a temp dir, deleted on exit):
+
+- **Postgres 16** as the `postgres` OS user (when run as root), UTF-8 with the
+  C.UTF-8 locale, on a unix socket and `127.0.0.1:55432`
+  (`COMPAT_PG_PORT`). The superuser is `supabase_admin`, which loads
+  `supabase-stubs.sql` and `compat/compat-roles.sql`; every migration then
+  runs as `postgres`, which, as on Supabase (and in its SQL editor), is not a
+  superuser: CREATEROLE, CREATEDB, BYPASSRLS, owner of `public`, allowed to
+  write `storage.buckets`. The roles are Supabase's: `anon`, `authenticated`,
+  `service_role` (BYPASSRLS, so RLS-on-no-policies hides nothing from it) and
+  an `authenticator` login role that PostgREST connects as and that can only
+  switch to those three; Supabase's statement timeouts (8 s, anon 3 s).
+- **PostgREST 12.2.3** on `127.0.0.1:3001` (`COMPAT_PGRST_PORT`), configured as
+  Supabase configures it: schema `public`, anon role `anon`, `db-max-rows
+  1000`, a fresh JWT secret. The binary is never committed: `POSTGREST_BIN`,
+  else `~/.cache/aircon-compat`, else downloaded once from the GitHub release.
+- **The gateway** (`compat/gateway.mjs`, node:http only) on
+  `http://localhost:54321` (`COMPAT_GW_PORT`): the `SUPABASE_URL`. `/rest/v1`
+  goes to PostgREST after Kong's key check (the `apikey` must be the project's
+  anon or service-role key) and Supabase's pg-safeupdate rule (an UPDATE or
+  DELETE with no filter is refused, 21000). `/storage/v1` is an
+  implementation of the Storage API calls storage-js v2 makes (signed upload
+  URLs and their PUT, signed read URLs one or many, upload, download, info,
+  list, remove, move/copy, buckets), shaped like the real responses
+  (`signedURL` relative to `/storage/v1`, `{ statusCode, error, message }`
+  errors), with signed URLs as JWTs over `<bucket>/<path>`, Storage's key
+  character rule, and each bucket's `file_size_limit` and
+  `allowed_mime_types` read from `storage.buckets` (migration 0011).
+- **Keys**: HS256 JWTs (`compat/jwt.mjs`, node:crypto) for `service_role`
+  and `anon`, ten years, as a project issues them.
+
+`run-compat-e2e.sh` then builds the app, starts `next start` on `:3390`
+(`COMPAT_APP_PORT`) with `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` set
+and **no** `DATA_BACKEND`, and runs:
+
+| Walk | What |
+| --- | --- |
+| `pilot` | `apps/web/scripts/e2e-pilot.mjs`: one home from new pilot to closed, every role, on phones and a desk. |
+| `funnel` | `apps/web/scripts/e2e-funnel.mjs`: the public quote funnel. |
+| `intel` | The property-book importers (`import-intel.mjs`, `recompute-intel.mjs`) over 3,000 sample homes, three times Max Rows: every home enriched and classified. |
+| `routes` | `compat/walk-routes.mjs`: break-glass sign-in (`ADMIN_EMAILS` + `OPS_PASSWORD`, the real way in), load the DEMO pilots, then every ops, field, portal and public screen reachable from the consoles (at most 2 pages per route pattern), ids that aren't there or aren't ids (404, never 5xx), a NUL in the funnel, the CSV exports (the property book's with all 3,000 homes) and every cron with `CRON_SECRET`. |
+
+Afterwards it fails the run on any statement Postgres refused (the Postgres
+log; unique violations are listed, since the app meets them on purpose: a
+double tap, a retry), and on any PostgREST or Storage error the app logged,
+because a page that swallowed one still rendered.
+
+The app runs as a **demo deployment** (`ALLOW_DEMO_LOGIN=1
+DEMO_DEPLOYMENT=1`): the database is a throwaway one holding nothing real,
+which is exactly what that existing switch declares, and the pilot walk needs
+it ("Try as…" for the whole team, and messages recorded as demo because no
+email provider is configured: a live deployment without email refuses to
+issue a proposal). No test-only escape hatch exists or is needed; the route
+walk signs in by break-glass.
+
+Ports and paths are overridable (see the headers of `stack.sh` and
+`run-compat-e2e.sh`); `KEEP=1` keeps the temp dir, `GATEWAY_LOG=1` logs every
+gateway request to `$COMPAT_WORK/gateway.log`.
+
+## The local backend enforces the same schema
+
+`apps/web/lib/db/local-client.ts` (the file and memory backends the unit
+tests and the local e2e walk use) now refuses what Postgres and PostgREST
+refuse, from `db-schema.generated.ts` plus `local-schema.ts`: unknown tables
+(42P01) and columns (42703 / PGRST204); values cast to their column types the
+way Postgres casts them (a non-uuid against a uuid column is 22P02 in a write
+*and* in a filter, 1.5 into an integer is 22P02, NUL in text or jsonb is
+22P05); NOT NULL (23502, including the proposed row of an upsert); check
+constraints (23514); foreign keys, with ON DELETE cascade / set null / no
+action (23503); ON CONFLICT only on a real unique constraint (42P10); unique
+indexes checked in creation order, as Postgres reports them; and rows come
+back as PostgREST returns them (timestamptz as `…+00:00`, dates as
+`yyyy-mm-dd`, uuids lower case). Tests build rows with
+`apps/web/tests/helpers/rows.ts`.
