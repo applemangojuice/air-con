@@ -259,6 +259,25 @@ function assertUnique(table: string, schema: TableSchema, unchanged: readonly Ro
       seen.add(k);
     }
   }
+  for (const index of schema.uniqueIndexes) {
+    const seen = new Set<string>();
+    const keyFor = (r: Row) => {
+      const values = index.key(r);
+      return values && !values.some((v) => v === null || v === undefined) ? canonicalJson(values) : null;
+    };
+    for (const r of unchanged) {
+      const k = keyFor(r);
+      if (k !== null) seen.add(k);
+    }
+    for (const r of changed) {
+      const k = keyFor(r);
+      if (k === null) continue;
+      if (seen.has(k)) {
+        throw new QueryError("23505", `duplicate key value violates unique constraint "${index.name}"`, 409, `Key ${k} already exists.`);
+      }
+      seen.add(k);
+    }
+  }
 }
 
 function runGuard(schema: TableSchema, before: Row, after: Row): void {

@@ -6,6 +6,7 @@ import {
   type Project,
   type ProjectAction,
   PROPOSAL_TURNAROUND_WORKING_DAYS,
+  shiftWorkingDays,
 } from "@aircon/domain";
 import { fmtDate, fmtDayTime, money } from "../format.ts";
 import type { CommsData } from "./templates.ts";
@@ -49,15 +50,9 @@ export function textHash(text: string): string {
   return h.toString(36);
 }
 
+/** Working days on (weekends and bank holidays skipped: the domain's rule, as the reducer promises it). */
 function addWorkingDays(dateIso: string, n: number): string {
-  const d = new Date(`${dateIso.slice(0, 10)}T12:00:00Z`);
-  let left = n;
-  while (left > 0) {
-    d.setUTCDate(d.getUTCDate() + 1);
-    const dow = d.getUTCDay();
-    if (dow !== 0 && dow !== 6) left--;
-  }
-  return d.toISOString().slice(0, 10);
+  return n > 0 ? shiftWorkingDays(dateIso, n) : dateIso.slice(0, 10);
 }
 
 const lastEventAt = (p: Project, type: string) => [...p.events].reverse().find((e) => e.type === type)?.at;

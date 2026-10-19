@@ -80,8 +80,14 @@ export interface Invoice {
   /** Drafts only: voided, and why. */
   voidedAt?: string;
   voidReason?: string;
-  /** The form submission that created it, so a double click can't issue it twice. */
+  /** The form submission that created it, so a double click can't issue it twice (unique: migration 0013). */
   requestId?: string;
+  /**
+   * How many invoices the project had when this one's figure was worked out.
+   * Unique per project (migration 0013), so two issued at the same moment,
+   * both planned on the same invoices, can't both stand.
+   */
+  issueKey?: string;
   /** When the project's own totals (money.invoicedPence) took this invoice in. */
   recordedOnProjectAt?: string;
   /**

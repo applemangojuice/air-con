@@ -12,6 +12,7 @@ import {
 } from "./project-v1.ts";
 import { DEFAULT_SETTINGS, schedule2Missing, type PilotSettings } from "./settings.ts";
 import { ROLE_LABEL, can, meetsRequirement, type StaffMember, type StaffRole } from "./staff.ts";
+import { addWorkingDays, nextWorkingDay, notWorkingReason } from "./working-days.ts";
 
 // Unchanged from v1: one declaration, shared by both machines.
 export { daysBetween };
@@ -543,8 +544,6 @@ export const SERVICE_INTERVAL_MONTHS = 12;
 // identical wherever the reducer runs (server, browser, tests).
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const MON_FRI = [1, 2, 3, 4, 5];
-
 /**
  * Working days from the survey to the proposal, as promised to customers:
  * the reducer's survey-submitted update, the timeline estimate, the
@@ -590,33 +589,7 @@ function addDays(iso: string, days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-/** 1 = Monday … 7 = Sunday, matching settings.scheduling.workingDays. */
-function isoWeekday(iso: string): number {
-  const dow = new Date(`${dateOf(iso)}T12:00:00Z`).getUTCDay();
-  return dow === 0 ? 7 : dow;
-}
-
-function isWorkingDay(iso: string, workingDays: number[] = MON_FRI): boolean {
-  return (workingDays.length ? workingDays : MON_FRI).includes(isoWeekday(iso));
-}
-
-/** The date itself when it's a working day, else the next one. */
-function nextWorkingDay(iso: string, workingDays: number[] = MON_FRI): string {
-  let d = dateOf(iso);
-  while (!isWorkingDay(d, workingDays)) d = addDays(d, 1);
-  return d;
-}
-
-/** Move n working days (negative goes back). The start day itself doesn't count. */
-function addWorkingDays(iso: string, n: number, workingDays: number[] = MON_FRI): string {
-  let d = dateOf(iso);
-  const step = n < 0 ? -1 : 1;
-  for (let left = Math.abs(n); left > 0; ) {
-    d = addDays(d, step);
-    if (isWorkingDay(d, workingDays)) left -= 1;
-  }
-  return d;
-}
+// Working days (weekdays in settings, less England and Wales bank holidays) come from working-days.ts.
 
 /**
  * The day we told the customer their proposal would be with them (the
@@ -2476,7 +2449,8 @@ export function applyProjectAction(project: Project, action: ProjectAction, now:
       if (dates.length !== n) return err(`Pick ${n} install day${n === 1 ? "" : "s"}.`);
       if (dates[0] !== dateOf(action.startDate)) return err("The start date must be the first install day.");
       if (dates.some((d, i) => i > 0 && d <= dates[i - 1]!)) return err("Install days must be in order, with no repeats.");
-      if (!dates.every((d) => isWorkingDay(d, settings.scheduling.workingDays))) return err("Install days must be working days.");
+      const offDay = dates.map((d) => notWorkingReason(d, settings.scheduling.workingDays, fmtDate)).find((r) => r !== null);
+      if (offDay) return err(`Install days must be working days: ${offDay}.`);
       const start = dates[0]!;
       if (daysBetween(today, start) < INSTALL_LEAD_DAYS) {
         return err(`Install dates need at least ${INSTALL_LEAD_DAYS} days' notice.`);

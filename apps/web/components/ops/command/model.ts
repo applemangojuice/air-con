@@ -1,4 +1,4 @@
-import { TIME_KIND_LABEL, entryMinutes, type TimeEntry } from "@aircon/domain";
+import { TIME_KIND_LABEL, entryMinutes, upcomingWorkingDays as sharedUpcomingWorkingDays, type TimeEntry } from "@aircon/domain";
 
 /**
  * Pure helpers behind the command centre and its forms (tested in
@@ -49,16 +49,9 @@ export function slotIso(date: string, time: string): string | null {
 }
 
 /** The next `count` working days after `today` (1 = Monday … 7 = Sunday), for date pickers. */
-export function upcomingWorkingDays(today: string, workingDays: number[], count: number): string[] {
-  const days = workingDays.length ? workingDays : [1, 2, 3, 4, 5];
-  const out: string[] = [];
-  const d = new Date(`${today.slice(0, 10)}T12:00:00Z`);
-  for (let i = 0; out.length < count && i < 370; i++) {
-    d.setUTCDate(d.getUTCDate() + 1);
-    const dow = d.getUTCDay() === 0 ? 7 : d.getUTCDay();
-    if (days.includes(dow)) out.push(d.toISOString().slice(0, 10));
-  }
-  return out;
+export function upcomingWorkingDays(today: string, workingDays: readonly number[], count: number): string[] {
+  // The domain's working days (working-days.ts): bank holidays are skipped.
+  return sharedUpcomingWorkingDays(today, workingDays, count);
 }
 
 export interface TimeTotals {

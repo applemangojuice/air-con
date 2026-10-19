@@ -1,10 +1,10 @@
-import { TAX_CODES, effectiveTaxCode, sendVariationToCustomer, type Issue, type StaffMember } from "@aircon/domain";
+import { TAX_CODES, contractTaxCode, sendVariationToCustomer, type Issue, type StaffMember, type TaxCodeId } from "@aircon/domain";
 import { audit } from "./audit";
 import { notify } from "./comms/outbox";
 import { fail, type Outcome } from "./purchasing-server";
 import * as issuesRepo from "./repo/issues";
 import * as proposalsRepo from "./repo/proposals";
-import { getSettings } from "./settings-server";
+import { getSettingsStrict } from "./settings-server";
 
 /**
  * Variations between the field and the customer (plan §4: variation → owner
@@ -15,17 +15,20 @@ import { getSettings } from "./settings-server";
  */
 
 /**
- * The VAT rate a variation is priced at: the accepted contract option's own
- * tax treatment, not whatever settings say today; settings only when
- * there's no accepted contract on record.
+ * The tax code a variation is priced on: the accepted contract option's own
+ * tax treatment, not whatever settings say today (the money page invoices
+ * on the same code: contractTaxCode); settings, as they must be charged,
+ * only when there's no accepted contract on record. A failed read throws:
+ * a price at the wrong rate is worse than "try again".
  */
+export async function variationTaxCode(projectId: string): Promise<TaxCodeId> {
+  const [settings, accepted] = await Promise.all([getSettingsStrict(), proposalsRepo.acceptedForProject(projectId)]);
+  return contractTaxCode(accepted, settings);
+}
+
+/** The VAT rate that code charges, for the office's "VAT is added" note. */
 export async function contractTaxRatePct(projectId: string): Promise<number> {
-  const settings = await getSettings();
-  let taxCode = effectiveTaxCode(settings);
-  const accepted = await proposalsRepo.acceptedForProject(projectId).catch(() => null);
-  const option = accepted?.acceptance ? accepted.options.find((o) => o.id === accepted.acceptance!.optionId) : undefined;
-  if (option?.pricing.taxCode && TAX_CODES[option.pricing.taxCode]) taxCode = option.pricing.taxCode;
-  return TAX_CODES[taxCode]?.ratePct ?? 0;
+  return TAX_CODES[await variationTaxCode(projectId)]?.ratePct ?? 0;
 }
 
 /** Tell the customer a priced change is waiting for their answer. */
@@ -64,7 +67,7 @@ export async function sendVariation(
   if (staff.external) return fail("Prices go to the customer from the office.", 403);
   let next: Issue;
   try {
-    next = sendVariationToCustomer(issue, { ...input, taxRatePct: await contractTaxRatePct(projectId) }, staff.name, new Date().toISOString());
+    next = sendVariationToCustomer(issue, { ...input, taxCode: await variationTaxCode(projectId) }, staff.name, new Date().toISOString());
   } catch (err) {
     return fail(err instanceof Error ? err.message : String(err));
   }

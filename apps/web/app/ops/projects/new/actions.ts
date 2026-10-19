@@ -7,7 +7,7 @@ import { audit } from "@/lib/audit";
 import { CUSTOMER_EMAIL_LINK_TTL_DAYS, issueMagicLink } from "@/lib/auth/magic";
 import { requireStaff } from "@/lib/auth/server";
 import { isValidUkPostcode, normalisePostcode } from "@/lib/format";
-import { createProjectForQuote, dispatch, pilotNumberHolder } from "@/lib/project-service";
+import { DEMO_PILOT_FROM, createProjectForQuote, dispatch, pilotNumberHolder, pilotTakenMessage } from "@/lib/project-service";
 import { isUniqueViolation } from "@/lib/repo/base";
 import { getSettings } from "@/lib/settings-server";
 import { requireDb } from "@/lib/supabase-server";
@@ -37,7 +37,11 @@ const schema = z.object({
   floorAreaM2: z.union([z.coerce.number().min(30).max(1000), z.literal("")]),
   ownership: z.enum(["owner", "renting"]),
   electrics: z.enum(["modern-spare-ways", "modern-full", "older-fuse-box", "unsure"]),
-  pilotNumber: z.coerce.number().int().min(1, "Pilot number must be 1 or more").max(999),
+  pilotNumber: z.coerce
+    .number()
+    .int()
+    .min(1, "Pilot number must be 1 or more")
+    .max(DEMO_PILOT_FROM - 1, `Pilot numbers go up to ${DEMO_PILOT_FROM - 1}: ${DEMO_PILOT_FROM} and up are the DEMO pilots'.`),
   pilotLabel: z.string().trim().min(1, "Give the pilot a short label (an area, not the address)").max(80),
   note: z.string().trim().max(2000),
   sendLink: z.boolean(),
@@ -77,7 +81,7 @@ export async function createPilotAction(fd: FormData): Promise<ActionResult> {
   // One household per pilot number (a retry of this same form is fine: it finds its own project).
   try {
     const holder = await pilotNumberHolder(d.pilotNumber, { quoteId: d.requestId });
-    if (holder) return refused(`Pilot ${d.pilotNumber} is already ${holder.name}. Pick another number.`);
+    if (holder) return refused(pilotTakenMessage(d.pilotNumber, holder));
   } catch (err) {
     console.error("[new pilot] pilot number check failed:", err);
     return refused("The pilot number couldn't be checked. Nothing was created; please try again.");
@@ -140,7 +144,11 @@ export async function createPilotAction(fd: FormData): Promise<ActionResult> {
     contact: { email: d.email, ...(d.phone ? { phone: d.phone } : {}) },
     actor: staff,
   });
-  if ("error" in created) return refused(created.error === "demo" ? "There's no database connected." : `The project couldn't be created: ${created.error}`);
+  if ("error" in created) {
+    // 409: the pilot number went to another household a moment ago (the check above raced it); 503: settings unreadable.
+    if (created.status === 409 || created.status === 503) return refused(created.error);
+    return refused(created.error === "demo" ? "There's no database connected." : `The project couldn't be created: ${created.error}`);
+  }
   const id = created.id;
 
   if (!created.created) {

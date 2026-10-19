@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { Annotation, StaffMember } from "@aircon/domain";
 import { annotatedAlt, chipTextColour, describeAnnotations, legendEntries } from "../components/annotate/annotation-summary.ts";
+import { afterAwait, interceptTable, recordUpdates } from "./helpers/db-intercept.ts";
 import { registerAppResolver } from "./helpers/resolve-app.ts";
 
 process.env.DATA_BACKEND = "memory";
@@ -289,4 +290,45 @@ test("updateMedia: drawings versioned, stale saves refused, locked items keep th
   assert.equal(fine.item.annotations.length, 1, "the locked drawing is untouched");
 
   assert.equal((await media.updateMedia(MEDIA, { caption: "x" })).ok, false);
+});
+
+test("updateMedia writes only what changed, so a lock or a drawing saved since its read stays", async () => {
+  const item = await media.storeSystemMedia({
+    projectId: PROJECT,
+    fileName: "demo-race.svg",
+    contentType: "image/svg+xml",
+    body: "<svg xmlns='http://www.w3.org/2000/svg'/>",
+    tag: "indoor-wall",
+    source: "ops",
+  });
+  const { result, patches } = await recordUpdates("media", () => media.updateMedia(item.id, { caption: " DEMO hallway ", customerVisible: true }));
+  assert.ok(result.ok);
+  assert.equal(patches.length, 1);
+  assert.deepEqual(Object.keys(patches[0]!).sort(), ["caption", "customer_visible", "updated_at"], "never locked, annotations or their version");
+
+  // Another phone saves a drawing and the design is approved (locking the photo) between
+  // updateMedia's read and its write.
+  const db = requireDb();
+  const behindItsBack = (fields: Record<string, unknown>) => {
+    let reads = 0;
+    return (real: () => unknown) =>
+      reads++ === 0 ? afterAwait(real(), async () => void (await db.from("media").update(fields).eq("id", item.id))) : real();
+  };
+  const drawing = [{ id: "h1", type: "core-hole", x: 0.4, y: 0.4 }];
+  const caption = await interceptTable("media", behindItsBack({ locked: true, annotations: drawing, annotations_version: 7 }), () =>
+    media.updateMedia(item.id, { caption: "DEMO hallway, by the stairs" }),
+  );
+  assert.ok(caption.ok, "a caption is still editable");
+  const after = (await mediaRepo.get(item.id))!;
+  assert.equal(after.locked, true, "the design lock stands");
+  assert.equal(after.annotationsVersion, 7, "the other phone's drawing stands");
+  assert.deepEqual(after.annotations.map((a) => a.id), ["h1"]);
+  assert.equal(after.caption, "DEMO hallway, by the stairs");
+
+  // A structural change raced by the lock is refused, and leaves it locked.
+  await db.from("media").update({ locked: false }).eq("id", item.id);
+  const retag = await interceptTable("media", behindItsBack({ locked: true }), () => media.updateMedia(item.id, { tag: "other" }));
+  assert.equal(!retag.ok && retag.status, 409);
+  const still = (await mediaRepo.get(item.id))!;
+  assert.deepEqual([still.locked, still.tag], [true, "indoor-wall"]);
 });

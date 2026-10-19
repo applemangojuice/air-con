@@ -12,7 +12,7 @@ import { updateMedia } from "./media-server";
 import { dispatch, loadProject, londonToday } from "./project-service";
 import { isUuid } from "./repo/base";
 import * as mediaRepo from "./repo/media";
-import { getSettings } from "./settings-server";
+import { SETTINGS_UNAVAILABLE, settingsForWrite } from "./settings-server";
 
 /**
  * Certificates we hold for the customer (the electrical installation
@@ -51,6 +51,9 @@ export async function recordCertificate(projectId: string, input: CertificateInp
   const wanted = [...new Set(input.mediaIds.filter((id) => isUuid(id)))].slice(0, 8);
   const media = (await mediaRepo.listByIds(wanted)).filter((m) => m.projectId === projectId);
   if (electrical && media.length === 0) return fail("Upload the certificate itself (a PDF or a photo of it) first.");
+  // The document freezes the company's details: never on the fallback defaults.
+  const settings = await settingsForWrite();
+  if (!settings) return fail(SETTINGS_UNAVAILABLE, 503);
 
   for (const m of media) {
     if (m.customerVisible) continue;
@@ -58,7 +61,6 @@ export async function recordCertificate(projectId: string, input: CertificateInp
     if (!shown.ok) console.warn(`[certificates] couldn't show ${m.id} to the customer:`, shown.error);
   }
 
-  const settings = await getSettings();
   const now = new Date().toISOString();
   const snapshot: DocumentSnapshots["certificate"] = {
     company: documentCompany(settings),

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ROLE_LABEL } from "@aircon/domain";
+import { ROLE_LABEL, bankHolidayName } from "@aircon/domain";
 import { Badge, EmptyState, PageHeader } from "@/components/kit";
 import { requireStaff } from "@/lib/auth/server";
 import { demoLoginAllowed } from "@/lib/auth/access";
@@ -235,8 +235,9 @@ function MonthView({ month, today, events, clashing, dayHref }: { month: string;
             {week.map((d, i) => {
               const dayEvents = events.filter((e) => e.date === d);
               const outside = !d.startsWith(month);
+              const holiday = bankHolidayName(d);
               return (
-                <div key={d} className={`min-h-28 min-w-0 border-line p-1.5 ${i < 6 ? "border-r" : ""} ${outside ? "bg-surface/40" : ""} ${i >= 5 ? "bg-surface/30" : ""}`}>
+                <div key={d} className={`min-h-28 min-w-0 border-line p-1.5 ${i < 6 ? "border-r" : ""} ${outside ? "bg-surface/40" : ""} ${i >= 5 || holiday ? "bg-surface/30" : ""}`}>
                   <Link
                     href={dayHref(d)}
                     className={`mb-1 inline-flex h-7 min-w-7 items-center justify-center rounded-full px-1.5 text-xs font-semibold ${d === today ? "bg-accent-700 text-white" : outside ? "text-ink-500" : "text-ink-900 hover:bg-surface"}`}
@@ -244,6 +245,7 @@ function MonthView({ month, today, events, clashing, dayHref }: { month: string;
                   >
                     {Number(d.slice(8))}
                   </Link>
+                  {holiday && <p className="mb-1 truncate text-xs text-ink-500" title={`${holiday}: not a working day`}>{holiday}</p>}
                   <ul className="space-y-1">
                     {dayEvents.slice(0, 3).map((e) => (
                       <li key={e.id}>
@@ -279,6 +281,7 @@ function WeekView({ date, today, events, clashing, dayHref }: { date: string; to
             <Link href={dayHref(d)} className={`mb-2 block text-sm font-semibold ${d === today ? "text-accent-700" : "text-ink-900"}`}>
               {fmtDay(d)}
             </Link>
+            {bankHolidayName(d) && <p className="-mt-1 mb-2 text-xs text-ink-500">{bankHolidayName(d)}: not a working day</p>}
             <ul className="space-y-1.5">
               {events
                 .filter((e) => e.date === d)

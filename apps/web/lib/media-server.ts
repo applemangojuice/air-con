@@ -629,28 +629,26 @@ export async function updateMedia(id: string, patch: MediaPatch): Promise<MediaR
     current = saved;
   }
 
-  const next: MediaItem = { ...current };
-  let changed = false;
-  if (patch.tag !== undefined && patch.tag !== current.tag) {
-    next.tag = patch.tag;
-    changed = true;
-  }
+  // Only the columns that change are written: the drawing, its version and the lock are never
+  // put back from this read (another phone's drawing, or a design lock, may have landed since).
+  const fields: mediaRepo.MediaFields = {};
+  if (patch.tag !== undefined && patch.tag !== current.tag) fields.tag = patch.tag;
   if (patch.caption !== undefined) {
     const caption = patch.caption === null ? "" : text(patch.caption, 280);
-    if (caption) next.caption = caption;
-    else delete next.caption;
-    changed = changed || caption !== (current.caption ?? "");
+    if (caption !== (current.caption ?? "")) fields.caption = caption || null;
   }
   if (patch.roomId !== undefined) {
     const roomId = patch.roomId === null ? "" : text(patch.roomId, 64);
-    if (roomId) next.roomId = roomId;
-    else delete next.roomId;
-    changed = changed || roomId !== (current.roomId ?? "");
+    if (roomId !== (current.roomId ?? "")) fields.roomId = roomId || null;
   }
-  if (patch.customerVisible !== undefined && patch.customerVisible !== current.customerVisible) {
-    next.customerVisible = patch.customerVisible === true;
-    changed = true;
+  if (patch.customerVisible !== undefined && patch.customerVisible !== current.customerVisible) fields.customerVisible = patch.customerVisible === true;
+  if (Object.keys(fields).length === 0) return { ok: true, item: current };
+  const structuralFields = fields.tag !== undefined || fields.roomId !== undefined;
+  const saved = await mediaRepo.updateFields(id, fields, { unlockedOnly: structuralFields });
+  if (!saved) {
+    return structuralFields
+      ? fail("This photo was locked a moment ago (it's part of an approved design), so its tag and room can't change. Make a new version instead.", 409)
+      : fail("Not found", 404);
   }
-  if (!changed) return { ok: true, item: current };
-  return { ok: true, item: await mediaRepo.update(next) };
+  return { ok: true, item: saved };
 }

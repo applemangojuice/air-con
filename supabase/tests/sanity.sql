@@ -317,6 +317,56 @@ begin
 end
 $$;
 
+\echo '--- sanity: unique guards (0013)'
+
+-- A second household, so pilot numbers and invoice plans have something to clash with.
+insert into public.quote_requests (
+  id, customer_name, email, postcode, address_line, engine_version,
+  survey, quote, total_gbp, room_count, confidence_score, confidence_band
+) values (
+  'a0000000-0000-4000-8000-0000000000a1', 'DEMO Neighbour', 'demo.neighbour@example.com',
+  'SW16 1AB', '3 Demo Road', 'test', '{}', '{}', 5200, 1, 80, 'high'
+);
+insert into public.projects (id, quote_id, project, customer_name, postcode, current_stage)
+values ('b0000000-0000-4000-8000-0000000000a1', 'a0000000-0000-4000-8000-0000000000a1', '{"schemaVersion": 2}', 'DEMO Neighbour', 'SW16 1AB', 'survey');
+
+select pg_temp.expect_error('projects.pilot_number unique (pilot 1 is taken)', '23505', $sql$
+  update public.projects set pilot_number = 1 where id = 'b0000000-0000-4000-8000-0000000000a1'
+$sql$);
+select pg_temp.expect_ok('another pilot number is fine', $sql$
+  update public.projects set pilot_number = 2 where id = 'b0000000-0000-4000-8000-0000000000a1'
+$sql$);
+do $$
+begin
+  update public.projects set pilot_number = null
+    where id in ('b0000000-0000-4000-8000-000000000001', 'b0000000-0000-4000-8000-0000000000a1');
+  assert (select count(*) from public.projects where pilot_number is null) >= 2, 'two households without a number';
+  update public.projects set pilot_number = 1 where id = 'b0000000-0000-4000-8000-000000000001';
+  update public.projects set pilot_number = 2 where id = 'b0000000-0000-4000-8000-0000000000a1';
+  raise notice 'ok: households without a pilot number never clash';
+end
+$$;
+
+insert into public.invoices (project_id, number, kind, status, invoice)
+values ('b0000000-0000-4000-8000-000000000001', 'DIH-0101', 'deposit', 'issued', '{"requestId": "demo-request-1", "issueKey": "1"}');
+select pg_temp.expect_error('one invoice per request (requestId)', '23505', $sql$
+  insert into public.invoices (project_id, number, kind, invoice)
+  values ('b0000000-0000-4000-8000-000000000001', 'DIH-0102', 'balance', '{"requestId": "demo-request-1"}')
+$sql$);
+select pg_temp.expect_error('one invoice per plan on a project (issueKey)', '23505', $sql$
+  insert into public.invoices (project_id, number, kind, invoice)
+  values ('b0000000-0000-4000-8000-000000000001', 'DIH-0103', 'balance', '{"issueKey": "1"}')
+$sql$);
+select pg_temp.expect_ok('the same plan key on another project is fine', $sql$
+  insert into public.invoices (project_id, number, kind, invoice)
+  values ('b0000000-0000-4000-8000-0000000000a1', 'DIH-0104', 'deposit', '{"issueKey": "1"}')
+$sql$);
+select pg_temp.expect_ok('invoices without the keys (older ones) never clash', $sql$
+  insert into public.invoices (project_id, number, kind, invoice)
+  values ('b0000000-0000-4000-8000-000000000001', 'DIH-0105', 'change-fee', '{}'),
+         ('b0000000-0000-4000-8000-000000000001', 'DIH-0106', 'change-fee', '{}')
+$sql$);
+
 \echo '--- sanity: foreign keys and checks'
 
 select pg_temp.expect_error('child rows need a real project', '23503', $sql$

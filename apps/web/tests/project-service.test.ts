@@ -173,3 +173,30 @@ test("pilot numbers belong to one household: the holder is found, except the pro
   assert.equal(await pilotNumberHolder(707, { quoteId }), null, "a retry of the form that made it is fine");
   assert.equal(await pilotNumberHolder(708), null);
 });
+
+test("the database refuses a second household on a pilot number, even when the check was raced", async () => {
+  const quote = async (name: string) => {
+    const id = crypto.randomUUID();
+    await requireDb()
+      .from("quote_requests")
+      .insert({ id, customer_name: name, email: `${id.slice(0, 8)}@example.test`, source: "ops", survey: DEMO_SURVEY, quote: generateQuote(DEMO_SURVEY) });
+    return id;
+  };
+  const first = await createProjectForQuote(await quote("DEMO Pilot Seventeen"), { pilot: { number: 717, label: "DEMO seventeen" } });
+  assert.ok("id" in first, JSON.stringify(first));
+  // A second form that passed its pilotNumberHolder check a moment before the first saved: the insert itself is refused.
+  const raced = await createProjectForQuote(await quote("DEMO Raced"), { pilot: { number: 717, label: "DEMO raced" } });
+  assert.ok("error" in raced, JSON.stringify(raced));
+  assert.equal(raced.status, 409);
+  assert.equal(raced.error, "Pilot 717 is already DEMO Pilot Seventeen. Pick another number.");
+  // Retagging another household onto it goes through the reducer's save: refused the same way.
+  const other = await createProjectForQuote(await quote("DEMO Other"));
+  assert.ok("id" in other);
+  const retag = await dispatch(other.id, { type: "set-pilot", number: 717, label: "DEMO retag" }, OPS);
+  assert.ok("error" in retag && retag.status === 409, JSON.stringify(retag));
+  assert.match(retag.error, /^Pilot 717 is already DEMO Pilot Seventeen\./);
+  assert.equal((await loadProject(other.id))!.pilot, undefined, "nothing was saved");
+  // Its own number again is fine.
+  const again = await dispatch(first.id, { type: "set-pilot", number: 717, label: "DEMO seventeen (renamed)" }, OPS);
+  assert.ok(!("error" in again), JSON.stringify(again));
+});

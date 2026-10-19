@@ -173,7 +173,7 @@ export function NewPilotForm({
               Pilot
             </h2>
             <div className="grid gap-4 sm:grid-cols-[8rem_1fr]">
-              <Input label="Number" name="pilotNumber" type="number" min={1} max={999} required defaultValue={String(nextPilotNumber)} />
+              <Input label="Number" name="pilotNumber" type="number" min={1} max={899} required defaultValue={String(nextPilotNumber)} />
               <Input label="Label" name="pilotLabel" required maxLength={80} placeholder="e.g. Croydon semi" hint="An area or house type, never the address: it shows on dashboards and exports." />
             </div>
             <Textarea label="Note" name="note" rows={3} maxLength={2000} hint="Optional. Only the team sees it." className="mt-4" />

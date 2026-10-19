@@ -15,6 +15,9 @@
 #   4. 0010 again on the fresh schema: proves it's re-runnable
 #   5. sanity.sql: one row in every new table, constraints, the proposal guard
 #   6. 0010 a third time, now over real rows: re-running never touches data
+#   7. 0013 again over real rows, then over data from before it: two households
+#      on one pilot number stop it with their names; a request that made two
+#      invoices keeps its key on the first
 #
 # Exits non-zero on the first SQL error (psql ON_ERROR_STOP).
 
@@ -130,6 +133,41 @@ apply "$PILOT_MIGRATION"
   assert (select count(*) from storage.buckets where id in ('survey-photos', 'survey-videos', 'project-media')
           and file_size_limit > 0 and cardinality(allowed_mime_types) > 0) = 3, 'a bucket has no size or type limit (0011)';
   assert not (select 'text/html' = any(allowed_mime_types) from storage.buckets where id = 'survey-photos'), 'survey photos take HTML';
+end \$\$;"
+
+UNIQUE_GUARDS="$MIGRATIONS/0013_unique_guards.sql"
+echo "==> re-apply 0013 (idempotency, populated schema)"
+apply "$UNIQUE_GUARDS"
+
+echo "==> 0013 over data from before it"
+# Two households already on one pilot number: it stops and names them, changing nothing.
+"${PSQL[@]}" -d "$DB" -c "drop index public.projects_pilot_number_key;
+  update public.projects set pilot_number = 1 where id = 'b0000000-0000-4000-8000-0000000000a1';"
+GUARD_ERR="$(mktemp "${PGTEST_TMP:-/tmp}/aircon-0013.XXXXXX")"
+if "${PSQL[@]}" -d "$DB" --single-transaction -f "$UNIQUE_GUARDS" 2>"$GUARD_ERR"; then
+  echo "run-migrations: 0013 ran over two households on one pilot number" >&2
+  rm -f "$GUARD_ERR"
+  exit 1
+fi
+if ! grep -q "Two households share a pilot number: pilot 1 (DEMO Householder, DEMO Neighbour)" "$GUARD_ERR"; then
+  cat "$GUARD_ERR" >&2
+  rm -f "$GUARD_ERR"
+  exit 1
+fi
+rm -f "$GUARD_ERR"
+echo "    refused, naming both households"
+# One request that already made two invoices (the race 0013 closes): the first keeps its key.
+"${PSQL[@]}" -d "$DB" -c "update public.projects set pilot_number = 2 where id = 'b0000000-0000-4000-8000-0000000000a1';
+  drop index public.invoices_request_id_key;
+  insert into public.invoices (project_id, number, kind, created_at, invoice) values
+    ('b0000000-0000-4000-8000-0000000000a1', 'DIH-0201', 'balance', now() - interval '1 minute', '{\"requestId\": \"demo-twice\", \"lines\": [1]}'),
+    ('b0000000-0000-4000-8000-0000000000a1', 'DIH-0202', 'balance', now(), '{\"requestId\": \"demo-twice\", \"lines\": [2]}');"
+apply "$UNIQUE_GUARDS"
+"${PSQL[@]}" -d "$DB" -c "do \$\$ begin
+  assert (select invoice->>'requestId' from public.invoices where number = 'DIH-0201') = 'demo-twice', 'the first invoice keeps its request id';
+  assert not (select invoice ? 'requestId' from public.invoices where number = 'DIH-0202'), 'the second loses only its request id';
+  assert (select invoice->'lines' from public.invoices where number = 'DIH-0202') = '[2]', 'nothing else on it changes';
+  assert (select count(*) from pg_indexes where indexname in ('projects_pilot_number_key', 'invoices_request_id_key', 'invoices_issue_key')) = 3, '0013 indexes in place';
 end \$\$;"
 
 echo "==> all migration checks passed (${#migrations[@]} migrations)"

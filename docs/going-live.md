@@ -27,7 +27,7 @@ watches (Vercel → Project → Settings → Git → Production Branch).
    `0001` → `0002` → `0003` → `0004` → `0005` → **both** `0006` files
    (`0006_draft_quotes.sql` and `0006_property_intelligence.sql`) → `0007` →
    `0008` → `0009` → **`0010_pilot_platform.sql`** → **`0011_storage_limits.sql`**
-   → **`0012_rate_limits.sql`**.
+   → **`0012_rate_limits.sql`** → **`0013_unique_guards.sql`**.
 
    `0010` is the pilot platform itself: the staff and sign-in tables, every
    project record (surveys, designs, proposals, orders, invoices, payments,
@@ -36,7 +36,11 @@ watches (Vercel → Project → Settings → Git → Production Branch).
    public photo upload takes photos only); `/api/health` and `/ops/status`
    report a bucket without them. `0012` makes the sign-in limits count once
    for the whole site rather than per server instance (`/ops/launch` shows
-   amber without it). Re-running a file is safe. If you skip one the
+   amber without it). `0013` makes the database refuse what two people
+   pressing the same button at once could otherwise both get: two households
+   on one pilot number, two invoices from one request, two invoices planned
+   on the same bill. If two households already share a pilot number it stops
+   and names them: give one another number, then run it again. Re-running a file is safe. If you skip one the
    site looks connected but can't save; `/login` says so, and so do the
    deploy logs (`[schema] The database is missing …`).
 
@@ -137,6 +141,8 @@ watches (Vercel → Project → Settings → Git → Production Branch).
 | A bucket shows "No file size or type limits" in `/api/health` | Migration `0011` hasn't been run | Run `0011_storage_limits.sql` |
 | "mime type … is not supported" uploading | The file isn't a type the bucket stores | Photos (JPEG, PNG, WebP, HEIC), PDFs and MP4/.mov only (0011) |
 | Reminders, expiries and the digest never happen | `CRON_SECRET` missing (the crons answer 401) | Set it, redeploy |
+| `0013_unique_guards.sql` stops with "Two households share a pilot number" | Two projects were tagged with the same pilot number before 0013 | Change one on its project page (the Pilot box), then run 0013 again |
+| "We couldn't read the business settings just now, so nothing was saved" | The database didn't answer when an invoice, proposal, contract, receipt or booking needed the settings (pages show the defaults meanwhile; writes never use them) | Try again in a moment; if it keeps happening, check `/ops/status` |
 | `/ops/launch` shows "Shared sign-in limits" amber | Migration `0012` hasn't been run, so each server instance counts sign-in requests on its own | Run `0012_rate_limits.sql` |
 | A refund made in Stripe doesn't appear on the money page | The webhook isn't sent `charge.refunded` | Add `charge.refunded` and `charge.refund.updated` to the endpoint in Stripe (step 3); Stripe resends recent events from its dashboard |
 | Pages feel slow (a second or more per click) | The functions and the database are far apart | Put Supabase and `regions` in `apps/web/vercel.json` in the same place (London by default) |

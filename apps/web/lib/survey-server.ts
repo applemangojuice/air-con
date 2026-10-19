@@ -18,6 +18,7 @@ import {
   type Issue,
   type MeasuredSurvey,
   type MessageRecord,
+  type PilotSettings,
   type Project,
   type SelfSurveyDiffRow,
   type StaffMember,
@@ -25,6 +26,7 @@ import {
   type SurveyCompleteness,
   type SurveyRecord,
   type TimeEntry,
+  shiftWorkingDays,
 } from "@aircon/domain";
 import { staffCanAccessProject, type AssignmentView } from "./auth/access";
 import { audit } from "./audit";
@@ -42,7 +44,7 @@ import * as mediaRepo from "./repo/media";
 import * as messagesRepo from "./repo/messages";
 import * as surveysRepo from "./repo/surveys";
 import * as timeRepo from "./repo/time";
-import { getSettings } from "./settings-server";
+import { SETTINGS_UNAVAILABLE, getSettings, settingsForWrite } from "./settings-server";
 
 /**
  * The surveyor's visit on the server (F2): the draft measured survey, its
@@ -762,6 +764,10 @@ export async function submitSurvey(projectId: string, input: unknown, expectedUp
     return { ...fail(409, `The survey isn't finished: ${completeness.missing.length} thing${completeness.missing.length === 1 ? "" : "s"} still to do.`), completeness };
   }
 
+  // The survey report freezes the company's details: read them before anything is submitted.
+  const settings = draft.record.status !== "submitted" ? await settingsForWrite() : null;
+  if (draft.record.status !== "submitted" && !settings) return fail(503, SETTINGS_UNAVAILABLE);
+
   let latest = project;
   if (!alreadyDone) {
     const finding = electricsFinding(draft.record.data);
@@ -797,21 +803,15 @@ export async function submitSurvey(projectId: string, input: unknown, expectedUp
       surveyor: record.surveyor ?? { staffId: staff.id, name: staff.name },
     });
     await audit({ actor: staff, action: "survey.submit", entity: "survey", entityId: record.id, detail: { projectId, minutes: record.minutes } });
-    await issueSurveyReport(latest, record, staff, now);
+    if (settings) await issueSurveyReport(latest, record, staff, now, settings);
   }
   await stopSurveyClock(projectId, staff, now);
   return { ok: true, project: latest, record };
 }
 
-/** Working days on from a date (weekends skipped), yyyy-mm-dd. */
+/** Working days on from a date (weekends and bank holidays skipped: the domain's rule), yyyy-mm-dd. */
 export function addWorkingDays(dateIso: string, n: number): string {
-  const d = new Date(`${dateIso.slice(0, 10)}T12:00:00Z`);
-  for (let left = n; left > 0; ) {
-    d.setUTCDate(d.getUTCDate() + 1);
-    const dow = d.getUTCDay();
-    if (dow !== 0 && dow !== 6) left--;
-  }
-  return d.toISOString().slice(0, 10);
+  return shiftWorkingDays(dateIso, n);
 }
 
 /**
@@ -820,9 +820,8 @@ export function addWorkingDays(dateIso: string, n: number): string {
  * lists. Best-effort: the survey is already submitted, so a failure here
  * is logged, never shown as a failed submit.
  */
-async function issueSurveyReport(project: Project, record: SurveyRecord, staff: StaffMember, now: string): Promise<void> {
+async function issueSurveyReport(project: Project, record: SurveyRecord, staff: StaffMember, now: string, settings: PilotSettings): Promise<void> {
   try {
-    const settings = await getSettings();
     const proposalBy = addWorkingDays(now.slice(0, 10), PROPOSAL_TURNAROUND_WORKING_DAYS);
     await createDocument(
       project.id,

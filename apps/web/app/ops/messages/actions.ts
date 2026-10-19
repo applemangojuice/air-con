@@ -7,7 +7,7 @@ import { audit } from "@/lib/audit";
 import { requireStaff } from "@/lib/auth/server";
 import { DAILY_JOB_LABEL, DAILY_JOB_IDS } from "@/lib/ops-core-schedule";
 import { runDailyOps } from "@/lib/ops-core-server";
-import { getSettings, saveSettings } from "@/lib/settings-server";
+import { SETTINGS_UNAVAILABLE, saveSettings, settingsForWrite } from "@/lib/settings-server";
 import { ALWAYS_ON } from "./always-on";
 import { revalidateSettingsCaches } from "@/lib/public-settings";
 
@@ -18,7 +18,9 @@ export async function toggleEventAction(fd: FormData): Promise<ActionResult> {
   const on = String(fd.get("on") ?? "") === "1";
   if (!Object.prototype.hasOwnProperty.call(COMMS_EVENTS, event)) return refused("Unknown message.");
   if (!on && ALWAYS_ON[event]) return refused(`This one can't be turned off: ${ALWAYS_ON[event]}`);
-  const settings = await getSettings();
+  // Saved back whole: a failed read must never write the defaults over everything else.
+  const settings = await settingsForWrite();
+  if (!settings) return refused(SETTINGS_UNAVAILABLE);
   const disabled = new Set(settings.comms.disabledEvents);
   if (on) disabled.delete(event);
   else disabled.add(event);

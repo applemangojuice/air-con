@@ -1,4 +1,4 @@
-import type { Project, PurchaseOrder, StaffRole } from "@aircon/domain";
+import { workingDatesFrom as sharedWorkingDatesFrom, type Project, type PurchaseOrder, type StaffRole } from "@aircon/domain";
 
 /**
  * The ops calendar as data: pure, no I/O, no clock (today is passed in), so
@@ -63,16 +63,12 @@ export function mondayOf(iso: string): string {
   return addDaysIso(iso, 1 - isoWeekday(iso));
 }
 
-/** `n` working days starting on `start` (or the next working day), in order. */
-export function workingDatesFrom(start: string, n: number, workingDays: number[] = [1, 2, 3, 4, 5]): string[] {
-  const days = workingDays.length ? workingDays : [1, 2, 3, 4, 5];
-  const out: string[] = [];
-  let d = dateOf(start);
-  for (let guard = 0; out.length < Math.max(0, n) && guard < 400; guard++) {
-    if (days.includes(isoWeekday(d))) out.push(d);
-    d = addDaysIso(d, 1);
-  }
-  return out;
+/**
+ * `n` working days starting on `start` (or the next working day), in order:
+ * the domain's rule (working-days.ts), so bank holidays are skipped.
+ */
+export function workingDatesFrom(start: string, n: number, workingDays: readonly number[] = [1, 2, 3, 4, 5]): string[] {
+  return sharedWorkingDatesFrom(start, n, workingDays);
 }
 
 /** "2026-11" → its weeks, Monday first, each seven dates (spilling into the months either side). */

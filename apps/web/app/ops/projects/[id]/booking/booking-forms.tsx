@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { REQUIREMENT_LABEL, ROLE_LABEL, type StaffRole, type StepRequirement } from "@aircon/domain";
+import { REQUIREMENT_LABEL, ROLE_LABEL, bankHolidayName, type StaffRole, type StepRequirement } from "@aircon/domain";
 import { Badge, Fieldset, inputClass } from "@/components/kit";
 import { fmtDate, fmtDay } from "@/lib/format";
 import { workingDatesFrom } from "../../../calendar/calendar-model";
@@ -54,18 +54,28 @@ export function DatesForm({
       {start && (
         <div className="mt-3 rounded-2xl border border-line bg-surface/60 px-4 py-3 text-sm" aria-live="polite">
           {notWorking ? (
-            <p className="font-medium text-amber-800">{fmtDay(start)} isn&apos;t a working day: pick a weekday.</p>
+            <p className="font-medium text-amber-800">
+              {bankHolidayName(start) ? `${fmtDay(start)} is a bank holiday (${bankHolidayName(start)}): pick another day.` : `${fmtDay(start)} isn't a working day: pick a weekday.`}
+            </p>
           ) : start < earliest ? (
             <p className="font-medium text-amber-800">That&apos;s before the earliest date the rules allow ({fmtDate(earliest)}).</p>
           ) : (
             <p className="text-ink-700">
               <span className="font-semibold text-ink-900">{installDays}-day block:</span> {preview.map((d) => fmtDay(d)).join(" · ")}
+              {preview.some((d, i) => i > 0 && d > nextDay(preview[i - 1]!)) && <span className="block text-xs text-ink-500">Weekends and bank holidays are skipped.</span>}
             </p>
           )}
         </div>
       )}
     </ActionForm>
   );
+}
+
+/** The calendar day after a yyyy-mm-dd date. */
+function nextDay(iso: string): string {
+  const d = new Date(`${iso}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
 }
 
 const REQS: StepRequirement[] = ["fgas", "electrical", "tech-lead"];

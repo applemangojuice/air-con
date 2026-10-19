@@ -8,8 +8,8 @@ import {
   creditPurposeOf,
   depositPence,
   documentCompany,
+  contractTaxCode,
   documentCustomer,
-  effectiveTaxCode,
   invoiceDueOn,
   invoiceLineFromTotal,
   invoiceOutstanding,
@@ -48,7 +48,7 @@ import * as invoicesRepo from "./repo/invoices";
 import * as issuesRepo from "./repo/issues";
 import * as paymentsRepo from "./repo/payments";
 import * as proposalsRepo from "./repo/proposals";
-import { getSettings } from "./settings-server";
+import { SETTINGS_UNAVAILABLE, getSettings, getSettingsStrict, settingsForWrite } from "./settings-server";
 
 /**
  * Money on the server (F5): invoices, verified payments and receipts.
@@ -82,8 +82,8 @@ export interface InvoicePlan {
   reason?: string;
   lines: InvoiceLine[];
   totalPence: number;
-  /** For variation invoices: the variations still to bill. */
-  variations?: { id: string; number: number; title: string; totalPence: number }[];
+  /** For variation invoices: the variations still to bill, each on the tax code it was priced on. */
+  variations?: { id: string; number: number; title: string; totalPence: number; taxCode: TaxCodeId }[];
   /**
    * Balance only: it's ready to bill but the contract says not yet (the
    * install isn't finished). An admin may still issue it with a reason.
@@ -114,11 +114,8 @@ export function cardAvailability(): MoneyView["card"] {
   };
 }
 
-/** The tax code invoices use: the accepted option's, else the settings default. */
-function taxCodeFor(proposal: ProposalRecord | null, settings: PilotSettings): TaxCodeId {
-  const accepted = proposal?.acceptance ? proposal.options.find((o) => o.id === proposal.acceptance!.optionId) : undefined;
-  return accepted?.pricing?.taxCode ?? effectiveTaxCode(settings);
-}
+/** The tax code invoices use: the accepted option's, else the settings default as it must be charged. */
+const taxCodeFor = (proposal: ProposalRecord | null, settings: PilotSettings): TaxCodeId => contractTaxCode(proposal, settings);
 
 /**
  * The payment terms the customer agreed, as settings: the contract
@@ -239,7 +236,16 @@ export function planInvoices(input: {
           ? "Every accepted variation is billed (the balance invoice includes them)."
           : "Every accepted variation is billed."
         : "No accepted variations.",
-    { variations: unbilled.map((v) => ({ id: v.id, number: v.number, title: v.title, totalPence: v.variation?.totalDeltaPence ?? 0 })) },
+    {
+      variations: unbilled.map((v) => ({
+        id: v.id,
+        number: v.number,
+        title: v.title,
+        totalPence: v.variation?.totalDeltaPence ?? 0,
+        // Billed at the rate it was priced at (stored since batch 8; older ones were priced on the contract's code).
+        taxCode: v.variation?.taxCode ?? taxCode,
+      })),
+    },
   );
   if (unbilled.length) variation.available = true;
 
@@ -340,8 +346,10 @@ export type Issuer = StaffMember | { kind: "system"; name: string };
 export async function issueInvoice(projectId: string, input: IssueInput, staff: Issuer): Promise<Outcome<Invoice>> {
   const project = await loadProject(projectId);
   if (!project) return fail("Project not found.", 404);
-  const [settings, invoices, issues, proposal, contractDoc] = await Promise.all([
-    getSettings(),
+  // An invoice freezes the terms and the company's details: never on the fallback defaults.
+  const settings = await settingsForWrite();
+  if (!settings) return fail(SETTINGS_UNAVAILABLE, 503);
+  const [invoices, issues, proposal, contractDoc] = await Promise.all([
     invoicesRepo.listForProject(projectId),
     issuesRepo.listForProject(projectId),
     proposalsRepo.acceptedForProject(projectId),
@@ -394,7 +402,7 @@ export async function issueInvoice(projectId: string, input: IssueInput, staff: 
     const plans = planned();
     const v = plans.variation.variations?.find((x) => x.id === input.issueId);
     if (!v) return fail("Pick an accepted variation that isn't billed yet.");
-    lines = [invoiceLineFromTotal(`Variation ${v.number}: ${v.title}`, v.totalPence, taxCode)];
+    lines = [invoiceLineFromTotal(`Variation ${v.number}: ${v.title}`, v.totalPence, v.taxCode)];
     extra = { issueId: v.id };
   } else {
     const plan = planned()[input.kind];
@@ -417,24 +425,38 @@ export async function issueInvoice(projectId: string, input: IssueInput, staff: 
   const now = new Date().toISOString();
   const today = londonToday();
   const dueOn = invoiceDueOn(today, input.kind, agreed);
-  const invoice = await invoicesRepo.insertNumbered({
-    id: crypto.randomUUID(),
-    projectId,
-    kind: input.kind,
-    status: "issued",
-    lines,
-    ...totals,
-    paidPence: 0,
-    ...(dueOn ? { dueOn } : {}),
-    issuedAt: now,
-    issuedBy: staff.name,
-    createdAt: now,
-    createdBy: staff.name,
-    ...(input.notes?.trim() ? { notes: input.notes.trim() } : {}),
-    ...(input.requestId ? { requestId: input.requestId } : {}),
-    ...extra,
-    issuing: true,
-  });
+  let invoice: Invoice;
+  try {
+    invoice = await invoicesRepo.insertNumbered({
+      id: crypto.randomUUID(),
+      projectId,
+      kind: input.kind,
+      status: "issued",
+      lines,
+      ...totals,
+      paidPence: 0,
+      ...(dueOn ? { dueOn } : {}),
+      issuedAt: now,
+      issuedBy: staff.name,
+      createdAt: now,
+      createdBy: staff.name,
+      ...(input.notes?.trim() ? { notes: input.notes.trim() } : {}),
+      ...(input.requestId ? { requestId: input.requestId } : {}),
+      // Planned on these invoices: one issued at the same moment on the same ones is refused (0013).
+      issueKey: String(invoices.length),
+      ...extra,
+      issuing: true,
+    });
+  } catch (err) {
+    if (!(err instanceof invoicesRepo.InvoiceClashError)) throw err;
+    // The number it was given goes unused: say so where the books can see it.
+    await audit({ actor: staff, action: "invoice.number-unused", entity: "invoice", entityId: err.number, detail: { projectId, kind: input.kind, why: err.clash } });
+    if (err.clash === "request") {
+      const again = (await invoicesRepo.listForProject(projectId)).find((i) => i.requestId === input.requestId);
+      if (again) return { ok: true, value: again, message: `Invoice ${again.number} is issued.` };
+    }
+    return fail("Another invoice was issued on this project at the same moment. Reload to see it, then check what's left to bill.", 409);
+  }
   await audit({
     actor: staff,
     action: "invoice.issue",
@@ -464,11 +486,13 @@ export async function finishIssue(invoice: Invoice, actor: Issuer): Promise<{ in
   const warnings: string[] = [];
   const project = await loadProject(inv.projectId);
   if (!project) return { invoice: inv, warning: "The project couldn't be read." };
-  const settings = await getSettings();
   const card = cardAvailability();
 
   if (!inv.documentId) {
     try {
+      // The printable copy freezes the company's details and how to pay: never the fallback defaults
+      // (unreadable settings leave it to "finish issuing").
+      const settings = await getSettingsStrict();
       const payments = await paymentsRepo.listForInvoice(inv.id);
       const doc = await createDocument(
         inv.projectId,
@@ -545,8 +569,8 @@ export async function finishIssue(invoice: Invoice, actor: Issuer): Promise<{ in
 
 /** An invoice as the customer's document shows it: no internal bookkeeping. */
 export function customerInvoice(inv: Invoice): Invoice {
-  const { requestId: _r, issuing: _i, recordedOnProjectAt: _p, notes: _n, createdBy: _c, checkoutSessionId: _s, ...rest } = inv;
-  void [_r, _i, _p, _n, _c, _s];
+  const { requestId: _r, issueKey: _k, issuing: _i, recordedOnProjectAt: _p, notes: _n, createdBy: _c, checkoutSessionId: _s, ...rest } = inv;
+  void [_r, _k, _i, _p, _n, _c, _s];
   return rest;
 }
 
@@ -641,6 +665,17 @@ async function applyNow(paymentId: string, actor: ActorInput): Promise<{ warning
   if (!payment || !payment.pendingApply) return {};
   const warnings: string[] = [];
   let invoice: Invoice | null = null;
+  // The receipt freezes the company's details. With settings unreadable, stop before anything
+  // changes: the payment stays pending, so a retry (Stripe's, or "finish applying") does it all.
+  const receipt = payment.status === "succeeded" && payment.amountPence > 0;
+  let settings: PilotSettings | null = null;
+  if (receipt) {
+    try {
+      settings = await getSettingsStrict();
+    } catch {
+      return { warning: "Recorded, but not applied yet: the business settings couldn't be read for the receipt. Try again in a minute: it finishes where it stopped." };
+    }
+  }
 
   if (payment.invoiceId) {
     const all = await paymentsRepo.listForInvoice(payment.invoiceId);
@@ -704,13 +739,12 @@ async function applyNow(paymentId: string, actor: ActorInput): Promise<{ warning
     console.error(`[money] marking payment ${payment.id} applied failed:`, err);
   }
 
-  if (payment.status === "succeeded" && payment.amountPence > 0) {
+  if (receipt && settings) {
     const project = await loadProject(payment.projectId);
     try {
       const existing = await listDocuments(payment.projectId, { kind: "receipt", includeSuperseded: true });
       const already = existing.some((d) => (d.snapshot as { payment?: { id?: string } } | null)?.payment?.id === payment.id);
       if (!already && project) {
-        const settings = await getSettings();
         await createDocument(
           payment.projectId,
           "receipt",

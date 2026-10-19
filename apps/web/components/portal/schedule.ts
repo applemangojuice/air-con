@@ -4,6 +4,11 @@ import {
   earliestInstallStart,
   earliestStartForKit,
   earlyStartRequestedOf,
+  MON_FRI,
+  addWorkingDays as shiftByWorkingDays,
+  isWorkingDay,
+  nextWorkingDay,
+  notWorkingReason,
   shiftWorkingDays,
   type PilotSettings,
   type Project,
@@ -23,7 +28,6 @@ import {
 /* Date helpers (UTC noon arithmetic: no DST drift)                    */
 /* ------------------------------------------------------------------ */
 
-const MON_FRI = [1, 2, 3, 4, 5];
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -44,25 +48,13 @@ export function isoWeekday(iso: string): number {
 const workingDaysOf = (settings: PilotSettings) =>
   settings.scheduling.workingDays.length ? settings.scheduling.workingDays : MON_FRI;
 
-export function isWorkingDay(iso: string, workingDays: number[] = MON_FRI): boolean {
-  return (workingDays.length ? workingDays : MON_FRI).includes(isoWeekday(iso));
-}
-
-/** The date itself when it's a working day, else the next one. */
-export function nextWorkingDay(iso: string, workingDays: number[] = MON_FRI): string {
-  let d = iso.slice(0, 10);
-  for (let guard = 0; guard < 14 && !isWorkingDay(d, workingDays); guard++) d = addDays(d, 1);
-  return d;
-}
+// Working days are the domain's (working-days.ts): the weekdays in settings, less England and
+// Wales bank holidays, so nobody can pick Christmas Day for a survey or an install.
+export { isWorkingDay, nextWorkingDay };
 
 /** n working days after `iso` (the start day itself doesn't count). */
-export function addWorkingDays(iso: string, n: number, workingDays: number[] = MON_FRI): string {
-  let d = iso.slice(0, 10);
-  for (let left = n; left > 0; ) {
-    d = addDays(d, 1);
-    if (isWorkingDay(d, workingDays)) left -= 1;
-  }
-  return d;
+export function addWorkingDays(iso: string, n: number, workingDays: readonly number[] = MON_FRI): string {
+  return n > 0 ? shiftByWorkingDays(iso, n, workingDays) : iso.slice(0, 10);
 }
 
 /** The Monday of the date's week: groups blocks by week. */
@@ -251,7 +243,7 @@ export const INSTALL_BLOCK_OPTIONS = 6;
 /** The planned rhythm (pilot plan §9): Monday prep, install from Tuesday. Preferred, never required. */
 const PREFERRED_START_WEEKDAY = 2;
 
-function longestRun(workingDays: number[]): number {
+function longestRun(workingDays: readonly number[]): number {
   let best = 0;
   for (let start = 1; start <= 7; start++) {
     let run = 0;
@@ -329,7 +321,8 @@ export function blockProblem(input: {
   for (let i = 1; i < dates.length; i++) {
     if (dates[i] !== addWorkingDays(dates[i - 1]!, 1, wd)) return "Install days must be back to back.";
   }
-  if (!dates.every((d) => isWorkingDay(d, wd))) return "Install days must be working days.";
+  const offDay = dates.map((d) => notWorkingReason(d, wd, shortDay)).find((r) => r !== null);
+  if (offDay) return `Install days must be working days: ${offDay}.`;
   const earliest = earliestOfferedStart(project, input.today, settings, input.kitArrivesOn).date;
   if (dates[0]! < earliest) return `The earliest we can start is ${shortDay(earliest)}.`;
   const busy = new Set(input.booked.map((d) => d.slice(0, 10)));

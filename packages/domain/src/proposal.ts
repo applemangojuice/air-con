@@ -304,6 +304,18 @@ export function settingsForProposal(settings: PilotSettings, record: Pick<Propos
 }
 
 /**
+ * The tax code the contract is on: the accepted option's own, else (no
+ * accepted contract on record) the settings default as it must be charged
+ * (effectiveTaxCode). Invoices, credit notes and variations all use it, so
+ * a change priced on site is billed at the rate it was priced at.
+ */
+export function contractTaxCode(proposal: Pick<ProposalRecord, "options" | "acceptance"> | null | undefined, settings: PilotSettings): TaxCodeId {
+  const accepted = proposal?.acceptance ? proposal.options.find((o) => o.id === proposal.acceptance!.optionId) : undefined;
+  const code = accepted?.pricing?.taxCode;
+  return code && Object.prototype.hasOwnProperty.call(TAX_CODES, code) ? code : effectiveTaxCode(settings);
+}
+
+/**
  * What the project's gates need to know about its latest proposal. Both
  * readiness builders (project-service and the board's in-memory one) use
  * this, so they can't drift apart.

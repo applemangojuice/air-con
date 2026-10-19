@@ -1,4 +1,5 @@
 import type { GateId } from "./project.ts";
+import { TAX_CODES, type TaxCodeId } from "./settings.ts";
 import type { StaffRole } from "./staff.ts";
 
 /**
@@ -54,6 +55,12 @@ export interface Issue {
     priceDeltaNetPence: number;
     taxPence: number;
     totalDeltaPence: number;
+    /**
+     * The contract's tax code the change was priced on, so its invoice
+     * splits the total at the same rate. Missing on variations from before
+     * it was stored: those were priced on the contract's code too.
+     */
+    taxCode?: TaxCodeId;
     /**
      * draft: proposed on site, with the office to check the price (the
      * customer can't see it yet); proposed: sent, waiting for the customer.
@@ -238,6 +245,16 @@ export function variationAmounts(priceDeltaNetPence: number, taxRatePct: number)
 }
 
 /**
+ * A variation priced on a tax code (the contract's): its amounts and the
+ * code itself, stored so the invoice uses the same one. An unknown code
+ * prices at 0% and isn't stored.
+ */
+export function variationPricing(priceDeltaNetPence: number, taxCode: TaxCodeId): ReturnType<typeof variationAmounts> & { taxCode?: TaxCodeId } {
+  const known = Object.prototype.hasOwnProperty.call(TAX_CODES, taxCode);
+  return { ...variationAmounts(priceDeltaNetPence, known ? TAX_CODES[taxCode].ratePct : 0), ...(known ? { taxCode } : {}) };
+}
+
+/**
  * A new issue with the kind's defaults, overridable, and its first history
  * line. Variations start proposed and wait for the customer.
  */
@@ -262,7 +279,7 @@ export function createIssue(input: {
    * waits for the office to check its price; only then does the customer see
    * it (sendVariationToCustomer).
    */
-  variation?: { description: string; priceDeltaNetPence: number; taxRatePct: number; officeReview?: boolean };
+  variation?: { description: string; priceDeltaNetPence: number; taxCode: TaxCodeId; officeReview?: boolean };
 }): Issue {
   const d = defaultsForKind(input.kind);
   const title = input.title.trim();
@@ -272,7 +289,7 @@ export function createIssue(input: {
   const variation = input.variation
     ? {
         description: input.variation.description.trim() || title,
-        ...variationAmounts(input.variation.priceDeltaNetPence, input.variation.taxRatePct),
+        ...variationPricing(input.variation.priceDeltaNetPence, input.variation.taxCode),
         status: review ? ("draft" as const) : ("proposed" as const),
       }
     : undefined;
@@ -312,13 +329,13 @@ export const CUSTOMER_DECIDES_ACTION = "Customer to approve or decline in their 
 
 /**
  * The office has checked a variation proposed on site: it goes to the
- * customer with the price as corrected (re-priced at the contract's tax
- * rate), customer-visible, waiting for their yes or no. Only a draft,
+ * customer with the price as corrected (re-priced on the contract's tax
+ * code), customer-visible, waiting for their yes or no. Only a draft,
  * still-open variation can be sent; anything else throws.
  */
 export function sendVariationToCustomer(
   issue: Issue,
-  input: { title?: string; description: string; priceDeltaNetPence: number; taxRatePct: number },
+  input: { title?: string; description: string; priceDeltaNetPence: number; taxCode: TaxCodeId },
   by: string,
   now: string,
 ): Issue {
@@ -329,7 +346,7 @@ export function sendVariationToCustomer(
   const description = input.description.trim();
   if (description.length < 3) throw new Error("Describe the change for the customer.");
   const title = input.title?.trim() || issue.title;
-  const amounts = variationAmounts(input.priceDeltaNetPence, input.taxRatePct);
+  const amounts = variationPricing(input.priceDeltaNetPence, input.taxCode);
   const changed = amounts.priceDeltaNetPence !== issue.variation.priceDeltaNetPence;
   const next: Issue = JSON.parse(JSON.stringify(issue)) as Issue;
   next.title = title;

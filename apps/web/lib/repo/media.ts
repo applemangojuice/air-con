@@ -93,6 +93,11 @@ export async function insert(item: MediaItem): Promise<MediaItem> {
   return fromRow(data!);
 }
 
+/**
+ * Every column, from the item as given. Only for system paths that own the
+ * whole row (a fresh upload being finished): a person's edit goes through
+ * `updateFields`, so it can't put back a drawing or a lock from a stale read.
+ */
 export async function update(item: MediaItem): Promise<MediaItem> {
   const data = must(
     await db()
@@ -105,6 +110,36 @@ export async function update(item: MediaItem): Promise<MediaItem> {
   );
   if (!data) throw new Error(`media update: ${item.id} not found`);
   return fromRow(data);
+}
+
+/** The columns a person edits on a media item (media-server updateMedia). */
+export interface MediaFields {
+  tag?: PhotoTag;
+  caption?: string | null;
+  roomId?: string | null;
+  customerVisible?: boolean;
+}
+
+/**
+ * Write only these columns (and updated_at), never the drawing, its version
+ * or the lock, so a drawing saved on another phone or a design lock that
+ * landed since the caller's read stays. `unlockedOnly` (tag and room: they're
+ * structural) applies it only while the item isn't locked. Returns the item
+ * as stored, or null when no row matched (gone, or locked under
+ * `unlockedOnly`).
+ */
+export async function updateFields(id: string, fields: MediaFields, opts: { unlockedOnly?: boolean } = {}): Promise<MediaItem | null> {
+  if (!isUuid(id)) return null;
+  const patch: Row = { updated_at: nowIso() };
+  if (fields.tag !== undefined) patch.tag = fields.tag;
+  if (fields.caption !== undefined) patch.caption = fields.caption || null;
+  if (fields.roomId !== undefined) patch.room_id = fields.roomId || null;
+  if (fields.customerVisible !== undefined) patch.customer_visible = fields.customerVisible;
+  let q = db().from(TABLE).update(patch).eq("id", id);
+  if (opts.unlockedOnly) q = q.eq("locked", false);
+  const data = must(await q.select("*"), "media updateFields");
+  const row = (data ?? [])[0];
+  return row ? fromRow(row as Row) : null;
 }
 
 /**

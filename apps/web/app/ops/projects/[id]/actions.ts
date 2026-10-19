@@ -33,7 +33,7 @@ import { recordCancellation } from "@/lib/cancellation-server";
 import { recordCertificate } from "@/lib/certificates-server";
 import { resend } from "@/lib/comms/outbox";
 import { sendVariation } from "@/lib/variation-server";
-import { dispatch, loadProject, pilotNumberHolder } from "@/lib/project-service";
+import { DEMO_PILOT_FROM, dispatch, loadProject, pilotNumberHolder, pilotTakenMessage } from "@/lib/project-service";
 import * as issuesRepo from "@/lib/repo/issues";
 import * as learningsRepo from "@/lib/repo/learnings";
 import * as messagesRepo from "@/lib/repo/messages";
@@ -268,10 +268,17 @@ export async function setPilotAction(projectId: string, fd: FormData): Promise<A
   if (!staff) return notFound();
   const parsed = pilotSchema.safeParse({ number: field(fd, "number"), label: field(fd, "label") });
   if (!parsed.success) return refused(firstIssue(parsed.error));
+  // 900 and up are the DEMO pilots' (a project keeps the number it has, so a DEMO one can be relabelled).
+  if (parsed.data.number >= DEMO_PILOT_FROM) {
+    const current = await loadProject(projectId);
+    if (current?.pilot?.number !== parsed.data.number) {
+      return refused(`Pilot numbers go up to ${DEMO_PILOT_FROM - 1}: ${DEMO_PILOT_FROM} and up are the DEMO pilots'.`);
+    }
+  }
   // One household per pilot number: the pilots page and CSV line them up by it.
   const holder = await pilotNumberHolder(parsed.data.number, { projectId }).catch(() => undefined);
   if (holder === undefined) return refused("The pilot number couldn't be checked. Nothing changed; try again.");
-  if (holder) return refused(`Pilot ${parsed.data.number} is already ${holder.name}. Pick another number.`);
+  if (holder) return refused(pilotTakenMessage(parsed.data.number, holder));
   return runAs(staff, projectId, { type: "set-pilot", ...parsed.data }, `Tagged as pilot ${parsed.data.number}.`);
 }
 

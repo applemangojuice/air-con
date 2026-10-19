@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createIssue } from "@aircon/domain";
+import { DEFAULT_SETTINGS, createIssue, mergeSettings, type StaffMember } from "@aircon/domain";
 import { registerAppResolver } from "./helpers/resolve-app.ts";
 
 // F1 decides a variation on the portal; F5's balance invoice bills it. The real modules on the in-memory backend.
@@ -14,6 +14,11 @@ const { loadProject } = await import("../lib/project-service.ts");
 const issuesRepo = await import("../lib/repo/issues.ts");
 const messagesRepo = await import("../lib/repo/messages.ts");
 const { listDocuments } = await import("../lib/documents-server.ts");
+const { issueInvoice } = await import("../lib/money-server.ts");
+const { sendVariation, variationTaxCode } = await import("../lib/variation-server.ts");
+const settingsRepo = await import("../lib/repo/settings.ts");
+
+const OFFICE: StaffMember = { id: "aa000000-0000-4000-8000-0000000000c1", email: "office@demo.dang.invalid", name: "DEMO Office", roles: ["admin"], external: false, active: true, qualifications: [] };
 
 test("a variation the customer accepts on the portal is billed by the balance invoice; a declined one isn't", async () => {
   const summary = await resetDemoData({ now: new Date().toISOString() });
@@ -32,7 +37,7 @@ test("a variation the customer accepts on the portal is billed by the balance in
         title,
         raisedBy: { kind: "staff", name: "DEMO Tech" },
         raisedAt: new Date().toISOString(),
-        variation: { description: title, priceDeltaNetPence: net, taxRatePct: 0 },
+        variation: { description: title, priceDeltaNetPence: net, taxCode: "outside-scope" },
       }),
     );
   const yes = await raise("DEMO: condensate pump in the loft", 18_000);
@@ -80,4 +85,48 @@ test("a variation the customer accepts on the portal is billed by the balance in
   assert.equal(after.plans.balance.totalPence - balanceBefore, accepted.variation!.totalDeltaPence, "the balance grows by exactly the accepted variation");
   assert.ok(after.plans.balance.lines.some((l) => /Accepted variations/.test(l.label)));
   assert.deepEqual(after.plans.variation.variations?.map((v) => v.id), [yes.id], "or it can be billed on its own");
+});
+
+test("a variation is priced and invoiced on the contract's tax code, never on the settings default", async () => {
+  // The founders tick "VAT registered" and leave the default tax code at outside-scope.
+  const registered = mergeSettings({ ...DEFAULT_SETTINGS, tax: { ...DEFAULT_SETTINGS.tax, vatRegistered: true, defaultTaxCode: "outside-scope" } });
+  await settingsRepo.setValue(settingsRepo.PILOT_SETTINGS_KEY, registered, "test");
+  const summary = await resetDemoData({ now: new Date().toISOString(), settings: registered });
+  const demo3 = summary.projects.find((p) => p.label.startsWith("DEMO 3"))!;
+  const demo1 = summary.projects.find((p) => p.label.startsWith("DEMO 1"))!;
+  const project = (await loadProject(demo3.id))!;
+  assert.equal(await variationTaxCode(demo3.id), "standard-20", "the contract was priced at the standard rate");
+  assert.equal(await variationTaxCode(demo1.id), "standard-20", "no contract yet: settings as they must be charged, not outside-scope");
+
+  // Proposed on site, checked and sent by the office, accepted by the customer.
+  const draft = await issuesRepo.insert(
+    createIssue({
+      id: crypto.randomUUID(),
+      projectId: demo3.id,
+      number: await issuesRepo.nextNumber(demo3.id),
+      kind: "variation",
+      title: "DEMO: condensate pump",
+      raisedBy: { kind: "staff", name: "DEMO Tech" },
+      raisedAt: new Date().toISOString(),
+      variation: { description: "DEMO: a pump", priceDeltaNetPence: 9_000, taxCode: await variationTaxCode(demo3.id), officeReview: true },
+    }),
+  );
+  assert.equal(draft.variation?.taxCode, "standard-20");
+  // Settings change after acceptance (VAT unticked by mistake): the contract's code still rules.
+  await settingsRepo.setValue(settingsRepo.PILOT_SETTINGS_KEY, mergeSettings({ ...registered, tax: { ...registered.tax, vatRegistered: false } }), "test");
+  const sent = await sendVariation(demo3.id, draft.id, { description: "A condensate pump in the loft (DEMO)", priceDeltaNetPence: 10_000 }, OFFICE);
+  assert.ok(sent.ok, !sent.ok ? sent.error : "");
+  assert.deepEqual([sent.value.variation?.priceDeltaNetPence, sent.value.variation?.taxPence, sent.value.variation?.totalDeltaPence, sent.value.variation?.taxCode], [10_000, 2_000, 12_000, "standard-20"]);
+  const accepted = await decideVariation(demo3.id, { customerId: project.customer.customerId! }, draft.id, "accept", { name: "Jordan Okafor", agreed: true });
+  assert.ok(accepted.ok, JSON.stringify(accepted));
+
+  const plan = (await loadMoney(demo3.id))!.plans.variation.variations!.find((v) => v.id === draft.id)!;
+  assert.deepEqual([plan.totalPence, plan.taxCode], [12_000, "standard-20"]);
+  const invoice = await issueInvoice(demo3.id, { kind: "variation", issueId: draft.id, requestId: crypto.randomUUID() }, OFFICE);
+  assert.ok(invoice.ok, !invoice.ok ? invoice.error : "");
+  // The VAT the customer agreed to is the VAT on the invoice: not a sixth of it out of the margin.
+  assert.deepEqual(
+    invoice.value.lines.map((l) => [l.netPence, l.taxPence, l.totalPence, l.taxCode]),
+    [[10_000, 2_000, 12_000, "standard-20"]],
+  );
 });

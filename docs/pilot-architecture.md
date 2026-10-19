@@ -90,7 +90,10 @@ of the supabase-js API used in this repo and returns the same
   step when a migration adds one). Uniques include `projects.quote_id`,
   `messages.idempotency_key`, `payments.provider_ref`, `staff.email`,
   `customers.email`, `documents.ref`, `invoices.number`, and
-  (`project_id`, `version`) on `surveys` / `designs` / `proposals`. A clash
+  (`project_id`, `version`) on `surveys` / `designs` / `proposals`; from
+  0013, `projects.pilot_number` and the invoice's `requestId` and
+  (`project_id`, `issueKey`), the last two as named expression indexes
+  (`uniqueIndexes`). A clash
   produces a PostgREST-style error `{ code: "23505" }`
   (`repo/base.isUniqueViolation`). The accepted-proposal trigger is mirrored
   (§E).
@@ -1852,3 +1855,51 @@ changelog and the reasons, so nobody "fixes" a deliberate choice back.
     - *One filled button per screen*: a panel action the next-step card
       already offers is drawn as a secondary button (`useEchoesNextStep`)
       until it's the actual submit (a slot picked, the box ticked).
+
+35. **Hardening review, batch 8 (before the first real customers).**
+    - *Variations on the contract's tax code*: one domain rule,
+      `contractTaxCode(proposal, settings)` (the accepted option's code, else
+      `effectiveTaxCode`), prices a variation (`variationTaxCode`), plans every
+      invoice and fills the booking page. The code is stored on the variation
+      (`variation.taxCode`) and its own invoice splits the total on it, so a
+      VAT-registered business with the shipped outside-scope default never
+      prices at 0% and invoices as if VAT were inside.
+    - *Settings for writing* (`getSettingsStrict` / `settingsForWrite`): a
+      failed read throws (`SettingsUnavailableError`) instead of returning the
+      defaults. Proposal drafts, issue and acceptance (the contract), invoices
+      and their printable copy, receipts (read before a payment is applied, so
+      it stays pending and a retry does it all), certificates, the survey
+      report, the commissioning certificate, the handover pack (when
+      published), accepted-variation documents,
+      install dates, the customer's portal actions, new projects and the
+      message on/off switch (which saves the whole document back) use it and
+      answer "We couldn't read the business settings just now, so nothing was
+      saved" (503). Pages keep `getSettings`'s conservative fallback.
+    - *Unique guards (migration 0013)*: `projects_pilot_number_key` (partial,
+      where not null; the migration stops and names two households already
+      sharing a number); `invoices_request_id_key` on `invoice->>'requestId'`;
+      and `invoices_issue_key` on (`project_id`, `invoice->>'issueKey'`), where
+      `issueKey` is the project's invoice count when the figure was planned, so
+      two invoices planned on the same bill (two deposits, two balances, a
+      balance and a credit note) can't both stand. No partial index on deposits:
+      a deposit credited in full is re-raisable (batch 5) and is planned on a
+      later count. A clash on the request answers with the invoice it made; one
+      on the plan says another invoice was just issued, and the unused number
+      is audited (`invoice.number-unused`). The pilot clash maps to the same
+      "Pilot N is already …" message. Real pilots take 1 to 899
+      (`DEMO_PILOT_FROM`): 900 and up are the DEMO pilots', so the seed can't
+      collide with a real household.
+    - *Working days*: `working-days.ts` in the domain is the one rule (the
+      weekdays in settings, less England and Wales bank holidays, worked out
+      from gov.uk's rules with its announced changes in
+      `BANK_HOLIDAY_CHANGES`, checked against its published 2025 to 2027
+      lists). The reducer, purchasing's lead times and order-by dates, the
+      portal's slots and blocks, the ops calendar and booking form, the
+      command centre's slot days, survey and comms turnarounds and the demo
+      seed all use it. Refusals name the day ("Fri 25 Dec is a bank holiday
+      (Christmas Day)"); the calendar marks bank holidays.
+    - *Media edits write only what changed* (`repo/media.updateFields`):
+      caption, tag, room and visibility, never the drawing, its version or the
+      lock, and tag or room only while unlocked; the full-row `update` is for
+      system paths. A caption saved while another phone draws or the design is
+      approved no longer undoes either.

@@ -98,8 +98,8 @@ import * as proposalsRepo from "./repo/proposals";
 import * as purchaseOrdersRepo from "./repo/purchaseOrders";
 import * as surveysRepo from "./repo/surveys";
 import * as timeRepo from "./repo/time";
-import { getSettings } from "./settings-server";
-import { contractTaxRatePct } from "./variation-server";
+import { SETTINGS_UNAVAILABLE, getSettings, settingsForWrite } from "./settings-server";
+import { variationTaxCode } from "./variation-server";
 import { getServiceClient } from "./supabase-server";
 
 /**
@@ -1001,8 +1001,8 @@ async function raiseIssue(
     if (existing.projectId !== project.id) throw new FieldError("That issue belongs to another job.", 409);
     return { issue: existing, created: false };
   }
-  // A variation is priced on the contract's own tax treatment (variation-server).
-  const taxRatePct = input.variation ? await contractTaxRatePct(project.id) : 0;
+  // A variation is priced (and later invoiced) on the contract's own tax code (variation-server).
+  const taxCode = input.variation ? await variationTaxCode(project.id) : "outside-scope";
   const issue = createIssue({
     id: input.id,
     projectId: project.id,
@@ -1023,7 +1023,7 @@ async function raiseIssue(
           variation: {
             description: input.variation.description,
             priceDeltaNetPence: input.variation.priceDeltaNetPence,
-            taxRatePct,
+            taxCode,
             officeReview: true,
           },
         }
@@ -1322,7 +1322,8 @@ export async function endDay(
     if (mediaIds.some((id) => onIssues.has(id))) throw new FieldError("One of the photos is on an issue, so it isn't shared in the day's update. Pick another.", 400);
   }
   // Shared first: the update must never point at photos the customer can't open.
-  for (const m of media) if (!m.customerVisible) await mediaRepo.update({ ...m, customerVisible: true });
+  // Visibility only: never the whole row from this read (a drawing saved meanwhile stays).
+  for (const m of media) if (!m.customerVisible) await mediaRepo.updateFields(m.id, { customerVisible: true });
   const text = input.customerText.trim();
   const project = throwDispatch(
     await dispatch(
@@ -1495,6 +1496,9 @@ export async function signCommissioning(projectId: string, staff: StaffMember, n
   if (!job) throw new FieldError("There's no runsheet for this job yet.", 409);
   const errors = commissioningSignErrors(job, staff, today);
   if (errors.length) throw new FieldError(errors.join(" "), 409);
+  // The certificate freezes the company's details: read them before anything is signed.
+  const settings = await settingsForWrite();
+  if (!settings) throw new FieldError(SETTINGS_UNAVAILABLE, 503);
   const record: CommissioningRecord = buildCommissioningRecord(job, staff, now, notes);
   await mutateJob(projectId, (parts) => (parts.commissioning ? null : { ...parts, commissioning: record, qa: { status: "signed-off", reviewedBy: staff.name } }));
   const undo = () =>
@@ -1518,7 +1522,6 @@ export async function signCommissioning(projectId: string, staff: StaffMember, n
   }
   p = signed.project;
 
-  const settings = await getSettings();
   const fullJob = { ...job, commissioning: record };
   let certificate: { id: string; ref: string } | null = null;
   try {
@@ -1557,10 +1560,12 @@ export interface HandoverDraft {
 }
 
 /** What the handover pack would say right now, and what's still missing before it can be published. */
-export async function handoverDraft(projectId: string, staff: StaffMember): Promise<HandoverDraft> {
+export async function handoverDraft(projectId: string, staff: StaffMember, opts: { forPublish?: boolean } = {}): Promise<HandoverDraft> {
   const project = await projectForStaff(projectId, staff);
   const job = await installJobsRepo.loadForProject(projectId, project);
-  const settings = await getSettings();
+  // Published, the pack freezes the company's details and guarantees: never the fallback defaults.
+  const settings = opts.forPublish ? await settingsForWrite() : await getSettings();
+  if (!settings) throw new FieldError(SETTINGS_UNAVAILABLE, 503);
   const now = nowIso();
   const missing: string[] = [];
   if (project.handover.status === "pending") missing.push("Commissioning isn't signed yet.");
@@ -1618,7 +1623,7 @@ export async function handoverDraft(projectId: string, staff: StaffMember): Prom
 /** Publish the handover pack (a new version supersedes the old) and record it on the project, which emails the customer. */
 export async function publishHandoverPack(projectId: string, staff: StaffMember) {
   if (!can(staff, "install.work")) throw new FieldError("You don't have install permissions.", 403);
-  const draft = await handoverDraft(projectId, staff);
+  const draft = await handoverDraft(projectId, staff, { forPublish: true });
   const blocking = draft.missing.filter((m) => /Commissioning|runsheet/.test(m));
   if (blocking.length) throw new FieldError(blocking.join(" "), 409);
   const doc = await createDocument(projectId, "handover-pack", draft.snapshot, { title: "Your handover pack", customerVisible: true, createdBy: staff.name });

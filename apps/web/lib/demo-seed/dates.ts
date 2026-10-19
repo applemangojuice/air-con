@@ -1,3 +1,5 @@
+import { isWorkingDay as sharedIsWorkingDay } from "@aircon/domain";
+
 /**
  * Calendar helpers for the demo story. Dates are yyyy-mm-dd; times are ISO
  * instants. Appointment slots use the house convention (UK wall-clock
@@ -16,8 +18,9 @@ export function isoWeekday(date: string): number {
   return dow === 0 ? 7 : dow;
 }
 
+/** The domain's rule (working-days.ts): a working weekday that isn't a bank holiday, so the story never books Christmas Day. */
 export function isWorkingDay(date: string, workingDays: number[] = [1, 2, 3, 4, 5]): boolean {
-  return workingDays.includes(isoWeekday(date));
+  return sharedIsWorkingDay(date, workingDays);
 }
 
 /** The date itself when it's a working day, else the next one. */

@@ -50,7 +50,7 @@ import * as purchaseOrdersRepo from "./repo/purchaseOrders";
 import * as staffRepo from "./repo/staff";
 import { smsConfigured } from "./providers/sms";
 import { enforceRateLimit } from "./rate-limit";
-import { getSettings } from "./settings-server";
+import { SETTINGS_UNAVAILABLE, getSettings, settingsForWrite } from "./settings-server";
 import { getServiceClient } from "./supabase-server";
 import {
   addDays,
@@ -585,7 +585,9 @@ async function tellTeam(projectId: string, title: string, lines: string[], discr
 export async function customerAct(projectId: string, actor: CustomerActor, req: PortalRequest): Promise<ActResult> {
   const project = await loadProject(projectId);
   if (!project) return { ok: false, error: "Project not found", status: 404 };
-  const settings = await getSettings();
+  // Slots, install days and the cancellation period are worked out on settings: never on the fallback defaults.
+  const settings = await settingsForWrite();
+  if (!settings) return { ok: false, error: SETTINGS_UNAVAILABLE, status: 503 };
   const today = londonToday();
   const name = customerName(project);
 
@@ -733,6 +735,9 @@ export async function decideVariation(
   }
 
   const project = await loadProject(projectId);
+  // A yes gets its document, which freezes the company's details: read them before anything is saved.
+  const settings = decision === "accept" ? await settingsForWrite() : null;
+  if (decision === "accept" && !settings) return { ok: false, error: SETTINGS_UNAVAILABLE, status: 503 };
   const name = project ? customerName(project) : "The customer";
   const now = new Date().toISOString();
   const status = decision === "accept" ? "accepted" : "declined";
@@ -782,7 +787,7 @@ export async function decideVariation(
       ...(acceptance ? { typedName: acceptance.name, wording: acceptance.wording, contentHash: acceptance.contentHash, ip: acceptance.ip ?? null } : {}),
     },
   });
-  if (acceptance && project) await recordAcceptedVariation(project, next, acceptance);
+  if (acceptance && project && settings) await recordAcceptedVariation(project, next, acceptance, settings);
   await tellTeam(
     projectId,
     `Variation #${issue.number} ${status} by ${name}: ${issue.title}`,
@@ -809,9 +814,8 @@ export async function decideVariation(
  * Best-effort, like the contract document: the decision is already saved,
  * and a failure here is logged for ops to put right.
  */
-async function recordAcceptedVariation(project: Project, issue: Issue, acceptance: VariationAcceptance): Promise<void> {
+async function recordAcceptedVariation(project: Project, issue: Issue, acceptance: VariationAcceptance, settings: PilotSettings): Promise<void> {
   const v = issue.variation!;
-  const settings = await getSettings();
   const contract = (await listDocuments(project.id, { kind: "contract", customerVisibleOnly: true }).catch(() => []))[0];
   const contractTotal = project.proposal.contractTotalPence ?? project.money.contractTotalPence;
   let documentId: string | undefined;

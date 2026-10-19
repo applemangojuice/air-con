@@ -809,7 +809,10 @@ test("install-dates-set: accepted, working days, right length, lead time, after 
   refuses(walk("proposal-viewed"), set(INSTALL_DATES), T.dates, {}, /Accept your proposal/);
   const p = walk("proposal-accepted", INSTALL_ONLY); // the period runs to Tue 10 Nov
   refuses(p, set(["2026-11-17", "2026-11-18"]), T.dates, {}, /Pick 3 install days/);
-  refuses(p, set(["2026-11-20", "2026-11-21", "2026-11-23"]), T.dates, {}, /working days/); // Sat
+  refuses(p, set(["2026-11-20", "2026-11-21", "2026-11-23"]), T.dates, {}, /working days: Sat 21 Nov isn't one of our working days/);
+  // Bank holidays aren't working days either: no install on Christmas Day.
+  refuses(p, set(["2026-12-23", "2026-12-24", "2026-12-25"]), T.dates, {}, /working days: Fri 25 Dec is a bank holiday \(Christmas Day\)/);
+  assert.ok(apply(p, set(["2026-12-23", "2026-12-24", "2026-12-29"]), T.dates).ok, "Wed, Thu, then Tue after the Christmas holidays");
   refuses(p, set(["2026-11-18", "2026-11-17", "2026-11-19"]), T.dates, {}, /in order/);
   refuses(p, { type: "install-dates-set", startDate: "2026-11-18", dates: INSTALL_DATES }, T.dates, {}, /first install day/);
   refuses(p, set(["2026-11-09", "2026-11-10", "2026-11-11"]), T.dates, {}, /cancellation period runs until Tue 10 Nov/);

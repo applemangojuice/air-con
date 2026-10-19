@@ -6,7 +6,9 @@ import * as settingsRepo from "./settings";
  * `invoices`: deposit, balance, variation, fee and credit-note invoices.
  * `number` ("DIH-0001") is sequential, from the counter in settings
  * (`payments.nextInvoiceNumber`), and unique in the database, so a number is
- * never issued twice even if two invoices race.
+ * never issued twice even if two invoices race. Migration 0013 adds two more
+ * uniques: the form's `requestId`, and (project, `issueKey`), so two
+ * invoices planned on the same state of the project can't both be made.
  */
 
 const TABLE = "invoices";
@@ -80,7 +82,35 @@ export async function insert(invoice: Invoice): Promise<Invoice> {
   return fromRow(data!);
 }
 
-/** Number and insert in one go, retrying with a fresh number if another invoice took it first. */
+/**
+ * Another invoice holds this one's place: the same request made it already
+ * (`request`), or one planned on the same state of the project got there
+ * first (`plan`). `number` was allocated and is left unused.
+ */
+export class InvoiceClashError extends Error {
+  readonly clash: "request" | "plan";
+  readonly number: string;
+  constructor(clash: "request" | "plan", number: string) {
+    super(clash === "request" ? "That request has already issued an invoice." : "Another invoice was issued on this project at the same moment.");
+    this.name = "InvoiceClashError";
+    this.clash = clash;
+    this.number = number;
+  }
+}
+
+/** Which unique a violation hit: the number (try the next one), or one of 0013's. */
+function clashOf(error: { message?: string | null; details?: string | null }): "number" | "request" | "plan" {
+  const text = `${error.message ?? ""} ${error.details ?? ""}`;
+  if (text.includes("invoices_request_id_key")) return "request";
+  if (text.includes("invoices_issue_key")) return "plan";
+  return "number";
+}
+
+/**
+ * Number and insert in one go, retrying with a fresh number if another
+ * invoice took it first. A clash on the request or the plan throws
+ * InvoiceClashError: a fresh number wouldn't help.
+ */
 export async function insertNumbered(invoice: Omit<Invoice, "number">): Promise<Invoice> {
   for (let attempt = 0; attempt < 5; attempt++) {
     const number = await nextNumber();
@@ -89,7 +119,11 @@ export async function insertNumbered(invoice: Omit<Invoice, "number">): Promise<
       .insert(toRow({ ...invoice, number }))
       .select("*")
       .single();
-    if (isUniqueViolation(res.error)) continue;
+    if (isUniqueViolation(res.error)) {
+      const clash = clashOf(res.error as { message?: string; details?: string });
+      if (clash === "number") continue;
+      throw new InvoiceClashError(clash, number);
+    }
     return fromRow(must(res, "invoices insert")!);
   }
   throw new Error("invoices insertNumbered: could not allocate a free invoice number");

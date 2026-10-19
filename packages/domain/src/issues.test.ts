@@ -9,6 +9,7 @@ import {
   sendVariationToCustomer,
   transitionIssue,
   variationAmounts,
+  variationPricing,
   type Issue,
   type IssueKind,
 } from "./issues.ts";
@@ -73,6 +74,11 @@ test("variations: priced with tax from the contract's rate, proposed, waiting fo
   assert.deepEqual(variationAmounts(12_000, 20), { priceDeltaNetPence: 12_000, taxPence: 2_400, totalDeltaPence: 14_400 });
   assert.deepEqual(variationAmounts(10_001, 5), { priceDeltaNetPence: 10_001, taxPence: 500, totalDeltaPence: 10_501 });
   assert.deepEqual(variationAmounts(-5_000, 20), { priceDeltaNetPence: -5_000, taxPence: -1_000, totalDeltaPence: -6_000 });
+  // Priced on a code: its rate, and the code kept so the invoice splits the total the same way.
+  assert.deepEqual(variationPricing(12_000, "standard-20"), { priceDeltaNetPence: 12_000, taxPence: 2_400, totalDeltaPence: 14_400, taxCode: "standard-20" });
+  assert.deepEqual(variationPricing(10_000, "reduced-5"), { priceDeltaNetPence: 10_000, taxPence: 500, totalDeltaPence: 10_500, taxCode: "reduced-5" });
+  assert.deepEqual(variationPricing(10_000, "outside-scope"), { priceDeltaNetPence: 10_000, taxPence: 0, totalDeltaPence: 10_000, taxCode: "outside-scope" });
+  assert.deepEqual(variationPricing(10_000, "junk" as never), { priceDeltaNetPence: 10_000, taxPence: 0, totalDeltaPence: 10_000 });
   const v = createIssue({
     id: "v1",
     projectId: "p1",
@@ -82,9 +88,10 @@ test("variations: priced with tax from the contract's rate, proposed, waiting fo
     raisedBy: RAISER,
     raisedAt: AT,
     customerVisible: false,
-    variation: { description: "The office wall has no fall to the outside: a pump is needed.", priceDeltaNetPence: 18_000, taxRatePct: 0 },
+    variation: { description: "The office wall has no fall to the outside: a pump is needed.", priceDeltaNetPence: 18_000, taxCode: "outside-scope" },
   });
   assert.equal(v.status, "awaiting-customer");
+  assert.equal(v.variation?.taxCode, "outside-scope", "the code it was priced on is kept for its invoice");
   assert.equal(v.customerVisible, true, "a variation is always the customer's to see");
   assert.equal(v.variation?.status, "proposed");
   assert.equal(v.variation?.totalDeltaPence, 18_000);
@@ -101,7 +108,7 @@ test("a variation proposed on site waits for the office; sending it re-prices it
     title: "2 m more trunking",
     raisedBy: RAISER,
     raisedAt: AT,
-    variation: { description: "The run round the bay is longer than measured.", priceDeltaNetPence: 18_000, taxRatePct: 0, officeReview: true },
+    variation: { description: "The run round the bay is longer than measured.", priceDeltaNetPence: 18_000, taxCode: "outside-scope", officeReview: true },
   });
   assert.equal(draft.variation?.status, "draft");
   assert.equal(draft.customerVisible, false, "the customer can't see an unchecked price");
@@ -110,7 +117,7 @@ test("a variation proposed on site waits for the office; sending it re-prices it
   assert.match(draft.nextAction ?? "", /Check the price and send it to the customer/);
   assert.match(draft.history[0]!.note, /office checks the price/);
 
-  const sent = sendVariationToCustomer(draft, { description: "  2 m of trunking round the bay window.  ", priceDeltaNetPence: 12_000, taxRatePct: 20 }, "DEMO Ada", "2026-11-10T12:00:00.000Z");
+  const sent = sendVariationToCustomer(draft, { description: "  2 m of trunking round the bay window.  ", priceDeltaNetPence: 12_000, taxCode: "standard-20" }, "DEMO Ada", "2026-11-10T12:00:00.000Z");
   assert.equal(draft.variation?.status, "draft", "pure");
   assert.equal(sent.variation?.status, "proposed");
   assert.equal(sent.status, "awaiting-customer");
@@ -118,12 +125,13 @@ test("a variation proposed on site waits for the office; sending it re-prices it
   assert.equal(sent.ownerRole, "customer");
   assert.equal(sent.variation?.description, "2 m of trunking round the bay window.");
   assert.deepEqual([sent.variation?.priceDeltaNetPence, sent.variation?.taxPence, sent.variation?.totalDeltaPence], [12_000, 2_400, 14_400]);
+  assert.equal(sent.variation?.taxCode, "standard-20", "re-priced on the contract's code, and the code kept");
   assert.match(sent.history.at(-1)!.note, /sent to the customer at £120 before VAT \(estimated on site at £180\)/);
 
-  assert.throws(() => sendVariationToCustomer(sent, { description: "Again", priceDeltaNetPence: 1, taxRatePct: 0 }, "Ada", AT), /already gone to the customer/);
+  assert.throws(() => sendVariationToCustomer(sent, { description: "Again", priceDeltaNetPence: 1, taxCode: "outside-scope" }, "Ada", AT), /already gone to the customer/);
   const withdrawn = transitionIssue(draft, "rejected", "Ada", "Not needed", AT);
-  assert.throws(() => sendVariationToCustomer(withdrawn, { description: "Trunking", priceDeltaNetPence: 1, taxRatePct: 0 }, "Ada", AT), /withdrawn/);
-  assert.throws(() => sendVariationToCustomer(draft, { description: " ", priceDeltaNetPence: 1, taxRatePct: 0 }, "Ada", AT), /Describe the change/);
+  assert.throws(() => sendVariationToCustomer(withdrawn, { description: "Trunking", priceDeltaNetPence: 1, taxCode: "outside-scope" }, "Ada", AT), /withdrawn/);
+  assert.throws(() => sendVariationToCustomer(draft, { description: " ", priceDeltaNetPence: 1, taxCode: "outside-scope" }, "Ada", AT), /Describe the change/);
 });
 
 test("transitionIssue: history appended, resolvedAt stamped once, reopening clears it, pure", () => {

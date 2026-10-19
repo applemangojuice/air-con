@@ -62,7 +62,7 @@ import * as mediaRepo from "./repo/media";
 import * as proposalsRepo from "./repo/proposals";
 import * as staffRepo from "./repo/staff";
 import * as surveysRepo from "./repo/surveys";
-import { getSettings } from "./settings-server";
+import { SETTINGS_UNAVAILABLE, getSettings, settingsForWrite } from "./settings-server";
 import { buildAcceptanceRecord, proposalDocumentHash, termsHash, withoutAt, type AcceptanceForm } from "@/components/proposal/model";
 import { toPublicSettings } from "@/components/site/claims";
 import { termsSections } from "./legal/terms";
@@ -380,7 +380,8 @@ export async function startDraft(projectId: string, staff: StaffMember): Promise
     // Drafted on a design that's since been replaced: close it, and start again from the approved one.
     await proposalsRepo.update({ ...draft, status: "superseded" });
   }
-  const settings = await getSettings();
+  const settings = await settingsForWrite();
+  if (!settings) return fail(SETTINGS_UNAVAILABLE, 503);
   const { ctx } = await optionContext(project, design, settings, project.proposal.contractType ?? "supply-and-install");
   const today = londonToday();
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -501,7 +502,8 @@ export async function saveDraft(
     if (seen.has(o.designVariantId)) return fail("Each design variant can only be one option.", 422);
     seen.add(o.designVariantId);
   }
-  const settings = await getSettings();
+  const settings = await settingsForWrite();
+  if (!settings) return fail(SETTINGS_UNAVAILABLE, 503);
   const { ctx } = await optionContext(project, design, settings, patch.contractType);
   const canPrice = can(staff, "finance.view-margin");
 
@@ -640,7 +642,9 @@ export async function issueDraft(projectId: string, proposalId: string, staff: S
       409,
     );
   }
-  const settings = await getSettings();
+  // Frozen into this version (terms, Schedule 2, the company): never on the fallback defaults.
+  const settings = await settingsForWrite();
+  if (!settings) return fail(SETTINGS_UNAVAILABLE, 503);
   const today = londonToday();
   // Settings saved since the draft's last edit (guarantees, warranty, terms, payment terms) still
   // reach the customer, and are frozen with this version from here on, with the full terms text.
@@ -962,8 +966,11 @@ export async function acceptProposal(
   const opened = await openForCustomer(proposalId);
   if (!opened.ok) return opened;
   let { project, record } = opened;
-  // Frozen at issue: what they accept is what the page showed them.
-  const settings = settingsForProposal(await getSettings(), record);
+  // Frozen at issue: what they accept is what the page showed them. The contract also freezes the
+  // company's details, so never on the fallback defaults.
+  const live = await settingsForWrite();
+  if (!live) return fail(SETTINGS_UNAVAILABLE, 503);
+  const settings = settingsForProposal(live, record);
   const today = londonToday();
 
   if (project.proposal.status === "accepted") {

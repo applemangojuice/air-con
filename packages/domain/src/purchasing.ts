@@ -1,6 +1,7 @@
 import type { CatalogueItem } from "./catalogue.ts";
 import type { DesignBomLine, DesignRecord } from "./design-record.ts";
 import { sameJson } from "./json.ts";
+import { MON_FRI, addWorkingDays } from "./working-days.ts";
 import type { Project } from "./project.ts";
 
 /**
@@ -785,37 +786,28 @@ function londonDate(iso: string): string {
 /* When to order                                                        */
 /* ------------------------------------------------------------------ */
 
-const MON_FRI = [1, 2, 3, 4, 5];
-
 function addDays(iso: string, days: number): string {
   const d = new Date(`${dateOf(iso)}T12:00:00Z`);
   d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
 }
 
-function isWorkingDay(iso: string, workingDays: number[]): boolean {
-  const dow = new Date(`${dateOf(iso)}T12:00:00Z`).getUTCDay();
-  return (workingDays.length ? workingDays : MON_FRI).includes(dow === 0 ? 7 : dow);
-}
-
-/** n working days before (negative n) or after a date. The date itself doesn't count. */
-export function shiftWorkingDays(iso: string, n: number, workingDays: number[] = MON_FRI): string {
-  let d = dateOf(iso);
-  const step = n < 0 ? -1 : 1;
-  for (let left = Math.abs(Math.trunc(n)); left > 0; ) {
-    d = addDays(d, step);
-    if (isWorkingDay(d, workingDays)) left -= 1;
-  }
-  return d;
+/**
+ * n working days before (negative n) or after a date. The date itself
+ * doesn't count. Bank holidays aren't working days (working-days.ts): a
+ * supplier's lead time doesn't run over Christmas.
+ */
+export function shiftWorkingDays(iso: string, n: number, workingDays: readonly number[] = MON_FRI): string {
+  return addWorkingDays(iso, n, workingDays);
 }
 
 /** The kit needs to be on site this day: install day 1 less the buffer, in working days. */
-export function needOnSiteBy(installStart: string, workingDays: number[] = MON_FRI): string {
+export function needOnSiteBy(installStart: string, workingDays: readonly number[] = MON_FRI): string {
   return shiftWorkingDays(installStart, -KIT_ON_SITE_BUFFER_DAYS, workingDays);
 }
 
 /** The last day to place an order that takes `leadDays` working days to arrive. */
-export function orderByDate(needOnSite: string, leadDays: number = DEFAULT_SUPPLIER_LEAD_DAYS, workingDays: number[] = MON_FRI): string {
+export function orderByDate(needOnSite: string, leadDays: number = DEFAULT_SUPPLIER_LEAD_DAYS, workingDays: readonly number[] = MON_FRI): string {
   return shiftWorkingDays(needOnSite, -Math.max(0, Math.round(leadDays)), workingDays);
 }
 
@@ -839,7 +831,7 @@ export const PO_FLAG_TEXT: Record<PoFlag, string> = {
  * default lead time. (For the cancellation period's floor on install dates:
  * project.ts earliestStartForKit.)
  */
-export function earliestKitArrival(pos: PurchaseOrder[], todayIso: string, workingDays: number[] = MON_FRI): string {
+export function earliestKitArrival(pos: PurchaseOrder[], todayIso: string, workingDays: readonly number[] = MON_FRI): string {
   const today = dateOf(todayIso);
   const tomorrow = addDays(today, 1);
   const later = (a: string, b: string) => (a >= b ? a : b);
@@ -869,7 +861,7 @@ export function poSchedule(
   po: PurchaseOrder,
   installStart: string | undefined,
   todayIso: string,
-  workingDays: number[] = MON_FRI,
+  workingDays: readonly number[] = MON_FRI,
   opts: { deliverBy?: string } = {},
 ): { needOnSiteBy?: string; orderBy?: string; needFor?: "install" | "cancellation-period"; flags: PoFlag[] } {
   const today = dateOf(todayIso);

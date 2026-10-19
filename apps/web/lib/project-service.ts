@@ -35,7 +35,7 @@ import {
 import { audit, type AuditActor } from "./audit";
 import { isPlausibleEmail, normaliseEmail, relinkEmail, sameEmail } from "./auth/access";
 import { notifyForAction } from "./comms/for-action";
-import { isUuid, uuidOrNull } from "./repo/base";
+import { isUniqueViolation, isUuid, uuidOrNull } from "./repo/base";
 import * as complianceRepo from "./repo/compliance";
 import * as customersRepo from "./repo/customers";
 import * as designsRepo from "./repo/designs";
@@ -49,7 +49,7 @@ import * as purchaseOrdersRepo from "./repo/purchaseOrders";
 import * as staffRepo from "./repo/staff";
 import * as surveysRepo from "./repo/surveys";
 import { withLegacyContact } from "./legacy-contact";
-import { getSettings } from "./settings-server";
+import { SETTINGS_UNAVAILABLE, getSettings, settingsForWrite } from "./settings-server";
 import { getServiceClient } from "./supabase-server";
 
 /**
@@ -174,7 +174,7 @@ function denormalise(p: Project, blocked?: boolean) {
   };
 }
 
-type WriteResult = { ok: true } | { ok: false; conflict: boolean; error: string };
+type WriteResult = { ok: true } | { ok: false; conflict: boolean; error: string; pilotClash?: boolean };
 
 async function writeProject(
   project: Project,
@@ -185,7 +185,7 @@ async function writeProject(
   let q = db.from("projects").update(denormalise(project, opts.blocked)).eq("id", project.id);
   if (opts.expectedUpdatedAt) q = q.eq("updated_at", opts.expectedUpdatedAt);
   const { data, error } = await q.select("id");
-  if (error) return { ok: false, conflict: false, error: error.message };
+  if (error) return { ok: false, conflict: false, error: error.message, ...(isPilotNumberClash(error) ? { pilotClash: true } : {}) };
   if ((data ?? []).length === 0) {
     return opts.expectedUpdatedAt
       ? { ok: false, conflict: true, error: "The project changed while saving" }
@@ -211,6 +211,27 @@ export async function saveProject(
 /* ------------------------------------------------------------------ */
 /* Create                                                              */
 /* ------------------------------------------------------------------ */
+
+/**
+ * The database refusing a second household on one pilot number
+ * (`projects_pilot_number_key`, migration 0013): the check below runs first,
+ * but two people tagging at the same moment both pass it.
+ */
+export function isPilotNumberClash(error: { code?: string; message: string } | null | undefined): boolean {
+  return isUniqueViolation(error) && /pilot_number/.test(error?.message ?? "");
+}
+
+/**
+ * DEMO pilots are numbered from 900 (the demo seed), so real households take
+ * 1 to 899: a real 901 would stop "Load demo pilots" working, now that the
+ * database refuses a shared number.
+ */
+export const DEMO_PILOT_FROM = 900;
+
+/** What the office reads when a pilot number is taken. */
+export function pilotTakenMessage(number: number, holder: { name: string } | null | undefined): string {
+  return `Pilot ${number} is already ${holder?.name ?? "another household"}. Pick another number.`;
+}
 
 /**
  * The project already tagged with this pilot number, if any (other than the
@@ -268,7 +289,9 @@ export async function createProjectForQuote(
     .maybeSingle();
   if (!quoteRow) return { error: "Quote not found", status: 404 };
 
-  const settings = await getSettings();
+  // The survey fee, its length and the install block are frozen onto the project: never the fallback defaults.
+  const settings = await settingsForWrite();
+  if (!settings) return { error: SETTINGS_UNAVAILABLE, status: 503 };
   const name = (quoteRow.customer_name as string | null) ?? "";
   const email = normaliseEmail(opts.contact?.email ?? (quoteRow.email as string | null) ?? "");
   const phone = opts.contact?.phone ?? (quoteRow.phone as string | null) ?? undefined;
@@ -318,6 +341,10 @@ export async function createProjectForQuote(
     // Lost a race with a concurrent create; the unique quote_id makes this safe.
     const { data: raced } = await db.from("projects").select("id").eq("quote_id", quoteId).maybeSingle();
     if (raced) return { id: String(raced.id), created: false };
+    if (opts.pilot && isPilotNumberClash(error)) {
+      const holder = await pilotNumberHolder(opts.pilot.number, { quoteId }).catch(() => null);
+      return { error: pilotTakenMessage(opts.pilot.number, holder), status: 409 };
+    }
     console.error("[project] insert failed:", error?.message);
     return { error: "Could not create project", status: 502 };
   }
@@ -643,6 +670,10 @@ export async function dispatch(projectId: string, action: ProjectAction, actorIn
       blocked: isBlocked(next, ctx),
     });
     if (!write.ok && write.conflict) continue; // someone saved in between: re-read and re-apply
+    if (!write.ok && write.pilotClash && next.pilot) {
+      const holder = await pilotNumberHolder(next.pilot.number, { projectId }).catch(() => null);
+      return { error: pilotTakenMessage(next.pilot.number, holder), status: 409 };
+    }
     if (!write.ok) {
       console.error(`[project] dispatch ${action.type} on ${projectId} failed to save:`, write.error);
       return { error: "Could not save project", status: 502 };

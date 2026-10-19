@@ -10,7 +10,7 @@ import {
   earlyStartEvidenceProblem,
   earlyStartRequestedOf,
   earlyStartWording,
-  effectiveTaxCode,
+  contractTaxCode,
   hasCurrentQualification,
   meetsRequirement,
   qualificationStatus,
@@ -40,7 +40,7 @@ import * as issuesRepo from "./repo/issues";
 import * as proposalsRepo from "./repo/proposals";
 import * as purchaseOrdersRepo from "./repo/purchaseOrders";
 import * as staffRepo from "./repo/staff";
-import { getSettings } from "./settings-server";
+import { SETTINGS_UNAVAILABLE, getSettings, settingsForWrite } from "./settings-server";
 import { fmtDay } from "./format";
 
 /**
@@ -168,9 +168,7 @@ export async function loadBooking(projectId: string, staff: StaffMember): Promis
     REQUIREMENTS.map((r) => [r, crewStaff.filter((m) => meetsRequirement(m, r, checkOn)).map((m) => m.name)]),
   ) as Record<StepRequirement, string[]>;
 
-  const taxCode =
-    (proposal?.acceptance ? proposal.options.find((o) => o.id === proposal.acceptance!.optionId)?.pricing?.taxCode : undefined) ??
-    effectiveTaxCode(settings);
+  const taxCode = contractTaxCode(proposal, settings);
   // Planned on the terms the customer agreed, as the money page does.
   const contractDoc = contracts.filter((d) => d.status === "final").sort((a, b) => b.version - a.version)[0];
   const agreed = agreedTerms(settings, proposal, contractDoc);
@@ -251,7 +249,9 @@ export async function setInstallDates(projectId: string, startDate: string, staf
   if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate)) return fail("Pick the first install day.");
   const project = await loadProject(projectId);
   if (!project) return fail("Project not found.", 404);
-  const settings = await getSettings();
+  // The dates and the cancellation period are worked out on settings: never on the fallback defaults.
+  const settings = await settingsForWrite();
+  if (!settings) return fail(SETTINGS_UNAVAILABLE, 503);
   const dates = workingDatesFrom(startDate, project.booking.installDays, settings.scheduling.workingDays);
   if (dates[0] !== startDate) return fail("The first install day must be a working day.");
   // Supply-and-install with no early start: the period runs from the kit's

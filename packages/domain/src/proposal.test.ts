@@ -21,6 +21,7 @@ import {
   proposalIssueErrors,
   proposalCheckFor,
   agreedPaymentsFor,
+  contractTaxCode,
   recomputeOption,
   reviseProposal,
   unitHighlights,
@@ -602,4 +603,26 @@ test("unitHighlights: spec facts the blurb already makes aren't repeated", () =>
   assert.deepEqual(unitHighlights({ customerBlurb: "", specs }), ["19 dB on its quietest setting", "Heats in winter as well as cooling in summer", "App control"]);
   assert.deepEqual(unitHighlights({ customerBlurb: "Heats and cools a big room.", specs: { wifi: false } as unknown as CatalogueItem["specs"] }), ["Heats and cools a big room."]);
   assert.deepEqual(unitHighlights(undefined), []);
+});
+
+test("contractTaxCode: the accepted option's own code; else settings as they must be charged", () => {
+  const p = issued();
+  const accepted: ProposalRecord = { ...p, status: "accepted", acceptance: { ...acceptance(p), at: NOW } };
+  const chosen = accepted.options.find((o) => o.id === accepted.acceptance!.optionId)!;
+  const reduced: ProposalRecord = {
+    ...accepted,
+    options: accepted.options.map((o) => (o.id === chosen.id ? { ...o, pricing: { ...o.pricing, taxCode: "reduced-5" } } : o)),
+  };
+  const registered = mergeSettings({ ...READY, tax: { ...READY.tax, vatRegistered: true, defaultTaxCode: "outside-scope" } });
+  assert.equal(contractTaxCode(reduced, registered), "reduced-5", "the contract's code, whatever settings say now");
+  // No accepted contract: a registered business with the shipped outside-scope default charges the standard rate.
+  assert.equal(contractTaxCode(p, registered), "standard-20");
+  assert.equal(contractTaxCode(null, registered), "standard-20");
+  assert.equal(contractTaxCode(null, mergeSettings({ ...READY, tax: { ...READY.tax, vatRegistered: false } })), "outside-scope");
+  // A junk code on the stored option isn't trusted.
+  const junk: ProposalRecord = {
+    ...accepted,
+    options: accepted.options.map((o) => (o.id === chosen.id ? { ...o, pricing: { ...o.pricing, taxCode: "nonsense" as never } } : o)),
+  };
+  assert.equal(contractTaxCode(junk, registered), "standard-20");
 });

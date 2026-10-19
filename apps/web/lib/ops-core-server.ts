@@ -723,7 +723,7 @@ export async function goLiveChecks(): Promise<GoLiveCheck[]> {
           : !allOk
             ? `Some checks failed: ${[...schema.errors, ...report.tables.filter((t) => !t.ok).map((t) => `${t.table}: ${t.error ?? "error"}`)].slice(0, 4).join("; ")}.`
             : "Every pilot table and column is there.",
-      fix: `Run every file in supabase/migrations in order (0001 to 0012, both 0006 files) in the Supabase SQL editor; ${PILOT_MIGRATION} is the pilot platform. Then reload this page.`,
+      fix: `Run every file in supabase/migrations in order (0001 to 0013, both 0006 files) in the Supabase SQL editor; ${PILOT_MIGRATION} is the pilot platform. Then reload this page.`,
       href: "/ops/status",
     });
   } else {
@@ -735,7 +735,7 @@ export async function goLiveChecks(): Promise<GoLiveCheck[]> {
         backend === "none"
           ? "No database: nothing saves."
           : `Using the local ${backend} backend. Fine for trying things out; real customers need Supabase (local files don't survive a Vercel deploy).`,
-      fix: "Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in Vercel, run every migration 0001 to 0012 in order, redeploy.",
+      fix: "Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in Vercel, run every migration 0001 to 0013 in order, redeploy.",
     });
   }
   const buckets = report.buckets.filter((b) => !b.ok);

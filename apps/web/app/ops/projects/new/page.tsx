@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { EmptyState, PageHeader } from "@/components/kit/layout";
 import { requireStaff } from "@/lib/auth/server";
+import { DEMO_PILOT_FROM } from "@/lib/project-service";
 import { getSettings } from "@/lib/settings-server";
 import { getServiceClient } from "@/lib/supabase-server";
 import { createPilotAction } from "./actions";
@@ -8,9 +9,6 @@ import { NewPilotForm } from "./new-pilot-form";
 
 export const metadata: Metadata = { title: "New pilot · ops", robots: { index: false } };
 export const dynamic = "force-dynamic";
-
-/** DEMO pilots are numbered from 900, so the next real number ignores them. */
-const DEMO_PILOT_FROM = 900;
 
 export default async function NewPilotPage() {
   await requireStaff("projects.edit");

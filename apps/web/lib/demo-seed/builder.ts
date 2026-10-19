@@ -1973,7 +1973,10 @@ function buildProject(sc: Scenario, today: string, settings: PilotSettings, invo
   // The walkthrough found one loose clip: signed with a snag, fixed three days later.
   story.act({ type: "handover-signed", name: sc.customer.signName, outcome: "snags", snagCount: 1 }, at(cal.d3!, "16:25"));
   timeEntry("handover", TECH, at(cal.d3!, "15:45"), 45, 3);
-  const snagFixed = nextWorkingDay(addDays(cal.d3!, 3));
+  // A few working days after the handover, and always before the 7-day check-in (Christmas and
+  // the other bank holidays can push "the next working day" a week out).
+  const snagNext = nextWorkingDay(addDays(cal.d3!, 3));
+  const snagFixed = snagNext <= addDays(cal.d3!, 5) ? snagNext : prevWorkingDay(addDays(cal.d3!, 3));
   out.issues.push({
     id: id("issue:1"),
     projectId,

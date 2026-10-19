@@ -16,6 +16,12 @@ export interface TableSchema {
   primaryKey: string[];
   /** Further unique constraints, each a column list. NULLs never collide (SQL semantics). */
   unique: string[][];
+  /**
+   * Unique indexes on expressions, or partial ones (`… where …`), by their
+   * migration name: `key` gives the indexed values, or null for a row the
+   * index leaves out (its `where` is false, or a value is NULL).
+   */
+  uniqueIndexes: { name: string; key: (row: Row) => unknown[] | null }[];
   /** SQL `default` values applied on insert when the column is absent. */
   defaults: Record<string, unknown>;
   /** Timestamp columns stamped with now on insert when absent. */
@@ -30,6 +36,15 @@ export interface TableSchema {
 }
 
 const BOTH_STAMPS = ["created_at", "updated_at"];
+
+/** A jsonb column's text field, as `col->>'field'` reads it (absent: null). */
+const jsonText = (row: Row, col: string, field: string): string | null => {
+  const obj = row[col];
+  if (typeof obj !== "object" || obj === null || Array.isArray(obj)) return null;
+  const v = (obj as Row)[field];
+  if (v === undefined || v === null) return null;
+  return typeof v === "string" ? v : canonicalJson(v);
+};
 const CREATED_ONLY = ["created_at"];
 
 const recordOf = (row: Row): Row => {
@@ -76,7 +91,8 @@ const TABLES: Record<string, SchemaPatch> = {
   quote_requests: { stamps: CREATED_ONLY, defaults: { status: "new", source: "web" } },
   video_surveys: { stamps: CREATED_ONLY, defaults: { status: "uploaded" } },
   projects: {
-    unique: [["quote_id"]],
+    // pilot_number: 0013's partial index (where not null); NULLs never collide here either.
+    unique: [["quote_id"], ["pilot_number"]],
     defaults: { completed: false, schema_version: 1, blocked: false },
   },
   properties: {
@@ -106,7 +122,14 @@ const TABLES: Record<string, SchemaPatch> = {
   install_jobs: { unique: [["project_id"]] },
   install_evidence: { stamps: CREATED_ONLY },
   time_entries: { stamps: CREATED_ONLY },
-  invoices: { unique: [["number"]] },
+  invoices: {
+    unique: [["number"]],
+    // Migration 0013: one invoice per request, and one per project per invoice count.
+    uniqueIndexes: [
+      { name: "invoices_request_id_key", key: (r) => { const v = jsonText(r, "invoice", "requestId"); return v === null ? null : [v]; } },
+      { name: "invoices_issue_key", key: (r) => { const v = jsonText(r, "invoice", "issueKey"); return v === null || r.project_id == null ? null : [r.project_id, v]; } },
+    ],
+  },
   payments: { unique: [["provider_ref"]], stamps: CREATED_ONLY },
   messages: { unique: [["idempotency_key"]] },
   documents: { unique: [["ref"]], stamps: CREATED_ONLY },
@@ -119,6 +142,7 @@ export function tableSchema(table: string): TableSchema {
   return {
     primaryKey: patch.primaryKey ?? ["id"],
     unique: patch.unique ?? [],
+    uniqueIndexes: patch.uniqueIndexes ?? [],
     defaults: patch.defaults ?? {},
     stamps: patch.stamps ?? BOTH_STAMPS,
     autoId: patch.autoId ?? true,
