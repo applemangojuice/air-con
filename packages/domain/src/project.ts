@@ -886,6 +886,9 @@ export function blockersFor(project: Project, ctx: ReadinessContext, gate: GateI
       const serious = gate === "closed" && (issue.severity === "high" || issue.severity === "critical");
       if (holds || serious) {
         block(`issue:${issue.id}`, `Open ${issue.severity} issue: ${issue.title}`, "ops", "Resolve the issue");
+      } else if (gate === "closed") {
+        // Closing doesn't wait for a small one, but nobody should close a project without seeing it.
+        warn(`issue:${issue.id}`, `Open ${issue.severity} issue: ${issue.title}. It stays open after the project closes.`, "ops", "Resolve the issue");
       }
     }
   };
@@ -1271,6 +1274,9 @@ export function projectTimeline(project: Project, todayIso: string): TimelineEnt
   }
   if (p.install.completedAt) {
     dates.install = { kind: "actual", iso: p.install.completedAt };
+  } else if (p.install.startedAt) {
+    // Under way: the day it really started (a crew can start early), not the booked one.
+    dates.install = { kind: "actual", iso: p.install.startedAt };
   } else if (p.booking.startDate) {
     dates.install = { kind: p.booking.status === "booked" ? "confirmed" : "estimated", iso: p.booking.startDate };
   } else {
@@ -1682,6 +1688,32 @@ export function rescheduleFeeGbp(kind: "survey" | "installation", daysNotice: nu
 }
 
 /**
+ * A day closed off by the install completing rather than by the crew ending
+ * it: the last day worked, done, with no summary (ending a day always
+ * leaves one). The crew can still end it, adding the customer update and
+ * stopping their clock, once the install is complete.
+ */
+export function isWrapUpDay(p: Pick<Project, "install">, day: InstallDay): boolean {
+  if (p.install.status !== "complete" || day.status !== "done" || day.summary !== undefined || !day.startedAt) return false;
+  const worked = p.install.days.filter((d) => d.startedAt);
+  return worked[worked.length - 1]?.n === day.n;
+}
+
+/** The day the crew can still wrap up after the install completed (see isWrapUpDay), if any. */
+export function wrapUpDayOf(p: Pick<Project, "install">): InstallDay | undefined {
+  return p.install.days.find((d) => isWrapUpDay(p, d));
+}
+
+/**
+ * The updates-feed line for an end-of-day update: "Day 2 done: …", without
+ * doubling the prefix when the installer already wrote "Day 2 done: …".
+ */
+export function dayUpdateLabel(n: number, text: string): string {
+  const t = text.trim();
+  return new RegExp(`^day\\s*${n}\\b`, "i").test(t) ? t : `Day ${n} done: ${t}`;
+}
+
+/**
  * Apply one action to a project. Pure: returns a new project (or an error),
  * never mutates. `now` is injected so server and tests control the clock;
  * `ctx` carries everything outside the snapshot that a gate needs. Gated
@@ -1692,15 +1724,6 @@ export function rescheduleFeeGbp(kind: "survey" | "installation", daysNotice: nu
  * rest are the system's. Date-change fees apply only to the customer's own
  * changes; when we move a date it's on us.
  */
-/**
- * The updates-feed line for an end-of-day update: "Day 2 done: …", without
- * doubling the prefix when the installer already wrote "Day 2 done: …".
- */
-export function dayUpdateLabel(n: number, text: string): string {
-  const t = text.trim();
-  return new RegExp(`^day\\s*${n}\\b`, "i").test(t) ? t : `Day ${n} done: ${t}`;
-}
-
 export function applyProjectAction(project: Project, action: ProjectAction, now: string, ctx?: ReadinessContext): ApplyResult {
   // Projects are JSON snapshots by design, so JSON is a faithful deep clone.
   const p: Project = JSON.parse(JSON.stringify(project)) as Project;
@@ -2267,7 +2290,10 @@ export function applyProjectAction(project: Project, action: ProjectAction, now:
 
     case "install-day-ended": {
       const day = p.install.days.find((d) => d.n === action.n);
-      if (!day || day.status !== "in-progress") return err(`Day ${action.n} hasn't started.`);
+      // The day the install completed on (commissioning signed mid-day) is closed with it, but the
+      // crew is still on site for the handover: they still end it, with the update and their clock.
+      const wrapUp = day ? isWrapUpDay(p, day) : false;
+      if (!day || (day.status !== "in-progress" && !wrapUp)) return err(`Day ${action.n} hasn't started.`);
       day.status = "done";
       day.endedAt = now;
       day.summary = action.summary;

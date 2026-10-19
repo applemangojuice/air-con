@@ -272,6 +272,8 @@ export function commsForAction(project: Project, action: ProjectAction, actor?: 
             photoCount: action.customerUpdate.mediaIds.length,
             nextDate: next?.date,
             by: crewLead(p, actor)?.name,
+            // Ended after commissioning (the day the install completed on): nothing is "next" any more.
+            ...(p.install.status === "complete" ? { complete: { handoverPack: Boolean(p.handover.packDocumentId) } } : {}),
           },
           `day-${action.n}`,
         ),

@@ -149,12 +149,16 @@ export function QuickActions({ data, merged, day }: { data: FieldJob; merged: Me
             clock.running ? (
               <Action label="Pause" hint="Stops your clock (lunch, a supplier run)" onClick={() => void pauseResume(data, clock, close)} />
             ) : (
-              <Action label="Resume" hint="Starts your clock again" onClick={() => void pauseResume(data, clock, close)} primary />
+              !done && <Action label="Resume" hint="Starts your clock again" onClick={() => void pauseResume(data, clock, close)} primary />
             )
+          )}
+          {/* A clock with no open day to end (someone else ended it): it must still be stoppable, or it runs until the next job. */}
+          {!header.currentDay && clock.running && (
+            <Action label="Stop my clock" hint={`Running since ${clock.since ? londonTime(clock.since) : "earlier"}: stop it when you leave`} onClick={() => void pauseResume(data, clock, close)} primary />
           )}
           <Action label="Raise an issue" hint="Missing kit, damage, safety, a question for the office" onClick={() => setPanel("issue")} />
           <Action label="Request a variation" hint="A change to the job that needs the customer's OK and a price" onClick={() => setPanel("variation")} />
-          {header.currentDay && <Action label={`End day ${header.currentDay}`} hint={staleDay ? `Still open from ${fmtDay(openDay!.date)}: close it first` : "Summary, customer update, photos"} onClick={() => setPanel("end")} primary={Boolean(staleDay)} />}
+          {header.currentDay && <Action label={`End day ${header.currentDay}`} hint={staleDay ? `Still open from ${fmtDay(openDay!.date)}: close it first` : "Summary, customer update, photos"} onClick={() => setPanel("end")} primary={Boolean(staleDay) || done} />}
           {header.customerPhone && (
             <li>
               <a href={telHref(header.customerPhone)} className="flex min-h-14 items-center justify-between rounded-2xl border border-line bg-white px-4 py-3">
@@ -180,7 +184,10 @@ export function QuickActions({ data, merged, day }: { data: FieldJob; merged: Me
 
 function statusText(data: FieldJob, running: boolean): string {
   const h = data.header;
-  if (h.installStatus === "complete") return "The install is complete.";
+  if (h.installStatus === "complete") {
+    if (h.currentDay) return `The install is complete. End day ${h.currentDay} when you leave: it sends the customer's update${running ? " and stops your clock" : ""}.`;
+    return running ? "The install is complete, and your clock is still running." : "The install is complete.";
+  }
   if (h.currentDay) {
     const d = h.days.find((x) => x.n === h.currentDay);
     return `Day ${h.currentDay} of ${h.totalDays} under way${d?.startedAt ? ` since ${londonTime(d.startedAt)}` : ""}. Your clock is ${running ? "running" : "paused"}.`;
@@ -710,11 +717,20 @@ function EndDaySheet({ open, onClose, data, merged, n: liveN, clockEntryId }: { 
     const doneTitles = uniqueTitles(doneToday.map((s) => lowerFirst(s.title)));
     const nextTitles = uniqueTitles(stepsForDay(merged.job.runsheet, n + 1).map((s) => lowerFirst(s.title)), 3);
     const last = n >= data.header.totalDays;
+    // Ending the last day after commissioning was signed: the job is finished, not paused for the night.
+    const complete = data.header.installStatus === "complete";
+    const next = complete
+      ? " Your system is commissioned, and your handover pack is on your project page."
+      : last
+        ? " Next: commissioning and your handover."
+        : nextTitles.length
+          ? ` Tomorrow: ${nextTitles.join(", ")}.`
+          : "";
     return {
       summary: doneTitles.length ? `Done today: ${doneTitles.join(", ")}.` : `Day ${n} on site.`,
-      message: `${doneTitles.length ? `Today we did: ${doneTitles.join(", ")}.` : "Good progress today."}${last ? " Next: commissioning and your handover." : nextTitles.length ? ` Tomorrow: ${nextTitles.join(", ")}.` : ""} Everything is tidied away for the night.`,
+      message: `${doneTitles.length ? `Today we did: ${doneTitles.join(", ")}.` : "Good progress today."}${next}${complete ? " Thank you for having us." : " Everything is tidied away for the night."}`,
     };
-  }, [merged, data.header.today, data.header.totalDays, n]);
+  }, [merged, data.header.today, data.header.totalDays, data.header.installStatus, n]);
 
   useEffect(() => {
     if (open) {

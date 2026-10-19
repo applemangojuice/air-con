@@ -27,7 +27,7 @@ import { londonToUtcIso, slotIso } from "@/components/ops/command/model";
 import { audit } from "@/lib/audit";
 import { requireStaff } from "@/lib/auth/server";
 import { resend } from "@/lib/comms/outbox";
-import { dispatch, loadProject } from "@/lib/project-service";
+import { dispatch, loadProject, pilotNumberHolder } from "@/lib/project-service";
 import * as issuesRepo from "@/lib/repo/issues";
 import * as learningsRepo from "@/lib/repo/learnings";
 import * as messagesRepo from "@/lib/repo/messages";
@@ -215,8 +215,13 @@ const pilotSchema = z.object({
 
 export async function setPilotAction(projectId: string, fd: FormData): Promise<ActionResult> {
   const parsed = pilotSchema.safeParse({ number: field(fd, "number"), label: field(fd, "label") });
+  const staff = await requireStaff("projects.edit");
   if (!parsed.success) return refused(firstIssue(parsed.error));
-  return run(projectId, { type: "set-pilot", ...parsed.data }, `Tagged as pilot ${parsed.data.number}.`);
+  // One household per pilot number: the pilots page and CSV line them up by it.
+  const holder = await pilotNumberHolder(parsed.data.number, { projectId }).catch(() => undefined);
+  if (holder === undefined) return refused("The pilot number couldn't be checked. Nothing changed; try again.");
+  if (holder) return refused(`Pilot ${parsed.data.number} is already ${holder.name}. Pick another number.`);
+  return runAs(staff, projectId, { type: "set-pilot", ...parsed.data }, `Tagged as pilot ${parsed.data.number}.`);
 }
 
 const contactSchema = z.object({

@@ -18,6 +18,7 @@ import {
   earlyStartWording,
   isLegacySnapshot,
   isGatePassed,
+  isWrapUpDay,
   isStageComplete,
   migrateProject,
   nextGate,
@@ -30,6 +31,7 @@ import {
   seasonalCheckDue,
   stageInfo,
   stageState,
+  wrapUpDayOf,
   PROJECT_STAGES,
   STAGE_INFO,
   type Blocker,
@@ -1032,6 +1034,21 @@ test("install-completed needs the install-complete gate", () => {
   assert.ok(done.install.days.every((d) => d.status === "done")); // day 3 closed off with the install
 });
 
+test("the day the install completed on can still be ended by the crew, once (update, learnings, their clock)", () => {
+  const done = walk("install-completed");
+  assert.ok(isWrapUpDay(done, done.install.days[2]!));
+  assert.equal(wrapUpDayOf(done)?.n, 3);
+  assert.equal(wrapUpDayOf(walk("day-2-end")), undefined, "a day ended before completion isn't one");
+  refuses(done, { type: "install-day-ended", n: 2, summary: "again" }, T.handover, {}, /Day 2 hasn't started/);
+  const ended = step(done, { type: "install-day-ended", n: 3, summary: "Handed over", customerUpdate: { text: "All done.", mediaIds: [] } }, T.handover, { actor: INSTALLER });
+  assert.equal(ended.install.status, "complete");
+  assert.equal(ended.install.days[2]!.customerUpdate?.text, "All done.");
+  assert.equal(ended.install.days[2]!.endedAt, T.handover);
+  assert.equal(ended.events.at(-1)!.label, "Day 3 done: All done.");
+  assert.equal(wrapUpDayOf(ended), undefined);
+  refuses(ended, { type: "install-day-ended", n: 3, summary: "and again" }, T.handover, {}, /Day 3 hasn't started/);
+});
+
 /* ------------------------------------------------------------------ */
 /* Handover + close                                                    */
 /* ------------------------------------------------------------------ */
@@ -1098,6 +1115,13 @@ test("closed gate: money, electrical certificate, warranty, serious issues", () 
   assert.deepEqual(blockersFor(ready, c({}), "closed"), []);
   const serious = blockersFor(ready, c({ openIssues: [{ id: "i9", title: "Drip from the bedroom unit", kind: "defect", severity: "high", blocking: false }] }), "closed");
   assert.deepEqual(codes(serious), ["issue:i9"]);
+  // A small open issue doesn't hold the close, but it's shown, so it isn't closed over unseen.
+  const small = c({ openIssues: [{ id: "i3", title: "Remote holder by the door", kind: "clarification", severity: "low", blocking: false }] });
+  assert.deepEqual(codes(blockersFor(ready, small, "closed")), ["issue:i3"]);
+  assert.equal(severityOf(blockersFor(ready, small, "closed"), "issue:i3"), "warn");
+  assert.match(blockersFor(ready, small, "closed")[0]!.message, /stays open after the project closes/);
+  assert.ok(applyProjectAction(ready, { type: "project-closed" }, T.close, small).ok, "closing still goes ahead");
+  assert.deepEqual(blockersFor(ready, small, "ready-to-install"), [], "and it doesn't show on the earlier gates");
   const notRequired = step(walk("handover-signed"), { type: "electrical-cert-updated", status: "not-required" }, T.after, { actor: ADMIN });
   assert.ok(!codes(blockersFor(notRequired, c({}), "closed")).includes("electrical-cert-pending"));
 });
@@ -1332,6 +1356,10 @@ test("timeline: actual where it happened, confirmed where booked, estimated ahea
 
   // Chosen but unconfirmed dates are an estimate too.
   assert.equal(by(projectTimeline(walk("install-dates-set"), T.dates)).install!.date!.kind, "estimated");
+
+  // Under way: the day it really started, even when the crew started before the booked day.
+  const early = step(walk("installer-on-my-way"), { type: "install-day-started", n: 1, by: "Ian Stall" }, "2026-11-16T08:30:00.000Z", { actor: INSTALLER });
+  assert.deepEqual(by(projectTimeline(early, "2026-11-16T12:00:00.000Z")).install!.date, { kind: "actual", iso: "2026-11-16T08:30:00.000Z" });
 
   const done = by(projectTimeline(walk(), "2026-12-20T10:00:00.000Z"));
   for (const stage of PROJECT_STAGES) assert.equal(done[stage]!.date!.kind, "actual", stage);

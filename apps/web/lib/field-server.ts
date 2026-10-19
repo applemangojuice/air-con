@@ -55,6 +55,7 @@ import {
   type StepStatusRecord,
   type TargetKey,
   type TimeEntry,
+  wrapUpDayOf,
 } from "@aircon/domain";
 import type {
   FieldClock,
@@ -230,7 +231,8 @@ export function riskFlags(measured: MeasuredSurvey | null | undefined, opts: { p
 function dayState(p: Project): { currentDay: number | null; nextDay: number | null; totalDays: number } {
   const totalDays = p.booking.installDays || p.booking.dates.length || 3;
   const current = p.install.days.find((d) => d.status === "in-progress")?.n ?? null;
-  if (p.install.status === "complete") return { currentDay: current, nextDay: null, totalDays };
+  // Complete: the last day stays open to the crew until they end it (update, learnings, their clock).
+  if (p.install.status === "complete") return { currentDay: current ?? wrapUpDayOf(p)?.n ?? null, nextDay: null, totalDays };
   const startedNs = p.install.days.filter((d) => d.startedAt).map((d) => d.n);
   const next = current ? null : (startedNs.length ? Math.max(...startedNs) + 1 : 1);
   return { currentDay: current, nextDay: next, totalDays };
@@ -1224,14 +1226,26 @@ export async function startDay(projectId: string, staff: StaffMember, n: number,
   return project;
 }
 
+/** Every photo attached to an issue on this project. */
+async function issuePhotoIds(projectId: string): Promise<Set<string>> {
+  return new Set((await issuesRepo.listForProject(projectId)).flatMap((i) => i.mediaIds ?? []));
+}
+
 /** Install media from one day, newest first, with URLs: the photos the end-of-day update can share. */
 export async function dayPhotos(projectId: string, staff: StaffMember, n: number) {
   const project = await projectForStaff(projectId, staff);
   const day = project.install.days.find((d) => d.n === n);
   const date = day?.date ?? project.booking.dates[n - 1];
+  // Photos of an issue (damage, a safety worry, a question for the office) aren't the day's finished
+  // work: the customer sees an issue only through the issue itself, never by being picked here.
+  const onIssues = await issuePhotoIds(projectId);
   const items = (await mediaRepo.listForProject(projectId)).filter(
     // The London day the photo was taken on (a photo at 00:30 BST is that day's, not the UTC day before).
-    (m) => (m.source === "install" || m.source === "handover") && m.contentType.startsWith("image/") && (!date || londonDateOf(m.takenAt) === date),
+    (m) =>
+      (m.source === "install" || m.source === "handover") &&
+      m.contentType.startsWith("image/") &&
+      !onIssues.has(m.id) &&
+      (!date || londonDateOf(m.takenAt) === date),
   );
   const urls = await signedMediaUrls(items);
   return items.map((m) => ({ id: m.id, url: urls.get(m.id) ?? null, caption: m.caption, tag: m.tag, customerVisible: m.customerVisible, takenAt: m.takenAt }));
@@ -1252,6 +1266,10 @@ export async function endDay(
   const mediaIds = [...new Set(input.mediaIds)].slice(0, 4);
   const media = await mediaRepo.listByIds(mediaIds);
   if (media.length !== mediaIds.length || media.some((m) => m.projectId !== projectId)) throw new FieldError("One of the photos isn't on this job.", 400);
+  if (mediaIds.length) {
+    const onIssues = await issuePhotoIds(projectId);
+    if (mediaIds.some((id) => onIssues.has(id))) throw new FieldError("One of the photos is on an issue, so it isn't shared in the day's update. Pick another.", 400);
+  }
   // Shared first: the update must never point at photos the customer can't open.
   for (const m of media) if (!m.customerVisible) await mediaRepo.update({ ...m, customerVisible: true });
   const text = input.customerText.trim();
@@ -1316,6 +1334,7 @@ export async function dayUpdatePreview(projectId: string, staff: StaffMember, n:
     photoCount,
     ...(next ? { nextDate: next } : {}),
     ...(lead ? { by: lead.name } : {}),
+    ...(project.install.status === "complete" ? { complete: { handoverPack: Boolean(project.handover.packDocumentId) } } : {}),
   });
   return { subject: r.subject, text: r.text, to: project.customer.email ? "the customer's email" : null, mode: appMode().email };
 }

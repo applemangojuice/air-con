@@ -7,7 +7,7 @@ import { audit } from "@/lib/audit";
 import { CUSTOMER_EMAIL_LINK_TTL_DAYS, issueMagicLink } from "@/lib/auth/magic";
 import { requireStaff } from "@/lib/auth/server";
 import { isValidUkPostcode, normalisePostcode } from "@/lib/format";
-import { createProjectForQuote, dispatch } from "@/lib/project-service";
+import { createProjectForQuote, dispatch, pilotNumberHolder } from "@/lib/project-service";
 import { isUniqueViolation } from "@/lib/repo/base";
 import { getSettings } from "@/lib/settings-server";
 import { requireDb } from "@/lib/supabase-server";
@@ -74,6 +74,14 @@ export async function createPilotAction(fd: FormData): Promise<ActionResult> {
   const d = parsed.data;
   const postcode = normalisePostcode(d.postcode);
   const db = requireDb();
+  // One household per pilot number (a retry of this same form is fine: it finds its own project).
+  try {
+    const holder = await pilotNumberHolder(d.pilotNumber, { quoteId: d.requestId });
+    if (holder) return refused(`Pilot ${d.pilotNumber} is already ${holder.name}. Pick another number.`);
+  } catch (err) {
+    console.error("[new pilot] pilot number check failed:", err);
+    return refused("The pilot number couldn't be checked. Nothing was created; please try again.");
+  }
 
   // The funnel's own shape: a default room set for the house, priced by the engine.
   const config = buildDefaultConfig({

@@ -1241,3 +1241,28 @@ test("the end-of-day update is signed by the crew lead, never an arbitrary subco
   assert.equal(signer([sub, fitter]), fitter.name, "no tech lead, no actor: an employed installer");
   assert.equal(signer([sub]), undefined, "never a subcontractor nobody chose");
 });
+
+test("kit checked: the email says our team checked it (the office often does), as the portal and timeline do", () => {
+  const m = render("kit-update", { status: "inspected", shortages: 0 });
+  assert.equal(m.subject, "Your equipment has been checked");
+  assert.match(m.text, /Our team has checked the equipment for .+ against the design\./);
+  assert.doesNotMatch(m.text, /Your installer has checked/);
+});
+
+test("a day ended after commissioning (the wrap-up) never tells the customer commissioning is still to come", () => {
+  const p = baseProject();
+  p.booking.status = "booked";
+  p.booking.installDays = 3;
+  p.booking.dates = ["2026-12-01", "2026-12-02", "2026-12-03"];
+  p.install.status = "complete";
+  p.install.days = [1, 2, 3].map((n) => ({ n, date: p.booking.dates[n - 1]!, status: "done" as const, startedAt: `${p.booking.dates[n - 1]}T08:00:00.000Z` }));
+  p.handover.packDocumentId = "doc-hp";
+  const [day] = commsForAction(p, { type: "install-day-ended", n: 3, summary: "Handed over", customerUpdate: { text: "All done.", mediaIds: [] } });
+  assert.deepEqual((day.data as CommsData["install-day-update"]).complete, { handoverPack: true });
+  const m = render("install-day-update", day.data as CommsData["install-day-update"]);
+  assert.match(m.text, /installed and commissioned, and your handover pack is on your project page/);
+  assert.doesNotMatch(m.text, /Next, we commission/);
+  // Before commissioning, the last day still says what's next.
+  const before = render("install-day-update", { n: 3, totalDays: 3, text: "Pipes tested." });
+  assert.match(before.text, /Next, we commission the system/);
+});

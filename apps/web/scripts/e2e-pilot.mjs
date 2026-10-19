@@ -2,7 +2,7 @@
  * The whole pilot, end to end, in a real browser, the way the people who use
  * it do: admin at a desk, customers and the crew on their phones.
  *
- *   A  Admin (DEMO sign-in) sets up a new pilot, owner and surveyor.
+ *   A  Admin (DEMO sign-in) sets up a new pilot (pilot number typed in), owner and surveyor.
  *   B  Customer opens their sign-in link, books the survey, agrees to documents by email.
  *   C  Surveyor on a phone: on my way, start, every section (2 rooms measured, photos,
  *      a drawing with the indoor unit and pipe route), outdoor, electrics, PD checks, risks, submit at 100%.
@@ -14,16 +14,23 @@
  *      contract document renders.
  *   G  Ops: early-start evidence, install dates, crew, deposit invoice paid by bank transfer,
  *      booking confirmed, purchase orders ordered, delivered and checked, compliance approved.
- *   H  Field, on phones: on my way, day 1 started (the app records today as day 1: the 5-day
- *      lead time means the booked dates are never today), every step's evidence, an issue and
- *      a variation (the customer approves it on the portal), end-of-day updates with photos and
- *      learnings; electrical steps by the electrician, F-gas steps by the technical lead.
+ *   H  Field, on phones: Today shows the job next up on its booked day; on my way, day 1
+ *      started (the app records today as day 1: the 5-day lead time means the booked dates are
+ *      never today, and no ops date change can make them today), so this project runs end to
+ *      end instead of a seeded one. Every step's evidence, an issue and a variation (the
+ *      customer approves it on the portal), end-of-day updates with photos (never the issue's)
+ *      and learnings; electrical steps by the electrician, F-gas steps by the technical lead.
  *   I  Technical lead sets the job's targets and signs commissioning: the certificate renders.
- *   J  Handover pack published, customer signs "All good" on the installer's phone, balance
- *      invoice paid (DEMO card simulator), electrical certificate in, warranty registered, closed.
- *   K  /ops/pilots shows the pilot with its numbers; the CSV downloads.
- *   L  Isolation and permissions: another customer, a subcontractor, signed-out visitors, a
- *      forged cookie, a bad Stripe signature, the demo seed route.
+ *   J  Handover pack published, customer signs "All good" on the installer's phone, the crew
+ *      ends day 3 after it (update, learnings, clock), balance invoice paid (DEMO card
+ *      simulator), electrical certificate in, warranty registered, open issues resolved,
+ *      closed; the customer's documents are all there.
+ *   K  Every customer message logged as demo; /ops/pilots shows the pilot with its numbers;
+ *      the CSV downloads.
+ *   L  Isolation and permissions: a duplicate pilot number, another customer (pages,
+ *      documents, invoices, photos, the variation API), a subcontractor (ops pages, other
+ *      jobs, media APIs), signed-out visitors, a forged cookie, a bad Stripe signature, the
+ *      demo seed route.
  *
  * It boots nothing: point it at a production build on the local file backend.
  *
@@ -372,11 +379,12 @@ async function endDay(page, n, update, learnings) {
   await d.getByRole("button", { name: "Next: customer update" }).click();
   const boxes = d.locator('input[type="checkbox"]');
   await boxes.first().waitFor();
-  // Two finished-work photos (the newest first), never an issue photo.
+  // Two finished-work photos (the newest first). Each is named by its caption (the issue photo's would be its title).
+  const offered = [];
+  for (let i = 0; i < (await boxes.count()); i++) offered.push((await boxes.nth(i).getAttribute("aria-label")) ?? "");
   let picked = 0;
-  for (let i = 0; i < (await boxes.count()) && picked < 2; i++) {
-    const label = (await boxes.nth(i).locator("xpath=ancestor::label[1]").innerText().catch(() => "")) || "";
-    if (/DEMO:/.test(label)) continue;
+  for (let i = 0; i < offered.length && picked < 2; i++) {
+    if (/DEMO:/.test(offered[i])) continue;
     await choose(boxes.nth(i));
     picked++;
   }
@@ -390,7 +398,7 @@ async function endDay(page, n, update, learnings) {
   for (const [q, a] of Object.entries(learnings ?? {})) await d.getByLabel(q).fill(a);
   await d.getByRole("button", { name: learnings ? "Save and finish" : "Skip" }).click();
   await d.getByRole("button", { name: /Done|Close/ }).first().click().catch(() => {});
-  return { preview, closed, picked };
+  return { preview, closed, picked, offered };
 }
 
 const TARGETS = {
@@ -473,8 +481,11 @@ try {
     await admin.fill('input[name="phone"]', CUSTOMER.phone);
     await admin.fill('input[name="addressLine"]', CUSTOMER.address);
     await admin.fill('input[name="postcode"]', "SW16 2BE");
-    ids.pilotNumber = await admin.locator('input[name="pilotNumber"]').inputValue();
-    check("pilot number defaults to the next free one", /^\d+$/.test(ids.pilotNumber), ids.pilotNumber);
+    const suggested = await admin.locator('input[name="pilotNumber"]').inputValue();
+    check("pilot number defaults to the next free one", /^\d+$/.test(suggested), suggested);
+    // The admin types the pilot number they've agreed for this household.
+    ids.pilotNumber = suggested;
+    await admin.fill('input[name="pilotNumber"]', ids.pilotNumber);
     await admin.fill('input[name="pilotLabel"]', "DEMO Streatham semi");
     await choose(admin.getByLabel(/Email them a link to their project now/));
     check("the form shows an instant price before anything is saved", await has(admin, /What gets created\s*£[\d,]+/));
@@ -931,7 +942,13 @@ try {
     await tryAs(electrician, "electrician");
     await tryAs(techPhone, "tech-lead");
     await go(installer, `/field`);
-    check("today shows the job as next up on its booked day", await has(installer, /NEXT UP[\s\S]*INSTALL · DAY 1 OF 3/) || (await has(installer, /INSTALL · DAY 1 OF 3/)));
+    // The 5-day lead time means the booked day 1 is never today: Today says so, and shows the job as next up.
+    const firstDay = new Date(`${ids.firstDay}T12:00:00Z`).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }).replace(",", "").toUpperCase();
+    check(
+      `Today: nothing booked today, the job next up on its booked day (${firstDay})`,
+      (await has(installer, /Nothing booked for you today/)) && (await has(installer, new RegExp(`NEXT UP · ${firstDay}[\\s\\S]*INSTALL · DAY 1 OF 3 · ${firstDay}[\\s\\S]*Pat Example \\(DEMO\\)`))),
+      (await text(installer)).slice(0, 300),
+    );
     await shot(installer, "H-today");
     await installer.getByRole("link", { name: /Open job/ }).first().click();
     await installer.waitForURL(new RegExp(`/field/jobs/${ids.pid}`));
@@ -950,6 +967,11 @@ try {
     const d1 = await startDay(installer, 1);
     check("starting early is explained (the booked day isn't today)", /Starting it today records today as day 1/.test(d1.intro) || /Starts your clock/.test(d1.intro));
     check("day 1 started (ready-to-install gate passed)", /Day 1 started/.test(d1.outcome), d1.outcome);
+    // Started early, the job is now today's: Today and the customer's timeline say so.
+    await go(installer, `/field`);
+    check("Today now shows the job as today's, day 1 under way", !(await has(installer, /Nothing booked for you today/)) && (await has(installer, /INSTALL · DAY 1 OF 3/)), (await text(installer)).slice(0, 300));
+    await shot(installer, "H-today-started");
+    await go(installer, `/field/jobs/${ids.pid}/day/1`);
     const day1 = await completeDay(installer);
     check("day 1: every step done by the installer", day1.every((s) => s.state !== "incomplete" && s.state !== "locked"), JSON.stringify(day1.filter((s) => s.state === "incomplete" || s.state === "locked")));
     check("day 1 shows all steps done", await waitFor(installer, /(\d+) of \1 steps done/));
@@ -983,6 +1005,7 @@ try {
       "What should the survey have captured?": "DEMO: the bay window return for the pipe route.",
     });
     check("end-of-day update previewed with 2 photos", e1.picked === 2 && /There are 2 photos from today/.test(e1.preview), e1.preview.slice(-400));
+    check("the issue's photo isn't offered for the customer's update", e1.offered.length >= 2 && !e1.offered.some((c) => /remote holder/.test(c)), e1.offered.join(" | "));
     check("day 1 closed, update recorded (demo mode)", /Day 1 closed/.test(e1.closed));
 
     // The customer approves the variation and sees the day's update.
@@ -994,8 +1017,13 @@ try {
     check("updates feed says 'Day 1 done' once", !(await has(customer, /Day 1 done: Day 1 done/)));
     check("customer sees the variation to decide", await has(customer, /A change needs your answer[\s\S]*DEMO: 2 m more trunking/));
     await shot(customer, "H-variation");
-    await customer.getByRole("button", { name: /^Yes, go ahead/ }).click();
+    const [decided] = await Promise.all([
+      customer.waitForRequest((r) => /\/variations\/[0-9a-f-]{36}$/.test(r.url()) && r.method() === "POST"),
+      customer.getByRole("button", { name: /^Yes, go ahead/ }).click(),
+    ]);
+    ids.variationId = decided.url().match(/variations\/([0-9a-f-]{36})$/)[1];
     check("variation accepted on the portal", await waitFor(customer, /You said yes/));
+    check("the customer's timeline dates the install to the day it really started", await has(customer, new RegExp(`Install\\s*(?:, (?:now|done)\\s*)?${londonDayLabel(new Date())}`)), (await text(customer)).match(/Install[^\n]*\n[^\n]*/)?.[0]);
 
     // Day 2: installer, then the electrician and the tech lead for their locked steps.
     await go(installer, `/field/jobs/${ids.pid}/day/2`);
@@ -1064,8 +1092,27 @@ try {
     await shot(installer, "J-sign");
     await installer.getByRole("button", { name: "Sign off the handover" }).click();
     check("customer signed 'all good' on the device", await waitFor(installer, /Signed by Pat Example, .*all good/));
-    await installer.getByRole("link", { name: "Open their handover pack" }).click();
-    await installer.waitForURL(/\/d\/[0-9a-f-]{36}/);
+    const packHref = await installer.getByRole("link", { name: "Open their handover pack" }).getAttribute("href");
+
+    // Commissioning closed day 3 with the install, but the crew is still here: they end the day
+    // (the customer's last update, learnings, and their clock).
+    await go(installer, `/field/jobs/${ids.pid}/day/3`);
+    let sheet = await openActions(installer);
+    check("after commissioning, Actions offers to end day 3 (and stop the clock)", /The install is complete\. End day 3 when you leave: it sends the customer's update and stops your clock/.test(await sheet.innerText()), await sheet.innerText());
+    await shot(installer, "J-wrapup-actions");
+    await installer.keyboard.press("Escape");
+    await sheet.waitFor({ state: "hidden" }).catch(() => {});
+    const e3 = await endDay(installer, 3, "All done: both units are commissioned and handed over. Your handover pack is on your project page. Thank you for having us.", {
+      "What should the survey have captured?": "DEMO: where the customer wanted the remote holder.",
+    });
+    check("day 3 closed after the handover, update recorded", /Day 3 closed/.test(e3.closed), e3.closed.slice(-300));
+    check("the day 3 email says it's commissioned (not 'next, we commission')", /installed and commissioned, and your handover pack is on your project page/.test(e3.preview) && !/Next, we commission/.test(e3.preview), e3.preview.slice(-500));
+    sheet = await openActions(installer);
+    const after = await sheet.innerText();
+    check("…and nothing is left running: no End day, no Stop my clock", /The install is complete\./.test(after) && !/End day|Stop my clock|Pause/.test(after), after);
+    await installer.keyboard.press("Escape");
+
+    await go(installer, packHref);
     check("handover pack renders", await waitFor(installer, /handover pack/i, 20_000, "body") && (await has(installer, /Your equipment|equipment/i, "body")));
     await shot(installer, "J-pack");
 
@@ -1095,15 +1142,74 @@ try {
     check("every compliance item settled", await has(tech, /DONE\s*(\d+) of \1/));
     check("auto items name a person, not a phrase", !(await has(tech, /Approved by Recorded on the project/)));
     await go(admin, `/ops/projects/${ids.pid}`);
+    check("no crew clock is left running on the job", !(await has(admin, /still running/)));
+    // The question and the (accepted, done) variation are still open: closing says so before it happens.
+    check("closing warns about the open issues, without blocking", (await has(admin, /Open low issue: DEMO: remote holder in the hallway, please\. It stays open after the project closes/)) && (await admin.locator("#blocking form").filter({ hasText: "Closing note" }).count()) === 1);
+    await go(admin, `/ops/projects/${ids.pid}/issues`);
+    for (let round = 0; round < 4; round++) {
+      const open = admin.locator("main li").filter({ has: admin.getByRole("button", { name: "Resolved", exact: true }) });
+      if (!(await open.count())) break;
+      const card = open.first();
+      await card.getByLabel(/^Note/).fill("DEMO: done on day 3, checked with the customer at handover.");
+      await card.getByRole("button", { name: "Resolved", exact: true }).click();
+      await admin.waitForTimeout(1500);
+    }
+    check("ops resolves the question and the variation with a note", await waitFor(admin, /0 open, \d+ done/));
+    await go(admin, `/ops/projects/${ids.pid}`);
     check("nothing blocks closing", await has(admin, /Nothing stands in the way of closed/));
     const close = admin.locator("#blocking form").filter({ hasText: "Closing note" });
     await close.getByLabel(/Closing note/).fill("DEMO: installed, commissioned, handed over and paid.");
     await close.getByRole("button", { name: "Close project" }).click();
     check("project closed", await waitFor(admin, /This project is closed/));
+    check("at a glance shows when the install really happened", await has(admin, /Install\s*Done \w{3} \d+ \w{3}/));
     await shot(admin, "J-closed");
+
+    // The customer's side once it's all over.
+    await go(customer, `/p/${ids.pid}`);
+    check("the hub has moved on to aftercare", await waitFor(customer, /All wrapped up/));
+    // The install stage, opened from the timeline, keeps every day's update.
+    await customer.getByRole("button", { name: /^Install\b/ }).first().click();
+    check("customer sees the day 3 update in the install stage", await waitFor(customer, /End-of-day updates\s*DAY 3[\s\S]*All done: both units are commissioned/));
+    check("no issue photo was shared in a day's update", !(await has(customer, /End-of-day updates[\s\S]*remote holder in the hallway[\s\S]*Changes you've decided/)));
+    await go(customer, `/p/${ids.pid}/documents`);
+    const docs = await text(customer);
+    check(
+      "customer's documents: contract, commissioning certificate, handover pack and invoices",
+      /Contract confirmation/i.test(docs) && /Commissioning certificate/i.test(docs) && /Handover pack/i.test(docs) && /Invoice/i.test(docs),
+      docs.slice(0, 600),
+    );
+    await shot(customer, "J-documents");
   });
 
   await phase("K · Pilots dashboard and CSV", async () => {
+    // Every customer message of the walk, logged honestly as demo (email isn't set up here).
+    await go(admin, `/ops/messages`);
+    const log = await text(admin);
+    const to = CUSTOMER.email.replace(/\./g, "\\.");
+    const expected = [
+      ["Survey booked", "Email"],
+      ["Surveyor on my way", "SMS"],
+      ["Survey complete", "Email"],
+      ["Proposal issued", "Email"],
+      ["Proposal accepted", "Email"],
+      ["Invoice issued", "Email"],
+      ["Payment received", "Email"],
+      ["Install booked", "Email"],
+      ["Kit update", "Email"],
+      ["Installer on my way", "SMS"],
+      ["Variation approval", "Email"],
+      ["Install day update", "Email"],
+      ["Handover ready", "Email"],
+      ["Certificate issued", "Email"],
+    ];
+    const missing = expected.filter(([what, ch]) => !new RegExp(`${what} · ${ch} to ${ch === "SMS" ? "\\+?[\\d ]+" : to}`).test(log)).map(([w]) => w);
+    check("the messages log has every customer message of the walk", missing.length === 0, `missing: ${missing.join(", ")}`);
+    check("three end-of-day emails, one per day", (log.match(new RegExp(`Install day update · Email to ${to}`, "g")) ?? []).length === 3);
+    // Each row's status is a line of its own; "Demo, not sent" is also one line as a filter option.
+    const rows = (log.match(/ · (?:Email|SMS) to /g) ?? []).length;
+    const demo = log.split("\n").filter((l) => l.trim() === "Demo, not sent").length - 1;
+    check("…every one marked Demo, not sent (nothing pretends to have gone)", rows > 0 && demo === rows, `${rows} rows, ${demo} demo`);
+
     await go(admin, `/ops/pilots`);
     check("pilot is in the comparison", await has(admin, new RegExp(`Pilot ${ids.pilotNumber}\\s*DEMO Streatham semi`)));
     check("contract and revenue shown", (await has(admin, /Contract price\s*£[\d,]+/)) && (await has(admin, /Revenue \(net\)\s*£[\d,]+/)));
@@ -1123,6 +1229,13 @@ try {
     await admin.fill('input[name="addressLine"]', CUSTOMER2.address);
     await admin.fill('input[name="postcode"]', "SW16 2BE");
     await admin.fill('input[name="pilotLabel"]', "DEMO second home");
+    // A slip of the finger: the first household's pilot number. Two pilots can't share one.
+    await admin.fill('input[name="pilotNumber"]', ids.pilotNumber);
+    await admin.getByRole("button", { name: "Set up the pilot" }).click();
+    const dup = admin.locator('main [role="alert"]').filter({ hasText: `Pilot ${ids.pilotNumber} is already` });
+    check("a pilot number already in use is refused, naming the household that has it", await visible(dup), await text(admin, '[role="alert"]'));
+    check("…and the refusal names the household", (await dup.innerText().catch(() => "")).includes("Pat Example (DEMO)"));
+    await admin.fill('input[name="pilotNumber"]', String(Number(ids.pilotNumber) + 1));
     await admin.getByRole("button", { name: "Set up the pilot" }).click();
     await admin.waitForURL(/\/ops\/projects\/[0-9a-f-]{36}/);
     ids.pid2 = admin.url().match(/projects\/([0-9a-f-]{36})/)[1];
@@ -1142,8 +1255,18 @@ try {
     await go(other, `/d/${ids.contractDoc}`);
     const doc = await text(other, "body");
     check("…nor its contract document", !doc.includes(CUSTOMER.address) && !/Acceptance record/.test(doc));
+    await go(other, `/p/${ids.pid}/documents`);
+    check("…nor its documents list", !/Contract confirmation|Commissioning certificate|Handover pack/i.test(await text(other, "body")));
+    await go(other, `/p/${ids.pid}/pay`);
+    check("…nor its invoices", !/DIH-\d+|Balance invoice/.test(await text(other, "body")));
+    // The control: the same media request works for the project's own customer.
+    const own = await customer.request.get(`${BASE}/api/media?projectId=${ids.pid}`);
+    const ownItems = own.ok() ? ((await own.json()).items ?? []) : [];
+    check("the first customer can list their own shared photos (the control)", own.status() === 200 && ownItems.length > 0, `${own.status()} ${ownItems.length}`);
     const media = await other.request.get(`${BASE}/api/media?projectId=${ids.pid}`);
-    check("…nor its photos (media API answers 404)", media.status() === 404, media.status());
+    check("…but the second customer can't (media API answers 404)", media.status() === 404, media.status());
+    const decide = await other.request.post(`${BASE}/api/portal/${ids.pid}/variations/${ids.variationId}`, { data: { decision: "decline" }, headers: { origin: BASE } });
+    check("…nor answer its variation (404)", decide.status() === 404, decide.status());
 
     // A subcontractor: only their own jobs, never margins, never ops.
     await go(admin, `/login`);
@@ -1158,6 +1281,10 @@ try {
     check("…nor the proposal builder", new URL(sub.url()).pathname.startsWith("/field") && !(await has(sub, /Gross margin|GROSS MARGIN/i, "body")));
     const subJob = await go(sub, `/field/jobs/${ids.pid}`);
     check("…nor a job they're not on", subJob.status() === 404 || (await has(sub, /not found|couldn't find|404/i, "body")), subJob.status());
+    const subMedia = await sub.request.get(`${BASE}/api/media?projectId=${ids.pid}`);
+    check("…nor its photos through the API (404)", subMedia.status() === 404, subMedia.status());
+    const subDay = await sub.request.get(`${BASE}/api/field/jobs/${ids.pid}/photos?day=1`);
+    check("…nor its day photos through the field API (404)", subDay.status() === 404, subDay.status());
     await go(sub, `/field/jobs`);
     const subJobs = sub.getByRole("link", { name: /Open job/ });
     if (await visible(subJobs, 20_000)) {
@@ -1208,6 +1335,11 @@ try {
   fails.push(err?.message ?? String(err));
   for (const [k, p] of Object.entries(pages)) await shot(p, `FAIL-${k}`, true);
   for (const [k, t] of Object.entries(trails)) if (t.length) console.error(`\n${k}, last requests:\n  ${t.slice(-15).join("\n  ")}`);
+}
+
+/** "Mon 19 Oct": a day as the app prints it, in London. */
+function londonDayLabel(d) {
+  return new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/London", weekday: "short", day: "numeric", month: "short" }).format(d).replace(",", "");
 }
 
 function londonMinutes(d) {

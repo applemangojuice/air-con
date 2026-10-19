@@ -2,7 +2,7 @@
 
 import { Fragment, type ReactNode } from "react";
 import { PROJECT_STAGES, STAGE_INFO, type ProjectStageId, type TimelineEntry } from "@aircon/domain";
-import { fmtDay } from "@/lib/format";
+import { fmtDay, fmtInstantDay } from "@/lib/format";
 
 /**
  * The customer's eight stages (contract §D3), price → aftercare.
@@ -23,7 +23,8 @@ function DateLine({ date }: { date: TimelineEntry["date"] }) {
   if (!date) return null;
   if (date.kind === "estimated") return <span className="text-ink-500">est. {fmtDay(date.iso)}</span>;
   if (date.kind === "confirmed") return <span className="font-semibold text-sage-700">{fmtDay(date.iso)}</span>;
-  return <span className="text-ink-700">{fmtDay(date.iso)}</span>;
+  // Done: a real moment, so its London date (a step at 00:30 BST is that day, not the UTC day before).
+  return <span className="text-ink-700">{fmtInstantDay(date.iso)}</span>;
 }
 
 function Node({ state, selected, index }: { state: TimelineEntry["state"]; selected: boolean; index: number }) {

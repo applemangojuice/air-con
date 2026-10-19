@@ -143,7 +143,16 @@ export interface CommsData {
   "install-prep": { startDate: string; prep?: string[] };
   "install-day-before": { startDate: string; crewNames?: string[]; arrival?: string; parkingNotes?: string };
   "installer-on-my-way": { etaMinutes: number; at: string; name?: string };
-  "install-day-update": { n: number; totalDays?: number; text: string; photoCount?: number; nextDate?: string; by?: string };
+  "install-day-update": {
+    n: number;
+    totalDays?: number;
+    text: string;
+    photoCount?: number;
+    nextDate?: string;
+    by?: string;
+    /** The install was already complete (commissioning signed) when the day was ended: "next" is behind them. */
+    complete?: { handoverPack: boolean };
+  };
   "variation-approval": { title: string; description?: string; totalDeltaPence: number; issueNumber?: number };
   "issue-update": { title: string; update: string; nextStep?: string; dueOn?: string; issueNumber?: number };
   "handover-ready": { electricalCertPending?: boolean };
@@ -1067,7 +1076,8 @@ const TEMPLATES: { [E in CommsEventId]: Renderer<E> } = {
           ? { subject: "Your equipment has been delivered", p: `The equipment for ${place(ctx)} has been delivered.` }
           : {
               subject: "Your equipment has been checked",
-              p: `Your installer has checked the equipment for ${place(ctx)} against the design.`,
+              // Whoever did it (office or crew): the same honest wording as the portal and the timeline.
+              p: `Our team has checked the equipment for ${place(ctx)} against the design.`,
             };
     return {
       subject: head.subject,
@@ -1113,7 +1123,11 @@ const TEMPLATES: { [E in CommsEventId]: Renderer<E> } = {
   "install-day-update": (ctx, d) => {
     const of = d.totalDays ? ` of ${d.totalDays}` : "";
     const last = d.totalDays !== undefined && d.n >= d.totalDays;
-    const next = last
+    const next = d.complete
+      ? d.complete.handoverPack
+        ? "Your system is installed and commissioned, and your handover pack is on your project page."
+        : "Your system is installed and commissioned. Your handover pack will be on your project page shortly."
+      : last
       ? "That's the last planned day. Next, we commission the system and walk you through it before we hand over."
       : d.nextDate
         ? `The team is back on ${dayLong(d.nextDate)}.`

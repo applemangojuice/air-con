@@ -7,7 +7,7 @@ import { registerAppResolver } from "./helpers/resolve-app.ts";
 process.env.DATA_BACKEND = "memory";
 delete process.env.SUPABASE_URL;
 registerAppResolver();
-const { createProjectForQuote, dispatch, loadProject, DEMO_SURVEY } = await import("../lib/project-service.ts");
+const { createProjectForQuote, dispatch, loadProject, pilotNumberHolder, DEMO_SURVEY } = await import("../lib/project-service.ts");
 const { customerLink, consumeToken } = await import("../lib/auth/magic.ts");
 const { requireDb } = await import("../lib/supabase-server.ts");
 const customersRepo = await import("../lib/repo/customers.ts");
@@ -108,4 +108,17 @@ test("a project made from a quote copies the funnel's consents onto the customer
   c = await customersRepo.getByEmail("consents@example.test");
   assert.equal(c?.marketingConsent, null);
   assert.equal(c?.opsConsent?.at, "2026-10-05T10:00:00.000Z");
+});
+
+test("pilot numbers belong to one household: the holder is found, except the project itself or a retried form's own", async () => {
+  const quoteId = crypto.randomUUID();
+  await requireDb()
+    .from("quote_requests")
+    .insert({ id: quoteId, customer_name: "DEMO Pilot Seven", email: "pilot7@example.test", source: "ops", survey: DEMO_SURVEY, quote: generateQuote(DEMO_SURVEY) });
+  const created = await createProjectForQuote(quoteId, { pilot: { number: 707, label: "DEMO seven" } });
+  assert.ok("id" in created, JSON.stringify(created));
+  assert.deepEqual(await pilotNumberHolder(707), { id: created.id, name: "DEMO Pilot Seven" }, "a second household can't take 707");
+  assert.equal(await pilotNumberHolder(707, { projectId: created.id }), null, "re-saving its own number is fine");
+  assert.equal(await pilotNumberHolder(707, { quoteId }), null, "a retry of the form that made it is fine");
+  assert.equal(await pilotNumberHolder(708), null);
 });

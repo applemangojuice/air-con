@@ -1238,11 +1238,12 @@ other event is sent by its owner with `notify`.
   customer can't open the first project (404), and an external installer
   can't see margin.
 - As built: `BASE_URL=http://localhost:3330 pnpm --filter @aircon/web
-  test:e2e:pilot` against a fresh `LOCAL_DATA_DIR` (phases A to L, about 150
+  test:e2e:pilot` against a fresh `LOCAL_DATA_DIR` (phases A to L, about 175
   checks, screenshots in `SHOTS_DIR`; `E2E_UNTIL=<letter>` stops after a
   phase). Phones are 390x844, ops 1280x800. Install day 1 is started early
   from the field app (the 5-day lead time means booked dates are never
-  today). The Stripe webhook with a secret set and the seed route with demo
+  today), so the walk's own project runs end to end; the crew ends day 3
+  after the handover (§K28). The Stripe webhook with a secret set and the seed route with demo
   sign-in off are covered by `tests/security-routes.test.ts`, since a running
   server's env can't be flipped.
 
@@ -1285,9 +1286,10 @@ changelog and the reasons, so nobody "fixes" a deliberate choice back.
 7. **Break-glass sessions last 12 hours**, not 30 days. Without a database,
    an `ADMIN_EMAILS` address gets a synthetic admin so the legacy console
    still opens.
-8. **On-screen magic links** appear only in development, or for DEMO staff
-   on a demo deployment: showing a real person's link would let anyone sign
-   in as them. Portal sign-in links last 60 minutes; links embedded in
+8. **On-screen magic links** appear only in development, or on a demo
+   deployment for DEMO staff and reserved demo addresses (example.com,
+   .invalid, .test…: `linkMayShowOnScreen`): showing a real person's link
+   would let anyone sign in as them. Portal sign-in links last 60 minutes; links embedded in
    customer emails last 30 days, as specified.
 9. **The accepted-proposal trigger is stricter:** besides the options, the
    acceptance record, project, version and `accepted_at` are frozen, and a
@@ -1442,3 +1444,24 @@ changelog and the reasons, so nobody "fixes" a deliberate choice back.
       whoever ended the day, else an employed installer (`comms/action-map
       crewLead`), never an arbitrary subcontractor.
 
+28. **The end-to-end walk (`scripts/e2e-pilot.mjs`).** Product decisions made
+    when the whole pilot was walked in a browser:
+    - *The last day after commissioning*: signing commissioning completes the
+      install and closes the day it's on, but the crew is still on site for
+      the handover. That day (`isWrapUpDay`: the last day worked, closed by
+      completion, no summary) can still be ended once, with the customer's
+      update, learnings and the crew's clock; its email says the system is
+      commissioned instead of "next, we commission". A clock with no open
+      day to end shows "Stop my clock" in the field Actions.
+    - *Pilot numbers are unique*: new pilot and "set pilot" refuse a number
+      another household has (`pilotNumberHolder`), naming it.
+    - *Closing over open issues*: a low or medium open issue is a warning on
+      the closed gate (it stays open after closing), never silent; high and
+      critical still block.
+    - *Started early*: once the install has started, the timeline and the
+      command centre date it to the day it really started; actual dates on
+      the timeline are London dates.
+    - *Issue photos stay private*: photos attached to an issue are never
+      offered for an end-of-day update, and the server refuses them there.
+    - *Kit checked*: the email says "our team has checked", like the portal
+      (the office often does it, not the installer).

@@ -372,3 +372,18 @@ test("variations: priced, customer-visible, waiting for the customer", async () 
   assert.equal(issue!.variation?.status, "proposed");
   assert.equal(issue!.variation?.totalDeltaPence, 18_000, "not VAT registered by default: no tax");
 });
+
+test("end of day: an issue's photo is never offered for the customer's update, nor accepted", async () => {
+  await seed("in-progress");
+  const issuePhoto = "7f7f7f7f-dddd-4ddd-8ddd-00000000f60d";
+  await mediaRepo.insert({ id: issuePhoto, projectId: PROJECT, bucket: "project-media", storagePath: `${PROJECT}/${issuePhoto}-x.jpg`, contentType: "image/jpeg", tag: "obstruction", source: "install", caption: "DEMO: cracked tile by the core hole", takenAt: "2026-11-10T10:00:00.000Z", customerVisible: false, annotations: [], annotationsVersion: 0, locked: false });
+  const raise: SyncOp = { type: "issue", id: "7f7f7f7f-eeee-4eee-8eee-00000000f60e", projectId: PROJECT, kind: "damage", title: "DEMO: cracked tile by the core hole", severity: "high", blocking: false, mediaIds: [issuePhoto], at: AT };
+  assert.equal((await field.processSyncBatch(INSTALLER, [raise]))[0]!.ok, true);
+  const offered = (await field.dayPhotos(PROJECT, INSTALLER, 1)).map((p) => p.id);
+  assert.deepEqual(offered, [MEDIA], "the day's work photo, not the issue's");
+  await assert.rejects(
+    field.endDay(PROJECT, INSTALLER, { n: 1, summary: "", customerText: "Holes drilled.", mediaIds: [issuePhoto], learnings: [] }),
+    /on an issue/,
+  );
+  assert.equal((await mediaRepo.get(issuePhoto))!.customerVisible, false, "and it stays private");
+});

@@ -53,7 +53,7 @@ import {
 } from "@/components/ops/command/forms";
 import { requireStaff } from "@/lib/auth/server";
 import { listDocuments } from "@/lib/documents-server";
-import { fmtDate, fmtDay, fmtDayTime } from "@/lib/format";
+import { fmtDate, fmtDay, fmtDayTime, fmtInstantDay } from "@/lib/format";
 import { blockersByGate, issueKindDefaults, loadCommandRecords, selfSurveyDiff } from "@/lib/ops-core-server";
 import { SelfSurveyDiff } from "@/components/field/survey/self-survey-diff";
 import { buildReadinessContext, loadProject, londonToday } from "@/lib/project-service";
@@ -846,7 +846,15 @@ export default async function CommandCentrePage({
                   ["Value", <Money key="v" pence={p.money.contractTotalPence ?? Math.round(p.quoteSummary.totalGbp * 100)} />],
                   ["Basis", p.money.contractTotalPence !== undefined ? "Contract" : "Instant price"],
                   ["Survey", p.survey.scheduledFor ? fmtDayTime(p.survey.scheduledFor) : null],
-                  ["Install", p.booking.startDate ? fmtDay(p.booking.startDate) : null],
+                  [
+                    "Install",
+                    // What really happened once it has (a crew can start before the booked day), else the booking.
+                    p.install.startedAt
+                      ? `${p.install.completedAt ? "Done" : "Started"} ${fmtInstantDay(p.install.completedAt ?? p.install.startedAt)}`
+                      : p.booking.startDate
+                        ? fmtDay(p.booking.startDate)
+                        : null,
+                  ],
                   ["Open issues", String(openIssues.length)],
                   ["Messages", String(messages.length)],
                 ]}

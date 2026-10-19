@@ -202,6 +202,26 @@ export async function saveProject(
 /* ------------------------------------------------------------------ */
 
 /**
+ * The project already tagged with this pilot number, if any (other than the
+ * one being tagged, or the one a retried new-pilot form already made).
+ * Pilot numbers line the pilots up against each other on /ops/pilots and in
+ * the CSV, so two households must never share one.
+ */
+export async function pilotNumberHolder(
+  number: number,
+  except: { projectId?: string; quoteId?: string } = {},
+): Promise<{ id: string; name: string } | null> {
+  const db = getServiceClient();
+  if (!db || !Number.isInteger(number)) return null;
+  const { data, error } = await db.from("projects").select("id, quote_id, customer_name").eq("pilot_number", number);
+  if (error) throw new Error(`pilot number lookup failed: ${error.message}`);
+  const rows = (data ?? []) as { id: unknown; quote_id: unknown; customer_name: unknown }[];
+  const other = rows.find((r) => String(r.id) !== except.projectId && (!except.quoteId || String(r.quote_id ?? "") !== except.quoteId));
+  if (!other) return null;
+  return { id: String(other.id), name: String(other.customer_name ?? "") || "another household" };
+}
+
+/**
  * The v2 project for a saved quote. Idempotent: one project per quote, a
  * repeat call returns the existing id (`created: false`). Links the
  * customer record (created from the quote's email on first sight) and sets
