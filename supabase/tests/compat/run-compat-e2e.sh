@@ -44,6 +44,11 @@ teardown() {
     for f in app.log gateway.log postgrest.log postgres.log; do
       [[ -f "$COMPAT_WORK/$f" ]] && { echo "--- $f (last 40 lines) ---" >&2; tail -n 40 "$COMPAT_WORK/$f" >&2; }
     done
+    # The stack's dir goes; the logs and the walk's screenshots stay, to look at.
+    local kept
+    kept="$(mktemp -d "${PGTEST_TMP:-/tmp}/aircon-compat-failed.XXXXXX")"
+    cp -r "$COMPAT_WORK"/*.log "$COMPAT_WORK"/*.txt "$COMPAT_WORK/shots" "$kept/" 2>/dev/null || true
+    echo "compat: logs and screenshots kept in $kept" >&2
   fi
   compat_stop
   exit $status
@@ -113,7 +118,7 @@ for walk in $ONLY; do
     pilot) run_walk "pilot walk (e2e-pilot.mjs)" env SHOTS_DIR="$COMPAT_WORK/shots" node "$WEB/scripts/e2e-pilot.mjs" ;;
     funnel) run_walk "funnel walk (e2e-funnel.mjs)" node "$WEB/scripts/e2e-funnel.mjs" ;;
     intel) run_walk "property book import (3,000 homes, past Max Rows)" compat_intel && intel_rows=3000 ;;
-    routes) run_walk "route walk (walk-routes.mjs)" env ADMIN_EMAIL="$ADMIN_EMAIL" OPS_PASSWORD="$OPS_PASSWORD" CRON_SECRET="$CRON_SECRET" EXPECT_INTEL_ROWS="${intel_rows:-}" node "$HERE/walk-routes.mjs" ;;
+    routes) run_walk "route walk (walk-routes.mjs)" env SHOTS_DIR="$COMPAT_WORK/shots" ADMIN_EMAIL="$ADMIN_EMAIL" OPS_PASSWORD="$OPS_PASSWORD" CRON_SECRET="$CRON_SECRET" EXPECT_INTEL_ROWS="${intel_rows:-}" node "$HERE/walk-routes.mjs" ;;
     *) echo "compat: unknown walk '$walk' (pilot, funnel, intel, routes)" >&2; exit 2 ;;
   esac
 done
@@ -139,7 +144,7 @@ fi
 echo
 echo "==> app log"
 if grep -nE '"code": ?"(PGRST|42|22|23|25|P0)[0-9A-Z]*"|code: '"'"'(PGRST|42|22|23|25|P0)[0-9A-Z]*'"'"'|StorageApiError|StorageUnknownError|column .* does not exist|Could not find the|violates|invalid input syntax' "$COMPAT_WORK/app.log" \
-  | grep -vE 'already exists|duplicate key value violates unique constraint' >"$COMPAT_WORK/app-errors.txt"; then
+  | grep -vE 'already exists|duplicate key value violates unique constraint|23505' >"$COMPAT_WORK/app-errors.txt"; then
   echo "compat: database or storage errors in the app log:" >&2
   head -n 40 "$COMPAT_WORK/app-errors.txt" >&2
   failed+=("app log")

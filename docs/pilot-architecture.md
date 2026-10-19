@@ -1942,3 +1942,14 @@ changelog and the reasons, so nobody "fixes" a deliberate choice back.
       so the second tap is answered with the first invoice; the local
       backend checks them in that order (the generated dump lists them by
       OID).
+    - *Pages that intermittently failed to hydrate* (React #418, then a full
+      client re-render) on either backend, more often with Supabase's
+      latency: Next starts hydrating while the page's RSC rows are still
+      streaming in, and when a host element's child is one of those rows (or
+      a client chunk still loading) React suspends, then replays the element
+      without putting its hydration cursor back, so it fails on the
+      element's own first child. `patches/next@15.5.20.patch` (applied by
+      pnpm, `pnpm-workspace.yaml`) restores the cursor in Next's vendored
+      react-dom; drop it when Next ships a React with the fix. The field
+      slot's barcode button is decided after mount, too (it read `window`
+      while rendering).

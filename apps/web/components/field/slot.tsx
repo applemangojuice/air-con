@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { EVIDENCE_KIND_LABEL, NUMERIC_KINDS, VIDEO_LENGTH_HINT, windowText, type InstallStep, type SlotView } from "@aircon/domain";
 import { canScanBarcodes, capturePhoto, captureValue, locate, parseReading, readBarcode, uploadProblem } from "./capture";
 import { SignaturePad, type SignaturePadHandle } from "./signature-pad";
@@ -58,6 +58,10 @@ export function Slot({ projectId, step, slot, waiting, refused, imageUrl, disabl
   const [error, setError] = useState<string | null>(null);
   const [localUrl, setLocalUrl] = useState<string | null>(null);
   const [signing, setSigning] = useState(false);
+  // Known only in the browser: deciding it while rendering would make the
+  // server's HTML and the first client render differ (a hydration error).
+  const [scanOk, setScanOk] = useState(false);
+  useEffect(() => setScanOk(canScanBarcodes()), []);
   const file = useRef<HTMLInputElement>(null);
   const photoFile = useRef<HTMLInputElement>(null);
   const scanFile = useRef<HTMLInputElement>(null);
@@ -302,7 +306,7 @@ export function Slot({ projectId, step, slot, waiting, refused, imageUrl, disabl
                   Save
                 </button>
               </div>
-              {(spec.kind === "barcode-scan" || spec.kind === "qr-scan") && canScanBarcodes() && (
+              {(spec.kind === "barcode-scan" || spec.kind === "qr-scan") && scanOk && (
                 <>
                   <input
                     ref={scanFile}

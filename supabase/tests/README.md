@@ -141,7 +141,9 @@ walk signs in by break-glass.
 
 Ports and paths are overridable (see the headers of `stack.sh` and
 `run-compat-e2e.sh`); `KEEP=1` keeps the temp dir, `GATEWAY_LOG=1` logs every
-gateway request to `$COMPAT_WORK/gateway.log`.
+gateway request to `$COMPAT_WORK/gateway.log`. A failed run keeps its logs
+and the walks' screenshots (with the server HTML and hydrated DOM of any page
+that failed to hydrate) in `/tmp/aircon-compat-failed.*` and says where.
 
 ## The local backend enforces the same schema
 

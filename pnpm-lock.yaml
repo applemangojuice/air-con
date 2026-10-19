@@ -4,6 +4,11 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  next@15.5.20:
+    hash: 978e7847293bf9b28b3ac7af5b7d04b196225693b2cfa4f9b620e463a14afa79
+    path: patches/next@15.5.20.patch
+
 importers:
 
   .: {}
@@ -67,7 +72,7 @@ importers:
         version: 2.110.5
       next:
         specifier: ^15.3.0
-        version: 15.5.20(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+        version: 15.5.20(patch_hash=978e7847293bf9b28b3ac7af5b7d04b196225693b2cfa4f9b620e463a14afa79)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       react:
         specifier: ^19.0.0
         version: 19.2.7
@@ -6138,7 +6143,7 @@ snapshots:
 
   nested-error-stacks@2.0.1: {}
 
-  next@15.5.20(react-dom@19.2.7(react@19.2.7))(react@19.2.7):
+  next@15.5.20(patch_hash=978e7847293bf9b28b3ac7af5b7d04b196225693b2cfa4f9b620e463a14afa79)(react-dom@19.2.7(react@19.2.7))(react@19.2.7):
     dependencies:
       '@next/env': 15.5.20
       '@swc/helpers': 0.5.15

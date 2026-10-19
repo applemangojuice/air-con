@@ -14,10 +14,11 @@
  *
  * Env: BASE_URL (http://localhost:3390), ADMIN_EMAIL, OPS_PASSWORD,
  * CRON_SECRET (optional: crons are skipped without it), CHROMIUM_PATH,
- * PER_PATTERN (2), MAX_PAGES (400).
+ * PER_PATTERN (2), MAX_PAGES (400), SHOTS_DIR (where a hydration error's
+ * server HTML and hydrated DOM are saved, to diff).
  */
 import { createRequire } from "node:module";
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -64,7 +65,24 @@ page.setDefaultTimeout(30_000);
 page.on("dialog", (d) => d.dismiss().catch(() => {}));
 let current = "";
 const problems = [];
-page.on("pageerror", (e) => problems.push(`page error: ${e.message.slice(0, 300)}`));
+// The last HTML document loaded: a hydration error is diagnosed by diffing it with the DOM.
+let lastDoc = { url: "", html: "" };
+page.on("response", (r) => {
+  if (r.request().resourceType() === "document" && r.status() === 200) r.text().then((html) => (lastDoc = { url: r.url(), html }), () => {});
+});
+let hydrationDumps = 0;
+page.on("pageerror", (e) => {
+  problems.push(`page error: ${e.message.slice(0, 300)}`);
+  const dir = process.env.SHOTS_DIR;
+  if (dir && /error #(418|419|423|425)/.test(e.message) && hydrationDumps < 5) {
+    const n = ++hydrationDumps;
+    mkdirSync(dir, { recursive: true });
+    setTimeout(() => {
+      writeFileSync(join(dir, `routes-hydration-${n}-server.html`), `<!-- ${lastDoc.url} -->\n${lastDoc.html}`);
+      page.content().then((dom) => writeFileSync(join(dir, `routes-hydration-${n}-dom.html`), dom), () => {});
+    }, 300);
+  }
+});
 page.on("response", (r) => {
   if (r.status() >= 500) problems.push(`${r.status()} ${r.request().method()} ${r.url().replace(BASE, "")}`);
 });
