@@ -11,23 +11,25 @@ import "./globals.css";
  * All three faces are self-hosted (Caprasimo + Figtree were previously a
  * render-blocking Google Fonts stylesheet): no third-party request in the
  * critical path, fonts served same-origin with immutable caching, and the
- * build never depends on fonts.googleapis.com being reachable.
+ * build never depends on fonts.googleapis.com being reachable. The files
+ * live in public/fonts so the hand-written sign-in confirm page
+ * (/auth/verify, a route handler outside React) can load the same faces.
  */
 const brandFont = localFont({
-  src: "./fonts/permanent-marker.woff2",
+  src: "../public/fonts/permanent-marker.woff2",
   variable: "--font-marker",
   display: "swap",
 });
 
 const displayFont = localFont({
-  src: "./fonts/caprasimo.woff2",
+  src: "../public/fonts/caprasimo.woff2",
   variable: "--font-caprasimo",
   display: "swap",
   weight: "400",
 });
 
 const sansFont = localFont({
-  src: "./fonts/figtree-variable.woff2",
+  src: "../public/fonts/figtree-variable.woff2",
   variable: "--font-figtree",
   display: "swap",
   weight: "300 900",

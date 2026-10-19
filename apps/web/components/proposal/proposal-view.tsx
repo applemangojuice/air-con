@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { reachUs } from "@/components/site/claims";
 import { fmtDate, money } from "@/lib/format";
@@ -12,6 +12,7 @@ import {
   CancelSection,
   GuaranteesSection,
   IncludedSection,
+  hasPipeNotes,
   OutsideSection,
   PipesSection,
   PlanSection,
@@ -120,8 +121,18 @@ export function ProposalView({ data }: { data: ProposalPageData }) {
 
   const total = option.pricing.totalPence;
   const aboveInstant = data.instantPricePence > 0 && total > data.instantPricePence && data.increaseReason;
-  let n = 0;
-  const next = () => ++n;
+  // Number only what's on the page: a section with nothing to show takes no number.
+  const sections = [
+    { key: "rooms", show: true, render: (n: number) => <RoomsSection data={data} option={option} n={n} /> },
+    { key: "outside", show: true, render: (n: number) => <OutsideSection data={data} option={option} n={n} /> },
+    { key: "pipes", show: hasPipeNotes(option), render: (n: number) => <PipesSection option={option} n={n} /> },
+    { key: "included", show: true, render: (n: number) => <IncludedSection data={data} n={n} /> },
+    { key: "plan", show: true, render: (n: number) => <PlanSection option={option} n={n} /> },
+    { key: "price", show: true, render: (n: number) => <PriceSection data={data} option={option} n={n} /> },
+    { key: "guarantees", show: true, render: (n: number) => <GuaranteesSection data={data} n={n} /> },
+    { key: "cancel", show: true, render: (n: number) => <CancelSection data={data} n={n} /> },
+  ].filter((x) => x.show);
+  const acceptNumber = sections.length + 1;
 
   return (
     <div className="space-y-12 sm:space-y-16">
@@ -243,18 +254,13 @@ export function ProposalView({ data }: { data: ProposalPageData }) {
         </div>
       </section>
 
-      <RoomsSection data={data} option={option} n={next()} />
-      <OutsideSection data={data} option={option} n={next()} />
-      <PipesSection option={option} n={next()} />
-      <IncludedSection data={data} n={next()} />
-      <PlanSection option={option} n={next()} />
-      <PriceSection data={data} option={option} n={next()} />
-      <GuaranteesSection data={data} n={next()} />
-      <CancelSection data={data} n={next()} />
+      {sections.map((x, i) => (
+        <Fragment key={x.key}>{x.render(i + 1)}</Fragment>
+      ))}
 
       {canAccept && (
         <section id="accept" aria-labelledby="accept-h" className="scroll-mt-6">
-          <SectionHeading n={next()} id="accept-h" title="Accept your proposal" lead="Four short steps. Nothing is agreed until the last one." />
+          <SectionHeading n={acceptNumber} id="accept-h" title="Accept your proposal" lead="Four short steps. Nothing is agreed until the last one." />
           {data.infoPending ? (
             <div role="status" className="rounded-3xl border border-amber-200 bg-amber-50 p-5 text-sm leading-relaxed text-amber-900 sm:p-6">
               <p className="font-semibold">Your contract information is still on its way</p>

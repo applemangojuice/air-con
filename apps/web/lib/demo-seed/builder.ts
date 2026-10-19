@@ -23,6 +23,7 @@ import {
   depositPence as depositPenceOf,
   isPlaceholderPhone,
   mergeSettings,
+  pipeNoteFor,
   plausibleValue,
   scoreInstallation,
   type AcceptanceRecord,
@@ -894,6 +895,7 @@ function optionFor(
         why: `Sized at ${unit.specs?.coolingKw ?? "?"} kW for a ${round1(r.lengthM * r.widthM)} m² ${r.orientation}-facing room, with room to spare on hot afternoons.`,
         highlights: [`${unit.specs?.soundPressureLowDb ?? "?"} dB on its quietest setting`, "Heats as well as cools"],
         mediaIds: media.rooms[r.key] ?? [],
+        pipeNote: pipeNoteFor({ pipeRunM: r.pipeRunM, heightDiffM: r.heightDropM, condensate: r.condensate }, { route: r.route, ...(r.routeNote ? { routeNote: r.routeNote } : {}) }),
       };
     }),
     outdoorMediaIds: Object.values(media.outdoor),

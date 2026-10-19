@@ -27,7 +27,7 @@ import {
 import { done, refused, type ActionResult } from "@/components/ops/command/types";
 import { londonToUtcIso, slotIso } from "@/components/ops/command/model";
 import { audit } from "@/lib/audit";
-import { earlyStartEvidenceFromForm, recordEarlyStartEvidence } from "@/lib/booking-server";
+import { earlyStartEvidenceFromForm, recordEarlyStartEvidence, surveyorClash } from "@/lib/booking-server";
 import { requireProjectAccess, requireStaff } from "@/lib/auth/server";
 import { recordCancellation } from "@/lib/cancellation-server";
 import { recordCertificate } from "@/lib/certificates-server";
@@ -147,6 +147,10 @@ export async function assignSurveyorAction(projectId: string, fd: FormData): Pro
   if (!uuid.safeParse(id).success) return refused("Pick a surveyor.");
   const surveyor = await staffRepo.get(id);
   if (!surveyor || !surveyor.active || !can(surveyor, "survey.conduct")) return refused("That person can't carry out surveys.");
+  // Not while they're on an install crew that day: one person can't be in two homes.
+  const project = await loadProject(projectId);
+  const clash = await surveyorClash(projectId, { staffId: surveyor.id, name: surveyor.name }, project?.survey.scheduledFor);
+  if (clash) return refused(clash);
   return runAs(staff, projectId, { type: "assign-surveyor", staffId: surveyor.id, name: surveyor.name }, `${surveyor.name} will do the survey.`);
 }
 
@@ -171,6 +175,12 @@ export async function bookSurveyAction(projectId: string, fd: FormData): Promise
     const s = await staffRepo.get(parsed.data.surveyorId);
     if (!s || !s.active || !can(s, "survey.conduct")) return refused("That person can't carry out surveys.");
     surveyor = { staffId: s.id, name: s.name };
+  }
+  // The person doing it (chosen now, or already assigned) mustn't be on an install crew that day.
+  const doing = surveyor ?? project.survey.surveyor;
+  if (doing) {
+    const clash = await surveyorClash(projectId, doing, at);
+    if (clash) return refused(clash);
   }
   const moving = project.survey.status === "booked";
   if (moving) {

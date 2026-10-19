@@ -1,4 +1,5 @@
 import {
+  can,
   documentsConsentCovers,
   canonicalJson,
   currentStage,
@@ -27,7 +28,7 @@ import {
   type VariationAcceptance,
 } from "@aircon/domain";
 import { audit } from "./audit";
-import { isPlausibleEmail, normaliseEmail } from "./auth/access";
+import { demoLoginAllowed, isPlausibleEmail, normaliseEmail } from "./auth/access";
 import { issueMagicLink } from "./auth/magic";
 import { getSession, requireProjectAccess, type ProjectAccess } from "./auth/server";
 import { notify } from "./comms/outbox";
@@ -58,6 +59,7 @@ import {
   earliestOfferedStart,
   installBlockOptions,
   isOfferedSlot,
+  datesWithNoSurveyor,
   londonWallClock,
   surveySlotDays,
 } from "@/components/portal/schedule";
@@ -118,6 +120,43 @@ export async function takenSurveySlots(excludeProjectId: string, today: string):
   return ((data ?? []) as Row[])
     .filter((r) => String(r.id) !== excludeProjectId && r.completed !== true)
     .map((r) => String(r.site_visit_at));
+}
+
+/**
+ * The days nobody can survey, from today on: every active surveyor-capable
+ * person is on another live project's install crew that day.
+ */
+export async function noSurveyorDates(excludeProjectId: string, today: string): Promise<string[]> {
+  const db = getServiceClient();
+  if (!db) return [];
+  const [staff, rows] = await Promise.all([
+    staffRepo.list({ activeOnly: true, ...(demoLoginAllowed(process.env) ? {} : { includeDemo: false }) }),
+    db.from("projects").select("id, completed, project").not("install_on", "is", null).gte("install_on", addDays(today, -21)),
+  ]);
+  if (rows.error) throw new Error(`no-surveyor dates: ${rows.error.message}`);
+  const surveyors = staff.filter((s) => can(s, "survey.conduct")).map((s) => s.id);
+  const installs: { dates: string[]; crewIds: string[] }[] = [];
+  for (const r of (rows.data ?? []) as Row[]) {
+    if (String(r.id) === excludeProjectId || r.completed === true) continue;
+    const snap = (r.project ?? {}) as Partial<Project>;
+    if (snap.closure?.closed || snap.install?.status === "complete") continue;
+    const crewIds = (snap.booking?.crew ?? []).map((c) => c.staffId).filter(Boolean);
+    const dates = (snap.booking?.dates ?? []).filter((d): d is string => typeof d === "string" && d.slice(0, 10) >= today);
+    if (crewIds.length && dates.length) installs.push({ dates, crewIds });
+  }
+  return datesWithNoSurveyor(installs, surveyors);
+}
+
+/** What the customer may book: other surveys' slots taken, and the days no surveyor is free. */
+async function surveyLimits(projectId: string, today: string): Promise<{ taken: string[]; unavailableDates: string[] }> {
+  const [taken, unavailableDates] = await Promise.all([
+    takenSurveySlots(projectId, today),
+    noSurveyorDates(projectId, today).catch((err: unknown) => {
+      console.error("[portal] no-surveyor dates failed:", err);
+      return [] as string[];
+    }),
+  ]);
+  return { taken, unavailableDates };
 }
 
 /** Every date other live projects are booked or installing on (one crew). */
@@ -196,7 +235,7 @@ export async function loadHub(projectId: string, access: ProjectAccess): Promise
   const wantsSlots = project.survey.status === "not-booked" || project.survey.status === "booked";
   const wantsBlocks = project.proposal.status === "accepted" && project.install.status === "not-started";
 
-  const [documents, issues, invoices, crewStaff, surveyorStaff, job, taken, booked, kitArrivesOn] = await Promise.all([
+  const [documents, issues, invoices, crewStaff, surveyorStaff, job, slotLimits, booked, kitArrivesOn] = await Promise.all([
     safe("documents", () => listDocuments(projectId, { customerVisibleOnly: true }), [] as DocumentRecord[]),
     safe("issues", async () => (await issuesRepo.listForProject(projectId)).filter((i) => i.customerVisible), [] as Issue[]),
     safe("invoices", () => invoicesRepo.listForProject(projectId), []),
@@ -207,7 +246,9 @@ export async function loadHub(projectId: string, access: ProjectAccess): Promise
       null as StaffMember | null,
     ),
     safe("install job", () => installJobsRepo.getForProject(projectId), null),
-    wantsSlots ? safe("survey slots", () => takenSurveySlots(projectId, today), [] as string[]) : Promise.resolve([] as string[]),
+    wantsSlots
+      ? safe("survey slots", () => surveyLimits(projectId, today), { taken: [] as string[], unavailableDates: [] as string[] })
+      : Promise.resolve({ taken: [] as string[], unavailableDates: [] as string[] }),
     wantsBlocks ? safe("install dates", () => bookedInstallDates(projectId, today), [] as string[]) : Promise.resolve([] as string[]),
     wantsBlocks ? safe("kit arrival", () => kitArrival(projectId, today, settings), undefined as string | undefined) : Promise.resolve(undefined),
   ]);
@@ -300,7 +341,7 @@ export async function loadHub(projectId: string, access: ProjectAccess): Promise
     viewer,
     surveyor,
     crew,
-    surveySlots: wantsSlots ? surveySlotDays({ settings, nowWall: londonWallClock(), taken }) : [],
+    surveySlots: wantsSlots ? surveySlotDays({ settings, nowWall: londonWallClock(), ...slotLimits }) : [],
     installBlocks: wantsBlocks ? installBlockOptions({ project: raw, settings, today, booked, ...(kitArrivesOn ? { kitArrivesOn } : {}) }) : [],
     earliestStart: earliestOfferedStart(raw, today, settings, kitArrivesOn),
     documents: documents.map(toHubDocument),
@@ -551,8 +592,8 @@ export async function customerAct(projectId: string, actor: CustomerActor, req: 
   switch (req.kind) {
     case "book-survey":
     case "reschedule-survey": {
-      const taken = await takenSurveySlots(projectId, today);
-      const days = surveySlotDays({ settings, nowWall: londonWallClock(), taken });
+      const limits = await surveyLimits(projectId, today);
+      const days = surveySlotDays({ settings, nowWall: londonWallClock(), ...limits });
       if (!isOfferedSlot(days, req.scheduledFor)) {
         return { ok: false, error: "That slot isn't available any more. Please pick another.", status: 409 };
       }

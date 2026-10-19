@@ -184,3 +184,21 @@ test("buildAcceptanceRecord: an unknown option or missing acknowledgement is cau
   assert.equal(io.contractType, "install-only");
   assert.match(acceptanceErrors({ ...PROPOSAL, contractType: "install-only" }, withoutAt(io), "2026-10-18").join(" "), /lose the right to cancel/);
 });
+
+test("proposalNotReady: says what comes first, by where the project really is", async () => {
+  const { proposalNotReady } = await import("../components/proposal/copy.ts");
+  const at = (status: "not-booked" | "booked" | "in-progress" | "submitted", design: "not-started" | "draft" | "in-review" | "approved" = "not-started", scheduledFor?: string) =>
+    proposalNotReady({ survey: { status, mode: "in-person", ...(scheduledFor ? { scheduledFor } : {}) }, design: { status: design } });
+  const booked = at("booked", "not-started", "2026-10-22T10:00:00.000Z");
+  assert.equal(booked.title, "Your proposal comes after your survey on Thu 22 Oct");
+  assert.match(booked.body, /booked for Thu 22 Oct, 10:00/);
+  assert.doesNotMatch(booked.body, /We're designing/);
+  assert.match(at("not-booked").body, /first step is booking one/);
+  assert.match(at("in-progress").title, /under way/);
+  assert.match(at("submitted", "draft").body, /We're designing your system from your survey/);
+  assert.match(at("submitted", "approved").body, /pricing it now/);
+  assert.equal(
+    proposalNotReady({ survey: { status: "booked", mode: "video", scheduledFor: "2026-10-22T10:00:00.000Z" }, design: { status: "not-started" } }).title,
+    "Your proposal comes after your video survey on Thu 22 Oct",
+  );
+});

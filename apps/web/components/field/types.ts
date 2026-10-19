@@ -153,6 +153,8 @@ export interface FieldJob {
   jobProblem?: string;
   me: FieldMe;
   clock: FieldClock | null;
+  /** This person has clocked on to this job today (London), running or not: "Resume", not "Arrived". */
+  clockedToday: boolean;
   issues: FieldIssue[];
   /** Signed read URLs for the photos already captured on the runsheet. */
   mediaUrls: Record<string, string>;

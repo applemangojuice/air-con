@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Handover } from "@/components/field/handover";
+import { JobActions } from "@/components/field/job-actions";
 import { JobNav } from "@/components/field/job-nav";
 import { requireProjectAccess, requireStaff } from "@/lib/auth/server";
 import { FieldError, handoverDraft, loadFieldJob } from "@/lib/field-server";
@@ -22,6 +23,7 @@ export default async function HandoverPage({ params }: { params: Promise<{ proje
       <>
         <JobNav projectId={projectId} active="handover" days={data.header.totalDays} />
         <Handover data={data} pack={draft?.snapshot ?? null} missing={draft?.missing ?? []} />
+        <JobActions data={data} />
       </>
     );
   } catch (err) {

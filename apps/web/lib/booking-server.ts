@@ -231,6 +231,21 @@ function clashMessage(clashes: BookingClash[]): string {
   return `${first.name} is already down for ${first.customer} on ${first.date}${first.confirmed ? "" : " (not confirmed yet)"}${more}. Pick other dates or other people.`;
 }
 
+/**
+ * Would this surveyor be double-booked by a survey on this slot? Checked
+ * against every other live project's install crew on the survey's date
+ * (confirmed or not). The message for the office, or null when they're free.
+ */
+export async function surveyorClash(projectId: string, surveyor: { staffId: string; name: string }, scheduledFor: string | undefined): Promise<string | null> {
+  if (!scheduledFor) return null;
+  const date = scheduledFor.slice(0, 10);
+  const others = (await loadOpsProjects()).map((o) => o.project);
+  const clashes = bookingClashes({ projectId, dates: [date], crew: [surveyor] }, others);
+  if (!clashes.length) return null;
+  const c = clashes[0]!;
+  return `${c.name} is on the install for ${c.customer} on ${fmtDay(date)}${c.confirmed ? "" : " (not confirmed yet)"}, so can't do this survey. Pick someone else, or move the survey to another day.`;
+}
+
 /** Set the install block from its first day: the next N working days, on the customer's behalf. */
 export async function setInstallDates(projectId: string, startDate: string, staff: StaffMember): Promise<Outcome<Project>> {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate)) return fail("Pick the first install day.");

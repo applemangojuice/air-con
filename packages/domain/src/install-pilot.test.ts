@@ -10,6 +10,9 @@ import {
   canReviewExceptions,
   canSetOutcome,
   commissioningFromJob,
+  customerWorkDone,
+  customerWorkNext,
+  listInWords,
   commissioningSignErrors,
   dayOf,
   electricalRefsFromJob,
@@ -20,6 +23,8 @@ import {
   jobTargets,
   latestEvidence,
   openExceptions,
+  photoContexts,
+  photoGroups,
   plausibleValue,
   ramsAcknowledgements,
   runsheetDays,
@@ -662,4 +667,74 @@ test("RAMS acknowledgements: once per person, earliest first", () => {
   ]);
   assert.deepEqual(ramsAcknowledgements(j).map((r) => r.by), ["DEMO Tess", "DEMO Ivo"]);
   assert.equal(latestEvidence(j, rams.id)?.id, "c");
+});
+
+test("customerWorkDone: the real work in the customer's words, by phase, nothing that matters left out", () => {
+  const steps = runsheetFromDesign(design(3, "multi"), "v-std", CATALOGUE);
+  const day1 = stepsForDay(steps, 1);
+  const words = customerWorkDone(day1, steps);
+  // No admin: arrival, protection, as-found photos, RAMS, the kit check.
+  assert.doesNotMatch(words.join(" | "), /on site|protection|condition|RAMS|kit|serial|asbestos/i);
+  assert.deepEqual(words, ["unit positions marked out", "holes drilled and sealed", "wall plates up", "the outdoor base in"]);
+  assert.equal(`Today: ${listInWords(words)}.`, "Today: unit positions marked out, holes drilled and sealed, wall plates up and the outdoor base in.");
+  // Only some rooms done: it says how many.
+  const partial = day1.filter((s) => s.title !== "Core drilling" || s.roomId === "room-1");
+  assert.ok(customerWorkDone(partial, steps).includes("the hole drilled and sealed in one of 3 rooms"));
+  const two = day1.filter((s) => s.title !== "Core drilling" || s.roomId !== "room-3");
+  assert.ok(customerWorkDone(two, steps).includes("holes drilled and sealed in 2 of 3 rooms"));
+  // Day 2: pipework and its flares read as one line; one system's circuit is singular.
+  const day2 = customerWorkDone(stepsForDay(steps, 2), steps);
+  assert.deepEqual(day2, ["indoor units hung", "the outdoor unit in place", "pipework run, insulated and connected", "drains fitted and tested", "the new electrical circuit fitted and tested"]);
+  // A one-room job says "the".
+  const one = runsheetFromDesign(design(1, "single"), "v-std", CATALOGUE);
+  assert.deepEqual(customerWorkDone(stepsForDay(one, 1), one).slice(0, 2), ["the unit position marked out", "the hole drilled and sealed"]);
+  // Steps outside the template read as their own title; admin-looking ones stay out.
+  const extra = [{ id: "x", phase: 6, title: "Trunking painted to match", evidence: [] }, { id: "y", phase: 1, title: "Protection down again", evidence: [] }] as InstallStep[];
+  assert.deepEqual(customerWorkDone(extra, steps), ["trunking painted to match"]);
+});
+
+test("customerWorkNext: tomorrow in plain words", () => {
+  const steps = runsheetFromDesign(design(2, "single"), "v-std", CATALOGUE);
+  assert.deepEqual(customerWorkNext(stepsForDay(steps, 2)), ["the indoor and outdoor units", "the pipework", "the drains", "the electrics"]);
+  assert.deepEqual(customerWorkNext(stepsForDay(steps, 3)), ["testing the system", "commissioning", "your handover"]);
+  assert.equal(listInWords([]), "");
+  assert.equal(listInWords(["a"]), "a");
+  assert.equal(listInWords(["a", "b", "c"]), "a, b and c");
+});
+
+test("photoGroups: finished work first, then the latest work, grouped by step; as-found and check photos last", () => {
+  const steps = runsheetFromDesign(design(2, "single"), "v-std", CATALOGUE);
+  const ev = (specId: string, mediaId: string): EvidenceRecord => ({ specId, mediaId, at: AT, by: "DEMO", id: `e-${mediaId}` });
+  const spec = (title: string, slot: RegExp, roomId?: string) => steps.find((s) => s.title === title && (!roomId || s.roomId === roomId))!.evidence.find((e) => slot.test(e.id))!.id;
+  const job = {
+    runsheet: steps,
+    evidence: [
+      ev(spec("Condition photos", /photo$/, "room-1"), "m-asfound"),
+      ev(spec("Marking out", /scan$/, "room-1"), "m-scan"),
+      ev(spec("Marking out", /marked$/, "room-1"), "m-marked"),
+      ev(spec("Core drilling", /sleeve$/, "room-1"), "m-sleeve"),
+      ev(spec("Core drilling", /seal$/, "room-1"), "m-seal"),
+      ev(spec("Finished photos", /photo$/, "room-2"), "m-done"),
+    ],
+  };
+  const ctx = photoContexts(job);
+  assert.equal(ctx.get("m-asfound")?.use, "condition");
+  assert.equal(ctx.get("m-scan")?.use, "check");
+  assert.equal(ctx.get("m-marked")?.use, "work");
+  assert.equal(ctx.get("m-done")?.finished, true);
+  assert.equal(ctx.get("m-sleeve")?.label, "Hole drilled with a fall, sleeve fitted");
+  const photos = ["m-asfound", "m-scan", "m-marked", "m-sleeve", "m-seal", "m-done", "m-loose"].map((id) => ({ id, caption: id === "m-loose" ? "Extra DEMO photo" : undefined }));
+  const groups = photoGroups(photos, ctx);
+  assert.deepEqual(
+    groups.map((g) => [g.title, g.item ?? "", g.use, g.photos.map((p) => p.id).join(",")]),
+    [
+      ["Finished photos", "Living room", "work", "m-done"],
+      ["Core drilling", "Main bedroom", "work", "m-sleeve,m-seal"],
+      ["Marking out", "Main bedroom", "work", "m-marked"],
+      ["Other photos from today", "", "work", "m-loose"],
+      ["Condition photos", "Main bedroom", "condition", "m-asfound"],
+      ["Marking out", "Main bedroom", "check", "m-scan"],
+    ].map(([t, i, u, ids]) => [t, i, u, ids]),
+  );
+  assert.equal(groups[3]!.photos[0]!.label, "Extra DEMO photo");
 });

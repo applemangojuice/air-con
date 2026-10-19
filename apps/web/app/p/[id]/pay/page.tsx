@@ -18,6 +18,7 @@ import { factsFromSession } from "../../../api/stripe/webhook/stripe-events";
 import { ActionForm } from "../../../ops/projects/[id]/booking/_f5/action-form";
 import { FlashRegion } from "../../../ops/projects/[id]/booking/_f5/flash";
 import { CopyButton } from "./copy-button";
+import { payHeadline } from "./headline";
 import { sentTransferAction, simulatePaymentAction } from "./actions";
 import { reachUs, realPhone } from "@/components/site/claims";
 
@@ -98,6 +99,7 @@ export default async function PayPage({
   const first = (project.customer.name || "").replace(/^DEMO\s+/, "").split(/\s+/)[0] || "there";
   const notice = typeof sp.card === "string" ? CARD_NOTICE[sp.card] : undefined;
   const totalOwed = payable.reduce((s, i) => s + i.owedPence, 0);
+  const headline = payHeadline({ first, cancelled, payableCount: payable.length, paidSomething: invoices.some((i) => i.paidPence > 0) });
 
   return (
     <div className="min-h-dvh bg-cream">
@@ -118,7 +120,7 @@ export default async function PayPage({
           {project.customer.postcode ? `, ${project.customer.postcode}` : ""}
         </p>
         <h1 className="mt-1 font-display text-3xl leading-tight text-ink-900 sm:text-4xl">
-          {cancelled ? `Your contract is cancelled, ${first}` : payable.length ? `Hi ${first}, here's what's due` : `You're all paid up, ${first}`}
+          {headline.title}
         </h1>
 
         <div aria-live="polite">
@@ -139,8 +141,8 @@ export default async function PayPage({
           <section className="mt-6 rounded-2xl border border-line bg-white p-5">
             <p className="text-ink-900">
               {cancelled
-                ? `Nothing is due, and nothing can be paid here.${project.cancellation ? ` We received your cancellation on ${fmtDate(project.cancellation.receivedAt)}; anything you've paid is refunded by ${fmtDate(project.cancellation.refundDueBy)}, the same way you paid.` : ""}`
-                : "Nothing is waiting to be paid. We only ask for money with an invoice, and you'll get an email when one is ready."}
+                ? `${headline.nothingDue}${project.cancellation ? ` We received your cancellation on ${fmtDate(project.cancellation.receivedAt)}; anything you've paid is refunded by ${fmtDate(project.cancellation.refundDueBy)}, the same way you paid.` : ""}`
+                : headline.nothingDue}
             </p>
             <LinkButton href={`/p/${id}`} variant="secondary" className="mt-4">
               Back to your project

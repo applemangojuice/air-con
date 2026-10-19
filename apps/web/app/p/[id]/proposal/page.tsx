@@ -5,11 +5,13 @@ import { EARLY_START_WORDING_VERSION, can, cancellationCopy, cancellationSentenc
 import { Logo } from "@/components/site/logo";
 import { realPhone } from "@/components/site/claims";
 import { ProposalView } from "@/components/proposal/proposal-view";
-import { earliestStartNote, extraCharges, paymentTerms, vatNote } from "@/components/proposal/copy";
+import { earliestStartNote, extraCharges, paymentTerms, proposalNotReady, vatNote } from "@/components/proposal/copy";
+import { CustomerNav, StaffNav } from "@/components/portal/shell";
 import type { ProposalPageData } from "@/components/proposal/types";
 import { getSession, requireProjectAccess } from "@/lib/auth/server";
 import { emailConfigured } from "@/lib/email";
 import { cancellationForm, cancellationInstructions } from "@/lib/comms/legal-text";
+import { loadProject } from "@/lib/project-service";
 import { loadCustomerProposal } from "@/lib/proposal-server";
 
 export const metadata: Metadata = {
@@ -21,15 +23,19 @@ export const dynamic = "force-dynamic";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-function Shell({ firstName, children }: { firstName?: string; children: React.ReactNode }) {
+function Shell({ firstName, nav, children }: { firstName?: string; nav?: React.ReactNode; children: React.ReactNode }) {
   return (
     <div className="min-h-dvh bg-cream">
       <header className="border-b border-line bg-cream/90">
-        <div className="mx-auto flex h-14 max-w-3xl items-center justify-between px-4 sm:px-6">
-          <Link href="/" aria-label="Dang, It's Hot: home" className="rounded-full">
+        <div className="mx-auto flex min-h-14 max-w-3xl items-center justify-between gap-3 px-4 sm:px-6">
+          <Link href="/" aria-label="Dang, It's Hot: home" className="shrink-0 rounded-full">
             <Logo />
           </Link>
-          {firstName && <span className="truncate text-sm font-medium text-ink-500">{firstName}&apos;s proposal</span>}
+          {nav ? (
+            <div className="flex min-w-0 items-center gap-1 text-sm">{nav}</div>
+          ) : (
+            firstName && <span className="truncate text-sm font-medium text-ink-500">{firstName}&apos;s proposal</span>
+          )}
         </div>
       </header>
       <main className="mx-auto w-full max-w-3xl px-4 pb-32 pt-6 sm:px-6 sm:pb-20 sm:pt-10">{children}</main>
@@ -95,20 +101,27 @@ export default async function CustomerProposalPage({
   const loaded = await loadCustomerProposal(id, previewId ? { previewId } : {});
 
   if (!loaded) {
+    const project = await loadProject(id);
+    const copy = project
+      ? proposalNotReady(project)
+      : { title: "Your proposal isn't ready yet", body: "We'll email you as soon as your proposal is ready." };
     return (
-      <Shell>
+      <Shell
+        nav={access.kind === "staff" ? <StaffNav href={`/ops/projects/${id}`} /> : <CustomerNav />}
+      >
         <Notice
-          title="Your proposal isn't ready yet"
-          body={
-            <p>
-              We&apos;re designing your system from your survey, and a qualified engineer signs it off before we price it. We&apos;ll email you as
-              soon as your proposal is ready.
-            </p>
-          }
+          title={copy.title}
+          body={<p>{copy.body}</p>}
           action={
-            <Link href={`/p/${id}`} className="inline-flex min-h-12 items-center rounded-full border border-line bg-white px-6 text-base font-semibold text-ink-900 hover:bg-surface">
-              Back to your project
-            </Link>
+            project?.survey.status === "not-booked" ? (
+              <Link href={`/p/${id}`} className="inline-flex min-h-12 items-center rounded-full bg-accent-700 px-6 text-base font-semibold text-white hover:bg-accent-800">
+                Book your survey
+              </Link>
+            ) : (
+              <Link href={`/p/${id}`} className="inline-flex min-h-12 items-center rounded-full border border-line bg-white px-6 text-base font-semibold text-ink-900 hover:bg-surface">
+                Back to your project
+              </Link>
+            )
           }
         />
       </Shell>

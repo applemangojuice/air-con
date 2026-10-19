@@ -1,5 +1,5 @@
-import { RESCHEDULE_FEES, TAX_CODES, depositPence, type ContractType, type OptionPricing, type PilotSettings } from "@aircon/domain";
-import { fmtDate, money } from "../../lib/format.ts";
+import { RESCHEDULE_FEES, TAX_CODES, depositPence, type ContractType, type OptionPricing, type PilotSettings, type Project } from "@aircon/domain";
+import { fmtDate, fmtDay, fmtDayTime, money } from "../../lib/format.ts";
 
 /**
  * The customer proposal's settings-driven sentences, in plain words. Pure,
@@ -85,4 +85,37 @@ export function earlyStartExplainer(contractType: ContractType, days: number): s
         `Because we're supplying your equipment, your cancellation period only ends ${days} days after it's delivered to you. Normally we wait until then before starting.`,
         `If you'd like us to start sooner, for example straight after delivery, tick the box below. ${proportionate}`,
       ];
+}
+
+/**
+ * What /p/<id>/proposal says before there's a proposal to show, by where the
+ * project really is: a survey still to book or still to happen comes first,
+ * so nobody is told "we're designing your system" before anyone has been.
+ */
+export function proposalNotReady(p: {
+  survey: Pick<Project["survey"], "status" | "scheduledFor" | "mode">;
+  design: Pick<Project["design"], "status">;
+}): { title: string; body: string } {
+  const what = p.survey.mode === "video" ? "video survey" : "survey";
+  const after = "After it, we design your system from what we measured, a qualified engineer signs the design off, and then we price it. We'll email you as soon as your proposal is ready.";
+  switch (p.survey.status) {
+    case "not-booked":
+      return {
+        title: "Your proposal comes after your survey",
+        body: "We design your system from a survey of your home, so the first step is booking one. Pick a time that suits you on your project page.",
+      };
+    case "booked":
+      return p.survey.scheduledFor
+        ? { title: `Your proposal comes after your ${what} on ${fmtDay(p.survey.scheduledFor)}`, body: `Your ${what} is booked for ${fmtDayTime(p.survey.scheduledFor)}. ${after}` }
+        : { title: "Your proposal comes after your survey", body: `Your ${what} is booked. ${after}` };
+    case "in-progress":
+      return { title: `Your ${what} is under way`, body: `Once it's finished we design your system from it, a qualified engineer signs the design off, and then we price it. We'll email you as soon as your proposal is ready.` };
+    case "submitted":
+      return p.design.status === "approved"
+        ? { title: "Your proposal is nearly ready", body: "Your design is signed off by our engineer and we're pricing it now. We'll email you as soon as your proposal is ready." }
+        : {
+            title: "Your proposal isn't ready yet",
+            body: "We're designing your system from your survey, and a qualified engineer signs it off before we price it. We'll email you as soon as your proposal is ready.",
+          };
+  }
 }

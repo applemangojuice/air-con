@@ -363,6 +363,27 @@ test("sync: time entries and issues are idempotent too; a stop before its start 
   assert.equal(bad!.ok, false);
 });
 
+test("joining a day someone else started: no clock today until they arrive, and the arrival keeps where it was", async () => {
+  await seed("in-progress");
+  const before = await field.loadFieldJob(PROJECT, FGAS);
+  assert.equal(before.clockedToday, false, "they haven't clocked on here today: Arrived, not Resume");
+  assert.equal(before.clock, null);
+  const id = "7a7a7a7a-dddd-4ddd-8ddd-00000000f60d";
+  const [r] = await field.processSyncBatch(FGAS, [{ type: "time-start", id, projectId: PROJECT, kind: "install", dayN: 1, note: "Arrived", gps: { lat: 51.45, lng: -0.14 }, at: AT }]);
+  assert.equal(r!.ok, true);
+  const entry = await timeRepo.get(id);
+  assert.equal(entry?.note, "Arrived");
+  assert.deepEqual(entry?.gps, { lat: 51.45, lng: -0.14 });
+  const after = await field.loadFieldJob(PROJECT, FGAS);
+  assert.equal(after.clockedToday, true);
+  assert.equal(after.clock?.entryId, id);
+  // Paused: still clocked on today, so the next tap is Resume.
+  await field.processSyncBatch(FGAS, [{ type: "time-stop", id: "tstop-join-1", projectId: PROJECT, entryId: id, at: new Date().toISOString() }]);
+  const paused = await field.loadFieldJob(PROJECT, FGAS);
+  assert.equal(paused.clock, null);
+  assert.equal(paused.clockedToday, true);
+});
+
 test("variations from site wait for the office, then go to the customer at the checked price", async () => {
   const seeded = await seed("in-progress");
   // A customer to email.
@@ -450,4 +471,15 @@ test("Today keeps the job after commissioning while the crew still has the hando
   assert.equal(field.wrapUpToday(allDone, TODAY), null);
   assert.equal(field.installDateFor(allDone, TODAY), null, "everything's finished: off Today, into Recent");
   assert.equal(field.installDateFor(commissioned(), "2026-11-13"), null, "the next day it's in Recent");
+});
+
+test("a surveyor on an install crew that day can't be given a survey on it", async () => {
+  await seed("not-started");
+  const { surveyorClash } = await import("../lib/booking-server.ts");
+  const clash = await surveyorClash(OTHER, { staffId: INSTALLER.id, name: INSTALLER.name }, "2026-11-11T10:00:00.000Z");
+  assert.match(clash ?? "", new RegExp(`${INSTALLER.name} is on the install for DEMO Customer on Wed 11 Nov`));
+  assert.equal(await surveyorClash(OTHER, { staffId: INSTALLER.id, name: INSTALLER.name }, "2026-11-13T10:00:00.000Z"), null, "free the day after");
+  assert.equal(await surveyorClash(OTHER, { staffId: SUB.id, name: SUB.name }, "2026-11-11T10:00:00.000Z"), null, "not on that crew");
+  assert.equal(await surveyorClash(PROJECT, { staffId: INSTALLER.id, name: INSTALLER.name }, "2026-11-11T10:00:00.000Z"), null, "its own install doesn't count");
+  assert.equal(await surveyorClash(OTHER, { staffId: INSTALLER.id, name: INSTALLER.name }, undefined), null, "no survey date yet");
 });

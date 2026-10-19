@@ -25,6 +25,7 @@ import {
   reviseProposal,
   unitHighlights,
   whyThisSize,
+  withPipeNotes,
   withSettingsWording,
   withoutDiscountLine,
   type AcceptanceRecord,
@@ -218,6 +219,22 @@ test("whyThisSize and pipeNoteFor read like a person wrote them", () => {
   );
   assert.match(pipeNoteFor(DESIGN.rooms[1]!), /About 4\.5 m of pipe.*small, quiet pump/);
   assert.match(pipeNoteFor(DESIGN.rooms[1]!, { route: "other", routeNote: "Behind the kitchen units" }), /Behind the kitchen units/);
+});
+
+test("withPipeNotes: cards with no pipe line get it from the design; a cleared one stays cleared", () => {
+  const o = defaultOptionFor(CTX, DESIGN.variants[1]!);
+  const bare = { ...o, roomCards: o.roomCards.map(({ pipeNote: _drop, ...c }) => c) };
+  const [filled] = withPipeNotes([bare], DESIGN);
+  assert.match(filled!.roomCards[0]!.pipeNote!, /About 6 m of pipe to the outdoor unit/);
+  assert.match(filled!.roomCards[1]!.pipeNote!, /small, quiet pump/);
+  // The office cleared one on purpose, and a card with a note keeps its own words.
+  const edited = { ...bare, roomCards: [{ ...bare.roomCards[0]!, pipeNote: "" }, { ...bare.roomCards[1]!, pipeNote: "Up through the loft hatch." }] };
+  const [kept] = withPipeNotes([edited], DESIGN);
+  assert.equal(kept!.roomCards[0]!.pipeNote, "");
+  assert.equal(kept!.roomCards[1]!.pipeNote, "Up through the loft hatch.");
+  // Nothing to go by: unchanged.
+  assert.equal(withPipeNotes([bare], null)[0], bare);
+  assert.equal(withPipeNotes([o], DESIGN)[0], o, "already complete: the same object back");
 });
 
 /* ------------------------------------------------------------------ */

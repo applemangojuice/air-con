@@ -43,7 +43,7 @@ export type SyncOp =
       at: string;
     }
   | { type: "step-status"; id: string; projectId: string; stepId: string; outcome: StepOutcome; reason?: string; issueId?: string; at: string }
-  | { type: "time-start"; id: string; projectId: string; kind: TimeKind; dayN?: number; note?: string; at: string }
+  | { type: "time-start"; id: string; projectId: string; kind: TimeKind; dayN?: number; note?: string; gps?: { lat: number; lng: number }; at: string }
   | { type: "time-stop"; id: string; projectId: string; entryId: string; at: string }
   | {
       type: "issue";
@@ -575,6 +575,26 @@ export function getFieldOutbox(): FieldOutbox {
     window.setInterval(() => {
       if (outbox.state().items.some((i) => i.state === "queued")) void outbox.flush();
     }, 15_000);
+    // The app opening again (a reload, back in signal after a dead spot) is a fresh start: send what's
+    // waiting now, past any backoff, instead of on the next tick or up to five minutes later.
+    void outbox.ready().then(() => {
+      if (navigator.onLine !== false && outbox.state().items.some((i) => i.state === "queued")) void outbox.flush(true);
+    });
   }
   return outbox;
+}
+
+/**
+ * The field layout mounting: make sure the outbox exists on every field
+ * screen (even one with nothing to capture) and send what's queued now,
+ * backoff reset.
+ */
+export function kickFieldOutbox(): void {
+  if (typeof window === "undefined") return;
+  const fresh = !singleton;
+  const outbox = getFieldOutbox();
+  if (fresh) return; // creating it already flushes once it has loaded
+  void outbox.ready().then(() => {
+    if (navigator.onLine !== false) void outbox.flush(true);
+  });
 }

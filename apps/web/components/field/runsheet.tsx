@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { INSTALL_PHASES, isStepFinished, runsheetDays, runsheetProgress, stepView, stepsForDay, type StepView } from "@aircon/domain";
+import { INSTALL_PHASES, canRecord, isStepFinished, runsheetDays, runsheetProgress, stepView, stepsForDay, type StepView } from "@aircon/domain";
 import { QuickActions } from "./quick-actions";
 import { StepCard } from "./step-card";
 import { HeaderTitle, SyncBadge } from "./sync-badge";
@@ -18,6 +18,14 @@ import { fmtDay, londonTime } from "./format";
  * the one after. It renders from the day layout, so a refresh after a sync
  * updates it in place; the day comes from the URL.
  */
+
+/** The id each step card carries, for "Next for you" and the scroll on opening. */
+const stepAnchor = (stepId: string) => `step-${stepId}`;
+
+/** The first unfinished step on the day this person can record (not blocked, not locked to someone else). */
+function nextForMe(views: StepView[], staff: FieldJob["me"]["staff"], today: string): StepView | undefined {
+  return views.find((v) => !isStepFinished(v) && v.state !== "blocked" && canRecord(v.step, staff, today).ok);
+}
 
 function dayFromPath(pathname: string | null): number {
   const n = Number.parseInt(/\/day\/(\d+)/.exec(pathname ?? "")?.[1] ?? "1", 10);
@@ -42,7 +50,20 @@ export function Runsheet({ data }: { data: FieldJob }) {
   const views: StepView[] = useMemo(() => (merged ? stepsForDay(merged.job.runsheet, day).map((s) => stepView(merged.job, s)) : []), [merged, day]);
   const progress = useMemo(() => (merged ? runsheetProgress(merged.job) : null), [merged]);
   const firstOpen = views.find((v) => !isStepFinished(v))?.step.id;
-  const [expanded, setExpanded] = useState<Set<string>>(() => new Set(firstOpen ? [firstOpen] : []));
+  // The first step still to do that this person can record (the electrician's circuit at the bottom of day 2).
+  const mine = nextForMe(views, me.staff, header.today);
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set([firstOpen, mine?.step.id].filter((x): x is string => Boolean(x))));
+  const mineIndex = mine ? views.findIndex((v) => v.step.id === mine.step.id) : -1;
+
+  // Opening the runsheet (or another day) takes them to their next step when finished work sits above it.
+  const scrollPending = useRef(true);
+  useEffect(() => {
+    if (!scrollPending.current || !merged) return;
+    scrollPending.current = false;
+    if (!mine || mineIndex <= 0) return;
+    document.getElementById(stepAnchor(mine.step.id))?.scrollIntoView({ block: "start" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [day, merged, mine?.step.id]);
   const finishedBefore = useRef<Set<string>>(new Set(views.filter(isStepFinished).map((v) => v.step.id)));
 
   // A step that's just been finished folds away and the next one opens.
@@ -61,10 +82,13 @@ export function Runsheet({ data }: { data: FieldJob }) {
 
   function switchDay(d: number, updateUrl = true) {
     setDay(d);
-    const first = merged ? stepsForDay(merged.job.runsheet, d).map((s) => stepView(merged.job, s)).find((v) => !isStepFinished(v))?.step.id : undefined;
-    setExpanded(new Set(first ? [first] : []));
+    const dayViews = merged ? stepsForDay(merged.job.runsheet, d).map((s) => stepView(merged.job, s)) : [];
+    const first = dayViews.find((v) => !isStepFinished(v))?.step.id;
+    const forMe = nextForMe(dayViews, me.staff, header.today)?.step.id;
+    setExpanded(new Set([first, forMe].filter((x): x is string => Boolean(x))));
     if (updateUrl) window.history.replaceState(null, "", `/field/jobs/${header.projectId}/day/${d}`);
     window.scrollTo({ top: 0 });
+    scrollPending.current = true;
   }
 
   const refusal =
@@ -146,6 +170,28 @@ export function Runsheet({ data }: { data: FieldJob }) {
               <div className="h-full rounded-full bg-emerald-600 transition-all" style={{ width: `${pct}%` }} />
             </div>
           </div>
+        )}
+        {mine && mineIndex > 0 && (
+          <a
+            href={`#${stepAnchor(mine.step.id)}`}
+            onClick={(e) => {
+              e.preventDefault();
+              setExpanded((prev) => new Set([...prev, mine.step.id]));
+              document.getElementById(stepAnchor(mine.step.id))?.scrollIntoView({ behavior: "smooth", block: "start" });
+            }}
+            className="mt-3 flex min-h-12 items-center justify-between gap-3 rounded-2xl border border-line bg-white px-4 py-2 text-base"
+          >
+            <span className="min-w-0">
+              <span className="font-semibold text-ink-900">Next for you: </span>
+              <span className="text-ink-700">
+                {mine.step.title}
+                {mine.step.item ? ` · ${mine.step.item}` : ""}
+              </span>
+            </span>
+            <span aria-hidden className="shrink-0 font-semibold text-accent-700">
+              ↓
+            </span>
+          </a>
         )}
       </header>
 

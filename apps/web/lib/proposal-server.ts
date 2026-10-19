@@ -9,6 +9,7 @@ import {
   cancellationCopy,
   cancellationStatus,
   customerSafeProposal,
+  withPipeNotes,
   defaultOptionFor,
   depositPence,
   performanceDueOn,
@@ -805,7 +806,8 @@ export async function loadCustomerProposal(projectId: string, opts: { previewId?
   const foundingPilot = record.options.some((o) => (o.pricing.discount?.amountPence ?? 0) > 0);
   return {
     project,
-    proposal: customerSafeProposal(record),
+    // Display only: a room card with no pipe line reads it from the design (the hash is the record's own).
+    proposal: customerSafeProposal({ ...record, options: withPipeNotes(record.options, design) }),
     state,
     preview: Boolean(opts.previewId),
     documentHash: await proposalDocumentHash(record),

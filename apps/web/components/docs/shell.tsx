@@ -107,12 +107,12 @@ export function DocSheet({
         <Watermark status={doc.status} />
         <header className="relative flex flex-col gap-6 border-b border-line pb-6 sm:flex-row sm:items-start sm:justify-between">
           <CompanyBlock company={company} />
-          <dl className="shrink-0 text-sm sm:text-right">
-            <dt className="sr-only">Document</dt>
-            <dd className="font-display text-2xl leading-tight text-ink-900">{doc.title}</dd>
+          <div className="shrink-0 text-sm sm:text-right">
+            {/* The document's own title is the page's heading (and, with its ref, the tab and the saved PDF's name). */}
+            <h1 className="font-display text-2xl leading-tight text-ink-900">{doc.title}</h1>
             {/* The kind, unless the title already says it ("Commissioning certificate" twice). */}
-            {DOCUMENT_KIND_LABEL[doc.kind].toLowerCase() !== doc.title.trim().toLowerCase() && <dd className="mt-1 text-ink-500">{DOCUMENT_KIND_LABEL[doc.kind]}</dd>}
-            <div className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 sm:justify-end">
+            {DOCUMENT_KIND_LABEL[doc.kind].toLowerCase() !== doc.title.trim().toLowerCase() && <p className="mt-1 text-ink-500">{DOCUMENT_KIND_LABEL[doc.kind]}</p>}
+            <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 sm:justify-end">
               <dt className="text-ink-500">Ref</dt>
               <dd className="font-semibold tabular-nums">{doc.ref}</dd>
               <dt className="text-ink-500">Version</dt>
@@ -123,8 +123,8 @@ export function DocSheet({
               <dd className={`font-semibold ${doc.status === "final" ? "text-emerald-800" : "text-amber-800"}`}>
                 {doc.status === "final" ? "Final" : doc.status === "draft" ? "Draft: not issued" : "Superseded by a newer version"}
               </dd>
-            </div>
-          </dl>
+            </dl>
+          </div>
         </header>
         <section className="relative grid gap-4 border-b border-line py-5 text-sm sm:grid-cols-2">
           <div>

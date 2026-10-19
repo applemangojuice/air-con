@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Commissioning } from "@/components/field/commissioning";
+import { JobActions } from "@/components/field/job-actions";
 import { JobNav } from "@/components/field/job-nav";
 import { requireProjectAccess, requireStaff } from "@/lib/auth/server";
 import { currentDocument } from "@/lib/documents-server";
@@ -26,6 +27,7 @@ export default async function CommissioningPage({ params }: { params: Promise<{ 
       <>
         <JobNav projectId={projectId} active="commissioning" days={data.header.totalDays} />
         <Commissioning data={data} holds={holds} {...(cert ? { certificateHref: `/d/${cert.id}` } : {})} />
+        <JobActions data={data} />
       </>
     );
   } catch (err) {

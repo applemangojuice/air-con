@@ -51,6 +51,7 @@ const opSchema = z.discriminatedUnion("type", [
     kind: z.enum(["install", "travel", "commissioning", "handover"]),
     dayN: z.number().int().min(1).max(30).optional(),
     note: z.string().max(300).optional(),
+    gps: z.object({ lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180) }).optional(),
     at,
   }),
   z.object({ type: z.literal("time-stop"), id, projectId, entryId: uuid, at }),

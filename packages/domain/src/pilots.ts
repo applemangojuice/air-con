@@ -31,6 +31,8 @@ export interface TimeEntry {
   endedAt?: string;
   minutes?: number;
   note?: string;
+  /** Where the clock was started from, when the phone gave a fix (a crew member arriving on a day someone else started). */
+  gps?: { lat: number; lng: number };
 }
 
 export const TIME_KINDS: TimeEntry["kind"][] = [

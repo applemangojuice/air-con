@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { canRecord, canSetOutcome, type StaffMember, type StepOutcome, type StepView } from "@aircon/domain";
 import { captureOutcome } from "./capture";
 import { Slot } from "./slot";
@@ -60,6 +60,10 @@ export function StepCard({
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  // Why a tap on Pass didn't pass it; gone once the evidence changes.
+  const [passNote, setPassNote] = useState<string | null>(null);
+  useEffect(() => setPassNote(null), [view.missing, view.state]);
   const lock = canRecord(step, me, today);
   const disabledReason = refusal ?? (lock.ok ? undefined : `${lock.reason}: this step is locked for you.`);
   const s = STATE[view.state];
@@ -67,6 +71,29 @@ export function StepCard({
   const doneSlots = required.filter((x) => x.state === "pass" || x.state === "accepted").length;
   const current: StepOutcome = view.latest?.outcome ?? "pass";
   const waitingOutcome = view.latest?.id ? merged.waiting.has(view.latest.id) : false;
+
+  /**
+   * Pass comes from the evidence, so a tap on Pass with slots still to
+   * capture can't pass the step: say what's missing and take them to it,
+   * never a silent tap.
+   */
+  function explainPass() {
+    const left = required.filter((x) => x.state === "missing" || x.state === "recapture");
+    const out = required.filter((x) => x.state === "exception");
+    if (left.length) {
+      setPassNote(`Capture ${left.length === 1 ? "the slot" : `the ${left.length} slots`} above first: Pass comes from the evidence.`);
+      // Show them which one: brought into view (only as far as needed) and ringed for a moment.
+      const first = bodyRef.current?.querySelector<HTMLElement>(`[data-slot="${CSS.escape(left[0]!.spec.id)}"]`);
+      if (first) {
+        first.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        first.querySelector<HTMLElement>("button:not([disabled])")?.focus({ preventScroll: true });
+        first.dataset.flash = "1";
+        window.setTimeout(() => delete first.dataset.flash, 2400);
+      }
+    } else if (out.length) {
+      setPassNote("A reading above is outside its window: the tech lead reviews it before this step can pass.");
+    }
+  }
 
   async function save(outcome: StepOutcome) {
     const check = canSetOutcome(step, outcome, me, today, reason);
@@ -95,7 +122,7 @@ export function StepCard({
   }
 
   return (
-    <li className={`overflow-hidden rounded-2xl border bg-white ${view.state === "blocked" || view.state === "failed" || view.state === "exception" ? "border-red-300" : "border-line"}`}>
+    <li id={`step-${step.id}`} className={`scroll-mt-20 overflow-hidden rounded-2xl border bg-white ${view.state === "blocked" || view.state === "failed" || view.state === "exception" ? "border-red-300" : "border-line"}`}>
       <h3>
         <button
           type="button"
@@ -127,7 +154,7 @@ export function StepCard({
       </h3>
 
       {expanded && (
-        <div id={`${id}-body`} className="space-y-3 border-t border-line px-4 pb-4 pt-3">
+        <div id={`${id}-body`} ref={bodyRef} className="space-y-3 border-t border-line px-4 pb-4 pt-3">
           {!lock.ok && (
             <p className="rounded-xl bg-ink-900 px-3 py-2 text-base font-semibold text-white">
               {lock.reason}. You can still mark it Blocked if it can't be done.
@@ -148,7 +175,7 @@ export function StepCard({
               const refused = merged.refused.get(slot.spec.id);
               const imageUrl = (rec?.mediaId ? mediaUrls[rec.mediaId] : undefined) ?? merged.previews.get(slot.spec.id);
               return (
-                <li key={slot.spec.id}>
+                <li key={slot.spec.id} data-slot={slot.spec.id} className="scroll-mt-24 rounded-2xl transition-shadow data-[flash]:ring-4 data-[flash]:ring-amber-400">
                   <Slot
                     projectId={projectId}
                     step={step}
@@ -178,9 +205,11 @@ export function StepCard({
                     aria-pressed={selected}
                     onClick={() => {
                       setError(null);
+                      setPassNote(null);
                       if (o.value === "pass") {
                         setPicking(null);
                         if (current !== "pass") void save("pass");
+                        else if (view.state !== "done") explainPass();
                         return;
                       }
                       setPicking(o.value);
@@ -231,6 +260,11 @@ export function StepCard({
                   </button>
                 </div>
               </div>
+            )}
+            {passNote && (
+              <p role="alert" className="mt-2 rounded-xl bg-amber-50 px-3 py-2 text-base font-semibold text-amber-900">
+                {passNote}
+              </p>
             )}
             {(error ?? merged.refused.get(`step:${step.id}`)) && (
               <p role="alert" className="mt-2 text-sm font-medium text-red-700">

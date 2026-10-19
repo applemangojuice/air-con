@@ -1558,6 +1558,237 @@ export function runsheetFromDesign(
   });
 }
 
+/* ---------------- the customer's end-of-day words ---------------- */
+
+interface WorkWords {
+  /** Steps that read as one line (pipework and its flares). */
+  group: string;
+  one: string;
+  many: string;
+  /** What's counted: rooms ("in 2 of 3 rooms"), systems (singular or plural), or the job (once). */
+  per: "room" | "system" | "job";
+}
+
+/**
+ * The pilot runsheet's steps in the customer's words. `null`: our own
+ * admin and checks (arriving, protection, as-found photos, RAMS, the kit
+ * check, paperwork), which a customer update leaves out.
+ */
+const CUSTOMER_WORK: Record<string, WorkWords | null> = {
+  "On site and introduced": null,
+  "Protection down": null,
+  "Condition photos": null,
+  "RAMS acknowledged": null,
+  "Kit and serial check": null,
+  "Asbestos check before drilling": null,
+  "Marking out": { group: "mark", one: "the unit position marked out", many: "unit positions marked out", per: "room" },
+  "Core drilling": { group: "core", one: "the hole drilled and sealed", many: "holes drilled and sealed", per: "room" },
+  "Wall plate": { group: "plate", one: "the wall plate up", many: "wall plates up", per: "room" },
+  "Outdoor base or bracket": { group: "base", one: "the outdoor base in", many: "the outdoor bases in", per: "system" },
+  "Indoor unit": { group: "indoor", one: "the indoor unit hung", many: "indoor units hung", per: "room" },
+  "Outdoor unit": { group: "outdoor", one: "the outdoor unit in place", many: "the outdoor units in place", per: "system" },
+  Pipework: { group: "pipes", one: "the pipework run, insulated and connected", many: "pipework run, insulated and connected", per: "room" },
+  "Flares and torque": { group: "pipes", one: "the pipework run, insulated and connected", many: "pipework run, insulated and connected", per: "room" },
+  Condensate: { group: "drain", one: "the drain fitted and tested", many: "drains fitted and tested", per: "room" },
+  "Electrical circuit": { group: "circuit", one: "the new electrical circuit fitted and tested", many: "the new electrical circuits fitted and tested", per: "system" },
+  "Strength and tightness test": { group: "pressure", one: "the pipework pressure-tested", many: "the pipework pressure-tested", per: "system" },
+  "Vacuum and decay test": { group: "vacuum", one: "the system vacuumed and checked for moisture", many: "the systems vacuumed and checked for moisture", per: "system" },
+  "Release and leak check": { group: "release", one: "the refrigerant released and every joint leak-checked", many: "the refrigerant released and every joint leak-checked", per: "system" },
+  "F-gas label and charge record": null,
+  "Commissioning: cooling and heating": { group: "commission", one: "heating and cooling tested", many: "heating and cooling tested", per: "room" },
+  "Defrost water route": { group: "defrost", one: "the defrost water route checked", many: "the defrost water routes checked", per: "system" },
+  "Noise check (MCS 020(a))": { group: "noise", one: "the noise checked against the design", many: "the noise checked against the design", per: "job" },
+  "Electrical certificate": { group: "eic", one: "the electrical certificate completed", many: "the electrical certificate completed", per: "job" },
+  "Customer walkthrough": null,
+  "Finished photos": null,
+  "Clean-up": null,
+};
+
+/** What the next day holds, as a customer reads it ("Tomorrow: the indoor and outdoor units, the pipework…"). */
+const CUSTOMER_NEXT: Record<string, string | null> = {
+  "Marking out": "marking out",
+  "Core drilling": "drilling the holes",
+  "Wall plate": "the wall plates",
+  "Outdoor base or bracket": "the outdoor base",
+  "Indoor unit": "the indoor and outdoor units",
+  "Outdoor unit": "the indoor and outdoor units",
+  Pipework: "the pipework",
+  "Flares and torque": "the pipework",
+  Condensate: "the drains",
+  "Electrical circuit": "the electrics",
+  "Strength and tightness test": "testing the system",
+  "Vacuum and decay test": "testing the system",
+  "Release and leak check": "testing the system",
+  "F-gas label and charge record": null,
+  "Commissioning: cooling and heating": "commissioning",
+  "Defrost water route": null,
+  "Noise check (MCS 020(a))": null,
+  "Electrical certificate": null,
+  "Customer walkthrough": "your handover",
+};
+
+const ADMIN_TITLE = /^(on site|protection|condition photos|rams|kit and serial|asbestos|finished photos|clean-?up|arrival)/i;
+
+/** "RAMS acknowledged" stays as it is; "Core drilling" becomes "core drilling". */
+function lowerFirstWord(t: string): string {
+  const first = t.split(/\s+/)[0] ?? "";
+  return first.length > 1 && first === first.toUpperCase() ? t : t.charAt(0).toLowerCase() + t.slice(1);
+}
+
+/** "a, b and c". */
+export function listInWords(items: string[]): string {
+  if (items.length <= 1) return items[0] ?? "";
+  return `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
+}
+
+const unitOf = (s: InstallStep, per: WorkWords["per"]): string => (per === "room" ? (s.roomId ?? s.item ?? s.id) : per === "system" ? (s.systemId ?? s.item ?? s.id) : "job");
+
+/**
+ * What got done, in the customer's words, for the end-of-day update: the
+ * real work only (never arrival, protection, as-found photos, RAMS or the
+ * kit check), by phase in runsheet order, one line per kind of work
+ * ("holes drilled and sealed", "wall plates up", "the outdoor base in"),
+ * saying how many rooms when it wasn't all of them. Nothing is capped:
+ * everything that matters is in. `all` is the whole runsheet (to know how
+ * many rooms there are). Steps outside the pilot template read as their
+ * own title.
+ */
+export function customerWorkDone(done: InstallStep[], all: InstallStep[]): string[] {
+  const totalRooms = new Set(all.filter((s) => s.roomId).map((s) => s.roomId)).size;
+  const ordered = done
+    .map((s, i) => ({ s, i }))
+    .sort((a, b) => a.s.phase - b.s.phase || a.i - b.i)
+    .map(({ s }) => s);
+  const groups = new Map<string, { words: WorkWords; units: Set<string> }>();
+  const out: { key: string; text?: string }[] = [];
+  for (const s of ordered) {
+    const words = CUSTOMER_WORK[s.title];
+    if (words === null) continue;
+    if (words === undefined) {
+      if (ADMIN_TITLE.test(s.title)) continue;
+      const text = lowerFirstWord(s.title);
+      if (!out.some((o) => o.text === text)) out.push({ key: `title:${text}`, text });
+      continue;
+    }
+    let g = groups.get(words.group);
+    if (!g) {
+      g = { words, units: new Set() };
+      groups.set(words.group, g);
+      out.push({ key: words.group });
+    }
+    g.units.add(unitOf(s, words.per));
+  }
+  return out.map((o) => {
+    if (o.text) return o.text;
+    const { words, units } = groups.get(o.key)!;
+    const n = units.size;
+    if (words.per !== "room") return n > 1 ? words.many : words.one;
+    if (totalRooms <= 1) return words.one;
+    if (n >= totalRooms) return words.many;
+    return `${n === 1 ? words.one : words.many} in ${n === 1 ? "one" : n} of ${totalRooms} rooms`;
+  });
+}
+
+/** What a day's steps hold, in the customer's words, for "Tomorrow: …" (at most `max`). */
+export function customerWorkNext(steps: InstallStep[], max = 4): string[] {
+  const out: string[] = [];
+  for (const s of steps) {
+    const known = s.title in CUSTOMER_NEXT;
+    const text = known ? CUSTOMER_NEXT[s.title] : ADMIN_TITLE.test(s.title) || s.stage === "handover" ? null : lowerFirstWord(s.title);
+    if (text && !out.includes(text)) out.push(text);
+  }
+  return out.slice(0, max);
+}
+
+/* ---------------- the end-of-day photo picker ---------------- */
+
+/**
+ * What a runsheet photo is for, so the picker can lead with the finished
+ * work: "work" (what we built, shown first, finished photos ahead of the
+ * rest), "condition" (the home as found) and "check" (detector scans,
+ * serials, gauges, labels, lock-offs: our records, not the customer's
+ * update). The last two are hidden until asked for.
+ */
+export type PhotoUse = "work" | "condition" | "check";
+
+export interface PhotoContext {
+  stepId: string;
+  stepTitle: string;
+  item?: string;
+  /** The slot's label: what the photo shows ("Hole drilled with a fall, sleeve fitted"). */
+  label: string;
+  use: PhotoUse;
+  finished: boolean;
+  /** The step's place in the runsheet. */
+  order: number;
+}
+
+const CHECK_TAGS: ReadonlySet<string> = new Set(["serial", "gauge", "kit", "signature", "fuse-board"]);
+const CHECK_SLOTS = /\.(scan|lockoff)$/;
+
+function photoUse(spec: EvidenceSpec): PhotoUse {
+  if (spec.role === "condition-photo" || spec.tag === "existing-condition") return "condition";
+  if (CHECK_SLOTS.test(spec.id) || (spec.tag && CHECK_TAGS.has(spec.tag))) return "check";
+  return "work";
+}
+
+/** Each runsheet photo's step, slot and use, by media id (every capture, not only the latest). */
+export function photoContexts(job: Pick<InstallJob, "runsheet" | "evidence">): Map<string, PhotoContext> {
+  const bySpec = new Map<string, { step: InstallStep; spec: EvidenceSpec; order: number }>();
+  job.runsheet.forEach((step, order) => {
+    for (const spec of step.evidence) if (spec.kind === "photo" || spec.kind === "video") bySpec.set(spec.id, { step, spec, order });
+  });
+  const out = new Map<string, PhotoContext>();
+  for (const e of job.evidence) {
+    const hit = e.mediaId ? bySpec.get(e.specId) : undefined;
+    if (!hit || !e.mediaId) continue;
+    out.set(e.mediaId, {
+      stepId: hit.step.id,
+      stepTitle: hit.step.title,
+      ...(hit.step.item ? { item: hit.step.item } : {}),
+      label: hit.spec.label,
+      use: photoUse(hit.spec),
+      finished: hit.spec.role === "finished-photo" || hit.spec.tag === "completed",
+      order: hit.order,
+    });
+  }
+  return out;
+}
+
+export interface PhotoGroup<T> {
+  key: string;
+  title: string;
+  item?: string;
+  use: PhotoUse;
+  photos: (T & { label?: string })[];
+}
+
+/**
+ * The day's photos for the picker, grouped by step: finished photos first,
+ * then the rest of the work, latest step first, then photos with no step
+ * (taken outside the runsheet), then as-found and check photos (which the
+ * picker hides until asked).
+ */
+export function photoGroups<T extends { id: string; caption?: string }>(photos: T[], contexts: Map<string, PhotoContext>): PhotoGroup<T>[] {
+  const groups = new Map<string, PhotoGroup<T> & { rank: number }>();
+  for (const p of photos) {
+    const c = contexts.get(p.id);
+    // A step's work photos and its check photos (the marking out and its detector scan) sit apart.
+    const key = c ? `${c.stepId}:${c.use}` : "other";
+    let g = groups.get(key);
+    if (!g) {
+      // Finished photos, then the rest of the work newest step first (the wall plates before the protection sheets).
+      const rank = !c ? 2_000_000 : c.use !== "work" ? 3_000_000 + (c.use === "condition" ? 0 : 500_000) + c.order : c.finished ? c.order : 1_999_999 - c.order;
+      g = c
+        ? { key, title: c.stepTitle, ...(c.item ? { item: c.item } : {}), use: c.use, photos: [], rank }
+        : { key, title: "Other photos from today", use: "work", photos: [], rank };
+      groups.set(key, g);
+    }
+    g.photos.push({ ...p, ...(c ? { label: c.label } : p.caption ? { label: p.caption } : {}) });
+  }
+  return [...groups.values()].sort((a, b) => a.rank - b.rank).map(({ rank: _rank, ...g }) => g);
+}
+
 /* ---------------- days ---------------- */
 
 /** The suggested day for a step: its own, or by phase for the demo runsheet (1-3 → 1, 4-6 → 2, 7-11 → 3). */

@@ -45,6 +45,29 @@ export const SignaturePad = forwardRef<SignaturePadHandle, { label: string; onCh
     setup();
   }, [setup]);
 
+  // While the pad is on screen the floating Actions button steps aside
+  // (html[data-signing]), so a signature near the bottom corner never opens
+  // the menu instead.
+  useEffect(() => {
+    const c = canvas.current;
+    if (!c || typeof IntersectionObserver === "undefined") return;
+    const root = document.documentElement;
+    let shown = false;
+    const set = (on: boolean) => {
+      if (on === shown) return;
+      shown = on;
+      const n = Math.max(0, Number(root.dataset.signing ?? 0) + (on ? 1 : -1));
+      if (n) root.dataset.signing = String(n);
+      else delete root.dataset.signing;
+    };
+    const io = new IntersectionObserver((entries) => set(entries.some((e) => e.isIntersecting)));
+    io.observe(c);
+    return () => {
+      io.disconnect();
+      set(false);
+    };
+  }, []);
+
   const mark = (next: boolean) => {
     setEmpty(next);
     onChange?.(next);

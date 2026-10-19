@@ -27,6 +27,8 @@ import {
   migrateProject,
   targetError,
   ramsAcknowledgements,
+  photoContexts,
+  photoGroups,
   runsheetFromDesign,
   runsheetPercent,
   runsheetProgress,
@@ -595,6 +597,18 @@ async function clockFor(staff: StaffMember, projectId: string): Promise<FieldClo
   return { entryId: open.id, startedAt: open.startedAt, kind: open.kind, ...(open.dayN ? { dayN: open.dayN } : {}) };
 }
 
+/**
+ * Has this person clocked on to this job today (London)? Someone joining a
+ * day another crew member started hasn't, so they're offered "Arrived",
+ * not "Resume".
+ */
+async function clockedTodayFor(staff: StaffMember, projectId: string, today: string): Promise<boolean> {
+  // From a little before London midnight in UTC terms: the London date decides.
+  const since = new Date(Date.parse(`${today}T00:00:00.000Z`) - 2 * 3_600_000).toISOString();
+  const entries = await timeRepo.listForStaff(staff.id, { sinceIso: since }).catch(() => []);
+  return entries.some((e) => e.projectId === projectId && londonDateOf(e.startedAt) === today);
+}
+
 async function fieldIssues(projectId: string, staff: StaffMember, customerName?: string): Promise<FieldIssue[]> {
   const issues = await issuesRepo.listForProject(projectId);
   const shown = issues.filter((i) => isOpen(i) || Date.parse(i.resolvedAt ?? "") > Date.now() - 14 * 86_400_000);
@@ -646,11 +660,12 @@ async function evidenceMediaUrls(job: InstallJobV2 | null): Promise<Record<strin
 export async function loadFieldJob(projectId: string, staff: StaffMember): Promise<FieldJob> {
   const project = await projectForStaff(projectId, staff);
   const today = londonToday();
-  const [ensured, survey, clock, issues] = await Promise.all([
+  const [ensured, survey, clock, issues, clockedToday] = await Promise.all([
     ensureInstallJob(projectId, project).catch((err: unknown) => ({ ok: false as const, reason: `The runsheet couldn't be loaded: ${(err as Error).message}` })),
     surveysRepo.currentForProject(projectId),
     clockFor(staff, projectId),
     fieldIssues(projectId, staff),
+    clockedTodayFor(staff, projectId, today),
   ]);
   const job = ensured.ok ? ensured.job : null;
   const pump = Boolean(job?.runsheet.some((s) => s.title === "Condensate" && /pump/.test(s.item ?? "")));
@@ -661,6 +676,7 @@ export async function loadFieldJob(projectId: string, staff: StaffMember): Promi
     ...(ensured.ok ? {} : { jobProblem: ensured.reason }),
     me: meOf(staff, today),
     clock,
+    clockedToday,
     issues,
     mediaUrls: await evidenceMediaUrls(job),
     smsMode: mode.sms,
@@ -1086,6 +1102,7 @@ async function syncTimeStart(ctx: BatchContext, op: Extract<SyncOp, { type: "tim
     ...(op.dayN ? { dayN: op.dayN } : {}),
     startedAt: at,
     ...(op.note?.trim() ? { note: op.note.trim() } : {}),
+    ...(op.gps ? { gps: { lat: op.gps.lat, lng: op.gps.lng } } : {}),
   };
   const res = await db().from("time_entries").insert(timeRepo.toRow(entry)).select("id");
   if (isUniqueViolation(res.error)) return { id: op.id, ok: true, duplicate: true };
@@ -1271,6 +1288,18 @@ export async function dayPhotos(projectId: string, staff: StaffMember, n: number
   );
   const urls = await signedMediaUrls(items);
   return items.map((m) => ({ id: m.id, url: urls.get(m.id) ?? null, caption: m.caption, tag: m.tag, customerVisible: m.customerVisible, takenAt: m.takenAt }));
+}
+
+/**
+ * The end-of-day picker's photos, grouped by the runsheet step each one
+ * proves and labelled with what it shows: finished work first, as-found and
+ * check photos (detector scans, serials, gauges) last, for the picker to
+ * hide until asked.
+ */
+export async function dayPhotoGroups(projectId: string, staff: StaffMember, n: number) {
+  const project = await projectForStaff(projectId, staff);
+  const [photos, job] = await Promise.all([dayPhotos(projectId, staff, n), installJobsRepo.loadForProject(projectId, project).catch(() => null)]);
+  return { items: photos, groups: photoGroups(photos, job ? photoContexts(job) : new Map()) };
 }
 
 /**

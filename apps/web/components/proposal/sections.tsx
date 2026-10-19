@@ -123,8 +123,13 @@ export function OutsideSection({ data, option, n }: { data: ProposalPageData; op
   );
 }
 
+/** Is there a "How the pipes run" section to show (any room with its pipe line)? */
+export function hasPipeNotes(option: ProposalOption): boolean {
+  return option.roomCards.some((c) => c.pipeNote?.trim());
+}
+
 export function PipesSection({ option, n }: { option: ProposalOption; n: number }) {
-  const notes = option.roomCards.filter((c) => c.pipeNote);
+  const notes = option.roomCards.filter((c) => c.pipeNote?.trim());
   if (notes.length === 0) return null;
   return (
     <section aria-labelledby="pipes-h" className="scroll-mt-24">

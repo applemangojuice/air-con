@@ -459,6 +459,28 @@ export function pipeNoteFor(room: Pick<RoomDesignInput, "pipeRunM" | "heightDiff
 }
 
 /**
+ * Every room card with its line in "How the pipes run": a card that never
+ * had one (built before pipe notes, or by hand) gets it from the design the
+ * proposal was built on, so the section is never missing. A note the office
+ * cleared on purpose (an empty string) stays cleared. Cards with no design
+ * room to go by are left as they are.
+ */
+export function withPipeNotes(options: ProposalOption[], design: Pick<DesignRecord, "rooms"> | null | undefined): ProposalOption[] {
+  if (!design?.rooms?.length) return options;
+  const rooms = new Map(design.rooms.map((r) => [r.roomId, r]));
+  return options.map((o) => {
+    if (o.roomCards.every((c) => c.pipeNote !== undefined || !rooms.has(c.roomId))) return o;
+    return {
+      ...o,
+      roomCards: o.roomCards.map((c) => {
+        const room = rooms.get(c.roomId);
+        return c.pipeNote !== undefined || !room ? c : { ...c, pipeNote: pipeNoteFor(room, room.route ? { route: room.route } : undefined) };
+      }),
+    };
+  });
+}
+
+/**
  * The unit's points for its room card: the catalogue blurb, then the facts
  * from its specs that the blurb doesn't already make (a card that says
  * "As quiet as 19 dB(A)… with Wi-Fi app control" doesn't then say "19 dB on

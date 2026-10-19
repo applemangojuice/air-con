@@ -97,6 +97,28 @@ test("survey slots: junk slot times are ignored and a fully booked day is left o
   assert.deepEqual(days[0]!.slots.map((s) => s.time), ["10:00"]);
 });
 
+test("survey slots: a day every surveyor spends on an install isn't offered", () => {
+  const ALEX = "a1", JO = "j1", SAM = "s1";
+  const installs = [
+    { dates: ["2026-10-20", "2026-10-21", "2026-10-22"], crewIds: [ALEX, JO] },
+    { dates: ["2026-10-23"], crewIds: [ALEX] },
+  ];
+  // Both founders on Tue to Thu: no surveyor those days. Friday Jo is free.
+  assert.deepEqual(schedule.datesWithNoSurveyor(installs, [ALEX, JO]), ["2026-10-20", "2026-10-21", "2026-10-22"]);
+  // A third surveyor who isn't installing keeps every day open; with nobody known, nothing is closed.
+  assert.deepEqual(schedule.datesWithNoSurveyor(installs, [ALEX, JO, SAM]), []);
+  assert.deepEqual(schedule.datesWithNoSurveyor(installs, []), []);
+  const days = schedule.surveySlotDays({
+    settings: DEFAULT_SETTINGS,
+    nowWall: "2026-10-19T07:00:00.000Z",
+    taken: [],
+    unavailableDates: schedule.datesWithNoSurveyor(installs, [ALEX, JO]),
+    workingDays: 6,
+  });
+  assert.deepEqual(days.map((d) => d.date), ["2026-10-19", "2026-10-23", "2026-10-26"]);
+  assert.equal(schedule.isOfferedSlot(days, "2026-10-22T10:00:00.000Z"), false);
+});
+
 test("londonWallClock encodes London time the house way", () => {
   // 1 July: BST (UTC+1). 1 December: GMT.
   assert.equal(schedule.londonWallClock(new Date("2026-07-01T09:30:00Z")), "2026-07-01T10:30:00.000Z");
@@ -330,4 +352,13 @@ test("personCard lists only qualifications held today and verified, never the ad
   assert.equal(card.role, "Technical lead");
   assert.deepEqual(card.qualifications, ["F-gas Category I"]);
   assert.equal(card.bio, "Twenty years on the tools.");
+});
+
+test("payHeadline: 'all paid up' only once something has been paid", async () => {
+  const { payHeadline } = await import("../app/p/[id]/pay/headline.ts");
+  assert.equal(payHeadline({ first: "Alex", cancelled: false, payableCount: 0, paidSomething: false }).title, "Nothing to pay yet, Alex");
+  assert.match(payHeadline({ first: "Alex", cancelled: false, payableCount: 0, paidSomething: false }).nothingDue, /there isn't one yet/);
+  assert.equal(payHeadline({ first: "Alex", cancelled: false, payableCount: 0, paidSomething: true }).title, "You're all paid up, Alex");
+  assert.equal(payHeadline({ first: "Alex", cancelled: false, payableCount: 2, paidSomething: true }).title, "Hi Alex, here's what's due");
+  assert.equal(payHeadline({ first: "Alex", cancelled: true, payableCount: 0, paidSomething: true }).title, "Your contract is cancelled, Alex");
 });

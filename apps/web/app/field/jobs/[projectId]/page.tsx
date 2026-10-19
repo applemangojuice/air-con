@@ -3,12 +3,14 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AnnotatedImage } from "@/components/annotate/annotated-image";
 import { RiskChips } from "@/components/field/job-card";
+import { JobActions } from "@/components/field/job-actions";
 import { JobNav } from "@/components/field/job-nav";
+import type { FieldJob } from "@/components/field/types";
 import { LoadList, RamsAck } from "@/components/field/pack-bits";
 import { HeaderTitle, SyncBadge } from "@/components/field/sync-badge";
 import { crewLabel, fmtDay, londonTime, telHref } from "@/components/field/format";
 import { requireProjectAccess, requireStaff } from "@/lib/auth/server";
-import { FieldError, loadJobPack } from "@/lib/field-server";
+import { FieldError, loadFieldJob, loadJobPack } from "@/lib/field-server";
 
 /**
  * The job pack, read before leaving home: where, who, the approved layout
@@ -51,8 +53,16 @@ export default async function JobPackPage({ params }: { params: Promise<{ projec
   const access = await requireProjectAccess(projectId, { perm: "install.work" });
   if (!access || access.kind !== "staff") notFound();
   let pack: Awaited<ReturnType<typeof loadJobPack>>;
+  // The job's live state for the Actions button (On my way before leaving home); the pack still shows without it.
+  let job: FieldJob | null;
   try {
-    pack = await loadJobPack(projectId, staff);
+    [pack, job] = await Promise.all([
+      loadJobPack(projectId, staff),
+      loadFieldJob(projectId, staff).catch((err: unknown) => {
+        console.error(`[field] job ${projectId}: no quick actions on the pack:`, err);
+        return null;
+      }),
+    ]);
   } catch (err) {
     if (err instanceof FieldError && err.status === 404) notFound();
     throw err;
@@ -259,6 +269,7 @@ export default async function JobPackPage({ params }: { params: Promise<{ projec
           </Block>
         )}
       </div>
+      {job && <JobActions data={job} />}
     </>
   );
 }

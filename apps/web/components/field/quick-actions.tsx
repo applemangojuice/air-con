@@ -1,13 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   ISSUE_KIND_LABEL,
   LEARNING_PROMPTS,
   SEVERITY_LABEL,
+  customerWorkDone,
+  customerWorkNext,
   defaultsForKind,
   isStepFinished,
+  listInWords,
   stepView,
   stepsForDay,
   type Blocker,
@@ -33,7 +36,7 @@ import { useOutboxState, type MergedJob } from "./use-outbox";
  * refuse to run offline and say why.
  */
 
-type Panel = null | "menu" | "omw" | "arrive" | "issue" | "variation" | "end";
+type Panel = null | "menu" | "omw" | "arrive" | "join" | "issue" | "variation" | "end";
 
 const BTN = "min-h-12 rounded-full px-5 font-semibold disabled:opacity-40";
 const PRIMARY = `${BTN} bg-accent-700 text-white shadow-sm hover:bg-accent-800`;
@@ -51,20 +54,25 @@ async function post<T>(url: string, body: unknown): Promise<{ ok: true; data: T 
   }
 }
 
-/** Is this person's clock running on this job: the server's view plus clock events still on the phone. */
-function useClock(data: FieldJob): { running: boolean; entryId?: string; since?: string } {
+/**
+ * Is this person's clock running on this job: the server's view plus clock
+ * events still on the phone. `startedToday`: they've clocked on here today
+ * at all (so a stopped clock is a pause, not someone who hasn't arrived).
+ */
+function useClock(data: FieldJob): { running: boolean; startedToday: boolean; entryId?: string; since?: string } {
   const state = useOutboxState();
   return useMemo(() => {
     const ops = [...state.acked, ...state.items.map((i) => i.op).filter((o): o is SyncOp => Boolean(o))].filter((o) => o.projectId === data.header.projectId);
     const starts = ops.filter((o): o is Extract<SyncOp, { type: "time-start" }> => o.type === "time-start").sort((a, b) => a.at.localeCompare(b.at));
     const stopped = new Set(ops.filter((o): o is Extract<SyncOp, { type: "time-stop" }> => o.type === "time-stop").map((o) => o.entryId));
     const lastStart = starts[starts.length - 1];
-    if (lastStart && !stopped.has(lastStart.id)) return { running: true, entryId: lastStart.id, since: lastStart.at };
+    const startedToday = data.clockedToday || starts.some((o) => londonDateOf(o.at) === data.header.today);
+    if (lastStart && !stopped.has(lastStart.id)) return { running: true, startedToday: true, entryId: lastStart.id, since: lastStart.at };
     if (data.clock && !stopped.has(data.clock.entryId) && !(lastStart && lastStart.at > data.clock.startedAt)) {
-      return { running: true, entryId: data.clock.entryId, since: data.clock.startedAt };
+      return { running: true, startedToday: true, entryId: data.clock.entryId, since: data.clock.startedAt };
     }
-    return { running: false };
-  }, [state.acked, state.items, data.clock, data.header.projectId]);
+    return { running: false, startedToday };
+  }, [state.acked, state.items, data.clock, data.clockedToday, data.header.projectId, data.header.today]);
 }
 
 /**
@@ -115,7 +123,7 @@ export function QuickActions({ data, merged, day }: { data: FieldJob; merged: Me
       <button
         type="button"
         onClick={() => setPanel("menu")}
-        className={`fixed bottom-24 right-4 z-30 flex min-h-14 items-center gap-2 rounded-full bg-ink-900 px-6 text-lg font-semibold text-white shadow-lg shadow-ink-900/25 sm:right-[max(1rem,calc(50%-17rem))] ${typing ? "hidden" : ""}`}
+        className={`fixed bottom-24 right-4 z-30 flex min-h-14 items-center gap-2 rounded-full bg-ink-900 px-6 text-lg font-semibold text-white shadow-lg shadow-ink-900/25 sm:right-[max(1rem,calc(50%-17rem))] [html[data-signing]_&]:hidden ${typing ? "hidden" : ""}`}
         aria-haspopup="dialog"
       >
         <svg aria-hidden viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round">
@@ -124,7 +132,7 @@ export function QuickActions({ data, merged, day }: { data: FieldJob; merged: Me
         Actions
       </button>
 
-      <Sheet open={panel === "menu"} onClose={close} title="Actions" description={statusText(data, clock.running)}>
+      <Sheet open={panel === "menu"} onClose={close} title="Actions" description={statusText(data, clock)}>
         <ul className="grid gap-2">
           {!done && !header.currentDay && header.nextDay && (
             <>
@@ -135,8 +143,11 @@ export function QuickActions({ data, merged, day }: { data: FieldJob; merged: Me
           {header.currentDay && !staleDay && (
             clock.running ? (
               <Action label="Pause" hint="Stops your clock (lunch, a supplier run)" onClick={() => void pauseResume(data, clock, close)} />
+            ) : !done && clock.startedToday ? (
+              <Action label="Resume" hint="Starts your clock again" onClick={() => void pauseResume(data, clock, close)} primary />
             ) : (
-              !done && <Action label="Resume" hint="Starts your clock again" onClick={() => void pauseResume(data, clock, close)} primary />
+              // Joining a day someone else started: an arrival, with its time and place, not a "resume".
+              !done && <Action label="Arrived: start my clock" hint={`Day ${header.currentDay} is already under way: this records your arrival`} onClick={() => setPanel("join")} primary />
             )
           )}
           {/* A clock with no open day to end (someone else ended it): it must still be stoppable, or it runs until the next job. */}
@@ -162,6 +173,7 @@ export function QuickActions({ data, merged, day }: { data: FieldJob; merged: Me
 
       <OnMyWaySheet open={panel === "omw"} onClose={close} data={data} />
       <ArriveSheet open={panel === "arrive"} onClose={close} data={data} running={clock.running} />
+      <JoinSheet open={panel === "join"} onClose={close} data={data} />
       <IssueSheet open={panel === "issue"} onClose={close} data={data} variation={false} />
       <IssueSheet open={panel === "variation"} onClose={close} data={data} variation />
       <EndDaySheet open={panel === "end"} onClose={close} data={data} merged={merged} n={header.currentDay ?? day} clockEntryId={clock.running ? clock.entryId : undefined} />
@@ -169,15 +181,18 @@ export function QuickActions({ data, merged, day }: { data: FieldJob; merged: Me
   );
 }
 
-function statusText(data: FieldJob, running: boolean): string {
+function statusText(data: FieldJob, clock: { running: boolean; startedToday: boolean }): string {
   const h = data.header;
+  const running = clock.running;
   if (h.installStatus === "complete") {
     if (h.currentDay) return `The install is complete. End day ${h.currentDay} when you leave: it sends the customer's update${running ? " and stops your clock" : ""}.`;
     return running ? "The install is complete, and your clock is still running." : "The install is complete.";
   }
   if (h.currentDay) {
     const d = h.days.find((x) => x.n === h.currentDay);
-    return `Day ${h.currentDay} of ${h.totalDays} under way${d?.startedAt ? ` since ${londonTime(d.startedAt)}` : ""}. Your clock is ${running ? "running" : "paused"}.`;
+    return `Day ${h.currentDay} of ${h.totalDays} under way${d?.startedAt ? ` since ${londonTime(d.startedAt)}` : ""}. ${
+      running ? "Your clock is running." : clock.startedToday ? "Your clock is paused." : "Your clock isn't running."
+    }`;
   }
   return h.nextDay ? `Day ${h.nextDay} hasn't started yet.` : "Nothing to start.";
 }
@@ -212,6 +227,80 @@ async function pauseResume(data: FieldJob, clock: { running: boolean; entryId?: 
     );
   }
   done();
+}
+
+/* ---------------- joining a day already under way ---------------- */
+
+function JoinSheet({ open, onClose, data }: { open: boolean; onClose: () => void; data: FieldJob }) {
+  const [phase, setPhase] = useState<"ready" | "working" | "done">("ready");
+  const [gpsNote, setGpsNote] = useState<string | null>(null);
+  const [since, setSince] = useState<string | null>(null);
+  const n = data.header.currentDay;
+  const day = n ? data.header.days.find((d) => d.n === n) : undefined;
+
+  useEffect(() => {
+    if (!open) {
+      setPhase("ready");
+      setGpsNote(null);
+      setSince(null);
+    }
+  }, [open]);
+
+  async function arrive() {
+    setPhase("working");
+    const fix = await locate();
+    setGpsNote(fix ? (fix.accuracyM && fix.accuracyM >= 1 ? `Location recorded (within about ${fix.accuracyM} m).` : "Location recorded.") : "No location: that's fine, it's optional.");
+    const at = nowIso();
+    await getFieldOutbox().enqueue(
+      {
+        type: "time-start",
+        id: newOpId(),
+        projectId: data.header.projectId,
+        kind: "install",
+        ...(n ? { dayN: n } : {}),
+        at,
+        note: "Arrived",
+        ...(fix ? { gps: { lat: fix.lat, lng: fix.lng } } : {}),
+      },
+      `Arrived: clock started${n ? ` (day ${n})` : ""}`,
+    );
+    setSince(at);
+    setPhase("done");
+  }
+
+  return (
+    <Sheet
+      open={open}
+      onClose={onClose}
+      title="Arrived: start my clock"
+      description={`Day ${n ?? ""} is already under way${day?.startedAt ? ` (since ${londonTime(day.startedAt)})` : ""}. This records when you got here.`}
+      footer={
+        phase === "done" ? (
+          <button type="button" onClick={onClose} className={`${PRIMARY} w-full`}>
+            Done
+          </button>
+        ) : (
+          <button type="button" disabled={phase === "working"} onClick={arrive} className={`${PRIMARY} w-full`}>
+            {phase === "working" ? "Starting your clock…" : "Start my clock"}
+          </button>
+        )
+      }
+    >
+      <div aria-live="polite" className="space-y-3">
+        {phase === "ready" && (
+          <ul className="space-y-2 text-base text-ink-700">
+            <li>· We ask for your location once, for the arrival record (optional).</li>
+            <li>· Your clock starts now. It works without signal: it syncs when there is some.</li>
+          </ul>
+        )}
+        {phase === "working" && <p className="text-base font-semibold text-ink-900">Getting your location (up to 5 seconds)…</p>}
+        {gpsNote && <p className="text-sm text-ink-500">{gpsNote}</p>}
+        {phase === "done" && since && (
+          <p className="rounded-2xl bg-emerald-50 px-4 py-3 text-base font-semibold text-emerald-800">Your clock is running from {londonTime(since)}.</p>
+        )}
+      </div>
+    </Sheet>
+  );
 }
 
 /* ---------------- on my way ---------------- */
@@ -360,6 +449,7 @@ function OnMyWaySheet({ open, onClose, data }: { open: boolean; onClose: () => v
 
 function ArriveSheet({ open, onClose, data, running }: { open: boolean; onClose: () => void; data: FieldJob; running: boolean }) {
   const router = useRouter();
+  const pathname = usePathname();
   const online = useOnline();
   const [phase, setPhase] = useState<"ready" | "working" | "started" | "refused" | "offline">("ready");
   // The day being started, held once the tap happens: the refresh after a
@@ -422,7 +512,15 @@ function ArriveSheet({ open, onClose, data, running }: { open: boolean; onClose:
             {!online ? "Offline: starting the day needs signal" : phase === "working" ? "Starting…" : `Start day ${n}`}
           </button>
         ) : (
-          <button type="button" onClick={onClose} className={`${PRIMARY} w-full`}>
+          <button
+            type="button"
+            onClick={() => {
+              onClose();
+              // Started from the pack (or another screen): take them to the day they've just started.
+              if (phase === "started" && !pathname?.includes("/day/")) router.push(`/field/jobs/${data.header.projectId}/day/${n}`);
+            }}
+            className={`${PRIMARY} w-full`}
+          >
             {phase === "started" ? "Go to the runsheet" : "Close"}
           </button>
         )
@@ -665,7 +763,18 @@ interface DayPhoto {
   id: string;
   url: string | null;
   caption?: string;
+  /** What it shows: its runsheet slot's label, or its own caption. */
+  label?: string;
   customerVisible: boolean;
+}
+
+/** The picker's groups (photoGroups, on the server): finished work first, as-found and check photos last. */
+interface DayPhotoGroup {
+  key: string;
+  title: string;
+  item?: string;
+  use: "work" | "condition" | "check";
+  photos: DayPhoto[];
 }
 
 /** "RAMS acknowledged" stays as it is; "Core drilling" becomes "core drilling". */
@@ -674,10 +783,10 @@ function lowerFirst(t: string): string {
   return first.length > 1 && first === first.toUpperCase() ? t : t.charAt(0).toLowerCase() + t.slice(1);
 }
 
-function uniqueTitles(titles: string[], max = 5): string[] {
+function uniqueTitles(titles: string[]): string[] {
   const out: string[] = [];
   for (const t of titles) if (!out.includes(t)) out.push(t);
-  return out.slice(0, max);
+  return out;
 }
 
 function EndDaySheet({ open, onClose, data, merged, n: liveN, clockEntryId }: { open: boolean; onClose: () => void; data: FieldJob; merged: MergedJob | null; n: number; clockEntryId?: string }) {
@@ -692,7 +801,9 @@ function EndDaySheet({ open, onClose, data, merged, n: liveN, clockEntryId }: { 
   // What the installer types is theirs: see end-day-draft.ts.
   const [draft, setDraft] = useState<EndDayDraft>(() => openDraft({ summary: "", message: "" }));
   const { summary, message } = draft;
-  const [photos, setPhotos] = useState<DayPhoto[] | null>(null);
+  const [photos, setPhotos] = useState<DayPhotoGroup[] | null>(null);
+  // As-found and check photos (detector scans, serials, gauges) stay folded away unless asked for.
+  const [allPhotos, setAllPhotos] = useState(false);
   const [chosen, setChosen] = useState<string[]>([]);
   const [preview, setPreview] = useState<{ subject: string; text: string; mode: "live" | "demo"; to: string | null } | null>(null);
   const [previewing, setPreviewing] = useState(false);
@@ -710,14 +821,20 @@ function EndDaySheet({ open, onClose, data, merged, n: liveN, clockEntryId }: { 
   const defaults = useMemo(() => {
     if (!merged) return { summary: "", message: "" };
     const today = data.header.today;
-    const doneToday = merged.job.runsheet.filter((s) => {
-      const v = stepView(merged.job, s);
-      if (!isStepFinished(v)) return false;
-      const last = v.slots.map((x) => x.record?.at).filter(Boolean).sort().pop();
-      return last ? londonDateOf(last) === today : false;
-    });
-    const doneTitles = uniqueTitles(doneToday.map((s) => lowerFirst(s.title)));
-    const nextTitles = uniqueTitles(stepsForDay(merged.job.runsheet, n + 1).map((s) => lowerFirst(s.title)), 3);
+    const finishedToday = merged.job.runsheet
+      .map((s) => stepView(merged.job, s))
+      .filter((v) => {
+        if (!isStepFinished(v)) return false;
+        const last = v.slots.map((x) => x.record?.at).filter(Boolean).sort().pop();
+        return last ? londonDateOf(last) === today : false;
+      });
+    // The office gets every step finished today; the customer gets the work itself, in their words (N/A steps weren't done).
+    const doneTitles = uniqueTitles(finishedToday.map((v) => lowerFirst(v.step.title)));
+    const workDone = customerWorkDone(
+      finishedToday.filter((v) => v.state === "done").map((v) => v.step),
+      merged.job.runsheet,
+    );
+    const nextWords = customerWorkNext(stepsForDay(merged.job.runsheet, n + 1));
     const last = n >= data.header.totalDays;
     // Ending the last day after commissioning was signed: the job is finished, not paused for the night.
     const complete = data.header.installStatus === "complete";
@@ -725,12 +842,12 @@ function EndDaySheet({ open, onClose, data, merged, n: liveN, clockEntryId }: { 
       ? " Your system is commissioned, and your handover pack is on your project page."
       : last
         ? " Next: commissioning and your handover."
-        : nextTitles.length
-          ? ` Tomorrow: ${nextTitles.join(", ")}.`
+        : nextWords.length
+          ? ` Tomorrow: ${listInWords(nextWords)}.`
           : "";
     return {
       summary: doneTitles.length ? `Done today: ${doneTitles.join(", ")}.` : `Day ${n} on site.`,
-      message: `${doneTitles.length ? `Today we did: ${doneTitles.join(", ")}.` : "Good progress today."}${next}${complete ? " Thank you for having us." : " Everything is tidied away for the night."}`,
+      message: `${workDone.length ? `Today: ${listInWords(workDone)}.` : "Good progress today."}${next}${complete ? " Thank you for having us." : " Everything is tidied away for the night."}`,
     };
   }, [merged, data.header.today, data.header.totalDays, data.header.installStatus, n]);
 
@@ -761,6 +878,7 @@ function EndDaySheet({ open, onClose, data, merged, n: liveN, clockEntryId }: { 
         setAnswers({});
       }
       setPhotos(null);
+      setAllPhotos(false);
       setPreview(null);
       setError(null);
       setBlockers([]);
@@ -777,7 +895,11 @@ function EndDaySheet({ open, onClose, data, merged, n: liveN, clockEntryId }: { 
       .then(async (r) => {
         const body = await r.json();
         if (!r.ok) throw new Error(body.error);
-        setPhotos(body.items);
+        setPhotos(
+          Array.isArray(body.groups)
+            ? body.groups
+            : [{ key: "all", title: "Today's photos", use: "work", photos: (body.items ?? []) as DayPhoto[] }],
+        );
       })
       .catch(() => {
         setPhotos([]);
@@ -847,6 +969,8 @@ function EndDaySheet({ open, onClose, data, merged, n: liveN, clockEntryId }: { 
     setStage("finished");
   }
 
+  // Nothing but as-found and check photos today: show those rather than an empty picker.
+  const noWorkPhotos = Boolean(photos) && !photos!.some((g) => g.use === "work" && g.photos.length > 0);
   const first = firstStep(draft);
   const footer =
     stage === "summary" ? (
@@ -937,33 +1061,61 @@ function EndDaySheet({ open, onClose, data, merged, n: liveN, clockEntryId }: { 
               <legend className="mb-1 text-sm font-semibold text-ink-900">Pick 2 to 4 photos to share</legend>
               <p className="mb-3 text-xs text-ink-500">Only the ones you pick are shown to the customer.</p>
               {photos === null && <p className="text-sm text-ink-500">Loading today&apos;s photos…</p>}
-              {photos && photos.length === 0 && <p className="rounded-2xl bg-surface px-4 py-3 text-sm text-ink-700">No photos from today on the server yet. Photos still uploading appear once they&apos;ve synced.</p>}
-              {photos && photos.length > 0 && (
-                <div className="grid grid-cols-3 gap-2">
-                  {photos.map((p) => {
-                    const on = chosen.includes(p.id);
+              {photos && photos.every((g) => g.photos.length === 0) && (
+                <p className="rounded-2xl bg-surface px-4 py-3 text-sm text-ink-700">No photos from today on the server yet. Photos still uploading appear once they&apos;ve synced.</p>
+              )}
+              {photos && photos.some((g) => g.photos.length > 0) && (
+                <div className="space-y-4">
+                  {photos
+                    .filter((g) => g.photos.length > 0 && (allPhotos || noWorkPhotos || g.use === "work" || g.photos.some((p) => chosen.includes(p.id))))
+                    .map((g) => (
+                      <section key={g.key} aria-label={`${g.title}${g.item ? `, ${g.item}` : ""}`}>
+                        <h3 className="mb-1.5 text-sm font-semibold text-ink-900">
+                          {g.title}
+                          {g.item && <span className="font-normal text-ink-500"> · {g.item}</span>}
+                          {g.use !== "work" && <span className="font-normal text-ink-500"> · {g.use === "condition" ? "as found" : "our check"}</span>}
+                        </h3>
+                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                          {g.photos.map((p) => {
+                            const on = chosen.includes(p.id);
+                            const label = p.label ?? p.caption ?? "Photo";
+                            return (
+                              <label key={p.id} className={`relative block cursor-pointer overflow-hidden rounded-xl border-2 bg-white ${on ? "border-accent-600" : "border-line"}`}>
+                                <input
+                                  type="checkbox"
+                                  className="sr-only"
+                                  checked={on}
+                                  onChange={() => {
+                                    setPreview(null);
+                                    setChosen((c) => (on ? c.filter((x) => x !== p.id) : c.length >= 4 ? c : [...c, p.id]));
+                                  }}
+                                  aria-label={label}
+                                />
+                                {p.url ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img src={p.url} alt="" className="aspect-[4/3] w-full object-cover" />
+                                ) : (
+                                  <span className="flex aspect-[4/3] items-center justify-center bg-surface text-xs text-ink-500">No preview</span>
+                                )}
+                                <span aria-hidden className="block px-2 py-1.5 text-xs leading-snug text-ink-700 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden">
+                                  {label}
+                                </span>
+                                {on && <span className="absolute right-1 top-1 rounded-full bg-accent-700 px-2 text-sm font-bold text-white">✓</span>}
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </section>
+                    ))}
+                  {(() => {
+                    const hidden = photos.filter((g) => g.use !== "work").reduce((n, g) => n + g.photos.length, 0);
+                    if (!hidden || noWorkPhotos) return null;
                     return (
-                      <label key={p.id} className={`relative block cursor-pointer overflow-hidden rounded-xl border-2 ${on ? "border-accent-600" : "border-transparent"}`}>
-                        <input
-                          type="checkbox"
-                          className="sr-only"
-                          checked={on}
-                          onChange={() => {
-                            setPreview(null);
-                            setChosen((c) => (on ? c.filter((x) => x !== p.id) : c.length >= 4 ? c : [...c, p.id]));
-                          }}
-                          aria-label={p.caption ?? "Photo"}
-                        />
-                        {p.url ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={p.url} alt="" className="aspect-square w-full object-cover" />
-                        ) : (
-                          <span className="flex aspect-square items-center justify-center bg-surface text-xs text-ink-500">No preview</span>
-                        )}
-                        {on && <span className="absolute right-1 top-1 rounded-full bg-accent-700 px-2 text-sm font-bold text-white">✓</span>}
-                      </label>
+                      <button type="button" onClick={() => setAllPhotos((v) => !v)} className={`${SECONDARY} w-full`} aria-expanded={allPhotos}>
+                        {allPhotos ? "Hide as-found and check photos" : `Show all photos (${hidden} more: as found, scans and readings)`}
+                      </button>
                     );
-                  })}
+                  })()}
                 </div>
               )}
               <p className="mt-2 text-sm text-ink-700">{chosen.length} chosen</p>

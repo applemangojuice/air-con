@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import type { ReactNode } from "react";
+import { cache, type ReactNode } from "react";
 import { notFound } from "next/navigation";
 import {
   documentCompany,
@@ -39,14 +39,34 @@ import { loadProject } from "@/lib/project-service";
 import { getSettings } from "@/lib/settings-server";
 import { reachUs, realPhone } from "@/components/site/claims";
 
-export const metadata: Metadata = {
-  title: "Your document",
-  robots: { index: false, follow: false },
-};
-
 export const dynamic = "force-dynamic";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** The document and who's asking, once per request (the metadata and the page both need them). */
+const viewerDocument = cache(async (id: string) => {
+  const doc = await getDocument(id);
+  const access = doc ? await requireProjectAccess(doc.projectId, { allowCustomer: true }) : null;
+  const allowed = Boolean(doc && access && (access.kind === "staff" || isCustomerVisible(doc)));
+  return { doc, access, allowed };
+});
+
+/**
+ * The tab title (and so the saved PDF's name): the document's own title,
+ * "Invoice DIH-0002 (Deposit) · Dang, It's Hot", for someone allowed to see
+ * it; anyone else learns nothing from the tab.
+ */
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const robots = { index: false, follow: false };
+  const { id } = await params;
+  if (!UUID_RE.test(id)) return { title: "Your document", robots };
+  try {
+    const { doc, allowed } = await viewerDocument(id.toLowerCase());
+    return { title: doc && allowed ? doc.title : "Your document", robots };
+  } catch {
+    return { title: "Your document", robots };
+  }
+}
 
 /**
  * One printable document (contract §G F1): the project's customer, for a
@@ -62,8 +82,10 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
   const settings = await getSettings();
 
   let doc: DocumentRecord | null = null;
+  let access: Awaited<ReturnType<typeof viewerDocument>>["access"] = null;
+  let allowed = false;
   try {
-    doc = await getDocument(id);
+    ({ doc, access, allowed } = await viewerDocument(id));
   } catch (err) {
     console.error(`[documents] ${id} failed to load:`, err);
     return (
@@ -75,9 +97,6 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
       </PortalShell>
     );
   }
-  const access = doc ? await requireProjectAccess(doc.projectId, { allowCustomer: true }) : null;
-  const allowed = doc && access && (access.kind === "staff" || isCustomerVisible(doc));
-
   if (!doc || !access || !allowed) {
     return (
       <PortalShell width="narrow">

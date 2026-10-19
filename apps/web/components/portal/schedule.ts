@@ -147,10 +147,13 @@ export function surveySlotDays(input: {
   /** londonWallClock(), the same encoding as slots. */
   nowWall: string;
   taken: string[];
+  /** yyyy-mm-dd days nobody can survey (every surveyor is on an install crew): datesWithNoSurveyor. */
+  unavailableDates?: string[];
   workingDays?: number;
   minNoticeMinutes?: number;
 }): SurveySlotDay[] {
   const { settings, nowWall } = input;
+  const closed = new Set((input.unavailableDates ?? []).map((d) => d.slice(0, 10)));
   const wd = workingDaysOf(settings);
   const times = [...new Set(settings.scheduling.surveySlotTimes.filter((t) => SLOT_TIME.test(t)))].sort();
   const duration = Math.max(1, settings.scheduling.surveyDurationMinutes || 90);
@@ -161,14 +164,39 @@ export function surveySlotDays(input: {
   const out: SurveySlotDay[] = [];
   let day = nextWorkingDay(nowWall.slice(0, 10), wd);
   for (let counted = 0; counted < want; counted++) {
-    const slots = times
-      .map((time) => ({ iso: `${day}T${time}:00.000Z`, date: day, time }))
-      .filter((s) => minutes(s.iso) >= earliest)
-      .filter((s) => !taken.some((t) => Math.abs(t - minutes(s.iso)) < duration));
+    const slots = closed.has(day)
+      ? []
+      : times
+          .map((time) => ({ iso: `${day}T${time}:00.000Z`, date: day, time }))
+          .filter((s) => minutes(s.iso) >= earliest)
+          .filter((s) => !taken.some((t) => Math.abs(t - minutes(s.iso)) < duration));
     if (slots.length) out.push({ date: day, slots });
     day = addWorkingDays(day, 1, wd);
   }
   return out;
+}
+
+/**
+ * The days no one can survey: every surveyor-capable person is on an install
+ * crew that day (a two-founder team installing all day can't also be at a
+ * 10:00 survey). With no surveyors known, no day is closed: the office
+ * assigns someone when they book.
+ */
+export function datesWithNoSurveyor(installs: { dates: string[]; crewIds: string[] }[], surveyorIds: string[]): string[] {
+  if (surveyorIds.length === 0) return [];
+  const busy = new Map<string, Set<string>>();
+  for (const job of installs) {
+    for (const raw of job.dates) {
+      const d = raw.slice(0, 10);
+      const set = busy.get(d) ?? new Set<string>();
+      job.crewIds.forEach((id) => set.add(id));
+      busy.set(d, set);
+    }
+  }
+  return [...busy.entries()]
+    .filter(([, crew]) => surveyorIds.every((id) => crew.has(id)))
+    .map(([d]) => d)
+    .sort();
 }
 
 /** Is this exact slot one the customer may book right now? (The server re-checks every booking.) */
