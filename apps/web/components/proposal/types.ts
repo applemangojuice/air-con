@@ -46,7 +46,8 @@ export interface ProposalPageData {
   approvedBy?: string;
   foundingPilot: boolean;
   vatRegistered: boolean;
-  company: { tradingName: string; legalName: string; phone: string; email: string };
+  /** `phone` is null while settings hold only the stand-in number: the page says "email us" instead. */
+  company: { tradingName: string; legalName: string; phone: string | null; email: string };
   /** Per option id: "No VAT: we're not VAT registered" or the VAT treatment. */
   vatNotes: Record<string, string>;
   /** Per option id: the payment terms, deposit worked out on that option's total. */

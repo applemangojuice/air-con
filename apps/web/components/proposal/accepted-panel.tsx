@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { LinkButton } from "@/components/kit";
+import { reachUs } from "@/components/site/claims";
 import { fmtDate, money } from "@/lib/format";
 
 /**
@@ -31,18 +32,22 @@ export function AcceptedPanel({
   projectId,
   firstName,
   phone,
+  email,
   justNow,
   emailDemo = false,
 }: {
   view: AcceptedView;
   projectId: string;
   firstName: string;
-  phone: string;
+  /** Null while settings hold only the stand-in number: then it says "email us". */
+  phone: string | null;
+  email: string;
   justNow: boolean;
   /** No email provider (a demo deployment): nothing was emailed, so never say it was. */
   emailDemo?: boolean;
 }) {
   const [copied, setCopied] = useState(false);
+  const reach = reachUs({ phone, email });
   const needsReply = view.earlyStartRequested && !view.earlyStartEvidenced && Boolean(view.wording);
 
   async function copy() {
@@ -110,10 +115,10 @@ export function AcceptedPanel({
                 : view.confirmationSentAt && !justNow
                   ? `We emailed your contract and cancellation form${view.email ? ` to ${view.email}` : ""} on ${fmtDate(view.confirmationSentAt)}. Please keep that email: it's your copy.`
                   : view.email
-                    ? `Your contract and cancellation form are on their way to ${view.email}. Please keep that email: it's your copy.${justNow ? "" : ` If it hasn't arrived, call us on ${phone} and we'll send it again.`}`
+                    ? `Your contract and cancellation form are on their way to ${view.email}. Please keep that email: it's your copy.${justNow ? "" : ` If it hasn't arrived, ${reach} and we'll send it again.`}`
                     : view.contractDocumentId
                       ? "Your contract and cancellation form are in your documents. Please keep a copy."
-                      : `We'll send you your contract and cancellation form to keep. If they don't arrive, call us on ${phone}.`,
+                      : `We'll send you your contract and cancellation form to keep. If they don't arrive, ${reach}.`,
               "Choose your install dates on your project page. We then confirm the dates and introduce your team.",
               "We order your equipment and tell you when it's delivered.",
             ].map((t, i) => (
@@ -130,7 +135,9 @@ export function AcceptedPanel({
         <div className="rounded-2xl bg-cream px-4 py-3">
           <p className="text-sm font-semibold text-ink-900">Your cancellation period</p>
           <p className="mt-1 text-sm leading-relaxed text-ink-700">{view.cancellation}</p>
-          <p className="mt-1 text-sm text-ink-500">To cancel, tell us clearly by email, letter or phone ({phone}).</p>
+          <p className="mt-1 text-sm text-ink-500">
+            {phone ? `To cancel, tell us clearly by email (${email}), letter or phone (${phone}).` : `To cancel, tell us clearly by email (${email}) or letter.`}
+          </p>
         </div>
 
         <div className="flex flex-col gap-3 sm:flex-row">
@@ -145,7 +152,23 @@ export function AcceptedPanel({
           )}
         </div>
         <p className="text-sm text-ink-500">
-          Questions? Call us on <Link href={`tel:${phone.replace(/\s+/g, "")}`} className="font-semibold text-accent-700 underline">{phone}</Link>.
+          {phone ? (
+            <>
+              Questions? Call us on{" "}
+              <Link href={`tel:${phone.replace(/\s+/g, "")}`} className="font-semibold text-accent-700 underline">
+                {phone}
+              </Link>
+              .
+            </>
+          ) : (
+            <>
+              Questions? Email us at{" "}
+              <a href={`mailto:${email}`} className="font-semibold text-accent-700 underline">
+                {email}
+              </a>
+              .
+            </>
+          )}
         </p>
       </div>
     </section>

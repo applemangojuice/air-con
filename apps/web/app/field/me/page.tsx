@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { QUALIFICATION_LABEL, REQUIREMENT_LABEL, ROLE_LABEL, hasCurrentQualification, meetsRequirement, type StepRequirement } from "@aircon/domain";
+import { QUALIFICATION_LABEL, REQUIREMENT_LABEL, ROLE_LABEL, meetsRequirement, qualificationStatus, type StepRequirement } from "@aircon/domain";
 import { Card, PageHeader } from "@/components/kit";
 import { SyncBadge } from "@/components/field/sync-badge";
 import { fmtDate } from "@/components/field/format";
@@ -45,14 +45,15 @@ export default async function FieldMePage() {
         ) : (
           <ul className="mt-3 divide-y divide-line">
             {staff.qualifications.map((q, i) => {
-              const current = hasCurrentQualification({ qualifications: [q] }, q.kind, today);
+              const status = qualificationStatus(q, today);
+              const current = status === "current";
               const soon = q.expiresOn && current && Date.parse(q.expiresOn) - Date.parse(today) < 60 * DAY;
               return (
                 <li key={`${q.kind}-${i}`} className="py-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="font-semibold text-ink-900">{QUALIFICATION_LABEL[q.kind]}</p>
                     <span className={`rounded-full px-3 py-1 text-sm font-semibold ${!current ? "bg-red-50 text-red-800" : soon ? "bg-amber-50 text-amber-900" : "bg-emerald-50 text-emerald-800"}`}>
-                      {!current ? "Expired" : soon ? "Expires soon" : "Current"}
+                      {status === "unverified" ? "Not checked yet" : !current ? "Expired" : soon ? "Expires soon" : "Current"}
                     </span>
                   </div>
                   <p className="mt-1 text-sm text-ink-700">

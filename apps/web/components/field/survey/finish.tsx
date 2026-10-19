@@ -122,7 +122,7 @@ export function ConsentSection({
             type="button"
             onClick={record}
             disabled={!asked || busy}
-            className="inline-flex min-h-12 w-full items-center justify-center rounded-full bg-accent-600 px-6 text-base font-semibold text-white shadow-sm hover:bg-accent-700 disabled:opacity-40"
+            className="inline-flex min-h-12 w-full items-center justify-center rounded-full bg-accent-700 px-6 text-base font-semibold text-white shadow-sm hover:bg-accent-800 disabled:opacity-40"
           >
             {busy ? "Recording…" : "Record their agreement"}
           </button>
@@ -252,7 +252,7 @@ export function SubmitSection({
               type="button"
               onClick={onSubmit}
               disabled={submitting}
-              className="min-h-12 rounded-full bg-accent-600 font-semibold text-white hover:bg-accent-700 disabled:opacity-50"
+              className="min-h-12 rounded-full bg-accent-700 font-semibold text-white hover:bg-accent-800 disabled:opacity-50"
             >
               {submitting ? "Submitting…" : "Submit"}
             </button>
@@ -263,7 +263,7 @@ export function SubmitSection({
           type="button"
           onClick={() => setConfirm(true)}
           disabled={!ready || pendingPhotos > 0 || submitting}
-          className="inline-flex min-h-14 w-full items-center justify-center rounded-full bg-accent-600 px-6 text-lg font-semibold text-white shadow-sm hover:bg-accent-700 disabled:cursor-not-allowed disabled:opacity-40"
+          className="inline-flex min-h-14 w-full items-center justify-center rounded-full bg-accent-700 px-6 text-lg font-semibold text-white shadow-sm hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {ready ? "Submit survey" : `Submit survey (${completeness.missing.length} to do)`}
         </button>

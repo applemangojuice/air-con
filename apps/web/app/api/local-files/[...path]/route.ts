@@ -99,6 +99,8 @@ export async function PUT(request: Request): Promise<Response> {
   if (body === "too-large") return json(413, { error: "The object exceeded the maximum allowed size" });
 
   const contentType = cleanContentType(request.headers.get("content-type"));
+  // As Supabase does with the bucket's allowed_mime_types (migration 0011).
+  if (!t.local.files.accepts(t.bucket, contentType)) return json(415, { error: `mime type ${contentType.split(";")[0]} is not supported` });
   const status = await t.local.files.write(t.bucket, t.path, body, contentType, t.params.get("op") === "upsert");
   if (status === "exists") return json(409, { error: "The resource already exists" });
   return json(200, { Key: `${t.bucket}/${t.path}` });

@@ -152,8 +152,13 @@ async function checkBucket(
   bucket: string,
   label: string,
 ): Promise<BucketCheck> {
-  const { error } = await supabase.storage.getBucket(bucket);
-  return { bucket, label, ok: !error, error: error?.message ?? null };
+  const { data, error } = await supabase.storage.getBucket(bucket);
+  if (error) return { bucket, label, ok: false, error: error.message ?? "Bucket not found" };
+  // A bucket with no size or type limit takes anything anyone uploads (migration 0011).
+  const limited = Number(data?.file_size_limit) > 0 && Array.isArray(data?.allowed_mime_types) && data.allowed_mime_types.length > 0;
+  return limited
+    ? { bucket, label, ok: true, error: null }
+    : { bucket, label, ok: false, error: "No file size or type limits on this bucket: run migration 0011_storage_limits.sql" };
 }
 
 function envReport(): EnvCheck[] {

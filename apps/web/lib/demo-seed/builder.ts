@@ -1,6 +1,7 @@
 import {
   COMMS_EVENTS,
   DEFAULT_SETTINGS,
+  EARLY_START_WORDING_VERSION,
   GATE_IDS,
   NUMERIC_KINDS,
   proposalTermsFrom,
@@ -1577,9 +1578,31 @@ function buildProject(sc: Scenario, today: string, settings: PilotSettings, invo
   story.act({ type: "invoice-issued", amountPence: depositPence }, depositIssuedAt, ADMIN);
   message("invoice-issued", "email", depositInvoiceId, depositIssuedAt, `Invoice ${depositNumber}`, `Your deposit invoice ${depositNumber} for ${fmtGbp(depositPence)} is in your documents.`);
   if (sc.earlyStart) {
-    // Their reply to the confirmation email, with the early-start wording: the durable copy.
+    // Their reply to the confirmation email, with the early-start wording: the durable copy, stored with the project.
+    const copy = photo(projectId, sc, {
+      key: "early-start-email",
+      scene: "document",
+      tag: "document",
+      room: "Their email",
+      source: "ops",
+      takenBy: { kind: "staff", id: ADMIN.id, name: ADMIN.name },
+      takenAt: at(cal.evidenced!, "09:25"),
+      customerVisible: false,
+      plain: true,
+      caption: "DEMO: the customer's early-start email, saved as a screenshot",
+    });
+    out.media.push(copy);
     story.act(
-      { type: "early-start-evidenced", channel: "email", evidenceRef: `DEMO-EMAIL-${sc.n}001`, by: ADMIN.name },
+      {
+        type: "early-start-evidenced",
+        channel: "email",
+        evidenceRef: `DEMO email of ${cal.evidenced}, Re: Your contract (DEMO-EMAIL-${sc.n}001)`,
+        by: ADMIN.name,
+        mediaIds: [copy.item.id],
+        receivedOn: cal.evidenced!,
+        fromAddress: sc.customer.email,
+        wordingVersion: EARLY_START_WORDING_VERSION,
+      },
       at(cal.evidenced!, "09:30"),
       ADMIN,
     );
@@ -1714,6 +1737,22 @@ function buildProject(sc: Scenario, today: string, settings: PilotSettings, invo
       readyStage[key] = approved(TECH, at(cal.booked!, "15:00"), key === "cancellation-and-consent" ? (sc.earlyStart ? "Early start requested and evidenced by email (DEMO)." : "Cancellation period ended before day 1 (DEMO).") : undefined);
     }
   }
+  // The refrigerant work runs under a DEMO certified company: its certificate is attached, so the item
+  // doesn't rest on a company certificate in settings (which a fresh install doesn't have).
+  const fgasCert = photo(projectId, sc, {
+    key: "fgas-company-certificate",
+    scene: "document",
+    tag: "document",
+    room: "F-gas company certificate",
+    source: "ops",
+    takenBy: { kind: "staff", id: TECH.id, name: TECH.name },
+    takenAt: at(cal.booked!, "14:55"),
+    customerVisible: false,
+    plain: true,
+    caption: "DEMO: the certified company's F-gas certificate (DEMO-REFCOM-0001)",
+  });
+  out.media.push(fgasCert);
+  readyStage["fgas-company"] = approved(TECH, at(cal.booked!, "15:00"), "Refrigerant work under DEMO Cool Ltd's company certificate, DEMO-REFCOM-0001 (DEMO).", [fgasCert.item.id]);
   if (!sc.systems.some((s) => s.position.accessEquipment === "tower")) {
     readyStage["working-at-height"] = { status: "not-applicable", note: "Ground-level outdoor unit; penetrations drilled from inside (DEMO).", reviewedBy: TECH.name, reviewedAt: at(cal.booked!, "15:00") };
   }

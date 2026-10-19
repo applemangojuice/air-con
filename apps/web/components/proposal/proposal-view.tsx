@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { reachUs } from "@/components/site/claims";
 import { fmtDate, money } from "@/lib/format";
 import { AcceptFlow } from "./accept-flow";
 import { AcceptedPanel, type AcceptedView } from "./accepted-panel";
@@ -137,7 +138,7 @@ export function ProposalView({ data }: { data: ProposalPageData }) {
 
       {accepted && (
         <div ref={acceptedRef} className="scroll-mt-6">
-          <AcceptedPanel view={accepted} projectId={data.projectId} firstName={data.firstName} phone={data.company.phone} justNow={Boolean(justAccepted)} emailDemo={Boolean(data.emailDemo)} />
+          <AcceptedPanel view={accepted} projectId={data.projectId} firstName={data.firstName} phone={data.company.phone} email={data.company.email} justNow={Boolean(justAccepted)} emailDemo={Boolean(data.emailDemo)} />
         </div>
       )}
 
@@ -227,7 +228,7 @@ export function ProposalView({ data }: { data: ProposalPageData }) {
 
           {canAccept && (
             <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-              <a href="#accept" className="inline-flex min-h-12 items-center justify-center rounded-full bg-accent-600 px-6 py-3 text-base font-semibold text-white shadow-sm transition hover:bg-accent-700">
+              <a href="#accept" className="inline-flex min-h-12 items-center justify-center rounded-full bg-accent-700 px-6 py-3 text-base font-semibold text-white shadow-sm transition hover:bg-accent-800">
                 Accept this proposal
               </a>
               <a href="#respond" className="inline-flex min-h-12 items-center justify-center rounded-full border border-line bg-white px-6 py-3 text-base font-semibold text-ink-900 transition hover:bg-surface">
@@ -256,7 +257,7 @@ export function ProposalView({ data }: { data: ProposalPageData }) {
               <p className="mt-1">
                 Before you accept, the law says you need this proposal&apos;s contract information and cancellation form by email, to keep. We
                 haven&apos;t been able to send it yet{data.email ? ` to ${data.email}` : ""}. We&apos;re on it, and you can accept here as soon as it
-                arrives. If it hasn&apos;t come by tomorrow, call us on {data.company.phone} or email {data.company.email}.
+                arrives. If it hasn&apos;t come by tomorrow, {data.company.phone ? `call us on ${data.company.phone} or email ${data.company.email}` : `email us at ${data.company.email}`}.
               </p>
             </div>
           ) : (
@@ -305,7 +306,7 @@ export function ProposalView({ data }: { data: ProposalPageData }) {
           </li>
         </ul>
         <p className="mt-3 text-sm text-ink-500">
-          Questions about anything here? Call {data.company.phone} or email{" "}
+          Questions about anything here? {data.company.phone ? `Call ${data.company.phone} or email` : "Email"}{" "}
           <a href={`mailto:${data.company.email}`} className="font-semibold text-accent-700 underline">
             {data.company.email}
           </a>
@@ -327,7 +328,7 @@ export function ProposalView({ data }: { data: ProposalPageData }) {
               <p className="truncate text-xs text-ink-500">{option.label} · pilot price</p>
               <p className="font-semibold tabular-nums text-ink-900">{money(total)}</p>
             </div>
-            <a href="#accept" className="inline-flex min-h-12 items-center rounded-full bg-accent-600 px-5 text-base font-semibold text-white shadow-sm">
+            <a href="#accept" className="inline-flex min-h-12 items-center rounded-full bg-accent-700 px-5 text-base font-semibold text-white shadow-sm">
               Accept
             </a>
           </div>
@@ -343,7 +344,7 @@ function StateBanner({ data, state, responded }: { data: ProposalPageData; state
       <div className="mt-5 rounded-2xl border border-line bg-white p-4 text-sm text-ink-700">
         <p className="font-semibold text-ink-900">You&apos;ve declined this proposal.</p>
         <p className="mt-1">
-          Thanks for letting us know{data.declineReason ? ` (“${data.declineReason}”)` : ""}. Changed your mind, or want something different? Call us on {data.company.phone}.
+          Thanks for letting us know{data.declineReason ? ` (“${data.declineReason}”)` : ""}. Changed your mind, or want something different? {reachUs(data.company, true)}.
         </p>
       </div>
     );
@@ -353,7 +354,7 @@ function StateBanner({ data, state, responded }: { data: ProposalPageData; state
       <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
         <p className="font-semibold">This proposal was valid until {fmtDate(data.validUntil)}.</p>
         <p className="mt-1">
-          Prices and availability may have changed, so it can&apos;t be accepted as it is. Call us on {data.company.phone} or email {data.company.email} and we&apos;ll send you an updated one.
+          Prices and availability may have changed, so it can&apos;t be accepted as it is. {data.company.phone ? `Call us on ${data.company.phone} or email ${data.company.email}` : `Email us at ${data.company.email}`} and we&apos;ll send you an updated one.
         </p>
       </div>
     );

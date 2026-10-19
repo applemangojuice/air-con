@@ -456,12 +456,14 @@ export async function startSurvey(projectId: string, staff: StaffMember): Promis
 export const ETA_CHOICES = [10, 20, 30, 45, 60] as const;
 export const MAX_ETA_MINUTES = 240;
 
-export type TextStatus =
+/** `channel` is "email" when no text could reach them, so it went by email instead (COMMS_EVENTS fallback). */
+export type TextStatus = (
   | { state: "sent"; to: string; at: string }
   | { state: "demo"; to: string; at: string }
   | { state: "queued"; to: string; at: string }
   | { state: "failed"; to: string; at: string; error?: string }
-  | { state: "not-sent"; reason: string };
+  | { state: "not-sent"; reason: string }
+) & { channel?: "email" };
 
 function statusOf(message: MessageRecord | null, reason: string): TextStatus {
   if (!message) return { state: "not-sent", reason };
@@ -500,8 +502,13 @@ export async function onMyWayPreview(project: Project, etaMinutes: number, by: s
 export async function onMyWayStatus(project: Project): Promise<{ etaMinutes: number; at: string; text: TextStatus } | null> {
   const omw = project.survey.onMyWay;
   if (!omw) return null;
-  const key = idempotencyKey("surveyor-on-my-way", project.id, `${project.survey.scheduledFor ?? "-"}:${omw.etaMinutes}`, "sms");
-  const message = await messagesRepo.findByKey(key).catch(() => null);
+  const discriminator = `${project.survey.scheduledFor ?? "-"}:${omw.etaMinutes}`;
+  const message = await messagesRepo.findByKey(idempotencyKey("surveyor-on-my-way", project.id, discriminator, "sms")).catch(() => null);
+  if (!message) {
+    // No text could reach them: did it go by email instead?
+    const emailed = await messagesRepo.findByKey(idempotencyKey("surveyor-on-my-way", project.id, discriminator, "email")).catch(() => null);
+    if (emailed) return { etaMinutes: omw.etaMinutes, at: omw.at, text: { ...statusOf(emailed, ""), channel: "email" } };
+  }
   return { etaMinutes: omw.etaMinutes, at: omw.at, text: statusOf(message, await whyNoText(project)) };
 }
 

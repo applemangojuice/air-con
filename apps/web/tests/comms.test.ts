@@ -1291,3 +1291,49 @@ test("a day ended after commissioning (the wrap-up) never tells the customer com
   const before = render("install-day-update", { n: 3, totalDays: 3, text: "Pipes tested." });
   assert.match(before.text, /Next, we commission the system/);
 });
+
+/* ------------------------------------------------------------------ */
+/* "We'll text you": only when a text will really reach them           */
+/* ------------------------------------------------------------------ */
+
+const { onTheWayChannel } = await import("../lib/comms/on-the-way.ts");
+
+test("on the way: a text with a mobile and texts going (or demo mode); email otherwise; nothing without either", () => {
+  const mobile = { phone: "07700 900123", email: "sam@example.test" };
+  assert.equal(onTheWayChannel(mobile, { sms: true, email: true }), "sms");
+  assert.equal(onTheWayChannel(mobile, { sms: false, email: false }), "sms", "demo mode: everything is recorded the same way");
+  assert.equal(onTheWayChannel(mobile, { sms: false, email: true }), "email", "email is live and texts aren't: a text would never arrive");
+  assert.equal(onTheWayChannel({ email: "sam@example.test" }, { sms: true, email: true }), "email", "no mobile");
+  assert.equal(onTheWayChannel({ phone: "020 7946 0123", email: "sam@example.test" }, { sms: true, email: true }), "email", "a landline can't take texts");
+  assert.equal(onTheWayChannel({}, { sms: true, email: true }), null);
+});
+
+test("the booking and day-before emails promise the channel that will really be used", () => {
+  const day = FULL["install-day-before"];
+  const withMobile = renderMessage("install-day-before", ctxFor(), day).text;
+  assert.match(withMobile, /We'll text you when they're on the way/);
+  const noMobile = renderMessage("install-day-before", ctxFor({ phone: "" }), day).text;
+  assert.doesNotMatch(noMobile, /text you/);
+  assert.match(noMobile, /We'll email you when they're on the way/);
+  const smsOff = templateContext({ settings: SETTINGS, portalUrl: PORTAL, live: { sms: false, email: true }, project: { id: PROJECT_ID, customer: CUSTOMER } });
+  assert.doesNotMatch(renderMessage("install-day-before", smsOff, day).text, /text you/, "texts aren't set up: no promise of one");
+  const booked = renderMessage("install-booked", ctxFor({ phone: "" }), FULL["install-booked"]).text;
+  assert.doesNotMatch(booked, /text/);
+  assert.match(booked, /and when the team is on the way/);
+});
+
+test("on my way with no mobile goes by email instead of nowhere; with one, by text", async () => {
+  const p = baseProject();
+  const noPhone = { ...p, customer: { ...p.customer, phone: undefined } } as Project;
+  const h = harness({ project: noPhone, email: true, sms: true });
+  const r = await h.outbox.notify("installer-on-my-way", { projectId: PROJECT_ID, data: { etaMinutes: 20, at: new Date().toISOString(), name: "DEMO Ivo" }, discriminator: "d1:20" });
+  assert.deepEqual(r.results.map((x) => [x.channel, x.status]), [["email", "sent"]]);
+  assert.match(h.sent[0]!.subject ?? "", /on the way/);
+  const textable = harness({ email: true, sms: true });
+  const t = await textable.outbox.notify("installer-on-my-way", { projectId: PROJECT_ID, data: { etaMinutes: 20, at: new Date().toISOString() }, discriminator: "d1:20" });
+  assert.deepEqual(t.results.map((x) => [x.channel, x.status]), [["sms", "sent"]]);
+  // Texts not set up but email live: by email, so it actually arrives.
+  const smsOff = harness({ email: true, sms: false });
+  const e = await smsOff.outbox.notify("surveyor-on-my-way", { projectId: PROJECT_ID, data: { etaMinutes: 15, at: new Date().toISOString() }, discriminator: "s:15" });
+  assert.deepEqual(e.results.map((x) => [x.channel, x.status]), [["email", "sent"]]);
+});

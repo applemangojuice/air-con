@@ -1,6 +1,7 @@
 import {
   COMPLIANCE_TEMPLATE,
   addComplianceEvidence,
+  companyFgasCertProblem,
   complianceTemplateFor,
   createIssue,
   instantiateCompliance,
@@ -14,11 +15,18 @@ import {
   type StaffMember,
 } from "@aircon/domain";
 import { audit } from "./audit";
-import { loadProject } from "./project-service";
+import { loadProject, londonToday } from "./project-service";
 import { fail, mutateRow, projectMediaIds, type Outcome } from "./purchasing-server";
 import * as complianceRepo from "./repo/compliance";
 import * as designsRepo from "./repo/designs";
 import * as issuesRepo from "./repo/issues";
+import { getSettings } from "./settings-server";
+
+/** The company F-gas certificate's standing for this job (the fgas-company item rests on it unless the subcontractor's is attached). */
+async function reviewContext(project: Project) {
+  const settings = await getSettings();
+  return { companyFgasProblem: companyFgasCertProblem(settings.company.fgasCompanyCert, project, londonToday()) };
+}
 
 /**
  * The compliance checklist on the server (F5). Every status change goes
@@ -57,7 +65,7 @@ export async function loadChecklist(project: Project): Promise<ComplianceItem[]>
     complianceRepo.listForProject(project.id),
     project.design.status === "approved" ? designsRepo.approvedForProject(project.id).catch(() => null) : Promise.resolve(null),
   ]);
-  const changed = syncCompliance(items, project, new Date().toISOString(), design);
+  const changed = syncCompliance(items, project, new Date().toISOString(), design, await reviewContext(project));
   for (const c of changed) {
     try {
       await complianceRepo.update(c);
@@ -80,9 +88,11 @@ export async function reviewItem(
   input: { to: ComplianceStatus; note?: string; overrideReason?: string },
   staff: StaffMember,
 ): Promise<Outcome<ComplianceItem>> {
+  const project = await loadProject(projectId);
+  const context = project ? await reviewContext(project) : {};
   const res = await mutateRow<ComplianceItem>("compliance_items", itemId, complianceRepo, (current) => {
     if (current.projectId !== projectId) return { ok: false, error: "That item isn't on this project's checklist." };
-    const r = reviewCompliance(current, input.to, staff, input.note, input.overrideReason, new Date().toISOString());
+    const r = reviewCompliance(current, input.to, staff, input.note, input.overrideReason, new Date().toISOString(), context);
     return r.ok ? { ok: true, value: r.item } : r;
   });
   if (!res.ok) return res;

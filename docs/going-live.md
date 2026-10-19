@@ -22,12 +22,14 @@ watches (Vercel → Project → Settings → Git → Production Branch).
 
    `0001` → `0002` → `0003` → `0004` → `0005` → **both** `0006` files
    (`0006_draft_quotes.sql` and `0006_property_intelligence.sql`) → `0007` →
-   `0008` → `0009` → **`0010_pilot_platform.sql`**.
+   `0008` → `0009` → **`0010_pilot_platform.sql`** → **`0011_storage_limits.sql`**.
 
    `0010` is the pilot platform itself: the staff and sign-in tables, every
    project record (surveys, designs, proposals, orders, invoices, payments,
    documents…) and the `project-media` bucket. **Without it nobody can sign
-   in.** Re-running a file is safe (`if not exists`). If you skip one the
+   in.** `0011` sets each storage bucket's size limit and file types (the
+   public photo upload takes photos only); `/api/health` and `/ops/status`
+   report a bucket without them. Re-running a file is safe. If you skip one the
    site looks connected but can't save; `/login` says so, and so do the
    deploy logs (`[schema] The database is missing …`).
 
@@ -66,8 +68,10 @@ watches (Vercel → Project → Settings → Git → Production Branch).
      wall in front of the console: everyone else signs in by magic link.
      Leave it unset if you don't want it.
    - `LEADS_NOTIFY_EMAIL` (where lead alerts go), `GETADDRESS_API_KEY`
-     (address autofill), `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` (video
-     walkthroughs).
+     (address autofill). The video walkthrough endpoints (the iOS capture
+     app, not part of the pilot) are off in production unless
+     `VIDEO_SURVEYS_ENABLED=1`; only then do `OPENAI_API_KEY` /
+     `ANTHROPIC_API_KEY` matter.
 
    Never set `ALLOW_DEMO_LOGIN`, `DEMO_DEPLOYMENT` or `DATA_BACKEND` on the
    live business: they're for demo deployments and local development.
@@ -117,6 +121,8 @@ watches (Vercel → Project → Settings → Git → Production Branch).
 | No admin account and no way to make one | `ADMIN_EMAILS` empty | Set it, redeploy, sign in with one of those addresses |
 | Quotes don't save; the funnel errors at the end | Supabase keys wrong, or migrations not run | Check `/api/health`, then `/ops/status` |
 | "Invalid path specified in URL" uploading photos | A storage bucket is missing | Migration `0001` creates survey photos, `0004` videos, `0010` project media |
+| A bucket shows "No file size or type limits" in `/api/health` | Migration `0011` hasn't been run | Run `0011_storage_limits.sql` |
+| "mime type … is not supported" uploading | The file isn't a type the bucket stores | Photos (JPEG, PNG, WebP, HEIC), PDFs and MP4/.mov only (0011) |
 | Reminders, expiries and the digest never happen | `CRON_SECRET` missing (the crons answer 401) | Set it, redeploy |
 | Property intelligence shows 0 | The property book hasn't been loaded | `/ops/intel` → **Seed sample book**, or the importer ([property-intelligence.md](./property-intelligence.md)) |
 

@@ -21,12 +21,14 @@ export interface SurveyMediaItem {
   source: "customer" | "survey" | "install" | "handover" | "ops";
 }
 
-export type TextStatus =
+/** `channel` is "email" when no text could reach them, so it went by email instead. */
+export type TextStatus = (
   | { state: "sent"; to: string; at: string }
   | { state: "demo"; to: string; at: string }
   | { state: "queued"; to: string; at: string }
   | { state: "failed"; to: string; at: string; error?: string }
-  | { state: "not-sent"; reason: string };
+  | { state: "not-sent"; reason: string }
+) & { channel?: "email" };
 
 export interface OnMyWayState {
   etaMinutes: number;

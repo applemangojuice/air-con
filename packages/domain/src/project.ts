@@ -278,15 +278,24 @@ export type DocumentsConsentChannel = "portal" | "in-person" | "email";
  * 36(1)): an express request, made by the customer on a durable medium for
  * an off-premises contract. The portal tick records the request; it only
  * counts once `evidencedAt` records the durable copy (their email reply with
- * the early-start wording, or a signed form).
+ * the early-start wording, or a signed form), and the trader carries the
+ * burden of proof (reg 17), so the copy itself is stored with the project
+ * (`mediaIds`: the email saved as a PDF or a screenshot, or the signed form)
+ * with when it reached us and, for an email, the address it came from.
  */
 export interface EarlyStartRecord {
   requested: boolean;
   requestedAt?: string;
   /** Where the request was made: the portal tick, then the durable copy's medium once evidenced. */
   channel?: "email" | "paper" | "portal";
-  /** The stored email's id, or the signed form's document or media id. */
+  /** Which email or form it is, so anyone can find the original: its date and subject, or the form's reference. */
   evidenceRef?: string;
+  /** The stored copy: the customer's email (PDF or screenshot) or the signed form, in the project's media. */
+  mediaIds?: string[];
+  /** The London day the request reached us (on or after acceptance, never in the future). */
+  receivedOn?: string;
+  /** For an email: the address it came from, which is the customer's own. */
+  fromAddress?: string;
   evidencedAt?: string;
   /** The signed-in staff member who recorded the evidence. */
   recordedBy?: string;
@@ -1720,8 +1729,22 @@ export type ProjectAction =
   | { type: "contract-confirmation-sent"; messageId?: string; demo?: boolean }
   /** The customer asks to start early after accepting (on the portal, or by email or form, recorded by ops). */
   | { type: "early-start-requested"; channel: "email" | "paper" | "portal" }
-  /** Ops: the customer's early-start request on a durable medium (their email reply, or a signed form) is on file. */
-  | { type: "early-start-evidenced"; channel: "email" | "paper"; evidenceRef: string; by: string }
+  /**
+   * Ops: the customer's early-start request on a durable medium (their email
+   * reply, or a signed form) is on file: the copy itself (`mediaIds`), the day
+   * it reached us, for an email the address it came from, and the wording
+   * version it uses (the one they were asked to use).
+   */
+  | {
+      type: "early-start-evidenced";
+      channel: "email" | "paper";
+      evidenceRef: string;
+      by: string;
+      mediaIds: string[];
+      receivedOn: string;
+      fromAddress?: string;
+      wordingVersion: string;
+    }
   // booking
   | { type: "install-dates-set"; startDate: string; dates: string[] }
   | { type: "crew-assigned"; crew: CrewMember[] }
@@ -2276,11 +2299,17 @@ export function applyProjectAction(project: Project, action: ProjectAction, now:
       // As with approvals: the verified person signed in, never a typed name.
       if (!staff) return err("Recording early-start evidence needs a signed-in staff member.");
       if (p.proposal.earlyStart?.evidencedAt) return err("The early-start request is already on file.");
+      const problem = earlyStartEvidenceProblem(p, action, today);
+      if (problem) return err(problem);
+      const fromAddress = action.channel === "email" ? normalisedAddress(action.fromAddress) : undefined;
       p.proposal.earlyStart = {
         ...(p.proposal.earlyStart ?? { requested: true, wordingVersion: EARLY_START_WORDING_VERSION }),
         requested: true,
         channel: action.channel,
         evidenceRef,
+        mediaIds: [...new Set(action.mediaIds)],
+        receivedOn: action.receivedOn,
+        ...(fromAddress ? { fromAddress } : {}),
         evidencedAt: now,
         recordedBy: staff.name,
       };
@@ -3066,6 +3095,44 @@ export function cancellationSentence(
   return supply
     ? `Because we're supplying your equipment, you can cancel without giving a reason until ${days} days after the day it's delivered to you. We'll tell you the exact date when it arrives.`
     : `You can cancel without giving a reason within ${days} days of the day you accepted.`;
+}
+
+const normalisedAddress = (v: string | null | undefined): string => (v ?? "").trim().toLowerCase();
+
+/**
+ * Why this early-start evidence can't go on file, or null when it can. The
+ * request is the customer's own, made on a durable medium, so: the copy is
+ * attached; it reached us on or after the day they accepted (they're asked
+ * to reply to the contract email) and not in the future; an email came from
+ * the address on the contract; and it uses the wording they were asked to
+ * use (`EARLY_START_WORDING_VERSION` when they accepted).
+ */
+export function earlyStartEvidenceProblem(
+  p: Pick<Project, "customer" | "proposal">,
+  e: { channel: "email" | "paper"; mediaIds: readonly string[]; receivedOn: string; fromAddress?: string; wordingVersion: string },
+  today: string,
+): string | null {
+  if (!Array.isArray(e.mediaIds) || e.mediaIds.filter((m) => typeof m === "string" && m.trim()).length === 0) {
+    return e.channel === "email"
+      ? "Attach their email (saved as a PDF, or a screenshot showing who it's from and when)."
+      : "Attach the signed form (a scan or a photo of it).";
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(e.receivedOn ?? "") || Number.isNaN(Date.parse(`${e.receivedOn}T12:00:00Z`))) return "When did it reach us? Pick the date.";
+  if (e.receivedOn > today) return "That date is in the future.";
+  const accepted = p.proposal.acceptedAt ? londonDateOf(p.proposal.acceptedAt) : null;
+  if (accepted && e.receivedOn < accepted) {
+    return `That's before they accepted the contract (${fmtDate(accepted)}). The request has to come with or after their acceptance: ask them to reply to the contract email.`;
+  }
+  if (e.channel === "email") {
+    const on = normalisedAddress(p.customer.email);
+    if (!on) return "There's no email address on the contract to check it against. Add theirs to the project first.";
+    if (normalisedAddress(e.fromAddress) !== on) {
+      return `It has to come from the address on the contract (${on}). If they've changed address, update their contact details first; otherwise ask them to reply from it, or use a signed form.`;
+    }
+  }
+  const asked = p.proposal.earlyStart?.wordingVersion ?? EARLY_START_WORDING_VERSION;
+  if (e.wordingVersion !== asked) return "Check it asks us to start before the cancellation period ends, in the words we gave them, and tick that it does.";
+  return null;
 }
 
 /** Bump whenever earlyStartWording changes: the project records the version the customer was asked to use. */

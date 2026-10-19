@@ -22,6 +22,7 @@ import {
   isOpen,
   isPlaceholderPhone,
   latestEvidence,
+  isVerifiedQualification,
   meetsRequirement,
   migrateProject,
   targetError,
@@ -163,10 +164,13 @@ function meOf(staff: StaffMember, today: string): FieldMe {
       roles: staff.roles,
       external: staff.external,
       active: staff.active,
-      qualifications: staff.qualifications.map((q) => ({
+      // Only verified ones (the domain counts nothing else), as facts: never the number, the file or who checked it.
+      qualifications: staff.qualifications.filter(isVerifiedQualification).map((q) => ({
         kind: q.kind,
-        reference: q.reference.trim() ? "on file" : "",
+        reference: "on file",
         ...(q.expiresOn ? { expiresOn: q.expiresOn } : {}),
+        verifiedAt: q.verifiedAt!,
+        mediaId: "on file",
       })),
     },
   };
@@ -1193,13 +1197,21 @@ async function messageStatus(event: Parameters<typeof idempotencyKey>[0], projec
   return { status: m.status === "failed" ? "failed" : "not-sent", ...(m.error ? { error: m.error } : {}) };
 }
 
-/** On my way: records it on the project (which sends the SMS through the outbox) and reports what really happened. */
+/**
+ * On my way: records it on the project (which sends the SMS through the
+ * outbox, or an email when a text can't reach them) and reports what really
+ * happened, and by which channel.
+ */
 export async function sendOnMyWay(projectId: string, staff: StaffMember, etaMinutes: number) {
   await projectForStaff(projectId, staff);
   const project = throwDispatch(await dispatch(projectId, { type: "installer-on-my-way", etaMinutes, by: staff.name }, staff));
   const at = project.install.onMyWay?.at ?? "";
-  const sms = await messageStatus("installer-on-my-way", projectId, `${at.slice(0, 10) || "-"}:${Math.round(etaMinutes)}`, "sms");
-  return { ...sms, hasPhone: Boolean(project.customer.phone?.trim()) };
+  const discriminator = `${at.slice(0, 10) || "-"}:${Math.round(etaMinutes)}`;
+  const sms = await messageStatus("installer-on-my-way", projectId, discriminator, "sms");
+  const hasPhone = Boolean(project.customer.phone?.trim());
+  if (sms.status !== "not-sent") return { ...sms, channel: "sms" as const, hasPhone };
+  const email = await messageStatus("installer-on-my-way", projectId, discriminator, "email");
+  return email.status === "not-sent" ? { ...sms, channel: "sms" as const, hasPhone } : { ...email, channel: "email" as const, hasPhone };
 }
 
 /** Start install day n (day 1 runs the ready-to-install gate in the reducer). */

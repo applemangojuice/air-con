@@ -316,7 +316,7 @@ function InvoiceCard({
           <form method="post" action={`/api/pay/${inv.id}`}>
             <button
               type="submit"
-              className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-accent-600 px-6 py-3 font-semibold text-white shadow-sm transition hover:bg-accent-700"
+              className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-accent-700 px-6 py-3 font-semibold text-white shadow-sm transition hover:bg-accent-800"
             >
               Pay {formatMoney(inv.owedPence)} by card
             </button>

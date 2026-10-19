@@ -5,6 +5,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import type { KitchenLivingLayout, Survey, SurveyGeo } from "@aircon/domain";
 import { isValidUkPostcode, normalisePostcode } from "@/lib/format";
 import type { Contact, QuoteDraft } from "@/lib/quote-draft";
+import { personNameProblem } from "@/lib/person-name";
 import { MARKETING_CONSENT, OPERATIONAL_CONSENT, coverageFor, type PublicSettings } from "@/components/site/claims";
 import { OutOfArea } from "./out-of-area";
 import { Group, NumberRow, OptionCards, StepShell, TextField, inputCls } from "./ui";
@@ -495,7 +496,7 @@ export function DetailsStep({
   const p = draft.survey.property;
   const [tried, setTried] = useState(false);
   const errors = {
-    name: c.name.trim().length >= 2 ? null : "Add your name (at least two letters).",
+    name: personNameProblem(c.name),
     email: EMAIL_RE.test(c.email) ? null : "Add an email address like name@example.com.",
     phone: phoneOk(c.phone) ? null : "That number doesn't look right. Check it, or leave it blank.",
     consent: consent.operational ? null : "Tick the first box so we can save your quote and email it to you.",

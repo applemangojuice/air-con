@@ -35,8 +35,9 @@ import { MEDIA_BUCKET } from "./supabase-server.ts";
  * confirm time (path, tag, uploader) is trusted: it all comes from the ticket.
  * An upload that's never confirmed leaves an orphan object, not a row.
  *
- * Size is enforced by storage itself (the local route's 25 MB ceiling;
- * the bucket limit on Supabase) and checked again at registration.
+ * Size and type are enforced by storage itself (the bucket's limits:
+ * migration 0011 on Supabase, lib/storage-buckets.ts locally) and checked
+ * again at registration.
  * SVG is only ever stored by the system (`storeSystemMedia`: demo photos,
  * generated drawings), never accepted from an upload.
  *

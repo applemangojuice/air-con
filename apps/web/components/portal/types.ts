@@ -107,6 +107,12 @@ export interface HubFacts {
   earlyStartWording: string;
   /** Short-notice fees for moving dates, in pounds, from the published fee table. */
   fees: { surveyShortNoticeGbp: number; installShortNoticeGbp: number };
+  /**
+   * How "we're on the way" will reach them (lib/comms/on-the-way.ts): a text
+   * only with a mobile and texts actually going, else email, else nothing.
+   * The copy promises exactly this.
+   */
+  onTheWay: "sms" | "email" | null;
 }
 
 export interface HubViewer {

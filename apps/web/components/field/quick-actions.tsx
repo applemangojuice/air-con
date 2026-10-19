@@ -36,7 +36,7 @@ import { useOutboxState, type MergedJob } from "./use-outbox";
 type Panel = null | "menu" | "omw" | "arrive" | "issue" | "variation" | "end";
 
 const BTN = "min-h-12 rounded-full px-5 font-semibold disabled:opacity-40";
-const PRIMARY = `${BTN} bg-accent-600 text-white shadow-sm hover:bg-accent-700`;
+const PRIMARY = `${BTN} bg-accent-700 text-white shadow-sm hover:bg-accent-800`;
 const SECONDARY = `${BTN} border border-line bg-white text-ink-900 hover:bg-surface`;
 const INPUT = "w-full rounded-2xl border border-line bg-white px-4 py-3 text-base text-ink-900 placeholder:text-ink-500 focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-100";
 
@@ -188,7 +188,7 @@ function Action({ label, hint, onClick, primary = false }: { label: string; hint
       <button
         type="button"
         onClick={onClick}
-        className={`flex min-h-14 w-full items-center justify-between rounded-2xl px-4 py-3 text-left ${primary ? "bg-accent-600 text-white" : "border border-line bg-white text-ink-900"}`}
+        className={`flex min-h-14 w-full items-center justify-between rounded-2xl px-4 py-3 text-left ${primary ? "bg-accent-700 text-white" : "border border-line bg-white text-ink-900"}`}
       >
         <span>
           <span className="block text-lg font-semibold">{label}</span>
@@ -258,20 +258,22 @@ function OnMyWaySheet({ open, onClose, data }: { open: boolean; onClose: () => v
     if (!eta) return;
     setBusy(true);
     setError(null);
-    const r = await post<{ status: string; hasPhone: boolean; error?: string }>(`/api/field/jobs/${id}/on-my-way`, { etaMinutes: eta });
+    const r = await post<{ status: string; channel?: "sms" | "email"; hasPhone: boolean; error?: string }>(`/api/field/jobs/${id}/on-my-way`, { etaMinutes: eta });
     setBusy(false);
     if (!r.ok) return setError(r.error);
     const s = r.data.status;
+    const emailed = r.data.channel === "email";
+    const what = emailed ? "email" : "text";
     setResult(
       s === "sent"
-        ? { tone: "ok", text: "Text sent." }
+        ? { tone: "ok", text: emailed ? "No mobile to text, so we emailed them instead." : "Text sent." }
         : s === "demo"
-          ? { tone: "warn", text: "Recorded in demo mode: no text was actually sent." }
+          ? { tone: "warn", text: `Recorded in demo mode: no ${what} was actually sent.` }
           : s === "queued"
             ? { tone: "warn", text: "Queued: it'll send in a moment." }
-            : !r.data.hasPhone
-              ? { tone: "bad", text: "There's no mobile number on this job, so nothing was sent. Call them instead." }
-              : { tone: "bad", text: `It didn't send${r.data.error ? `: ${r.data.error}` : ""}. Call them instead.` },
+            : !r.data.hasPhone && !emailed
+              ? { tone: "bad", text: "There's no mobile number or email on this job, so nothing was sent. Call them instead." }
+              : { tone: "bad", text: `The ${what} didn't send${r.data.error ? `: ${r.data.error}` : ""}. Call them instead.` },
     );
   }
 
@@ -949,7 +951,7 @@ function EndDaySheet({ open, onClose, data, merged, n: liveN, clockEntryId }: { 
                         ) : (
                           <span className="flex aspect-square items-center justify-center bg-surface text-xs text-ink-500">No preview</span>
                         )}
-                        {on && <span className="absolute right-1 top-1 rounded-full bg-accent-600 px-2 text-sm font-bold text-white">✓</span>}
+                        {on && <span className="absolute right-1 top-1 rounded-full bg-accent-700 px-2 text-sm font-bold text-white">✓</span>}
                       </label>
                     );
                   })}

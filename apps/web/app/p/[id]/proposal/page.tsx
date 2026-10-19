@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { EARLY_START_WORDING_VERSION, can, cancellationCopy, cancellationSentence, earlyStartWording, guaranteeLines } from "@aircon/domain";
 import { Logo } from "@/components/site/logo";
+import { realPhone } from "@/components/site/claims";
 import { ProposalView } from "@/components/proposal/proposal-view";
 import { earliestStartNote, extraCharges, paymentTerms, vatNote } from "@/components/proposal/copy";
 import type { ProposalPageData } from "@/components/proposal/types";
@@ -78,7 +79,7 @@ export default async function CustomerProposalPage({
             // /portal is the customer sign-in (magic link, F1) and honours ?next.
             <Link
               href={`/portal?next=${encodeURIComponent(`/p/${id}/proposal`)}`}
-              className="inline-flex min-h-12 items-center rounded-full bg-accent-600 px-6 text-base font-semibold text-white hover:bg-accent-700"
+              className="inline-flex min-h-12 items-center rounded-full bg-accent-700 px-6 text-base font-semibold text-white hover:bg-accent-800"
             >
               Email me a sign-in link
             </Link>
@@ -122,7 +123,7 @@ export default async function CustomerProposalPage({
     tradingName: company.tradingName,
     geographicAddress: company.geographicAddress,
     ...(company.registeredAddress ? { registeredAddress: company.registeredAddress } : {}),
-    phone: company.phone,
+    ...(realPhone(company.phone) ? { phone: realPhone(company.phone)! } : {}),
     email: company.email,
   };
   const firstName = project.customer.name.replace(/\s*\(DEMO\)\s*$/i, "").trim().split(/\s+/)[0] ?? "";
@@ -173,7 +174,7 @@ export default async function CustomerProposalPage({
     ...(loaded.approvedBy ? { approvedBy: loaded.approvedBy } : {}),
     foundingPilot: loaded.foundingPilot,
     vatRegistered: settings.tax.vatRegistered,
-    company: { tradingName: company.tradingName, legalName: company.legalName, phone: company.phone, email: company.email },
+    company: { tradingName: company.tradingName, legalName: company.legalName, phone: realPhone(company.phone), email: company.email },
     vatNotes: Object.fromEntries(proposal.options.map((o) => [o.id, vatNote(o.pricing, settings)])),
     paymentTerms: Object.fromEntries(proposal.options.map((o) => [o.id, paymentTerms(o.pricing.totalPence, settings)])),
     extraCharges: extraCharges(),

@@ -218,7 +218,7 @@ export function Runsheet({ data }: { data: FieldJob }) {
               </button>
             ) : (
               <div className="grid gap-2 sm:grid-cols-2">
-                <Link href={`/field/jobs/${header.projectId}/commissioning`} className="flex min-h-12 items-center justify-center rounded-full bg-accent-600 px-5 font-semibold text-white">
+                <Link href={`/field/jobs/${header.projectId}/commissioning`} className="flex min-h-12 items-center justify-center rounded-full bg-accent-700 px-5 font-semibold text-white">
                   Commissioning sign-off
                 </Link>
                 <Link href={`/field/jobs/${header.projectId}/handover`} className="flex min-h-12 items-center justify-center rounded-full border border-line bg-white px-5 font-semibold text-ink-900">

@@ -113,7 +113,7 @@ ${rows ? `<p><strong>Yesterday's quotes</strong></p><ul>${rows}</ul>` : ""}
 function pilotSection(p: Pulse, base: string): string {
   const link = (id: string, name: string) => `<a href="${base}/ops/projects/${encodeURIComponent(id)}">${escapeHtml(name)}</a>`;
   const list = (items: string[], empty: string) =>
-    items.length ? `<ul>${items.map((i) => `<li>${i}</li>`).join("")}</ul>` : `<p style="color:#6e7482">${empty}</p>`;
+    items.length ? `<ul>${items.map((i) => `<li>${i}</li>`).join("")}</ul>` : `<p style="color:#5d6371">${empty}</p>`;
   const on = [
     ...p.surveysToday.map((c) => `Survey: ${link(c.id, c.customer)} at ${escapeHtml(c.surveyAt ? (fmtDayTime(c.surveyAt).split(", ")[1] ?? "") : "")} (${escapeHtml(c.outcode)})`),
     ...p.installsToday.map((c) => `Install day ${c.installDates.indexOf(p.today) + 1} of ${c.installDates.length}: ${link(c.id, c.customer)} (${escapeHtml(c.outcode)})`),

@@ -104,7 +104,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Search
             <div className="mt-5 flex flex-col gap-3 sm:flex-row">
               <Link
                 href={staffLanding(staff, next)}
-                className="inline-flex min-h-12 flex-1 items-center justify-center rounded-full bg-accent-600 px-6 py-3 font-semibold text-white transition hover:bg-accent-700"
+                className="inline-flex min-h-12 flex-1 items-center justify-center rounded-full bg-accent-700 px-6 py-3 font-semibold text-white transition hover:bg-accent-800"
               >
                 Continue
               </Link>

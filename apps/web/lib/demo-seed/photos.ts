@@ -14,7 +14,7 @@ import { PHOTO_TAG_LABEL, type Annotation, type PhotoTag } from "@aircon/domain"
 export const DEMO_PHOTO_WIDTH = 1200;
 export const DEMO_PHOTO_HEIGHT = 900;
 
-export type DemoScene = "indoor-wall" | "room-overview" | "outdoor" | "loft" | "fuse-board" | "progress" | "completed" | "kit";
+export type DemoScene = "indoor-wall" | "room-overview" | "outdoor" | "loft" | "fuse-board" | "progress" | "completed" | "kit" | "document";
 
 export interface DemoPhotoSpec {
   scene: DemoScene;
@@ -231,6 +231,16 @@ export function demoPhoto(spec: DemoPhotoSpec): DemoPhoto {
         rect(0.15, 0.3, 0.4, 0.45, `fill="#c4a77d" ${INK}`),
         rect(0.6, 0.4, 0.25, 0.35, `fill="#c4a77d" ${INK}`),
         rect(0.2, 0.36, 0.2, 0.06, `fill="#f6f4ef" ${THIN}`),
+      ].join("");
+      break;
+    case "document":
+      // A saved email or a signed form: a page of lines, not a photo of anything real.
+      bg = ["#cfd3d8", "#b9bec5"];
+      scene = [
+        rect(0.2, 0.08, 0.6, 0.84, `fill="#ffffff" ${THIN}`),
+        rect(0.25, 0.14, 0.3, 0.035, `fill="#1d212b"`),
+        ...[0.24, 0.29, 0.34, 0.39, 0.44, 0.52, 0.57, 0.62].map((y, i) => rect(0.25, y, i % 3 === 2 ? 0.32 : 0.5, 0.018, `fill="#9aa0a8"`)),
+        rect(0.25, 0.72, 0.22, 0.03, `fill="#454b58"`),
       ].join("");
       break;
     case "room-overview":

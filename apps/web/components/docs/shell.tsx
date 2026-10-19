@@ -70,9 +70,7 @@ function CompanyBlock({ company }: { company: DocumentCompany }) {
       ) : (
         <p className="text-amber-800">Business address to be added</p>
       )}
-      <p>
-        {company.phone} · {company.email}
-      </p>
+      <p>{company.phone ? `${company.phone} · ${company.email}` : company.email}</p>
       {(company.companyNumber || company.vatNumber) && (
         <p>
           {company.companyNumber ? `Company no. ${company.companyNumber}` : ""}

@@ -30,6 +30,7 @@ import { isPlausibleEmail, normaliseEmail } from "./auth/access";
 import { issueMagicLink } from "./auth/magic";
 import { getSession, requireProjectAccess, type ProjectAccess } from "./auth/server";
 import { notify } from "./comms/outbox";
+import { onTheWayChannel } from "./comms/on-the-way";
 import { createDocument, isCustomerVisible, listDocuments } from "./documents-server";
 import { emailConfigured } from "./email";
 import { money } from "./format";
@@ -44,6 +45,7 @@ import * as issuesRepo from "./repo/issues";
 import * as mediaRepo from "./repo/media";
 import * as purchaseOrdersRepo from "./repo/purchaseOrders";
 import * as staffRepo from "./repo/staff";
+import { smsConfigured } from "./providers/sms";
 import { enforceRateLimit } from "./rate-limit";
 import { getSettings } from "./settings-server";
 import { getServiceClient } from "./supabase-server";
@@ -288,7 +290,8 @@ export async function loadHub(projectId: string, access: ProjectAccess): Promise
     access.kind === "staff" ? { kind: "staff", name: access.staff.name } : { kind: "customer" };
 
   return {
-    ...hubFacts(project, settings, today),
+    // How "on the way" will reach them: the same rule the outbox sends by (lib/comms/on-the-way.ts).
+    ...hubFacts(project, settings, today, onTheWayChannel(raw.customer, { sms: smsConfigured(), email: emailConfigured() })),
     project,
     today,
     nowIso,
@@ -442,7 +445,9 @@ export interface LinkResult {
 /**
  * The address a project's sign-in link goes to, with the customer record
  * made (and attached to the project) on first use: a v1 project or one
- * created before its customer existed. Null when there's no usable address.
+ * created before its customer existed. An address that already has a record
+ * attaches nothing here: the project joins that customer when they use the
+ * link (claimProjectOnSignIn). Null when there's no usable address.
  */
 async function customerEmailForProject(projectId: string): Promise<string | null> {
   const db = getServiceClient();
@@ -456,6 +461,7 @@ async function customerEmailForProject(projectId: string): Promise<string | null
   const project = await loadProject(projectId);
   const email = normaliseEmail(project?.customer.email ?? "");
   if (!project || !isPlausibleEmail(email)) return null;
+  if (await customersRepo.getByEmail(email)) return email;
   const customer = await customersRepo.findOrCreate({
     email,
     name: project.customer.name || undefined,

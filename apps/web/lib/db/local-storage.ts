@@ -15,19 +15,28 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { mkdir, readFile, readdir, rmdir, stat, unlink } from "node:fs/promises";
 import { dirname, join, resolve, sep } from "node:path";
+import { BUCKET_RULES, bucketAccepts } from "../storage-buckets.ts";
 import { writeAtomic } from "./local-store.ts";
 
 export type SignedOp = "get" | "put" | "upsert";
 
-/** Upload ceiling for signed PUTs and upload(): 25 MB, more for walkthrough videos. */
+/** Upload ceiling for a bucket without its own rule (lib/storage-buckets.ts). */
 export const DEFAULT_MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
-const MAX_UPLOAD_BYTES_BY_BUCKET: Record<string, number> = {
-  // Supabase's default per-file limit; phone walkthroughs run long.
-  "survey-videos": 50 * 1024 * 1024,
-};
 
+/** The bucket's per-file ceiling, as Supabase's file_size_limit (migration 0011). */
 export function maxUploadBytes(bucket: string): number {
-  return MAX_UPLOAD_BYTES_BY_BUCKET[bucket] ?? DEFAULT_MAX_UPLOAD_BYTES;
+  return BUCKET_RULES[bucket]?.maxBytes ?? DEFAULT_MAX_UPLOAD_BYTES;
+}
+
+/** The content types the bucket takes, as Supabase's allowed_mime_types (null: any). */
+export function allowedContentTypes(bucket: string): string[] | null {
+  const rule = BUCKET_RULES[bucket];
+  return rule ? [...rule.contentTypes] : null;
+}
+
+/** Supabase refuses an object whose type the bucket doesn't list; so does the local backend. */
+export function bucketTakesType(bucket: string, contentType: string | null | undefined): boolean {
+  return bucketAccepts(bucket, contentType);
 }
 
 const TEMP_MARKER = ".~tmp-";

@@ -243,7 +243,11 @@ export function BookingPanel({ data, state, slots }: PanelProps) {
             <p className="mt-1 font-display text-2xl text-ink-900">{blockLabel(p.booking.dates)}</p>
             <p className="mt-1 text-[15px] text-ink-700">
               {confirmed
-                ? "Your team and dates are locked in. We'll text you the evening before, and again when we're on the way."
+                ? data.onTheWay === "sms"
+                  ? "Your team and dates are locked in. We'll text you the evening before, and again when we're on the way."
+                  : data.onTheWay === "email"
+                    ? "Your team and dates are locked in. We'll email you the evening before, and again when we're on the way."
+                    : "Your team and dates are locked in. We'll be in touch the evening before."
                 : "We'll confirm once your team and kit are lined up. You'll get an email when we do."}
             </p>
           </div>

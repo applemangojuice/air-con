@@ -7,7 +7,7 @@ import { registerAppResolver } from "./helpers/resolve-app.ts";
 process.env.DATA_BACKEND = "memory";
 delete process.env.SUPABASE_URL;
 registerAppResolver();
-const { createProjectForQuote, dispatch, loadProject, pilotNumberHolder, DEMO_SURVEY } = await import("../lib/project-service.ts");
+const { claimProjectOnSignIn, createProjectForQuote, dispatch, loadProject, pilotNumberHolder, DEMO_SURVEY } = await import("../lib/project-service.ts");
 const { customerLink, consumeToken } = await import("../lib/auth/magic.ts");
 const { requireDb } = await import("../lib/supabase-server.ts");
 const customersRepo = await import("../lib/repo/customers.ts");
@@ -74,40 +74,91 @@ test("clearing the email leaves the project where it is and sends no token anywh
   assert.equal((await loadProject(id))?.customer.email, undefined);
 });
 
-test("a project made from a quote copies the funnel's consents onto the customer (marketing only when ticked)", async () => {
-  const consentsAt = (at: string, marketing: boolean) => ({
-    consents: {
-      operational: { given: true, at, version: "quote-consent-v1", text: "DEMO project updates", channels: ["email"], source: "quote-funnel" },
-      marketing: { given: marketing, at, version: "quote-consent-v1", text: "DEMO offers", channels: marketing ? ["email"] : [], source: "quote-funnel" },
-    },
-  });
-  async function fromQuote(email: string, attribution: unknown) {
-    const quoteId = crypto.randomUUID();
-    await requireDb()
-      .from("quote_requests")
-      .insert({ id: quoteId, customer_name: "DEMO Kim", email, source: "web", survey: DEMO_SURVEY, quote: generateQuote(DEMO_SURVEY), attribution });
-    const created = await createProjectForQuote(quoteId);
-    assert.ok("id" in created, JSON.stringify(created));
-  }
+const consentsAt = (at: string, marketing: boolean) => ({
+  consents: {
+    operational: { given: true, at, version: "quote-consent-v1", text: "DEMO project updates", channels: ["email"], source: "quote-funnel" },
+    marketing: { given: marketing, at, version: "quote-consent-v1", text: "DEMO offers", channels: marketing ? ["email"] : [], source: "quote-funnel" },
+  },
+});
 
+/** A funnel quote (or, with `actor`, one staff set up) and its project. */
+async function fromQuote(email: string, attribution: unknown, extra: { name?: string; phone?: string; actor?: StaffMember } = {}): Promise<string> {
+  const quoteId = crypto.randomUUID();
+  await requireDb()
+    .from("quote_requests")
+    .insert({ id: quoteId, customer_name: extra.name ?? "DEMO Kim", email, phone: extra.phone ?? null, source: "web", survey: DEMO_SURVEY, quote: generateQuote(DEMO_SURVEY), attribution });
+  const created = await createProjectForQuote(quoteId, extra.actor ? { actor: extra.actor } : {});
+  assert.ok("id" in created, JSON.stringify(created));
+  return created.id;
+}
+
+const customerIdOf = async (projectId: string) =>
+  ((await requireDb().from("projects").select("customer_id").eq("id", projectId).single()).data?.customer_id as string | null) ?? null;
+
+test("a project made from a quote copies the funnel's consents onto a new customer (marketing only when ticked)", async () => {
   await fromQuote("consents@example.test", consentsAt("2026-10-01T10:00:00.000Z", true));
-  let c = await customersRepo.getByEmail("consents@example.test");
+  const c = await customersRepo.getByEmail("consents@example.test");
   assert.equal(c?.opsConsent?.text, "DEMO project updates");
   assert.match(c?.opsConsent?.source ?? "", /quote-funnel \(quote-consent-v1; email\)/);
   assert.equal(c?.marketingConsent?.text, "DEMO offers");
+});
 
-  // A newer quote with marketing unticked clears it; operational stays given.
-  await fromQuote("consents@example.test", consentsAt("2026-10-05T10:00:00.000Z", false));
-  c = await customersRepo.getByEmail("consents@example.test");
-  assert.equal(c?.marketingConsent, null);
-  assert.equal(c?.opsConsent?.at, "2026-10-05T10:00:00.000Z");
+test("the funnel never changes an existing customer: the project joins them, with its consents, when the address signs in from its link", async () => {
+  const email = "victim.pilot@example.test";
+  const own = await fromQuote(email, consentsAt("2026-10-01T10:00:00.000Z", false));
+  const victim = (await customersRepo.getByEmail(email))!;
+  assert.equal(await customerIdOf(own), victim.id, "a new address gets its record at once");
+  assert.equal(victim.marketingConsent, null);
 
-  // An older quote never overwrites the newer answer; a quote without consents changes nothing.
-  await fromQuote("consents@example.test", consentsAt("2026-09-01T10:00:00.000Z", true));
-  await fromQuote("consents@example.test", { referrer: "https://example.test" });
-  c = await customersRepo.getByEmail("consents@example.test");
-  assert.equal(c?.marketingConsent, null);
-  assert.equal(c?.opsConsent?.at, "2026-10-05T10:00:00.000Z");
+  // Someone else types the same address, ticks marketing and adds a phone.
+  const typed = await fromQuote(email, consentsAt("2026-10-05T10:00:00.000Z", true), { name: "DEMO Mallory", phone: "07700 900999" });
+  const after = (await customersRepo.getByEmail(email))!;
+  assert.equal(after.marketingConsent, null, "no marketing consent they never gave");
+  assert.equal(after.opsConsent?.at, "2026-10-01T10:00:00.000Z", "their own answer stands");
+  assert.equal(after.phone, undefined, "no phone filled in from a stranger's form");
+  assert.equal(await customerIdOf(typed), null, "the project isn't theirs");
+  assert.deepEqual(await customersRepo.projectIdsFor(victim.id), [own], "and isn't among their homes");
+
+  // A link about it goes to the address, signs in as that customer, and attaches nothing until it's used.
+  const raw = tokenOf(await customerLink(typed, `/p/${typed}`, email));
+  assert.ok(raw, "the address's owner can still be sent a link");
+  assert.equal(await customerIdOf(typed), null, "sending a link attaches nothing");
+  const subject = await consumeToken(raw);
+  assert.equal(subject?.subjectId, victim.id);
+  // A link about some other project claims nothing.
+  assert.equal(await claimProjectOnSignIn(after, `/p/${own}`), null);
+  assert.equal(await claimProjectOnSignIn(after, "/portal"), null);
+  assert.equal(await claimProjectOnSignIn(after, subject?.next), typed, "using the link about it proves the address");
+  assert.equal(await customerIdOf(typed), victim.id);
+  const claimed = (await customersRepo.getByEmail(email))!;
+  assert.equal(claimed.marketingConsent?.text, "DEMO offers", "the newer quote's answer, now that it's theirs");
+  assert.equal(claimed.phone, "07700 900999");
+  assert.equal(await claimProjectOnSignIn(claimed, subject?.next), null, "only once");
+});
+
+test("a repeat quote's consents wait for the sign-in; the latest answer then wins, and an older one never overwrites it", async () => {
+  const email = "consents.repeat@example.test";
+  await fromQuote(email, consentsAt("2026-10-01T10:00:00.000Z", true));
+  const second = await fromQuote(email, consentsAt("2026-10-05T10:00:00.000Z", false));
+  let c = (await customersRepo.getByEmail(email))!;
+  assert.equal(c.marketingConsent?.text, "DEMO offers", "unchanged until the address signs in");
+  await claimProjectOnSignIn(c, `/p/${second}`);
+  c = (await customersRepo.getByEmail(email))!;
+  assert.equal(c.marketingConsent, null, "the newer quote unticked it");
+  assert.equal(c.opsConsent?.at, "2026-10-05T10:00:00.000Z");
+  const older = await fromQuote(email, consentsAt("2026-09-01T10:00:00.000Z", true));
+  await claimProjectOnSignIn(c, `/p/${older}`);
+  c = (await customersRepo.getByEmail(email))!;
+  assert.equal(c.marketingConsent, null, "an older quote never overwrites the newer answer");
+});
+
+test("a pilot staff set up under a customer's address joins that customer at once", async () => {
+  const email = "staff.typed@example.test";
+  const first = await fromQuote(email, null);
+  const customer = (await customersRepo.getByEmail(email))!;
+  const second = await fromQuote(email, null, { actor: OPS });
+  assert.equal(await customerIdOf(first), customer.id);
+  assert.equal(await customerIdOf(second), customer.id, "staff typed it: trusted");
 });
 
 test("pilot numbers belong to one household: the holder is found, except the project itself or a retried form's own", async () => {

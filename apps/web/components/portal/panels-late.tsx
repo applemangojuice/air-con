@@ -496,7 +496,7 @@ function Feedback({ data }: { data: PanelProps["data"] }) {
             <label
               key={n}
               className={`relative flex min-h-12 cursor-pointer items-center justify-center rounded-xl border text-base font-semibold transition has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent-500 has-[:focus-visible]:ring-offset-2 ${
-                score === n ? "border-accent-600 bg-accent-600 text-white" : "border-line bg-white text-ink-900 hover:border-ink-300"
+                score === n ? "border-accent-700 bg-accent-700 text-white" : "border-line bg-white text-ink-900 hover:border-ink-300"
               }`}
             >
               <input

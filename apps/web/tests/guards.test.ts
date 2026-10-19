@@ -171,10 +171,15 @@ test("decideProjectAccess: a quote-owner grant opens only the project made from 
     null,
     "customer-facing routes only",
   );
-  assert.equal(
+  assert.deepEqual(
     decideProjectAccess({ ...base, session: null, project: { ...fromQuote, customerId: null }, quoteGrant: [QUOTE] }),
+    { kind: "customer", customerId: `quote:${QUOTE}` },
+    "not attached to a customer yet (their email was someone else's): the browser acts as its quote, never as a customer record",
+  );
+  assert.equal(
+    decideProjectAccess({ ...base, session: { ...customer, customerId: "cust-9", projectIds: [] }, project: { ...fromQuote, customerId: null }, quoteGrant: [] }),
     null,
-    "no customer record: nothing to act as",
+    "an unattached project isn't the signed-in customer's just because the email matches",
   );
   assert.equal(
     decideProjectAccess({ ...base, session: staffSessionFor(sub), staff: sub, project: { ...otherProject, quoteId: QUOTE }, quoteGrant: [QUOTE] }),
@@ -190,6 +195,10 @@ test("decideStaffGate: signed out, forbidden or ok", () => {
   assert.equal(decideStaffGate(installer, "settings.edit"), "forbidden");
   assert.equal(decideStaffGate(admin, "settings.edit"), "ok");
   assert.equal(decideStaffGate(person("lead", { roles: ["tech-lead"] }), "staff.edit"), "forbidden");
+  // Several permissions: all of them are needed.
+  assert.equal(decideStaffGate(admin, ["projects.edit", "projects.view-all"]), "ok");
+  assert.equal(decideStaffGate(installer, ["install.work", "projects.view-all"]), "forbidden");
+  assert.equal(decideStaffGate(person("sub", { roles: ["surveyor"], external: true }), ["projects.edit", "projects.view-all"]), "forbidden");
 });
 
 test("staffHome: the board for board-wide roles, the field app for everyone else", () => {

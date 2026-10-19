@@ -25,6 +25,14 @@ export const DEMO_ROLE_KEYS: DemoRoleKey[] = [
 /** Long-dated so demo gates pass; still a real expiry, as the domain expects. */
 const DEMO_EXPIRY = "2030-12-31";
 
+/**
+ * A qualification counts only once it's verified with the certificate on
+ * file (domain staff.ts), so the DEMO certificates are marked checked by the
+ * DEMO seed and carry a fixed DEMO evidence id (no file sits behind it, so
+ * the staff page shows "Evidence attached" without a link).
+ */
+const DEMO_VERIFIED = { verifiedAt: "2026-01-05T09:00:00.000Z", verifiedBy: "DEMO seed" };
+
 export const DEMO_STAFF: Record<DemoRoleKey, StaffMember> = {
   admin: {
     id: "de300000-0000-4000-8000-000000000001",
@@ -61,7 +69,8 @@ export const DEMO_STAFF: Record<DemoRoleKey, StaffMember> = {
         reference: "DEMO-FGAS-0001",
         issuer: "DEMO certification body",
         expiresOn: DEMO_EXPIRY,
-        verifiedBy: "DEMO seed",
+        mediaId: "de300000-0000-4000-8000-0000000000c1",
+        ...DEMO_VERIFIED,
       },
     ],
     bio: "DEMO account: signs off designs and commissioning.",
@@ -91,7 +100,8 @@ export const DEMO_STAFF: Record<DemoRoleKey, StaffMember> = {
         reference: "DEMO-PARTP-0001",
         issuer: "DEMO competent person scheme",
         expiresOn: DEMO_EXPIRY,
-        verifiedBy: "DEMO seed",
+        mediaId: "de300000-0000-4000-8000-0000000000c2",
+        ...DEMO_VERIFIED,
       },
     ],
     bio: "DEMO account: the new circuit and its certificate.",

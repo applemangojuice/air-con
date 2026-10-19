@@ -239,8 +239,11 @@ test("upload flow: forged, expired and mismatched uploads are refused", async ()
   assert.equal(await media.verifyUploadTicket(started.ticket, { nowSec: Math.floor(Date.now() / 1000) + 3 * 3600 }), null, "expired");
   assert.equal(await media.verifyUploadTicket(42), null);
 
-  // Declared a PNG, uploaded HTML: refused, and the object is removed.
-  await upload(started.path, "text/html");
+  // HTML never lands at all: the bucket only stores the listed types (migration 0011).
+  const html = await requireDb().storage.from(MEDIA_BUCKET).upload(started.path, bytes(64), { contentType: "text/html" });
+  assert.match(html.error?.message ?? "", /not supported/);
+  // Declared a PNG, uploaded a JPEG: refused, and the object is removed.
+  await upload(started.path, "image/jpeg");
   const refused = await media.registerMedia(started.ticket);
   assert.equal(!refused.ok && refused.status, 415);
   const { data } = await requireDb().storage.from(MEDIA_BUCKET).exists(started.path);

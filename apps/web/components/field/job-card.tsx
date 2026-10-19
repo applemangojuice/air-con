@@ -136,7 +136,7 @@ export function JobCard({ job, today, compact = false }: { job: JobCardData; tod
           </svg>
           Maps
         </a>
-        <Link href={job.href} className="order-first col-span-2 flex min-h-12 items-center justify-center gap-1 whitespace-nowrap rounded-full bg-accent-600 px-4 font-semibold text-white shadow-sm hover:bg-accent-700">
+        <Link href={job.href} className="order-first col-span-2 flex min-h-12 items-center justify-center gap-1 whitespace-nowrap rounded-full bg-accent-700 px-4 font-semibold text-white shadow-sm hover:bg-accent-800">
           {job.kind === "survey" ? "Open survey" : "Open job"}
           <span aria-hidden>→</span>
         </Link>

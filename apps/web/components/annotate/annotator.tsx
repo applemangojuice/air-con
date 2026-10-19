@@ -605,7 +605,7 @@ function AnnotatorDialog({ src, width, height, initial, title, locked = false, d
             type="button"
             onClick={save}
             disabled={saving || (!dirty && routeDraft.length < 2)}
-            className="inline-flex min-h-12 items-center justify-center rounded-full bg-accent-600 px-5 text-base font-semibold text-white shadow-sm hover:bg-accent-700 disabled:bg-white/10 disabled:text-white/50 disabled:shadow-none"
+            className="inline-flex min-h-12 items-center justify-center rounded-full bg-accent-700 px-5 text-base font-semibold text-white shadow-sm hover:bg-accent-800 disabled:bg-white/10 disabled:text-white/50 disabled:shadow-none"
           >
             {saving ? "Saving…" : "Save"}
           </button>
@@ -816,7 +816,7 @@ function PanelButton({
 }) {
   const tones = {
     plain: "bg-white/10 text-white hover:bg-white/15",
-    accent: "bg-accent-600 text-white hover:bg-accent-700",
+    accent: "bg-accent-700 text-white hover:bg-accent-800",
     danger: "bg-red-700 text-white hover:bg-red-800",
   };
   return (

@@ -105,6 +105,40 @@ test("every server action under /ops and /field checks the session itself", () =
   assert.deepEqual(problems, []);
 });
 
+/**
+ * An action that takes a project id changes one project, so it checks that
+ * project too (requireProjectAccess), not only a permission: a permission
+ * says what someone may do, assignment says where (§C). The page around it
+ * is no protection, since actions are reachable from any route.
+ */
+const PROJECT_GUARD = /\brequireProjectAccess\(/;
+
+function reachesProjectGuard(body: string, bodies: Map<string, string>, seen = new Set<string>()): boolean {
+  if (PROJECT_GUARD.test(body)) return true;
+  for (const [name, helper] of bodies) {
+    if (seen.has(name) || !new RegExp(`\\b${name}\\(`).test(body)) continue;
+    seen.add(name);
+    if (reachesProjectGuard(helper, bodies, seen)) return true;
+  }
+  return false;
+}
+
+test("every server action that takes a project id checks access to that project", () => {
+  const problems: string[] = [];
+  let checked = 0;
+  for (const f of files) {
+    const src = readFileSync(f, "utf8");
+    if (!/^\s*["']use server["'];/.test(src)) continue;
+    const bodies = functionBodies(src);
+    for (const m of src.matchAll(/export\s+async\s+function\s+(\w+)\s*\(\s*projectId\b/g)) {
+      checked++;
+      if (!reachesProjectGuard(bodies.get(m[1]!) ?? "", bodies)) problems.push(`${rel(f)}: ${m[1]}`);
+    }
+  }
+  assert.ok(checked > 20, `found the project actions (${checked})`);
+  assert.deepEqual(problems, []);
+});
+
 test("the extractor sees through destructured params and shared helpers", () => {
   const src = `
 async function run(id: string) { await requireStaff("projects.edit"); return id; }

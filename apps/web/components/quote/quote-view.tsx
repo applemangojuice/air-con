@@ -6,6 +6,7 @@ import { fmtDate, gbp } from "@/lib/format";
 import {
   BAND_COPY,
   PRICE_PROMISE,
+  financeDisclosure,
   installDurationCopy,
   validUntil,
   vatCopy,
@@ -41,7 +42,7 @@ export function QuoteView({
   const vat = vatCopy(settings);
   const warranty = warrantyCopy(settings);
   const until = createdAt ? validUntil(settings, createdAt) : null;
-  const finance = settings.finance.lenderConfigured ? quote.finance : [];
+  const finance = settings.finance.offered ? settings.finance : null;
 
   return (
     <div>
@@ -160,23 +161,16 @@ export function QuoteView({
         </section>
       )}
 
-      {/* Finance: a regulated promotion, shown only once a lender is in place. */}
-      {finance.length > 0 && (
-        <section className="mt-8">
-          <h2 className="text-lg font-bold">Spread the cost</h2>
-          <div className="mt-3 grid gap-3 sm:grid-cols-3">
-            {finance.map((f) => (
-              <div key={f.months} className="rounded-2xl border border-line bg-white p-4 text-center">
-                <p className="text-xs font-semibold text-ink-500">{f.months} months</p>
-                <p className="mt-1 text-xl font-bold">{gbp(f.monthlyGbp)}</p>
-                <p className="text-xs text-ink-500">per month</p>
-                <p className="mt-2 text-xs text-ink-500">
-                  {gbp(f.depositGbp)} deposit · {f.aprPercent}% APR · total {gbp(f.totalPayableGbp)}
-                </p>
-              </div>
-            ))}
-          </div>
-          <p className="mt-2 text-xs text-ink-500">Finance is subject to status and the lender&apos;s approval.</p>
+      {/* Finance: a regulated promotion. Only with every fact on record (financeOffered), and only the lender's own example, word for word. */}
+      {finance && (
+        <section className="mt-8 rounded-2xl border border-line bg-white p-4 sm:p-5">
+          <h2 className="text-lg font-bold">Spreading the cost</h2>
+          <p className="mt-2 whitespace-pre-line text-sm text-ink-900">{finance.representativeExample}</p>
+          {financeDisclosure(finance, settings.company.tradingName).map((line) => (
+            <p key={line} className="mt-2 text-xs text-ink-500">
+              {line}
+            </p>
+          ))}
         </section>
       )}
     </div>

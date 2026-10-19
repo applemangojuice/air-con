@@ -11,6 +11,7 @@ import { ActionForm } from "./_f5/action-form";
 import { WrapBadge } from "./_f5/wrap-badge";
 import { JobHeader } from "./_f5/job-header";
 import { assignCrewAction, confirmBookingAction, earlyStartEvidenceAction, requestDepositAction, setDatesAction } from "./actions";
+import { EarlyStartFields } from "../early-start-form";
 import { CrewForm, DatesForm } from "./booking-forms";
 
 export const metadata: Metadata = { title: "Booking · ops", robots: { index: false } };
@@ -147,30 +148,18 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
             {accepted && !view.earlyStart.evidenced && !started && (
               <details className="mt-4 rounded-2xl border border-line bg-surface/50 px-4 py-3">
                 <summary className="min-h-10 cursor-pointer text-sm font-semibold text-ink-900">Record the customer&apos;s written early-start request</summary>
-                <p className="mt-2 text-xs text-ink-500">The customer&apos;s own email, or a signed form, with these words:</p>
-                <blockquote className="mt-1 rounded-xl border-l-4 border-accent-500 bg-white px-3 py-2 text-sm text-ink-700">{view.earlyStart.wording}</blockquote>
+                <p className="mt-2 text-xs text-ink-500">The customer&apos;s own email, or a signed form, with the words below. Attach the copy: we have to be able to show it if they cancel later.</p>
                 <ActionForm flash action={earlyStartEvidenceAction.bind(null, p.id)} submitLabel="Record the request" variant="secondary" className="mt-3" resetOnSuccess>
-                  <fieldset>
-                    <legend className="mb-1.5 text-sm font-semibold text-ink-900">It came as</legend>
-                    <div className="flex flex-wrap gap-4">
-                      {(["email", "paper"] as const).map((c) => (
-                        <label key={c} className="flex min-h-11 items-center gap-2 text-sm">
-                          <input type="radio" name="channel" value={c} defaultChecked={c === "email"} className="h-4 w-4 accent-accent-600" />
-                          {c === "email" ? "Their email" : "A signed form"}
-                        </label>
-                      ))}
-                    </div>
-                  </fieldset>
-                  <label htmlFor="evidenceRef" className="mb-1.5 mt-3 block text-sm font-semibold text-ink-900">
-                    Which one
-                  </label>
-                  <input id="evidenceRef" name="evidenceRef" required maxLength={200} placeholder="e.g. Email of 21 Oct, subject 'Start early'" className="min-h-12 w-full rounded-full border border-line bg-white px-4 text-base outline-none focus:border-accent-500 focus:ring-2 focus:ring-accent-100" />
+                  <EarlyStartFields projectId={p.id} today={view.today} wording={view.earlyStart.wording} {...(view.earlyStart.customerEmail ? { customerEmail: view.earlyStart.customerEmail } : {})} />
                 </ActionForm>
               </details>
             )}
             {view.earlyStart.evidenced && (
               <p className="mt-3 text-xs text-ink-500">
                 On file: {view.earlyStart.evidenceRef}
+                {view.earlyStart.receivedOn ? `, received ${fmtDate(view.earlyStart.receivedOn)}` : ""}
+                {view.earlyStart.fromAddress ? ` from ${view.earlyStart.fromAddress}` : ""}
+                {view.earlyStart.files ? ` (${view.earlyStart.files === 1 ? "copy" : `${view.earlyStart.files} files`} stored)` : ""}
                 {view.earlyStart.recordedBy ? `, recorded by ${view.earlyStart.recordedBy}` : ""}.
               </p>
             )}

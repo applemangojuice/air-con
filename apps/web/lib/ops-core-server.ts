@@ -7,6 +7,7 @@ import {
   proposalCheckFor,
   agreedPaymentsFor,
   diffSelfSurvey,
+  hasCurrentQualification,
   isOpen,
   kitSummary,
   migrateProject,
@@ -834,8 +835,8 @@ export async function goLiveChecks(): Promise<GoLiveCheck[]> {
   const today = londonToday();
   const real = staff.filter((s) => !s.demo);
   const pool = demoMode ? staff : real;
-  const holds = (s: StaffMember, kind: "fgas-cat1" | "part-p") =>
-    s.qualifications.some((q) => q.kind === kind && q.reference?.trim() && (!q.expiresOn || q.expiresOn.slice(0, 10) >= today));
+  // Verified, with the certificate on file, and current: what the gates count.
+  const holds = (s: StaffMember, kind: "fgas-cat1" | "part-p") => hasCurrentQualification(s, kind, today);
   const techLead = pool.some((s) => (s.roles.includes("tech-lead") || s.roles.includes("admin")) && holds(s, "fgas-cat1"));
   const electrician = pool.some((s) => s.roles.includes("electrician") && holds(s, "part-p"));
   checks.push({
@@ -845,7 +846,7 @@ export async function goLiveChecks(): Promise<GoLiveCheck[]> {
     detail: techLead
       ? "Designs and commissioning can be signed off."
       : "Nobody can approve a design or sign commissioning, so no proposal can be issued.",
-    fix: "Staff → add the technical lead with their F-gas Category I certificate number and expiry.",
+    fix: "Staff → add the technical lead with their F-gas Category I certificate number and expiry, upload the certificate and tick that you've checked it.",
     href: "/ops/staff",
   });
   checks.push({
@@ -853,7 +854,7 @@ export async function goLiveChecks(): Promise<GoLiveCheck[]> {
     label: "An electrician with Part P scheme membership",
     level: electrician ? "green" : "red",
     detail: electrician ? "Bookings can be confirmed." : "No booking can be confirmed without a Part P registered electrician on the crew.",
-    fix: "Staff → add the electrician with their competent person scheme number and expiry.",
+    fix: "Staff → add the electrician with their competent person scheme number and expiry, upload the certificate and tick that you've checked it.",
     href: "/ops/staff",
   });
   if (!demoMode && real.length === 0 && staff.length > 0) {

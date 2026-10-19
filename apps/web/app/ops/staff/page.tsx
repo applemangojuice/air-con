@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { QUALIFICATION_LABEL, ROLE_LABEL, type StaffMember } from "@aircon/domain";
+import { QUALIFICATION_LABEL, ROLE_LABEL, isVerifiedQualification, type StaffMember } from "@aircon/domain";
 import { Badge } from "@/components/kit/badge";
 import { LinkButton } from "@/components/kit/button";
 import { EmptyState, PageHeader } from "@/components/kit/layout";
@@ -90,11 +90,12 @@ export default async function StaffPage() {
                     ) : (
                       s.qualifications.map((q, i) => {
                         const st = expiryState(q.expiresOn, today);
+                        const unchecked = st !== "expired" && !isVerifiedQualification(q);
                         return (
                           <li key={i}>
-                            <Badge tone={st === "expired" ? "danger" : st === "soon" ? "warn" : "success"}>
+                            <Badge tone={st === "expired" ? "danger" : st === "soon" || unchecked ? "warn" : "success"}>
                               {QUALIFICATION_LABEL[q.kind]}
-                              {q.expiresOn ? ` · ${st === "expired" ? "expired" : "to"} ${fmtDate(q.expiresOn)}` : ""}
+                              {unchecked ? " · not verified" : q.expiresOn ? ` · ${st === "expired" ? "expired" : "to"} ${fmtDate(q.expiresOn)}` : ""}
                             </Badge>
                           </li>
                         );

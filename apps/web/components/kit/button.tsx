@@ -14,7 +14,7 @@ const BASE =
   "inline-flex items-center justify-center gap-2 rounded-full font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 aria-disabled:pointer-events-none aria-disabled:opacity-40";
 
 const VARIANT: Record<ButtonVariant, string> = {
-  primary: "bg-accent-600 text-white shadow-sm hover:bg-accent-700",
+  primary: "bg-accent-700 text-white shadow-sm hover:bg-accent-800",
   secondary: "border border-line bg-white text-ink-900 hover:border-ink-300 hover:bg-surface",
   ghost: "text-ink-700 hover:bg-surface hover:text-ink-900",
   danger: "bg-red-700 text-white shadow-sm hover:bg-red-800",

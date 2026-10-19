@@ -60,7 +60,7 @@ export function RamsAck({
             await getFieldOutbox().enqueue({ type: "evidence", id: newOpId(), projectId, specId, at: nowIso() }, "RAMS acknowledged");
             setBusy(false);
           }}
-          className="min-h-12 w-full rounded-full bg-accent-600 px-6 font-semibold text-white shadow-sm disabled:opacity-40"
+          className="min-h-12 w-full rounded-full bg-accent-700 px-6 font-semibold text-white shadow-sm disabled:opacity-40"
         >
           I&apos;ve read the RAMS and the risks
         </button>

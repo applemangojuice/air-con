@@ -29,6 +29,9 @@ import { base64urlEncode } from "./session";
  */
 
 export const STAFF_LINK_TTL_MINUTES = 20;
+/** Sign-in emails to one address per quarter hour, counted in the database (every instance sees the same count). */
+export const SIGN_IN_LINKS_PER_ADDRESS = 6;
+const SIGN_IN_WINDOW_MS = 15 * 60_000;
 export const CUSTOMER_SIGNIN_TTL_MINUTES = 60;
 export const CUSTOMER_EMAIL_LINK_TTL_DAYS = 30;
 
@@ -111,6 +114,19 @@ export async function issueMagicLink(input: {
 
   const ttlMinutes =
     input.ttlMinutes ?? (input.kind === "staff" ? STAFF_LINK_TTL_MINUTES : CUSTOMER_SIGNIN_TTL_MINUTES);
+  // A brake on anyone sending one address a pile of sign-in emails (and on
+  // spending the email quota everything shares). Same answer as any refusal.
+  const now = new Date();
+  const recent = await tokensRepo
+    .recentSignInLinks(email, new Date(now.getTime() - SIGN_IN_WINDOW_MS).toISOString(), now.toISOString())
+    .catch((err) => {
+      console.error("[auth] sign-in link count failed (continuing):", err);
+      return 0;
+    });
+  if (recent >= SIGN_IN_LINKS_PER_ADDRESS) {
+    console.warn(`[auth] sign-in links to one address held back: ${recent} in the last 15 minutes`);
+    return { sent: false };
+  }
   const next = input.next ? safeNextPath(input.next, "") || undefined : undefined;
   const token = await createToken({ kind: input.kind, subjectId, email, next, ttlMinutes });
 
@@ -143,8 +159,10 @@ export async function issueMagicLink(input: {
  * projects too, so it only ever goes to that customer's own address. Any
  * other recipient (a stale address, a correction staff made, a mismatch from
  * a quote submitted under someone else's email) gets the plain URL and signs
- * in the normal way. A project with no customer yet is attached to the one
- * for its own email (a v1 project: its quote's email) on first use.
+ * in the normal way. A project with no customer yet is attached to a new
+ * record for its own email (a v1 project: its quote's email) on first use;
+ * when the address already has a record, the token signs in as that
+ * customer and the project joins them only once they use it.
  */
 export async function customerLink(projectId: string, path: string, recipient: string): Promise<string> {
   const target = safeNextPath(path, `/p/${projectId}`);
@@ -173,12 +191,18 @@ export async function customerLink(projectId: string, path: string, recipient: s
     }
     const email = project.customer.email;
     if (!email || !linkMayCarryToken(email, to)) return plain;
-    customer = await customersRepo.findOrCreate({
-      email,
-      name: project.customer.name || undefined,
-      phone: project.customer.phone,
-    });
-    await db.from("projects").update({ customer_id: customer.id }).eq("id", projectId).is("customer_id", null);
+    // An address that's already a customer's, typed into the funnel: the link
+    // signs in as them, and the project joins them only when they use it
+    // (project-service claimProjectOnSignIn, at /auth/verify).
+    customer = await customersRepo.getByEmail(email);
+    if (!customer) {
+      customer = await customersRepo.findOrCreate({
+        email,
+        name: project.customer.name || undefined,
+        phone: project.customer.phone,
+      });
+      await db.from("projects").update({ customer_id: customer.id }).eq("id", projectId).is("customer_id", null);
+    }
   }
 
   if (!linkMayCarryToken(customer.email, to)) {

@@ -16,7 +16,10 @@ create table if not exists storage.buckets (
   id text primary key,
   name text not null,
   public boolean default false,
-  created_at timestamptz default now()
+  created_at timestamptz default now(),
+  -- As on Supabase: the per-file ceiling and the types a bucket stores (0011).
+  file_size_limit bigint,
+  allowed_mime_types text[]
 );
 
 do $$

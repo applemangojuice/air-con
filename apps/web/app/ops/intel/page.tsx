@@ -210,7 +210,7 @@ export default async function OpsIntelPage({ searchParams }: { searchParams: Pro
             />
             Audited only
           </label>
-          <button className="rounded-full bg-accent-600 px-4 py-2 font-semibold text-white transition hover:bg-accent-700">
+          <button className="rounded-full bg-accent-700 px-4 py-2 font-semibold text-white transition hover:bg-accent-800">
             Apply
           </button>
           <Link href="/ops/intel" className="pb-2 text-xs font-medium text-ink-500 hover:underline">
@@ -247,7 +247,7 @@ export default async function OpsIntelPage({ searchParams }: { searchParams: Pro
           <h2 className="font-bold">Run the mailing</h2>
           <a
             href={`/ops/intel/export${qs ? `?${qs}` : ""}`}
-            className="mt-3 inline-block rounded-full bg-accent-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-accent-700"
+            className="mt-3 inline-block rounded-full bg-accent-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-accent-800"
           >
             Download mailing CSV ({rows.length.toLocaleString("en-GB")} homes)
           </a>

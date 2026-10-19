@@ -3,7 +3,7 @@ import type { Issue } from "./issues.ts";
 import type { Invoice, Payment } from "./money.ts";
 import type { ContractType, Project } from "./project.ts";
 import type { AcceptanceRecord, ProposalOption, ProposalRecord, TermsSection } from "./proposal.ts";
-import type { PilotSettings } from "./settings.ts";
+import { isPlaceholderPhone, type PilotSettings } from "./settings.ts";
 import type { SurveyRecord } from "./survey-visit.ts";
 
 /**
@@ -103,7 +103,8 @@ export interface DocumentCompany {
   tradingName: string;
   /** Where we're established (CCR Sch 2(c)). Absent until settings hold one. */
   geographicAddress?: string;
-  phone: string;
+  /** Left out while settings hold only the stand-in number (isPlaceholderPhone): a frozen document never prints it. */
+  phone?: string;
   email: string;
   companyNumber?: string;
   vatNumber?: string;
@@ -381,7 +382,7 @@ export function documentCompany(settings: PilotSettings): DocumentCompany {
     legalName: c.legalName,
     tradingName: c.tradingName,
     ...(geographicAddress ? { geographicAddress } : {}),
-    phone: c.phone,
+    ...(isPlaceholderPhone(c.phone) ? {} : { phone: c.phone.trim() }),
     email: c.email,
     ...(companyNumber ? { companyNumber } : {}),
     ...(vatNumber ? { vatNumber } : {}),

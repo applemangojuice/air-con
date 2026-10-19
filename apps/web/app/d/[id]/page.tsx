@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { notFound } from "next/navigation";
 import {
   documentCompany,
+  isPlaceholderPhone,
   documentCustomer,
   type CertificateSnapshot,
   type CommissioningCertificateSnapshot,
@@ -108,7 +109,7 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
       tradingName: company.tradingName,
       geographicAddress: company.geographicAddress ?? settings.company.geographicAddress,
       ...(settings.company.registeredAddress ? { registeredAddress: settings.company.registeredAddress } : {}),
-      phone: company.phone,
+      ...(company.phone && !isPlaceholderPhone(company.phone) ? { phone: company.phone } : {}),
       email: company.email,
       complaintsProcess: settings.company.complaintsProcess,
       ...(settings.company.adr ? { adr: settings.company.adr } : {}),

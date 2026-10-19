@@ -887,11 +887,20 @@ try {
   await phase("G · Ops: evidence, dates, crew, deposit, kit, compliance", async () => {
     await go(admin, `/ops/projects/${ids.pid}`);
     check("deposit shows as due, not 'Not required'", await has(admin, /Deposit\s*£[\d,]+ due/));
+    // The early-start request goes on file with the copy itself: their email (a screenshot here), when it came, who from.
     const ev = admin.locator("main form").filter({ hasText: "Which one" });
-    await ev.getByLabel("Evidence").selectOption("email");
-    await ev.getByLabel(/^Which one/).fill("DEMO email 18 Oct, subject: Re: Your contract");
+    await ev.getByLabel("Their email", { exact: true }).check();
+    await ev.locator('input[type="file"]').setInputFiles(PHOTO);
+    await ev.getByText("Uploaded").waitFor({ timeout: 30_000 });
+    check("the From address starts as the customer's own", (await ev.getByLabel(/^From/).inputValue()) === CUSTOMER.email);
+    await ev.getByLabel(/^Which one/).fill("DEMO email, subject: Re: Your contract");
+    await ev.getByLabel(/in the words we gave them/).check();
+    await ev.getByLabel(/^From/).fill("someone.else@example.com");
     await ev.getByRole("button", { name: "Record" }).click();
-    check("early-start evidence on file", await waitFor(admin, /Early start on file \(email: DEMO email/));
+    check("an email from another address is refused", await waitFor(admin, /It has to come from the address on the contract/));
+    await ev.getByLabel(/^From/).fill(CUSTOMER.email);
+    await ev.getByRole("button", { name: "Record" }).click();
+    check("early-start evidence on file, with its copy", await waitFor(admin, /Early start on file \(email: DEMO email[^)]*from [^)]*copy stored/));
 
     await admin.getByRole("link", { name: /^Dates, crew and deposit/ }).click();
     await admin.waitForURL(new RegExp(`/ops/projects/${ids.pid}/booking`));

@@ -121,7 +121,7 @@ export function RoomsSection() {
             <button type="button" onClick={() => setAdding(false)} className="min-h-12 rounded-full border border-line bg-white font-semibold text-ink-900">
               Cancel
             </button>
-            <button type="button" onClick={add} className="min-h-12 rounded-full bg-accent-600 font-semibold text-white hover:bg-accent-700">
+            <button type="button" onClick={add} className="min-h-12 rounded-full bg-accent-700 font-semibold text-white hover:bg-accent-800">
               Add room
             </button>
           </div>
@@ -396,7 +396,7 @@ export function RoomEditor({ roomId }: { roomId: string }) {
           <button
             type="button"
             onClick={() => go({ s: "rooms", r: nextRoom.id })}
-            className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-accent-600 px-6 text-base font-semibold text-white shadow-sm hover:bg-accent-700 sm:w-auto"
+            className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-accent-700 px-6 text-base font-semibold text-white shadow-sm hover:bg-accent-800 sm:w-auto"
           >
             Next room: {nextRoom.name} <span aria-hidden>→</span>
           </button>
@@ -404,7 +404,7 @@ export function RoomEditor({ roomId }: { roomId: string }) {
           <button
             type="button"
             onClick={() => go({ s: "outdoor" })}
-            className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-accent-600 px-6 text-base font-semibold text-white shadow-sm hover:bg-accent-700 sm:w-auto"
+            className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-accent-700 px-6 text-base font-semibold text-white shadow-sm hover:bg-accent-800 sm:w-auto"
           >
             Next: Outdoor <span aria-hidden>→</span>
           </button>

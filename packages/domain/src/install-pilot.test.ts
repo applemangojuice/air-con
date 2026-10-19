@@ -158,8 +158,8 @@ const person = (over: Partial<StaffMember> & Pick<StaffMember, "roles">): StaffM
   qualifications: [],
   ...over,
 });
-const FGAS = { kind: "fgas-cat1" as const, reference: "DEMO-FGAS-1", expiresOn: "2030-12-31" };
-const PARTP = { kind: "part-p" as const, reference: "DEMO-PARTP-1", expiresOn: "2030-12-31" };
+const FGAS = { kind: "fgas-cat1" as const, reference: "DEMO-FGAS-1", expiresOn: "2030-12-31", verifiedAt: "2026-01-05T10:00:00.000Z", mediaId: "media-fgas" };
+const PARTP = { kind: "part-p" as const, reference: "DEMO-PARTP-1", expiresOn: "2030-12-31", verifiedAt: "2026-01-05T10:00:00.000Z", mediaId: "media-partp" };
 const INSTALLER = person({ roles: ["installer"] });
 const FGAS_INSTALLER = person({ roles: ["installer"], qualifications: [FGAS] });
 const ELECTRICIAN = person({ roles: ["electrician"], qualifications: [PARTP] });

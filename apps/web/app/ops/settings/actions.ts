@@ -90,7 +90,13 @@ const schema = z.object({
   warranty: z.object({ workmanshipYears: z.number().int().min(0).max(25).nullable(), manufacturerSummary: z.string().trim().max(1000).nullable() }),
   legal: z.object({ termsVersion: text(40).min(1, "Name the terms version"), termsReviewed: z.boolean(), cancellationReviewed: z.boolean() }),
   comms: z.object({ smsSenderId: z.string().trim().regex(/^[A-Za-z0-9 ]{1,11}$/, "SMS sender: up to 11 letters or digits"), disabledEvents: z.array(z.string()).max(50) }),
-  finance: z.object({ lenderConfigured: z.boolean() }),
+  finance: z.object({
+    firmName: text(120).optional(),
+    frn: z.union([z.string().trim().regex(/^\d{6,7}$/, "An FCA firm reference number is 6 or 7 digits"), z.literal("")]).optional(),
+    arrangement: z.enum(["authorised", "appointed-rep", "s21-approved"]).optional(),
+    approvalRef: text(120).optional(),
+    representativeExample: text(1500).optional(),
+  }),
   features: z.object({ showPrototypeNav: z.boolean() }),
 });
 
@@ -118,6 +124,8 @@ function tidy(s: z.infer<typeof schema>): PilotSettings {
       active: d.active,
     })),
     serviceArea: { outcodes: [...new Set(s.serviceArea.outcodes)] },
+    // Blank finance details are left out, not stored empty (financeOffered needs every one).
+    finance: Object.fromEntries(Object.entries(s.finance).filter(([, v]) => typeof v === "string" && v.trim())) as PilotSettings["finance"],
     warranty: { workmanshipYears: s.warranty.workmanshipYears, manufacturerSummary: s.warranty.manufacturerSummary?.trim() ? s.warranty.manufacturerSummary.trim() : null },
   } as PilotSettings;
 }

@@ -6,7 +6,8 @@ import { logServerEvent } from "@/lib/analytics-server";
 import { appUrl } from "@/lib/brand";
 import { escapeHtml, quoteEmail, sendEmail, sendTeamEmail } from "@/lib/email";
 import { QUOTE_OWNER_COOKIE, quoteOwnerCookieOptions, readQuoteOwner, signQuoteOwner } from "@/lib/auth/quote-owner";
-import { enforceRateLimit } from "@/lib/rate-limit";
+import { personNameProblem } from "@/lib/person-name";
+import { enforceRateLimit, rateLimit } from "@/lib/rate-limit";
 import { UUID_RE, surveySchema } from "@/lib/schemas";
 import { getServiceClient } from "@/lib/supabase-server";
 import { getPublicSettings } from "@/lib/public-settings";
@@ -51,8 +52,9 @@ const bodySchema = z.object({
   /** First-touch acquisition, so a booking traces back to its campaign. */
   attribution: attributionSchema,
   contact: z.object({
-    name: z.string().trim().min(2).max(120),
-    email: z.string().trim().email().max(200),
+    // Printed in the email we send to the address typed: a name, nothing else (lib/person-name.ts).
+    name: z.string().trim().max(120).refine((n) => personNameProblem(n) === null, "Invalid name"),
+    email: z.string().trim().toLowerCase().email().max(200),
     phone: phoneSchema,
     timeframe: z.enum(["asap", "1-3-months", "researching"]),
   }),
@@ -83,6 +85,42 @@ function trustedPhotos(survey: Survey): Survey {
     outdoor: { ...kept.outdoor, photos: take(kept.outdoor.photos) },
     electrics: { ...kept.electrics, photos: take(kept.electrics.photos) },
   };
+}
+
+/**
+ * Quote emails go to whatever address was typed, so they're capped where it
+ * counts: per address (a stranger can't fill someone's inbox) and overall
+ * (a flood can't spend the email quota the sign-in links share). Counted
+ * from the saved quotes themselves, so the caps hold across instances and
+ * restarts; an in-memory window per address backs them up. Over a cap the
+ * quote still saves (and shows in ops); only the emails are held back.
+ */
+const QUOTE_EMAILS_PER_ADDRESS_PER_DAY = 3;
+const QUOTE_EMAILS_PER_HOUR = 40;
+
+async function emailAllowance(
+  supabase: NonNullable<ReturnType<typeof getServiceClient>>,
+  email: string,
+  id: string,
+  nowMs: number,
+): Promise<{ customer: boolean; team: boolean }> {
+  const count = async (since: number, sameAddress: boolean) => {
+    let q = supabase
+      .from("quote_requests")
+      .select("id", { count: "exact", head: true })
+      .neq("status", "draft")
+      .neq("id", id)
+      .gte("created_at", new Date(since).toISOString());
+    if (sameAddress) q = q.eq("email", email);
+    const { count: n, error } = await q;
+    return error ? null : (n ?? 0);
+  };
+  const [toAddress, lastHour] = await Promise.all([count(nowMs - 24 * 3600_000, true), count(nowMs - 3600_000, false)]);
+  const busy = lastHour !== null && lastHour >= QUOTE_EMAILS_PER_HOUR;
+  const perAddress = rateLimit(`quote-email:${email}`, QUOTE_EMAILS_PER_ADDRESS_PER_DAY, 24 * 3600_000).ok;
+  const repeat = toAddress !== null && toAddress >= QUOTE_EMAILS_PER_ADDRESS_PER_DAY;
+  if (busy || repeat || !perAddress) console.warn(`[quotes] emails held back for quote ${id}: ${busy ? "hourly cap" : "per-address cap"}`);
+  return { customer: !busy && !repeat && perAddress, team: !busy };
 }
 
 export async function POST(request: Request) {
@@ -212,9 +250,10 @@ export async function POST(request: Request) {
     supportEmail: settings.company.email,
     supportPhone: settings.company.phone,
   });
-  const emailed = await sendEmail(contact.email, email.subject, email.html);
-  // Ping the team so a real submission is never missed.
-  await notifyNewLead(contact, quote.totalGbp, survey.postcode, id, attribution, consents.marketing);
+  const allowed = await emailAllowance(supabase, contact.email, id, Date.now());
+  const emailed = allowed.customer ? await sendEmail(contact.email, email.subject, email.html) : false;
+  // Ping the team so a real submission is never missed (unless a flood is on: it's all in ops anyway).
+  if (allowed.team) await notifyNewLead(contact, quote.totalGbp, survey.postcode, id, attribution, consents.marketing);
   const res = NextResponse.json({ ok: true, demo: false, id, emailed });
   // This browser saved this quote, so "Book my home survey" can open the
   // project made from it without an email round trip (lib/auth/quote-owner.ts).

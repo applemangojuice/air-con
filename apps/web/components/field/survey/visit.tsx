@@ -23,6 +23,21 @@ export function mapsLinks(addressLine: string, postcode: string) {
 export const telHref = (phone: string) => `tel:${phone.replace(/[^\d+]/g, "")}`;
 
 export function textStatusWords(t: TextStatus, _smsMode: "live" | "demo"): { tone: "ok" | "warn" | "bad"; text: string } {
+  if (t.channel === "email") {
+    // No mobile that takes texts (or texts aren't live): it went by email instead.
+    switch (t.state) {
+      case "sent":
+        return { tone: "ok", text: `No mobile to text, so it was emailed to ${t.to} at ${londonClock(t.at)}.` };
+      case "demo":
+        return { tone: "warn", text: `No mobile to text. Email recorded at ${londonClock(t.at)}, not sent: demo mode.` };
+      case "queued":
+        return { tone: "warn", text: `No mobile to text, so an email is queued to ${t.to}.` };
+      case "failed":
+        return { tone: "bad", text: `The email didn't send${t.error ? ` (${t.error})` : ""}. Call the customer instead.` };
+      case "not-sent":
+        return { tone: "warn", text: t.reason };
+    }
+  }
   switch (t.state) {
     case "sent":
       return { tone: "ok", text: `Text sent to ${t.to} at ${londonClock(t.at)}.` };
@@ -148,7 +163,7 @@ export function VisitCard({
           type="button"
           onClick={onStart}
           disabled={starting}
-          className="mt-3 inline-flex min-h-14 w-full items-center justify-center rounded-full bg-accent-600 px-6 text-lg font-semibold text-white shadow-sm hover:bg-accent-700 disabled:opacity-60"
+          className="mt-3 inline-flex min-h-14 w-full items-center justify-center rounded-full bg-accent-700 px-6 text-lg font-semibold text-white shadow-sm hover:bg-accent-800 disabled:opacity-60"
         >
           {starting ? "Starting…" : resume ? "Carry on with the survey" : "Start survey"}
         </button>
@@ -348,7 +363,7 @@ function OnMyWayDialog({ projectId, phone, smsMode, onClose, onSent }: OnMyWayPr
               type="button"
               onClick={send}
               disabled={sending || !(eta >= 1 && eta <= 240)}
-              className="inline-flex min-h-14 w-full items-center justify-center rounded-full bg-accent-600 px-6 text-lg font-semibold text-white shadow-sm hover:bg-accent-700 disabled:opacity-50"
+              className="inline-flex min-h-14 w-full items-center justify-center rounded-full bg-accent-700 px-6 text-lg font-semibold text-white shadow-sm hover:bg-accent-800 disabled:opacity-50"
             >
               {sending ? "Sending…" : phone ? `Send: about ${eta} min` : `Record: about ${eta} min`}
             </button>

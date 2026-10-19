@@ -91,7 +91,7 @@ export default async function JobPackPage({ params }: { params: Promise<{ projec
           </a>
         </div>
         {h.bookingStatus === "booked" && (
-          <Link href={`/field/jobs/${projectId}/day/${day}`} className="mt-2 flex min-h-12 w-full items-center justify-center rounded-full bg-accent-600 px-6 font-semibold text-white shadow-sm">
+          <Link href={`/field/jobs/${projectId}/day/${day}`} className="mt-2 flex min-h-12 w-full items-center justify-center rounded-full bg-accent-700 px-6 font-semibold text-white shadow-sm">
             Open the day {day} runsheet →
           </Link>
         )}

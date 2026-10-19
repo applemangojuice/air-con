@@ -98,7 +98,7 @@ function NextStep({ data, go }: { data: HubData; go: (stage: ProjectStageId, anc
   const staff = hub.mode === "staff";
 
   if (!next) {
-    const w = waitingCopy(p);
+    const w = waitingCopy(p, data.onTheWay);
     return (
       <section aria-labelledby="next-title" className="rounded-3xl border border-line bg-white p-5 sm:p-7">
         <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">{staff ? "Customer's next step" : "Your next step"}</p>

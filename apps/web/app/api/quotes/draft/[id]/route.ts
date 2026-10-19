@@ -11,7 +11,7 @@ import { getServiceClient } from "@/lib/supabase-server";
 const bodySchema = z.object({
   survey: surveySchema,
   /** A corrected email must reach the draft, or follow-ups go to the typo. */
-  email: z.string().trim().email().max(200).optional(),
+  email: z.string().trim().toLowerCase().email().max(200).optional(),
 });
 
 /** Update a draft in place as the customer moves through the funnel. */

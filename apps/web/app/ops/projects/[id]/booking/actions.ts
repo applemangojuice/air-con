@@ -3,7 +3,7 @@
 import { z } from "zod";
 import { STAFF_ROLES, type StaffMember, type StaffRole } from "@aircon/domain";
 import { requireProjectAccess, requireStaff } from "@/lib/auth/server";
-import { assignCrew, confirmBooking, recordEarlyStartEvidence, requestDeposit, setInstallDates } from "@/lib/booking-server";
+import { assignCrew, confirmBooking, earlyStartEvidenceFromForm, recordEarlyStartEvidence, requestDeposit, setInstallDates } from "@/lib/booking-server";
 import { isUuid } from "@/lib/repo/base";
 import { invalid, poundsToPence, text, toState, type ActionState } from "./_f5/action-state";
 
@@ -69,5 +69,5 @@ export async function earlyStartEvidenceAction(projectId: string, _prev: ActionS
   if (!channel.success) return invalid("Is it the customer's email or a signed form?");
   const ref = text(form, "evidenceRef", 200);
   if (!ref) return invalid("Say which email or form it is, so anyone can find it again.");
-  return toState(await recordEarlyStartEvidence(projectId, { channel: channel.data, evidenceRef: ref }, staff), "Early-start request recorded.");
+  return toState(await recordEarlyStartEvidence(projectId, earlyStartEvidenceFromForm(form), staff), "Early-start request recorded.");
 }

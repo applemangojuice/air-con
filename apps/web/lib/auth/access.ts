@@ -51,7 +51,18 @@ export function customerCanAccessProject(
   return session.projectIds.includes(projectId);
 }
 
+/**
+ * `customerId` is the customer record's id; for the browser holding the quote
+ * of a project that isn't attached to a customer yet (its unverified funnel
+ * email already belonged to someone: createProjectForQuote), it's that
+ * quote's `quoteActorId`, which is never a customer record's id.
+ */
 export type ProjectAccess = { kind: "staff"; staff: StaffMember } | { kind: "customer"; customerId: string };
+
+/** Who acts through a quote-owner grant on a project no customer holds yet. */
+export function quoteActorId(quoteId: string): string {
+  return `quote:${quoteId.toLowerCase()}`;
+}
 
 /**
  * The whole decision for one project. `staff` is the fresh database record
@@ -84,8 +95,8 @@ export function decideProjectAccess(input: {
   if (session && customerCanAccessProject(session, input.projectId, project.customerId)) {
     return { kind: "customer", customerId: session.customerId };
   }
-  if (project.quoteId && project.customerId && input.quoteGrant?.includes(project.quoteId.toLowerCase())) {
-    return { kind: "customer", customerId: project.customerId };
+  if (project.quoteId && input.quoteGrant?.includes(project.quoteId.toLowerCase())) {
+    return { kind: "customer", customerId: project.customerId || quoteActorId(project.quoteId) };
   }
   return null;
 }
@@ -93,9 +104,11 @@ export function decideProjectAccess(input: {
 /** What a staff-only page or route should do. */
 export type StaffGate = "ok" | "signed-out" | "forbidden";
 
-export function decideStaffGate(staff: StaffMember | null, perm?: Permission): StaffGate {
+/** `perm` may be several permissions, all of which are needed. */
+export function decideStaffGate(staff: StaffMember | null, perm?: Permission | readonly Permission[]): StaffGate {
   if (!staff || !staff.active) return "signed-out";
-  if (perm && !can(staff, perm)) return "forbidden";
+  const needed: readonly Permission[] = perm === undefined ? [] : typeof perm === "string" ? [perm] : perm;
+  if (needed.some((p) => !can(staff, p))) return "forbidden";
   return "ok";
 }
 

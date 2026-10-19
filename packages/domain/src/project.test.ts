@@ -5,6 +5,7 @@ import {
   dayUpdateLabel,
   CANCELLATION_RULE_STATUS,
   EARLY_START_WORDING_VERSION,
+  earlyStartEvidenceProblem,
   REVIEW_REQUEST_DAYS,
   applyProjectAction,
   blockersFor,
@@ -98,7 +99,7 @@ const INSTALL_DATES = ["2026-11-17", "2026-11-18", "2026-11-19"];
 function staff(over: Partial<StaffMember> & Pick<StaffMember, "id" | "name" | "roles">): StaffMember {
   return { email: `${over.id}@example.test`, external: false, active: true, qualifications: [], demo: true, ...over };
 }
-const fgas = (reference: string, expiresOn = "2028-01-31") => ({ kind: "fgas-cat1" as const, reference, expiresOn });
+const fgas = (reference: string, expiresOn = "2028-01-31") => ({ kind: "fgas-cat1" as const, reference, expiresOn, verifiedAt: "2026-01-05T10:00:00.000Z", mediaId: `media-${reference}` });
 
 const ADMIN = staff({ id: "s-admin", name: "Ada Admin", roles: ["admin"] });
 const TECH_LEAD = staff({ id: "s-tl", name: "Tess Lead", roles: ["tech-lead"], qualifications: [fgas("FG-0001")] });
@@ -109,7 +110,7 @@ const SPARKY = staff({
   name: "Ellie Watts",
   roles: ["electrician"],
   external: true,
-  qualifications: [{ kind: "part-p", reference: "SCHEME-123", expiresOn: "2027-06-30" }],
+  qualifications: [{ kind: "part-p", reference: "SCHEME-123", expiresOn: "2027-06-30", verifiedAt: "2026-01-05T10:00:00.000Z", mediaId: "media-scheme" }],
 });
 
 /** A business that has filled in everything the pre-contract information needs (DEMO details). */
@@ -194,7 +195,7 @@ const JOURNEY: Step[] = [
   ["install-dates-set", { type: "install-dates-set", startDate: INSTALL_DATES[0]!, dates: INSTALL_DATES }, T.dates],
   [
     "early-start-evidenced",
-    { type: "early-start-evidenced", channel: "email", evidenceRef: "inbound-msg-7", by: "Ada Admin" },
+    { type: "early-start-evidenced", channel: "email", evidenceRef: "28 Oct, Re: Your contract", by: "Ada Admin", mediaIds: ["media-email-7"], receivedOn: "2026-10-28", fromAddress: "Alex@Example.test", wordingVersion: EARLY_START_WORDING_VERSION },
     "2026-10-28T11:00:00.000Z",
     { actor: ADMIN },
   ],
@@ -315,7 +316,10 @@ test("the whole pilot journey runs price → aftercare and closes", () => {
     requested: true,
     requestedAt: T.accept,
     channel: "email",
-    evidenceRef: "inbound-msg-7",
+    evidenceRef: "28 Oct, Re: Your contract",
+    mediaIds: ["media-email-7"],
+    receivedOn: "2026-10-28",
+    fromAddress: "alex@example.test",
     evidencedAt: "2026-10-28T11:00:00.000Z",
     recordedBy: "Ada Admin",
     wordingVersion: EARLY_START_WORDING_VERSION,
@@ -709,7 +713,7 @@ test("contract-confirmation-sent: accepted only, the first send counts, allowed 
 
 test("early-start-evidenced: an accepted early-start request, a reference, a signed-in staff member, once", () => {
   const p = walk("install-dates-set");
-  const evidence: ProjectAction = { type: "early-start-evidenced", channel: "paper", evidenceRef: "media-form-1", by: "typed name" };
+  const evidence: ProjectAction = { type: "early-start-evidenced", channel: "paper", evidenceRef: "Signed form DEMO-F1", by: "typed name", mediaIds: ["media-form-1"], receivedOn: "2026-10-28", wordingVersion: EARLY_START_WORDING_VERSION };
   refuses(walk("proposal-viewed"), evidence, T.dates, { actor: ADMIN }, /no accepted contract/);
   refuses(walk("install-dates-set", { early: false }), evidence, T.dates, { actor: ADMIN }, /didn't ask to start early/);
   refuses(p, { ...evidence, evidenceRef: "  " } as ProjectAction, T.dates, { actor: ADMIN }, /reference/);
@@ -719,8 +723,30 @@ test("early-start-evidenced: an accepted early-start request, a reference, a sig
   assert.equal(done.proposal.earlyStart?.recordedBy, "Ada Admin"); // the verified person, not the typed name
   assert.equal(done.proposal.earlyStart?.channel, "paper");
   assert.equal(done.proposal.earlyStart?.requestedAt, T.accept); // when they first asked
+  assert.deepEqual(done.proposal.earlyStart?.mediaIds, ["media-form-1"]);
+  assert.equal(done.proposal.earlyStart?.receivedOn, "2026-10-28");
   assert.match(done.events.at(-1)!.label, /signed form asking us to start early/);
   refuses(done, evidence, T.dates, { actor: ADMIN }, /already on file/);
+});
+
+test("early-start-evidenced: the stored copy, on or after acceptance, from the customer's own address, in the words they were given", () => {
+  const p = walk("install-dates-set");
+  const email: ProjectAction = { type: "early-start-evidenced", channel: "email", evidenceRef: "28 Oct, Re: Your contract", by: "", mediaIds: ["m-1"], receivedOn: "2026-10-28", fromAddress: "alex@example.test", wordingVersion: EARLY_START_WORDING_VERSION };
+  const on = (over: Partial<Extract<ProjectAction, { type: "early-start-evidenced" }>>) => ({ ...email, ...over }) as ProjectAction;
+  refuses(p, on({ mediaIds: [] }), T.dates, { actor: ADMIN }, /Attach their email/);
+  refuses(p, on({ channel: "paper", mediaIds: [""] }), T.dates, { actor: ADMIN }, /Attach the signed form/);
+  refuses(p, on({ receivedOn: "28/10/2026" }), T.dates, { actor: ADMIN }, /Pick the date/);
+  refuses(p, on({ receivedOn: "2026-10-29" }), T.dates, { actor: ADMIN }, /in the future/);
+  refuses(p, on({ receivedOn: "2026-10-26" }), T.dates, { actor: ADMIN }, /before they accepted the contract/);
+  refuses(p, on({ fromAddress: "someone.else@example.test" }), T.dates, { actor: ADMIN }, /address on the contract \(alex@example\.test\)/);
+  refuses(p, on({ fromAddress: undefined }), T.dates, { actor: ADMIN }, /address on the contract/);
+  refuses(p, on({ wordingVersion: "early-start-v0" }), T.dates, { actor: ADMIN }, /words we gave them/);
+  // The day they accepted counts (they reply to the contract email), and a paper form needs no address.
+  const sameDay = step(p, on({ receivedOn: "2026-10-27", fromAddress: " ALEX@example.test " }), T.dates, { actor: ADMIN });
+  assert.equal(sameDay.proposal.earlyStart?.fromAddress, "alex@example.test");
+  const paper = step(p, on({ channel: "paper", fromAddress: "anyone@example.test" }), T.dates, { actor: ADMIN });
+  assert.equal(paper.proposal.earlyStart?.fromAddress, undefined);
+  assert.equal(earlyStartEvidenceProblem(p, { channel: "email", mediaIds: ["m"], receivedOn: "2026-10-28", fromAddress: "alex@example.test", wordingVersion: EARLY_START_WORDING_VERSION }, "2026-10-28"), null);
 });
 
 test("early-start-requested: a later request (after accepting without one), before the install starts", () => {
@@ -732,7 +758,12 @@ test("early-start-requested: a later request (after accepting without one), befo
   assert.equal(asked.proposal.earlyStartRequested, true);
   assert.equal(step(asked, { type: "early-start-requested", channel: "portal" }, T.dates).events.length, asked.events.length);
   // Then the evidence, as for a request made at acceptance; and dates inside the period are allowed.
-  const evidenced = step(asked, { type: "early-start-evidenced", channel: "email", evidenceRef: "inbound-9", by: "" }, "2026-10-29T10:00:00.000Z", { actor: ADMIN });
+  const evidenced = step(
+    asked,
+    { type: "early-start-evidenced", channel: "email", evidenceRef: "29 Oct, Start early", by: "", mediaIds: ["m-9"], receivedOn: "2026-10-29", fromAddress: "alex@example.test", wordingVersion: EARLY_START_WORDING_VERSION },
+    "2026-10-29T10:00:00.000Z",
+    { actor: ADMIN },
+  );
   assert.equal(evidenced.proposal.earlyStart?.evidencedAt, "2026-10-29T10:00:00.000Z");
   refuses(walk("day-1", { early: false, contractType: "install-only" }), { type: "early-start-requested", channel: "portal" }, T.day1, {}, /already started/);
 });

@@ -127,6 +127,9 @@ apply "$PILOT_MIGRATION"
   assert (select count(*) from public.proposals) > 0, 're-applying 0010 lost proposal rows';
   assert (select count(*) from public.install_evidence) > 0, 're-applying 0010 lost evidence rows';
   assert (select count(*) from storage.buckets where id = 'project-media') = 1, 'project-media bucket duplicated or missing';
+  assert (select count(*) from storage.buckets where id in ('survey-photos', 'survey-videos', 'project-media')
+          and file_size_limit > 0 and cardinality(allowed_mime_types) > 0) = 3, 'a bucket has no size or type limit (0011)';
+  assert not (select 'text/html' = any(allowed_mime_types) from storage.buckets where id = 'survey-photos'), 'survey photos take HTML';
 end \$\$;"
 
 echo "==> all migration checks passed (${#migrations[@]} migrations)"

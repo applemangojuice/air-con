@@ -18,6 +18,7 @@ import {
   cancellationStatus,
   currentStage,
   earlyStartRequestedOf,
+  earlyStartWording,
   isOpen,
   nextGate,
   runsheetProgress,
@@ -40,7 +41,6 @@ import {
   ConsentForm,
   ContactForm,
   Disclosure,
-  EarlyStartForm,
   LearningForm,
   LearningStatusForm,
   NextActionForm,
@@ -52,6 +52,7 @@ import {
 } from "@/components/ops/command/forms";
 import { requireStaff } from "@/lib/auth/server";
 import { ElectricalCertificateForms, WarrantyRegistrationForm } from "./certificate-forms";
+import { EarlyStartForm } from "./early-start-form";
 import { listDocuments } from "@/lib/documents-server";
 import { fmtDate, fmtDay, fmtDayTime, fmtInstantDay } from "@/lib/format";
 import { blockersByGate, issueKindDefaults, loadCommandRecords, selfSurveyDiff } from "@/lib/ops-core-server";
@@ -474,13 +475,23 @@ export default async function CommandCentrePage({
                   <p className="text-xs text-ink-500">{CANCELLATION_RULE_STATUS}</p>
                   {p.proposal.earlyStart?.evidencedAt ? (
                     <Note tone="success">
-                      Early start on file ({p.proposal.earlyStart.channel === "paper" ? "signed form" : "email"}: {p.proposal.earlyStart.evidenceRef}), recorded by {p.proposal.earlyStart.recordedBy}.
+                      Early start on file ({p.proposal.earlyStart.channel === "paper" ? "signed form" : "email"}: {p.proposal.earlyStart.evidenceRef}
+                      {p.proposal.earlyStart.receivedOn ? `, received ${fmtDay(p.proposal.earlyStart.receivedOn)}` : ""}
+                      {p.proposal.earlyStart.fromAddress ? ` from ${p.proposal.earlyStart.fromAddress}` : ""}
+                      {p.proposal.earlyStart.mediaIds?.length ? `; copy stored with the project's files` : ""}), recorded by {p.proposal.earlyStart.recordedBy}.
                     </Note>
                   ) : (
                     canEdit &&
                     p.install.status === "not-started" && (
                       <Disclosure summary={earlyRequested ? "Record their early-start email or form" : "They've asked to start early"} open={earlyRequested}>
-                        <EarlyStartForm action={bind(earlyStartEvidenceAction)} requested={earlyRequested} />
+                        <EarlyStartForm
+                          action={bind(earlyStartEvidenceAction)}
+                          requested={earlyRequested}
+                          projectId={id}
+                          today={today}
+                          wording={earlyStartWording(p.proposal.contractType)}
+                          {...(p.customer.email ? { customerEmail: p.customer.email } : {})}
+                        />
                       </Disclosure>
                     )
                   )}

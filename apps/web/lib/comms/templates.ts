@@ -25,6 +25,7 @@ import { brandedEmail, escapeHtml } from "../email.ts";
 import { fmtDate, fmtDay, fmtDayTime, money } from "../format.ts";
 import { fitSms, gsmSafe, smsLength } from "../providers/sms.ts";
 import { CANCELLATION_NOTICE_VERSION, cancellationForm, cancellationInstructions, type TraderDetails } from "./legal-text.ts";
+import { onTheWayChannel, onTheWayLine, type OnTheWayChannel } from "./on-the-way.ts";
 
 /**
  * One renderer per comms event (contract §F): typed data in, `{ subject,
@@ -232,6 +233,8 @@ export interface TemplateContext {
   projectId?: string;
   customerEmail?: string;
   customerPhone?: string;
+  /** How "on my way" will reach them (lib/comms/on-the-way.ts), so the copy only promises what happens. */
+  onTheWay: OnTheWayChannel;
 }
 
 const TITLES = new Set(["mr", "mrs", "ms", "miss", "mx", "dr", "prof", "sir", "dame", "rev"]);
@@ -256,6 +259,8 @@ export function templateContext(input: {
   } | null;
   /** Overrides the project customer's name (staff sign-in links, explicit recipients). */
   recipientName?: string;
+  /** Which providers are live (the outbox passes them); previews leave it out, which reads as demo mode. */
+  live?: { sms: boolean; email: boolean };
 }): TemplateContext {
   const c = input.project?.customer;
   const name = (input.recipientName ?? c?.name ?? "").trim();
@@ -269,6 +274,7 @@ export function templateContext(input: {
     projectId: input.project?.id,
     customerEmail: c?.email,
     customerPhone: c?.phone,
+    onTheWay: onTheWayChannel({ phone: c?.phone, email: c?.email }, input.live ?? { sms: false, email: false }),
   };
 }
 
@@ -436,7 +442,7 @@ const paraHtml = (p: Para) =>
 
 function blockHtml(b: Block): string {
   if ("p" in b) return `<p style="margin:0 0 14px;line-height:1.5">${paraHtml(b.p)}</p>`;
-  if ("small" in b) return `<p style="margin:0 0 10px;font-size:13px;line-height:1.5;color:#6e7482">${paraHtml(b.small)}</p>`;
+  if ("small" in b) return `<p style="margin:0 0 10px;font-size:13px;line-height:1.5;color:#5d6371">${paraHtml(b.small)}</p>`;
   if ("h" in b) return `<h2 style="margin:22px 0 10px;font-size:16px;line-height:1.3">${escapeHtml(b.h)}</h2>`;
   if ("list" in b) {
     return `<ul style="margin:0 0 14px;padding-left:20px;line-height:1.5">${b.list
@@ -447,7 +453,7 @@ function blockHtml(b: Block): string {
     return `<table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;margin:0 0 18px;font-size:14px">${b.facts
       .map(
         ([k, v]) =>
-          `<tr><td style="padding:7px 12px 7px 0;border-bottom:1px solid #ece6da;color:#6e7482;vertical-align:top;white-space:nowrap">${escapeHtml(k)}</td><td style="padding:7px 0;border-bottom:1px solid #ece6da;font-weight:600">${multiline(v)}</td></tr>`,
+          `<tr><td style="padding:7px 12px 7px 0;border-bottom:1px solid #ece6da;color:#5d6371;vertical-align:top;white-space:nowrap">${escapeHtml(k)}</td><td style="padding:7px 0;border-bottom:1px solid #ece6da;font-weight:600">${multiline(v)}</td></tr>`,
       )
       .join("")}</table>`;
   }
@@ -470,7 +476,7 @@ function blockText(b: Block): string {
 }
 
 const buttonHtml = (label: string, href: string) =>
-  `<p style="margin:4px 0 24px"><a href="${escapeHtml(href)}" style="display:inline-block;background:#d55a0a;color:#ffffff;text-decoration:none;font-weight:600;padding:12px 28px;border-radius:999px">${escapeHtml(label)}</a></p>`;
+  `<p style="margin:4px 0 24px"><a href="${escapeHtml(href)}" style="display:inline-block;background:#a84508;color:#ffffff;text-decoration:none;font-weight:600;padding:12px 28px;border-radius:999px">${escapeHtml(label)}</a></p>`;
 
 /** What a template returns; `wrap` adds the greeting, the button, the sign-off and support details. */
 interface Draft {
@@ -1123,9 +1129,12 @@ const TEMPLATES: { [E in CommsEventId]: Renderer<E> } = {
           ? [{ p: "Before day 1, it helps if you can:" } as Block, { list: d.prep } as Block]
           : []),
         {
-          p: ctx.customerPhone
-            ? "We'll email you a few days before, text you the evening before, and text again when the team is on the way."
-            : "We'll email you a few days before with everything you need for day 1.",
+          p:
+            ctx.onTheWay === "sms"
+              ? "We'll email you a few days before, text you the evening before, and text again when the team is on the way."
+              : ctx.onTheWay === "email"
+                ? "We'll email you a few days before, again the evening before, and when the team is on the way."
+                : "We'll email you a few days before with everything you need for day 1.",
         },
       ],
       cta: "See your install plan",
@@ -1179,7 +1188,7 @@ const TEMPLATES: { [E in CommsEventId]: Renderer<E> } = {
       body: [
         { p: [`${who} will arrive at ${place(ctx)} on `, { strong: `${dayLong(d.startDate)}${arrival}` }, "."] },
         ...(d.parkingNotes ? [{ p: `Parking: ${d.parkingNotes}` } as Block] : []),
-        { p: "We'll text you when they're on the way." },
+        ...(onTheWayLine(ctx.onTheWay, "they're") ? [{ p: onTheWayLine(ctx.onTheWay, "they're") } as Block] : []),
       ],
       cta: "See your install plan",
       sms: [

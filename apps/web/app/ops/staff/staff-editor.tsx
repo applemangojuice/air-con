@@ -146,7 +146,7 @@ export function StaffEditor({
         issuer: q.issuer,
         expiresOn: q.expiresOn,
         mediaId: q.mediaId,
-        verified: q.verified,
+        verified: q.verified && Boolean(q.mediaId),
       })),
     });
   }
@@ -234,7 +234,11 @@ export function StaffEditor({
                             {state === "soon" && <Badge tone="warn">Expires within 60 days</Badge>}
                             {state === "current" && <Badge tone="success">Current</Badge>}
                             {state === "no-expiry" && <Badge>No expiry date</Badge>}
-                            {q.verified ? <Badge tone="info">Verified{q.verifiedBy ? ` by ${q.verifiedBy}` : ""}</Badge> : <Badge tone="warn">Not verified</Badge>}
+                            {q.verified && q.mediaId ? (
+                              <Badge tone="info">Verified{q.verifiedBy ? ` by ${q.verifiedBy}` : ""}</Badge>
+                            ) : (
+                              <Badge tone="warn">Not verified: doesn&apos;t count yet</Badge>
+                            )}
                           </span>
                           <button type="button" onClick={() => setQuals((qs) => qs.filter((x) => x.key !== q.key))} className="min-h-10 rounded-full px-3 text-sm font-semibold text-red-700 hover:bg-red-50">
                             Remove
@@ -281,11 +285,22 @@ export function StaffEditor({
                             ) : (
                               <span className="text-sm text-ink-700">Evidence attached</span>
                             ))}
-                          <label className="flex min-h-10 items-center gap-2 text-sm text-ink-900">
-                            <input type="checkbox" checked={q.verified} onChange={(e) => update(q.key, { verified: e.currentTarget.checked })} className="h-5 w-5 accent-accent-600" />
+                          <label className={`flex min-h-10 items-center gap-2 text-sm ${q.mediaId ? "text-ink-900" : "text-ink-500"}`}>
+                            <input
+                              type="checkbox"
+                              checked={q.verified && Boolean(q.mediaId)}
+                              disabled={!q.mediaId}
+                              onChange={(e) => update(q.key, { verified: e.currentTarget.checked })}
+                              className="h-5 w-5 accent-accent-700"
+                            />
                             I&apos;ve checked it against the certificate
                           </label>
                         </div>
+                        {!(q.verified && q.mediaId) && (
+                          <p className="mt-2 text-xs text-ink-500">
+                            Bookings, sign-offs and the customer&apos;s project page only count it once the certificate is uploaded and you&apos;ve ticked that you checked it{q.mediaId ? "." : ": upload it first."}
+                          </p>
+                        )}
                       </li>
                     );
                   })}

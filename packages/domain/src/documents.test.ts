@@ -56,9 +56,11 @@ test("documentCompany: from settings, blanks left out, VAT number only when regi
   assert.equal(blank.tradingName, DEFAULT_SETTINGS.company.tradingName);
   assert.equal("geographicAddress" in blank, false);
   assert.equal("vatNumber" in blank, false);
+  assert.equal("phone" in blank, false, "the shipped 0800 000 0000 stand-in is never frozen into a document");
 
   const set = mergeSettings({
     company: {
+      phone: " 020 7946 0123 ",
       geographicAddress: " DEMO, 1 Demo Street, London ",
       vatNumber: "GB000000000",
       fgasCompanyCert: { body: "DEMO body", number: "DEMO-FG-1" },
@@ -66,6 +68,7 @@ test("documentCompany: from settings, blanks left out, VAT number only when regi
   });
   const c = documentCompany(set);
   assert.equal(c.geographicAddress, "DEMO, 1 Demo Street, London");
+  assert.equal(c.phone, "020 7946 0123", "a real number is printed");
   assert.equal("vatNumber" in c, false, "not VAT registered: no VAT number printed");
   assert.deepEqual(c.fgasCompanyCert, { body: "DEMO body", number: "DEMO-FG-1" });
   const registered = documentCompany(mergeSettings({ company: { vatNumber: "GB000000000" }, tax: { vatRegistered: true } }));

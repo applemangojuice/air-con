@@ -125,7 +125,7 @@ export function IssueCard({ issue, showJob = false, canUpdate = true }: { issue:
                   type="button"
                   disabled={busy || (mode === "resolved" && note.trim().length < 3)}
                   onClick={save}
-                  className="min-h-12 flex-1 rounded-full bg-accent-600 px-4 font-semibold text-white disabled:opacity-40"
+                  className="min-h-12 flex-1 rounded-full bg-accent-700 px-4 font-semibold text-white disabled:opacity-40"
                 >
                   {busy ? "Saving…" : mode === "resolved" ? "Mark fixed" : "Save"}
                 </button>

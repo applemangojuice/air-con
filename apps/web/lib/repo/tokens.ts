@@ -57,6 +57,23 @@ export async function insert(token: Omit<LoginToken, "id" | "usedAt" | "createdA
   return fromRow(data!);
 }
 
+/**
+ * Sign-in links minted for this address since `sinceIso` (the hour-long
+ * kind: the 30-day links inside operational emails don't count). Durable,
+ * so a per-address cap holds across instances and restarts.
+ */
+export async function recentSignInLinks(email: string, sinceIso: string, nowIso: string): Promise<number> {
+  const signInHorizon = new Date(Date.parse(nowIso) + 2 * 3600_000).toISOString();
+  const res = await db()
+    .from(TABLE)
+    .select("id", { count: "exact", head: true })
+    .eq("email", email.trim().toLowerCase())
+    .gte("created_at", sinceIso)
+    .lte("expires_at", signInHorizon);
+  if (res.error) throw new Error(`login_tokens count: ${res.error.message}`);
+  return res.count ?? 0;
+}
+
 export async function findByHash(tokenHash: string): Promise<LoginToken | null> {
   const data = must(
     await db().from(TABLE).select("*").eq("token_hash", tokenHash).maybeSingle(),

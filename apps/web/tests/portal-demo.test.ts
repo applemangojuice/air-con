@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  EARLY_START_WORDING_VERSION,
   applyProjectAction,
   createProject,
   currentStage,
@@ -92,7 +93,22 @@ function journey(early: boolean) {
     },
     T.surveyor,
   );
-  if (early) act({ type: "early-start-evidenced", channel: "email", evidenceRef: "DEMO-EMAIL-1", by: T.surveyor.name }, T.surveyor);
+  if (early) {
+    act(
+      {
+        type: "early-start-evidenced",
+        channel: "email",
+        evidenceRef: "DEMO-EMAIL-1",
+        by: T.surveyor.name,
+        mediaIds: ["demo-early-start-email"],
+        // Their reply to the contract email: the London day they accepted.
+        receivedOn: new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/London" }).format(new Date(s.project.proposal.acceptedAt!)),
+        fromAddress: "alex.morgan@example.com",
+        wordingVersion: EARLY_START_WORDING_VERSION,
+      },
+      T.surveyor,
+    );
+  }
   act({ type: "booking-confirmed" }, T.surveyor);
   act({ type: "kit-updated", status: "ordered", shortages: 0 }, T.surveyor);
   act({ type: "kit-updated", status: "confirmed", expectedDate: today(), shortages: 0 }, T.surveyor);

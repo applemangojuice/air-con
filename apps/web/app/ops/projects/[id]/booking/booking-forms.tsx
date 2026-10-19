@@ -134,7 +134,7 @@ export function CrewForm({
                         {t.qualifications.map((q) => (
                           <span key={`${q.kind}-${q.reference}`} className={`mr-3 inline-block ${q.current ? "" : "font-semibold text-red-700"}`}>
                             {q.label} {q.reference}
-                            {q.expiresOn ? `, ${q.current ? "until" : "EXPIRED"} ${fmtDate(q.expiresOn)}` : ""}
+                            {q.unverified ? ", NOT VERIFIED (upload it on Staff and tick that it's checked)" : q.expiresOn ? `, ${q.current ? "until" : "EXPIRED"} ${fmtDate(q.expiresOn)}` : ""}
                           </span>
                         ))}
                       </span>

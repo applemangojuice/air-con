@@ -328,7 +328,7 @@ export function SeedCase({ plan, a }: { plan: Plan; a: PlanAssumptions }) {
             <button
               type="button"
               onClick={copyMemo}
-              className="rounded-full bg-accent-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-accent-700"
+              className="rounded-full bg-accent-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-accent-800"
             >
               {copied ? "Copied ✓" : "Copy memo"}
             </button>

@@ -49,7 +49,7 @@ export interface DocPhoto {
 export interface DocContext {
   photos: Map<string, DocPhoto>;
   legal: { termsReviewed: boolean; cancellationReviewed: boolean; termsVersion: string };
-  company: { complaintsProcess: string; adr?: string; workmanshipGuarantee?: string; legalName: string; tradingName: string; geographicAddress: string; registeredAddress?: string; phone: string; email: string };
+  company: { complaintsProcess: string; adr?: string; workmanshipGuarantee?: string; legalName: string; tradingName: string; geographicAddress: string; registeredAddress?: string; phone?: string; email: string };
   payments: { depositPct: number; depositTiming: "on-acceptance" | "before-kit-order"; balanceDueDays: number; methods: string[] };
   cancellationDays: number;
   /** Where links to other documents go (null: plain text). */

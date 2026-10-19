@@ -490,11 +490,13 @@ test("storage: signed upload then signed read round trip, with tamper and expiry
 
 test("storage: upload, list, remove, path traversal and unknown buckets", async () => {
   await withTempDir(async (dir) => {
-    const db = createLocalClient({ backend: "file", dataDir: dir });
-    const bucket = db.storage.from("project-media");
+    // "scratch" has no rules (lib/storage-buckets.ts), so it takes any type, like a Supabase bucket without limits.
+    const db = createLocalClient({ backend: "file", dataDir: dir, buckets: ["project-media", "scratch"] });
+    const bucket = db.storage.from("scratch");
+    assert.match((await db.storage.from("project-media").upload("p1/a.txt", "hello", { contentType: "text/plain" })).error?.message ?? "", /not supported/, "a bucket with a type list refuses the rest");
 
     const up = await bucket.upload("p1/a.txt", "hello", { contentType: "text/plain" });
-    assert.deepEqual(up.data && { path: up.data.path, fullPath: up.data.fullPath }, { path: "p1/a.txt", fullPath: "project-media/p1/a.txt" });
+    assert.deepEqual(up.data && { path: up.data.path, fullPath: up.data.fullPath }, { path: "p1/a.txt", fullPath: "scratch/p1/a.txt" });
     assert.equal((await bucket.upload("p1/a.txt", "again")).error?.message, "The resource already exists");
     assert.equal((await bucket.upload("p1/a.txt", "again", { upsert: true })).error, null);
     await bucket.upload("p1/sub/b.png", new Blob([new Uint8Array([1, 2])], { type: "image/png" }));

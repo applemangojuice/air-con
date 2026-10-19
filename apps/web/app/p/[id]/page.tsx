@@ -80,7 +80,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
           <p className="mt-2 text-[15px] leading-relaxed text-ink-700">
             That&apos;s on us, not you. Try again in a moment, or {reachUs(settings.company)} and we&apos;ll help straight away.
           </p>
-          <a href={`/p/${id}`} className="mt-5 inline-flex min-h-12 items-center rounded-full bg-accent-600 px-6 font-semibold text-white hover:bg-accent-700">
+          <a href={`/p/${id}`} className="mt-5 inline-flex min-h-12 items-center rounded-full bg-accent-700 px-6 font-semibold text-white hover:bg-accent-800">
             Try again
           </a>
         </div>

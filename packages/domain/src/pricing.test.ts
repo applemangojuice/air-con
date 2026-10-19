@@ -85,12 +85,8 @@ test("no external wall adds internal routing line and review flag", () => {
   assert.ok(quote.reviewFlags.some((f) => f.includes("no external wall")));
 });
 
-test("finance options include deposit and monthly payment", () => {
+test("the engine works out no finance: no APR, no monthly figures", () => {
   const quote = generateQuote(survey([room()]));
-  assert.equal(quote.finance.length, 3);
-  for (const f of quote.finance) {
-    assert.equal(f.depositGbp, Math.round(quote.totalGbp * 0.1));
-    assert.ok(f.monthlyGbp > 0);
-    assert.ok(f.totalPayableGbp > quote.totalGbp); // interest > 0
-  }
+  assert.equal("finance" in quote, false);
+  assert.doesNotMatch(JSON.stringify(quote), /apr|monthly/i);
 });

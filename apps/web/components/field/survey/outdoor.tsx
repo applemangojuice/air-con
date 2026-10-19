@@ -247,7 +247,7 @@ export function PositionEditor({ positionId }: { positionId: string }) {
         <button
           type="button"
           onClick={() => go({ s: "electrics" })}
-          className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-accent-600 px-6 text-base font-semibold text-white shadow-sm hover:bg-accent-700 sm:w-auto"
+          className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-accent-700 px-6 text-base font-semibold text-white shadow-sm hover:bg-accent-800 sm:w-auto"
         >
           Next: Electrics <span aria-hidden>→</span>
         </button>

@@ -6,9 +6,12 @@
  * Hiding a button is presentation; this is the rule.
  *
  * Qualifications are facts with references and expiry dates, never a
- * checkbox. Steps that legally need a certified person (refrigerant work,
- * notifiable electrics, commissioning sign-off) check `meetsRequirement`
- * against the date the work happens.
+ * checkbox, and they count only once verified: an admin has checked the
+ * reference against the certificate (`verifiedAt`) and the certificate is on
+ * file (`mediaId`). Steps that legally need a certified person (refrigerant
+ * work, notifiable electrics, commissioning sign-off) check
+ * `meetsRequirement` against the date the work happens; customers are shown
+ * only verified, current ones.
  */
 
 /* ------------------------------------------------------------------ */
@@ -139,15 +142,25 @@ export const ROLE_PERMISSIONS: Record<StaffRole, readonly Permission[]> = {
 
 /**
  * Subcontractors work on the jobs they're assigned to and nothing else: no
- * board-wide view, no margins, no admin, no pilot dashboard.
+ * board-wide view, no margins, no admin, no pilot dashboard, and none of the
+ * office's own edits (the project record, contracts, the schedule, orders,
+ * money, design sign-off), whichever role they're given. What's left is the
+ * job itself: surveying, design drafts, install work, its reviews and
+ * commissioning.
  */
 export const EXTERNAL_DENIED: ReadonlySet<Permission> = new Set<Permission>([
   "projects.view-all",
+  "projects.edit",
   "finance.view-margin",
   "settings.edit",
   "staff.edit",
   "pilots.view",
   "catalogue.edit",
+  "proposal.issue",
+  "schedule.edit",
+  "purchasing.edit",
+  "payments.record",
+  "design.approve",
 ]);
 
 export function permissionsFor(staff: Pick<StaffMember, "roles" | "external" | "active">): Set<Permission> {
@@ -170,23 +183,36 @@ export function can(staff: Pick<StaffMember, "roles" | "external" | "active">, p
 /* Qualification checks                                                */
 /* ------------------------------------------------------------------ */
 
+/** Checked by an admin against the certificate, with the certificate itself on file. */
+export function isVerifiedQualification(q: Pick<Qualification, "reference" | "verifiedAt" | "mediaId">): boolean {
+  return (
+    typeof q.reference === "string" &&
+    q.reference.trim().length > 0 &&
+    typeof q.verifiedAt === "string" &&
+    q.verifiedAt.trim().length > 0 &&
+    typeof q.mediaId === "string" &&
+    q.mediaId.trim().length > 0
+  );
+}
+
 /**
- * Held, with a reference, and not expired on the day in question. A
- * certificate is good through its expiry date.
+ * Where one qualification stands on a day: `current` (verified and not
+ * expired: a certificate is good through its expiry date), `expired`, or
+ * `unverified` (no reference, not checked, or no certificate on file).
+ * Only `current` counts anywhere: gates, sign-offs, the customer's view.
  */
+export function qualificationStatus(q: Qualification, onIso: string): "current" | "expired" | "unverified" {
+  if (q.expiresOn && q.expiresOn.slice(0, 10) < onIso.slice(0, 10)) return "expired";
+  return isVerifiedQualification(q) ? "current" : "unverified";
+}
+
+/** Held, verified, and not expired on the day in question (qualificationStatus "current"). */
 export function hasCurrentQualification(
   staff: Pick<StaffMember, "qualifications">,
   kind: QualificationKind,
   onIso: string,
 ): boolean {
-  const on = onIso.slice(0, 10);
-  return staff.qualifications.some(
-    (q) =>
-      q.kind === kind &&
-      typeof q.reference === "string" &&
-      q.reference.trim().length > 0 &&
-      (!q.expiresOn || q.expiresOn.slice(0, 10) >= on),
-  );
+  return staff.qualifications.some((q) => q.kind === kind && qualificationStatus(q, onIso) === "current");
 }
 
 export type StepRequirement = "fgas" | "electrical" | "tech-lead";

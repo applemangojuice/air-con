@@ -69,6 +69,10 @@ export async function saveStaffAction(fd: FormData): Promise<ActionResult> {
   }
   if (d.external && d.roles.includes("admin")) return refused("Subcontractors can't be admins.");
 
+  // Ticking "checked" means checked against the certificate itself, which then stays on file: a typed number alone counts nowhere.
+  const unchecked = d.qualifications.find((q) => q.verified && !q.mediaId);
+  if (unchecked) return refused(`Upload the certificate for ${QUALIFICATION_LABEL[unchecked.kind as QualificationKind] ?? unchecked.kind} (${unchecked.reference}) before ticking that you've checked it.`);
+
   const now = new Date().toISOString();
   const qualifications = d.qualifications.map((q) => {
     const before = existing?.qualifications.find((x) => x.kind === q.kind && x.reference === q.reference);

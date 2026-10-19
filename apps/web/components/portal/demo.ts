@@ -47,7 +47,8 @@ const person = (id: string, name: string, roles: StaffMember["roles"], quals: St
   roles,
   external: false,
   active: true,
-  qualifications: quals,
+  // Checked, with a DEMO certificate on file: only verified qualifications count (domain staff.ts).
+  qualifications: quals.map((q) => ({ ...q, verifiedAt: "2026-01-05T09:00:00.000Z", verifiedBy: "DEMO", mediaId: `demo-certificate-${q.reference}` })),
   bio,
   demo: true,
 });
@@ -150,7 +151,8 @@ export function demoHubData(s: DemoState): HubData {
   const pack = s.documents.find((d) => d.kind === "handover-pack");
   const completedOn = p.install.completedAt?.slice(0, 10) ?? today;
   return {
-    ...hubFacts(p, settings, today),
+    // The demo records every message and sends none: a text when there's a mobile, as the outbox would.
+    ...hubFacts(p, settings, today, p.customer.phone?.trim() ? "sms" : p.customer.email ? "email" : null),
     project: customerSafeProject(p),
     today,
     nowIso,

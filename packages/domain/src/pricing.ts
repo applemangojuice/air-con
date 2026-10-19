@@ -3,7 +3,6 @@ import { getPermutation } from "./archetypes.ts";
 import { scoreConfidence } from "./confidence.ts";
 import type {
   CapacityKw,
-  FinanceOption,
   QuoteLine,
   QuoteResult,
   RoomDesign,
@@ -107,25 +106,12 @@ function designSystems(survey: Survey): SystemDesign[] {
   });
 }
 
-function financeOptions(totalGbp: number): FinanceOption[] {
-  const APR = 11.9;
-  const deposit = Math.round(totalGbp * 0.1);
-  const principal = totalGbp - deposit;
-  const monthlyRate = APR / 100 / 12;
-  return [24, 48, 60].map((months) => {
-    const monthly =
-      (principal * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -months));
-    const monthlyRounded = Math.round(monthly * 100) / 100;
-    return {
-      months,
-      aprPercent: APR,
-      depositGbp: deposit,
-      monthlyGbp: monthlyRounded,
-      totalPayableGbp: Math.round(deposit + monthlyRounded * months),
-    };
-  });
-}
-
+/**
+ * The price for a survey. No finance figures: a credit promotion only ever
+ * prints the lender's own representative example from settings
+ * (settings.finance, financeOffered), never one worked out here. (Quotes
+ * saved by older engines may still carry a `finance` array; nothing reads it.)
+ */
 export function generateQuote(survey: Survey): QuoteResult {
   const systems = designSystems(survey);
   const lines: QuoteLine[] = [];
@@ -232,7 +218,6 @@ export function generateQuote(survey: Survey): QuoteResult {
     installDays,
     warrantyYears: WARRANTY_YEARS,
     confidence: scoreConfidence(survey),
-    finance: totalGbp > 0 ? financeOptions(totalGbp) : [],
     reviewFlags,
   };
 }

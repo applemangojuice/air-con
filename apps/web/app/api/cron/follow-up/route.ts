@@ -63,18 +63,20 @@ export async function GET(request: Request) {
   // device/row), and collapse multiple drafts per email to the newest.
   let candidates = data ?? [];
   if (candidates.length > 0) {
-    const emails = [...new Set(candidates.map((d) => d.email))];
+    // Addresses are saved lower-case now; older rows may not be, so compare without case.
+    const lower = (e: unknown) => String(e ?? "").trim().toLowerCase();
+    const emails = [...new Set(candidates.flatMap((d) => [d.email, lower(d.email)]))];
     const { data: finished } = await supabase
       .from("quote_requests")
       .select("email")
       .in("email", emails)
       .neq("status", "draft");
-    const finishedEmails = new Set((finished ?? []).map((r) => r.email));
+    const finishedEmails = new Set((finished ?? []).map((r) => lower(r.email)));
     const newestPerEmail = new Map<string, (typeof candidates)[number]>();
     for (const d of candidates) {
-      if (finishedEmails.has(d.email)) continue;
-      const prev = newestPerEmail.get(d.email);
-      if (!prev || d.created_at > prev.created_at) newestPerEmail.set(d.email, d);
+      if (finishedEmails.has(lower(d.email))) continue;
+      const prev = newestPerEmail.get(lower(d.email));
+      if (!prev || d.created_at > prev.created_at) newestPerEmail.set(lower(d.email), d);
     }
     candidates = [...newestPerEmail.values()];
   }
@@ -130,7 +132,7 @@ async function sendFollowUp(to: string, postcode: string): Promise<boolean> {
     followUpSubject(postcode),
     brandedEmail(`<p style="margin:0 0 14px">${esc(greeting)}</p>
 <p style="margin:0 0 14px">${esc(opener)}</p>
-<p style="margin:0 0 24px"><a href="${appUrl()}/quote" style="display:inline-block;background:#d55a0a;color:#ffffff;text-decoration:none;font-weight:600;padding:12px 28px;border-radius:999px">Finish my quote</a></p>
+<p style="margin:0 0 24px"><a href="${appUrl()}/quote" style="display:inline-block;background:#a84508;color:#ffffff;text-decoration:none;font-weight:600;padding:12px 28px;border-radius:999px">Finish my quote</a></p>
 <p style="margin:0 0 14px;font-size:13px"><a href="${link}" style="color:#a84508">${link}</a></p>
 <p style="margin:0 0 14px">${esc(promise)}</p>
 <p style="margin:0 0 28px">${esc(signoff).replace(/\n/g, "<br/>")}</p>`),

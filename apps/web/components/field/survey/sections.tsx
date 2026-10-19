@@ -24,7 +24,7 @@ export function NextButton({ from, quiet = false }: { from: ScreenId; quiet?: bo
         <button
           type="button"
           onClick={() => go({ s: next })}
-          className={`inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full px-6 text-base font-semibold sm:w-auto ${quiet ? "border border-line bg-white text-ink-900 hover:bg-surface" : "bg-accent-600 text-white shadow-sm hover:bg-accent-700"}`}
+          className={`inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full px-6 text-base font-semibold sm:w-auto ${quiet ? "border border-line bg-white text-ink-900 hover:bg-surface" : "bg-accent-700 text-white shadow-sm hover:bg-accent-800"}`}
         >
           Next: {SCREEN_LABEL[next]} <span aria-hidden>→</span>
         </button>

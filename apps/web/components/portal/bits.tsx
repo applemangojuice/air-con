@@ -323,7 +323,7 @@ export function PersonCardView({ person }: { person: PersonCard }) {
 /* ------------------------------------------------------------------ */
 
 const PRIMARY =
-  "inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-accent-600 px-6 py-3 text-base font-semibold text-white shadow-sm transition hover:bg-accent-700 disabled:cursor-not-allowed disabled:opacity-50";
+  "inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-accent-700 px-6 py-3 text-base font-semibold text-white shadow-sm transition hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-50";
 const SECONDARY =
   "inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-line bg-white px-5 py-3 text-base font-semibold text-ink-900 transition hover:border-ink-300 hover:bg-surface disabled:cursor-not-allowed disabled:opacity-50";
 

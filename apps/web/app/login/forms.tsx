@@ -8,7 +8,7 @@ const inputCls =
   "w-full rounded-full border border-line bg-white px-5 py-3 text-base text-ink-900 outline-none transition placeholder:text-ink-300 focus:border-accent-500 focus:ring-2 focus:ring-accent-100";
 
 const primaryCls =
-  "inline-flex min-h-12 w-full items-center justify-center rounded-full bg-accent-600 px-6 py-3 font-semibold text-white transition hover:bg-accent-700 disabled:cursor-wait disabled:opacity-70";
+  "inline-flex min-h-12 w-full items-center justify-center rounded-full bg-accent-700 px-6 py-3 font-semibold text-white transition hover:bg-accent-800 disabled:cursor-wait disabled:opacity-70";
 
 function SubmitButton({ children, pending: pendingLabel }: { children: string; pending: string }) {
   const { pending } = useFormStatus();

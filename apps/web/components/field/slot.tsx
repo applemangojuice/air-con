@@ -47,7 +47,7 @@ function Chip({ state, waiting }: { state: SlotView["state"]; waiting: boolean }
 }
 
 const BIG = "min-h-12 rounded-full px-5 font-semibold";
-const PRIMARY = `${BIG} bg-accent-600 text-white shadow-sm hover:bg-accent-700 disabled:opacity-40`;
+const PRIMARY = `${BIG} bg-accent-700 text-white shadow-sm hover:bg-accent-800 disabled:opacity-40`;
 const SECONDARY = `${BIG} border border-line bg-white text-ink-900 hover:bg-surface disabled:opacity-40`;
 
 export function Slot({ projectId, step, slot, waiting, refused, imageUrl, disabledReason, meId }: SlotProps) {

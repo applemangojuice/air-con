@@ -33,7 +33,7 @@ test("defaults make no warranty, F-gas, finance, SLA or VAT-rate claims", () => 
   const ps = pub();
   assert.equal(warrantyCopy(ps), null, "no warranty years until settings say so");
   assert.equal(fgasClaim(ps), null, "no F-gas claim without a company certificate");
-  assert.equal(ps.finance.lenderConfigured, false);
+  assert.equal(ps.finance.offered, false);
   assert.deepEqual(slaCommitments(ps), [], "no 'money off automatically' while SLAs are off");
   assert.equal(vatCopy(ps).short, "No VAT to add", "not registered: no VAT line, the price is the price");
   assert.doesNotMatch(vatCopy(ps).long, /0%|zero/i);
@@ -168,4 +168,19 @@ test("consent record: operational and marketing are separate, versioned facts", 
   const m = quoteConsentRecord({ marketing: true, hasPhone: false, at: "2026-10-18T10:00:00.000Z" });
   assert.deepEqual(m.operational.channels, ["email"]);
   assert.deepEqual(m.marketing.channels, ["email"]);
+});
+
+test("finance: the lender's own example, word for word, with who provides it, and only with every detail on record", () => {
+  const example = "DEMO Representative example: borrowing £5,000 over 48 months at a representative 9.9% APR (fixed). Total amount payable £6,040.80.";
+  const full = { firmName: "DEMO Lending Ltd", frn: "123456", arrangement: "appointed-rep", approvalRef: "AR 987654", representativeExample: example };
+  assert.equal(pub({ finance: { ...full, approvalRef: "" } }).finance.offered, false, "a missing detail shows nothing");
+  assert.equal(pub({ finance: { lenderConfigured: true } }).finance.offered, false, "the old switch shows nothing");
+  const ps = pub({ finance: full });
+  assert.ok(ps.finance.offered);
+  if (!ps.finance.offered) return;
+  assert.equal(ps.finance.representativeExample, example, "verbatim");
+  const lines = claims.financeDisclosure(ps.finance, ps.company.tradingName);
+  assert.match(lines[0]!, /provided by DEMO Lending Ltd, authorised and regulated by the Financial Conduct Authority \(firm reference 123456\)/);
+  assert.match(lines[1]!, /credit broker, not a lender, and an appointed representative .*AR 987654/);
+  assert.doesNotMatch(JSON.stringify(ps.finance), /11\.9/);
 });

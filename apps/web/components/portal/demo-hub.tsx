@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useRef, useState } from "react";
 import {
+  EARLY_START_WORDING_VERSION,
   applyProjectAction,
   cancellationSentence,
   isFullName,
@@ -279,7 +280,22 @@ export function DemoHub({ initialProject }: { initialProject: Project }) {
   const earlyAsked = p.proposal.earlyStart?.requested ?? p.proposal.earlyStartRequested ?? false;
   if (p.proposal.status === "accepted" && earlyAsked && !p.proposal.earlyStart?.evidencedAt && p.install.status === "not-started") {
     add("Your early-start email arrives (we file it)", () =>
-      chain([{ action: { type: "early-start-evidenced", channel: "email", evidenceRef: "DEMO-EMAIL-1", by: office.name }, actor: office }]),
+      chain([
+        {
+          action: {
+            type: "early-start-evidenced",
+            channel: "email",
+            evidenceRef: "DEMO-EMAIL-1, Re: Your contract",
+            by: office.name,
+            // The office saves their reply with the project: a DEMO stand-in for the stored copy.
+            mediaIds: ["demo-early-start-email"],
+            receivedOn: londonWallClock(new Date(p.proposal.acceptedAt ?? Date.now())).slice(0, 10),
+            ...(p.customer.email ? { fromAddress: p.customer.email } : {}),
+            wordingVersion: p.proposal.earlyStart?.wordingVersion ?? EARLY_START_WORDING_VERSION,
+          },
+          actor: office,
+        },
+      ]),
     );
   }
   if (p.booking.dates.length > 0 && p.booking.crew.length === 0) {

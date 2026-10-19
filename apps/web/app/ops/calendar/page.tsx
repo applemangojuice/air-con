@@ -239,7 +239,7 @@ function MonthView({ month, today, events, clashing, dayHref }: { month: string;
                 <div key={d} className={`min-h-28 min-w-0 border-line p-1.5 ${i < 6 ? "border-r" : ""} ${outside ? "bg-surface/40" : ""} ${i >= 5 ? "bg-surface/30" : ""}`}>
                   <Link
                     href={dayHref(d)}
-                    className={`mb-1 inline-flex h-7 min-w-7 items-center justify-center rounded-full px-1.5 text-xs font-semibold ${d === today ? "bg-accent-600 text-white" : outside ? "text-ink-500" : "text-ink-900 hover:bg-surface"}`}
+                    className={`mb-1 inline-flex h-7 min-w-7 items-center justify-center rounded-full px-1.5 text-xs font-semibold ${d === today ? "bg-accent-700 text-white" : outside ? "text-ink-500" : "text-ink-900 hover:bg-surface"}`}
                     aria-label={`${fmtDay(d)}: ${dayEvents.length} item${dayEvents.length === 1 ? "" : "s"}`}
                   >
                     {Number(d.slice(8))}

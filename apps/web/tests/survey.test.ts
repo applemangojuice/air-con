@@ -181,9 +181,10 @@ test("on my way: records the ETA and says honestly that the text is demo-only he
     assert.equal(sent.text.state, "demo", "no SMS provider here: stored, never claimed as sent");
     assert.equal(sent.smsMode, "demo");
   }
+  // No mobile: a text could never arrive, so it goes by email instead (recorded as demo here).
   const noPhone = await newProject();
   const quiet = await survey.sendOnMyWay(noPhone, 15, surveyor);
-  assert.ok(quiet.ok && quiet.text.state === "not-sent" && /no mobile number/.test(quiet.text.reason));
+  assert.ok(quiet.ok && quiet.text.channel === "email" && quiet.text.state === "demo", JSON.stringify(quiet));
 });
 
 test("start → autosave with an optimistic check → submit, end to end", async () => {

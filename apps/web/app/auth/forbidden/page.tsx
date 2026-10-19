@@ -45,7 +45,7 @@ export default async function ForbiddenPage({ searchParams }: { searchParams: Se
         <div className="mt-6 flex flex-col gap-3 sm:flex-row">
           <Link
             href={home}
-            className="inline-flex min-h-12 flex-1 items-center justify-center rounded-full bg-accent-600 px-6 py-3 font-semibold text-white transition hover:bg-accent-700"
+            className="inline-flex min-h-12 flex-1 items-center justify-center rounded-full bg-accent-700 px-6 py-3 font-semibold text-white transition hover:bg-accent-800"
           >
             {staff ? "Go to my work" : "Sign in"}
           </Link>

@@ -1417,7 +1417,9 @@ changelog and the reasons, so nobody "fixes" a deliberate choice back.
     - *Consents*: `createProjectForQuote` copies the funnel's consents onto
       `customers.ops_consent` / `marketing_consent`
       (`repo/customers.consentsFromQuote`); the latest answer wins and
-      marketing is only ever a consent when it was ticked.
+      marketing is only ever a consent when it was ticked. (§K32: only for a
+      new address; an address that's already a customer's waits for its
+      sign-in.)
     - *Settings caches*: every `saveSettings` caller then calls
       `revalidateSettingsCaches()` (tag `settings` + the root layout).
     - *Placeholder phone*: the shipped "0800 000 0000" is
@@ -1643,3 +1645,78 @@ changelog and the reasons, so nobody "fixes" a deliberate choice back.
       with a boot warning naming them. `docs/going-live.md` is the pilot's
       setup: every migration to 0010, the required variables, the Stripe
       webhook.
+
+32. **Hardening review, batch 4 (before the first real customers).**
+    - *Project access in every project action*: the command centre's
+      actions (`app/ops/projects/[id]/actions.ts`) check the project itself
+      (`requireProjectAccess`, which re-reads the live staff row), not only a
+      permission, like the booking, kit, money, compliance, design and
+      proposal actions; `tests/route-guards.test.ts` fails any action taking
+      a project id that doesn't. Actions with no project (quotes, intel, new
+      pilot) need `projects.view-all` as well (`requireStaff` takes several
+      permissions). Subcontractors (`EXTERNAL_DENIED`) also lose the office's
+      edits whatever their role: `projects.edit`, `proposal.issue`,
+      `schedule.edit`, `purchasing.edit`, `payments.record`, `design.approve`.
+    - *An unverified funnel email never changes someone's record*: when the
+      address typed into the funnel is already a customer's,
+      `createProjectForQuote` leaves that customer alone (consents, phone,
+      name, homes) and the project unattached; the browser that saved the
+      quote acts through its grant as `quote:<id>` (`quoteActorId`). The
+      project joins the customer, with its quote's consents (latest answer
+      wins) and any missing phone or name, when the address signs in from a
+      link about that project (`claimProjectOnSignIn`, at `/auth/verify`);
+      minting or sending a link attaches nothing. A pilot staff set up is
+      trusted and attached at once.
+    - *Video walkthroughs*: `/api/video-surveys/**` answer 404 in production
+      unless `VIDEO_SURVEYS_ENABLED=1` (the capture app isn't in the pilot).
+      Processing is rate limited and runs once per record: a record already
+      extracted, quoted or parked answers from what's stored, and a run claims
+      it (`uploaded`/`transcribed` → `processing`) before any paid provider is
+      called (`lib/video-surveys.ts`).
+    - *Storage limits*: migration `0011_storage_limits.sql` sets every bucket's
+      `file_size_limit` and `allowed_mime_types` (survey photos: photos only,
+      25 MB; videos: MP4/.mov, 50 MB; project media: the domain's upload types
+      plus system SVG, 25 MB), mirrored by `lib/storage-buckets.ts` for the
+      local backend and kept in step by a test. `/api/uploads` requires a photo
+      content type and names the object for it; `/api/health` reports a bucket
+      without limits.
+    - *Email brakes*: `enforceRateLimit` keys IPv6 by /64. The quote funnel's
+      name is a name (`lib/person-name.ts`: letters and name punctuation, no
+      digits, nothing link-like); quote emails are capped per address (3 a
+      day) and overall (40 an hour), counted from the saved quotes, so the caps
+      hold across instances; over a cap the quote still saves. Sign-in links
+      are capped per address (6 a quarter hour) from `login_tokens`. Funnel
+      emails are saved lower-case.
+    - *Early-start evidence is the copy itself*: `early-start-evidenced` needs
+      the customer's email (PDF or screenshot) or the signed form uploaded to
+      the project (`mediaIds`), the day it reached us (on or after acceptance,
+      not in the future), for an email the address it came from (the
+      contract's), and a tick that it uses the wording they were given
+      (`earlyStartEvidenceProblem`). One server path
+      (`booking-server.recordEarlyStartEvidence`) for both forms.
+    - *Qualifications count only once verified*: `hasCurrentQualification` /
+      `qualificationStatus` need `verifiedAt` and the certificate on file
+      (`mediaId`), for every gate, sign-off, launch check and the customer's
+      people cards; the staff editor won't tick "checked" without the upload.
+      DEMO certificates are marked checked with a DEMO evidence id.
+    - *Company F-gas certificate*: approving `fgas-company` without an attached
+      certificate (the subcontracting route) needs a current one in settings
+      covering the last install day (`companyFgasCertProblem`); such an
+      approval reopens by itself when that stops being true, and the gates see
+      it at once (`buildReadinessContext`).
+    - *Finance is the lender's facts*: `settings.finance` holds the lender or
+      broker, their FRN, how we may promote it, its reference and the lender's
+      representative example; finance shows only with all of them
+      (`financeOffered`), word for word with the firm disclosure. The engine's
+      invented 11.9% APR examples are gone from `QuoteResult`.
+    - *No stand-in phone anywhere*: document snapshots leave out the
+      placeholder number, and the proposal, acceptance and respond copy say
+      "email us" until a real one is set.
+    - *Contrast*: `ink-500` is #5d6371, primary buttons are accent-700 with an
+      accent-800 hover everywhere, and the focus ring is accent-700
+      (`tests/contrast.test.ts`).
+    - *"We'll text you" only when a text will go*: `onTheWayChannel` (a mobile
+      that takes texts, and SMS live or nothing live; else email; else nothing)
+      decides both the on-my-way events' channel (`COMMS_EVENTS` fallback:
+      email when a text can't reach them) and every promise in the portal and
+      the booking and day-before emails.

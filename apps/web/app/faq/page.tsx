@@ -89,7 +89,7 @@ function faqsFor(s: PublicSettings): { q: string; a: string }[] {
     },
     {
       q: "How do I pay?",
-      a: `Getting a price costs nothing${surveyPriceCopy(s) === "Free" ? ", and so does the survey" : ""}. ${pay.deposit} ${pay.balance} ${pay.methods}${s.finance.lenderConfigured ? "" : " We don't offer finance at the moment."}`,
+      a: `Getting a price costs nothing${surveyPriceCopy(s) === "Free" ? ", and so does the survey" : ""}. ${pay.deposit} ${pay.balance} ${pay.methods}${s.finance.offered ? "" : " We don't offer finance at the moment."}`,
     },
     {
       q: "Can I change my mind?",

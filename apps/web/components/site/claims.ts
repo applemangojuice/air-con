@@ -3,10 +3,12 @@ import {
   TAX_CODES,
   cancellationSentence,
   effectiveTaxCode,
+  financeOffered,
   isInServiceArea,
   isPlaceholderPhone,
   mergeSettings,
   type ContractType,
+  type FinanceArrangement,
   type PilotSettings,
   type TaxCodeId,
 } from "@aircon/domain";
@@ -62,9 +64,30 @@ export interface PublicSettings {
     balanceDueDays: number;
     methods: PilotSettings["payments"]["methods"];
   };
-  finance: { lenderConfigured: boolean };
+  /** Only with every credit-promotion fact on record (financeOffered); the lender's own words, never figures we worked out. */
+  finance: PublicFinance;
   legal: { termsVersion: string; termsReviewed: boolean; cancellationReviewed: boolean };
   showPrototypeNav: boolean;
+}
+
+export type PublicFinance =
+  | { offered: false }
+  | { offered: true; firmName: string; frn: string; arrangement: FinanceArrangement; approvalRef: string; representativeExample: string };
+
+/**
+ * Who provides the credit and how we may promote it, said plainly beside the
+ * lender's example (legal review required before finance is switched on).
+ */
+export function financeDisclosure(f: Extract<PublicFinance, { offered: true }>, tradingName: string): string[] {
+  const lender = `Credit is provided by ${f.firmName}, authorised and regulated by the Financial Conduct Authority (firm reference ${f.frn}), and is subject to status.`;
+  switch (f.arrangement) {
+    case "authorised":
+      return [lender, `${tradingName} is a credit broker, not a lender, authorised and regulated by the Financial Conduct Authority (firm reference ${f.approvalRef}).`];
+    case "appointed-rep":
+      return [lender, `${tradingName} is a credit broker, not a lender, and an appointed representative for credit broking (FCA register reference ${f.approvalRef}).`];
+    case "s21-approved":
+      return [lender, `${tradingName} is not a lender. This finance promotion was approved by an FCA-authorised firm (approval ${f.approvalRef}).`];
+  }
 }
 
 const text = (v: string | null | undefined): string | null => (typeof v === "string" && v.trim() ? v.trim() : null);
@@ -143,7 +166,16 @@ export function toPublicSettings(settings: PilotSettings, todayIso: string): Pub
       balanceDueDays: Math.max(0, Math.round(s.payments.balanceDueDays)),
       methods: s.payments.methods,
     },
-    finance: { lenderConfigured: s.finance.lenderConfigured === true },
+    finance: financeOffered(s)
+      ? {
+          offered: true,
+          firmName: s.finance.firmName!.trim(),
+          frn: s.finance.frn!.trim(),
+          arrangement: s.finance.arrangement!,
+          approvalRef: s.finance.approvalRef!.trim(),
+          representativeExample: s.finance.representativeExample!.trim(),
+        }
+      : { offered: false },
     legal: {
       termsVersion: text(s.legal.termsVersion) ?? "pilot-draft-1",
       termsReviewed: s.legal.termsReviewed === true,

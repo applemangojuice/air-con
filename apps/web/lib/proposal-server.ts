@@ -17,6 +17,7 @@ import {
   earlyStartWording,
   engineListNetPence,
   guaranteeLines,
+  isPlaceholderPhone,
   settingsForProposal,
   withSettingsWording,
   hasCurrentQualification,
@@ -889,7 +890,8 @@ async function createContractDocument(project: Project, record: ProposalRecord, 
     tradingName: company.tradingName,
     geographicAddress: company.geographicAddress,
     ...(company.registeredAddress ? { registeredAddress: company.registeredAddress } : {}),
-    phone: company.phone,
+    // Never the stand-in number: the cancellation instructions say "email us" instead.
+    ...(isPlaceholderPhone(company.phone) ? {} : { phone: company.phone.trim() }),
     email: company.email,
   };
   const proposalDoc = (await listDocuments(project.id, { kind: "proposal" }))[0];

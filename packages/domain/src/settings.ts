@@ -125,8 +125,45 @@ export interface PilotSettings {
   warranty: { workmanshipYears: number | null; manufacturerSummary: string | null };
   legal: { termsVersion: string; termsReviewed: boolean; cancellationReviewed: boolean };
   comms: { smsSenderId: string; disabledEvents: string[] };
-  finance: { lenderConfigured: boolean };
+  finance: FinanceSettings;
   features: { showPrototypeNav: boolean };
+}
+
+/** How we're allowed to promote someone else's credit (FSMA s21; research §F). */
+export type FinanceArrangement = "authorised" | "appointed-rep" | "s21-approved";
+export const FINANCE_ARRANGEMENTS: readonly FinanceArrangement[] = ["authorised", "appointed-rep", "s21-approved"];
+
+/**
+ * A credit promotion's facts, all or nothing: finance shows nowhere until
+ * every one is set (`financeOffered`). The lender or broker providing the
+ * credit and their FCA firm reference number; how we may promote it (our own
+ * credit-broking permission, as an appointed representative, or a promotion
+ * an authorised firm approved under s21); the reference for that (our FRN,
+ * the register entry, or the approval reference and date); and the lender's
+ * representative example, printed word for word. Nothing is ever worked out
+ * by us: no APR, no monthly figure. Legal review required.
+ */
+export interface FinanceSettings {
+  firmName?: string;
+  frn?: string;
+  arrangement?: FinanceArrangement;
+  approvalRef?: string;
+  representativeExample?: string;
+}
+
+/** A plausible FCA firm reference number: 6 or 7 digits. */
+const isFrn = (v: string | undefined): boolean => /^\d{6,7}$/.test((v ?? "").trim());
+
+/** Every credit-promotion fact is on record, so finance may be shown (and only then). */
+export function financeOffered(settings: Pick<PilotSettings, "finance">): boolean {
+  const f = settings.finance ?? {};
+  return (
+    Boolean(f.firmName?.trim()) &&
+    isFrn(f.frn) &&
+    FINANCE_ARRANGEMENTS.includes(f.arrangement as FinanceArrangement) &&
+    Boolean(f.approvalRef?.trim()) &&
+    (f.representativeExample?.trim().length ?? 0) >= 40
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -196,7 +233,7 @@ export const DEFAULT_SETTINGS: PilotSettings = {
   warranty: { workmanshipYears: null, manufacturerSummary: null },
   legal: { termsVersion: "pilot-draft-1", termsReviewed: false, cancellationReviewed: false },
   comms: { smsSenderId: "DangItsHot", disabledEvents: [] },
-  finance: { lenderConfigured: false },
+  finance: {},
   features: { showPrototypeNav: false },
 };
 
@@ -294,6 +331,15 @@ function sanitise(s: PilotSettings): PilotSettings {
     const v = company[key];
     if (typeof v !== "string" || !v.trim()) delete company[key];
   }
+  // Finance: known keys only, real strings only, a listed arrangement (an old `lenderConfigured` switch is dropped).
+  const f = (isPlainObject(s.finance) ? s.finance : {}) as Record<string, unknown>;
+  const finance: FinanceSettings = {};
+  for (const key of ["firmName", "frn", "approvalRef", "representativeExample"] as const) {
+    const v = f[key];
+    if (typeof v === "string" && v.trim()) finance[key] = v.trim();
+  }
+  if (FINANCE_ARRANGEMENTS.includes(f.arrangement as FinanceArrangement)) finance.arrangement = f.arrangement as FinanceArrangement;
+  s.finance = finance;
   // The review link goes in a customer email button: http(s) only.
   if (s.company.reviewUrl !== undefined && !/^https?:\/\/[^\s/]+\.[^\s]+$/i.test(s.company.reviewUrl.trim())) {
     delete s.company.reviewUrl;

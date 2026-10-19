@@ -96,7 +96,7 @@ export default function OurProcessPage() {
             </p>
             <Link
               href="/quote"
-              className="mt-5 inline-block rounded-full bg-accent-600 px-6 py-3 font-semibold text-white transition hover:bg-accent-700"
+              className="mt-5 inline-block rounded-full bg-accent-700 px-6 py-3 font-semibold text-white transition hover:bg-accent-800"
             >
               Get my price
             </Link>

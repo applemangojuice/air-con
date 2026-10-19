@@ -11,6 +11,7 @@ import {
 import { escapeHtml } from "../email.ts";
 import type { MessageStore, StoredMessage } from "../repo/messages.ts";
 import { isTextable, normaliseUkPhone } from "../providers/sms.ts";
+import { onTheWayChannel } from "./on-the-way.ts";
 import { linkPathFor, renderMessage, templateContext, type CommsData, type RenderedMessage } from "./templates.ts";
 
 /**
@@ -318,8 +319,9 @@ export function createOutbox(deps: OutboxDeps) {
    */
   async function notify<E extends CommsEventId>(event: E, opts: NotifyOptions<E>): Promise<NotifyResult> {
     const def = COMMS_EVENTS[event];
-    const channels = opts.channels ? def.channels.filter((c) => opts.channels!.includes(c)) : def.channels;
+    let channels = opts.channels ? def.channels.filter((c) => opts.channels!.includes(c)) : def.channels;
     const fail = (error: string): NotifyResult => done(event, channels.map((channel) => ({ channel, status: "error", error })));
+    const live = { sms: deps.sms.configured(), email: deps.email.configured() };
     try {
       const settings = await deps.getSettings();
       if (settings.comms.disabledEvents.includes(event)) {
@@ -334,6 +336,10 @@ export function createOutbox(deps: OutboxDeps) {
       }
       const projectId = project?.id ?? opts.projectId;
       const recipient = await recipientFor(event, opts, project, settings);
+      // A text that can't reach them goes by email instead (on-my-way: COMMS_EVENTS fallback).
+      if (def.fallback === "email" && (!opts.channels || opts.channels.includes("email")) && onTheWayChannel(recipient, live) === "email") {
+        channels = ["email"];
+      }
       const marketingOk = MARKETING_EVENTS.has(event) ? Boolean(await deps.marketingConsent?.(project)) : true;
 
       const results: ChannelResult[] = [];
@@ -363,6 +369,7 @@ export function createOutbox(deps: OutboxDeps) {
       const ctx = templateContext({
         settings,
         project,
+        live,
         portalUrl: link.portalUrl,
         recipientName: recipient.name ?? (event === "magic-link" ? (opts.data as CommsData["magic-link"]).name : undefined),
       });

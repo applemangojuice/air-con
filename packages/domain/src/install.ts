@@ -2,7 +2,7 @@ import type { CatalogueItem } from "./catalogue.ts";
 import type { DesignRecord, DesignVariant, SystemSelection } from "./design-record.ts";
 import { R32_GWP, fgasRecord, type FgasRecord, type InstalledEquipmentRow } from "./documents.ts";
 import type { PhotoTag } from "./media.ts";
-import { can, meetsRequirement, type StaffMember, type StepRequirement } from "./staff.ts";
+import { can, meetsRequirement, qualificationStatus, type StaffMember, type StepRequirement } from "./staff.ts";
 import type { MeasuredSurvey } from "./survey-visit.ts";
 
 /**
@@ -2110,9 +2110,7 @@ export function commissioningSignErrors(job: InstallJobV2, signer: StaffMember, 
 /** The record the tech lead signs: who, when, their F-gas reference, and the derived results. */
 export function buildCommissioningRecord(job: InstallJobV2, signer: StaffMember, now: string, notes?: string): CommissioningRecord {
   const on = now.slice(0, 10);
-  const cert = signer.qualifications.find(
-    (q) => q.kind === "fgas-cat1" && q.reference.trim() && (!q.expiresOn || q.expiresOn.slice(0, 10) >= on),
-  );
+  const cert = signer.qualifications.find((q) => q.kind === "fgas-cat1" && qualificationStatus(q, on) === "current");
   const clean = notes?.trim();
   return {
     signedBy: { staffId: signer.id, name: signer.name, qualificationRef: cert?.reference.trim() ?? "" },

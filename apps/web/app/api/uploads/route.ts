@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { enforceRateLimit } from "@/lib/rate-limit";
+import { SURVEY_PHOTO_TYPES, baseContentType, storedFileName } from "@/lib/storage-buckets";
 import { PHOTO_BUCKET, getServiceClient } from "@/lib/supabase-server";
 
 const bodySchema = z.object({
   fileName: z.string().min(1).max(200),
+  /** What the browser will PUT. The bucket refuses anything else (migration 0011), and so does this. */
+  contentType: z.string().max(100).transform(baseContentType).pipe(z.enum(SURVEY_PHOTO_TYPES)),
   kind: z.enum([
     "room",
     "window",
@@ -15,7 +18,12 @@ const bodySchema = z.object({
   ]),
 });
 
-/** Mints a short-lived signed upload URL so photos go straight to Storage. */
+/**
+ * Mints a short-lived signed upload URL so photos go straight to Storage.
+ * Photos only: the content type is required and must be one the bucket
+ * stores, and the object's extension comes from it, never from the name the
+ * browser sent. Size is the bucket's limit (25 MB).
+ */
 export async function POST(request: Request) {
   // Stop signed-URL farming while leaving room for several photo-heavy
   // surveys and retries behind one shared IP — a tripped limit here means
@@ -33,8 +41,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ configured: false });
   }
 
-  const safeName = parsed.data.fileName.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-80);
-  const path = `${crypto.randomUUID()}/${parsed.data.kind}-${safeName}`;
+  const path = `${crypto.randomUUID()}/${parsed.data.kind}-${storedFileName(parsed.data.fileName, parsed.data.contentType, "photo")}`;
 
   const { data, error } = await supabase.storage
     .from(PHOTO_BUCKET)

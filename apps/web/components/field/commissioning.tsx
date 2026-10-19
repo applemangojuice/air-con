@@ -32,7 +32,7 @@ import { useMergedJob, useRefreshOnSync } from "./use-outbox";
  */
 
 const BTN = "min-h-12 rounded-full px-5 font-semibold disabled:opacity-40";
-const PRIMARY = `${BTN} bg-accent-600 text-white shadow-sm hover:bg-accent-700`;
+const PRIMARY = `${BTN} bg-accent-700 text-white shadow-sm hover:bg-accent-800`;
 const SECONDARY = `${BTN} border border-line bg-white text-ink-900 hover:bg-surface`;
 const INPUT = "min-h-12 w-full rounded-full border border-line bg-white px-4 text-lg text-ink-900 placeholder:text-ink-500 focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-100";
 

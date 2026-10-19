@@ -2,6 +2,7 @@ import {
   PROJECT_SCHEMA_VERSION,
   applyProjectAction,
   blockersFor,
+  companyFgasCertProblem,
   createProject,
   currentStage,
   depositPence,
@@ -20,7 +21,10 @@ import {
   projectFees,
   runsheetProgress,
   surveyCompleteness,
+  syncCompliance,
   type Blocker,
+  type ComplianceItem,
+  type PilotSettings,
   type Project,
   type ProjectAction,
   type QuoteResult,
@@ -29,12 +33,13 @@ import {
   type Survey,
 } from "@aircon/domain";
 import { audit, type AuditActor } from "./audit";
-import { isPlausibleEmail, normaliseEmail, relinkEmail } from "./auth/access";
+import { isPlausibleEmail, normaliseEmail, relinkEmail, sameEmail } from "./auth/access";
 import { notifyForAction } from "./comms/for-action";
 import { isUuid, uuidOrNull } from "./repo/base";
 import * as complianceRepo from "./repo/compliance";
 import * as customersRepo from "./repo/customers";
 import * as designsRepo from "./repo/designs";
+import * as documentsRepo from "./repo/documents";
 import * as installJobsRepo from "./repo/installJobs";
 import * as invoicesRepo from "./repo/invoices";
 import * as issuesRepo from "./repo/issues";
@@ -232,6 +237,14 @@ export async function pilotNumberHolder(
  * repeat call returns the existing id (`created: false`). Links the
  * customer record (created from the quote's email on first sight) and sets
  * up the compliance checklist.
+ *
+ * The funnel's email is unverified: anyone can type anyone's address. So
+ * when it's already a customer's, nothing about that customer changes here
+ * (their consents, phone, name, homes) and the project isn't attached to
+ * them: it joins their record when the address signs in from a link about
+ * this project (`claimProjectOnSignIn`), with this quote's consents. Until
+ * then only the browser that saved the quote opens it. A pilot made by staff
+ * (`actor`) is trusted and attached at once.
  */
 export async function createProjectForQuote(
   quoteId: string,
@@ -259,18 +272,18 @@ export async function createProjectForQuote(
   const name = (quoteRow.customer_name as string | null) ?? "";
   const email = normaliseEmail(opts.contact?.email ?? (quoteRow.email as string | null) ?? "");
   const phone = opts.contact?.phone ?? (quoteRow.phone as string | null) ?? undefined;
+  const trusted = toServiceActor(opts.actor).kind === "staff";
   let customerId: string | undefined;
   if (isPlausibleEmail(email)) {
     try {
-      const customer = await customersRepo.findOrCreate({ email, name: name || undefined, phone });
-      customerId = customer.id;
-      // The funnel's consents (operational, and marketing only if ticked) become the customer's.
-      const consents = customersRepo.consentsFromQuote(quoteRow.attribution);
-      if (consents) {
-        await customersRepo.recordQuoteConsents(customer, consents).catch((err) => {
-          console.error("[project] recording the quote's consents failed (continuing):", err);
-        });
+      const known = trusted ? null : await customersRepo.getByEmail(email);
+      if (!known) {
+        const customer = await customersRepo.findOrCreate({ email, name: name || undefined, phone });
+        customerId = customer.id;
+        // The funnel's consents (operational, and marketing only if ticked) become the customer's.
+        await applyQuoteConsents(customer, quoteRow.attribution);
       }
+      // else: someone else's record, until that address proves it's theirs (above).
     } catch (err) {
       console.error("[project] customer link failed (continuing without):", err);
     }
@@ -328,6 +341,72 @@ export async function createProjectForQuote(
   return { id: project.id, created: true };
 }
 
+async function applyQuoteConsents(customer: customersRepo.CustomerRecord, attribution: unknown): Promise<void> {
+  const consents = customersRepo.consentsFromQuote(attribution);
+  if (!consents) return;
+  await customersRepo.recordQuoteConsents(customer, consents).catch((err) => {
+    console.error("[project] recording the quote's consents failed (continuing):", err);
+  });
+}
+
+/** The project a sign-in link was about: `/p/<id>…`, or a document's `/d/<id>`. */
+async function projectOfPath(next: string | null | undefined): Promise<string | null> {
+  const m = /^\/(p|d)\/([0-9a-f-]{36})(?:[/?#]|$)/i.exec(next ?? "");
+  if (!m || !isUuid(m[2]!)) return null;
+  if (m[1]!.toLowerCase() === "p") return m[2]!.toLowerCase();
+  const doc = await documentsRepo.get(m[2]!.toLowerCase());
+  return doc?.projectId ?? null;
+}
+
+/**
+ * A customer just signed in from a link, so the address is theirs. When the
+ * link was about a project made under that address that isn't anyone's yet
+ * (the funnel left it unattached because the address already had a record:
+ * createProjectForQuote), it joins their record now, with its quote's
+ * consents (the latest answer wins) and any name or phone their record
+ * lacks. Returns the project's id when it was claimed. Best-effort.
+ */
+export async function claimProjectOnSignIn(customer: customersRepo.CustomerRecord, next: string | null | undefined): Promise<string | null> {
+  const db = getServiceClient();
+  if (!db) return null;
+  try {
+    const projectId = await projectOfPath(next);
+    if (!projectId) return null;
+    const { data: row } = await db.from("projects").select("id, customer_id, quote_id").eq("id", projectId).maybeSingle();
+    if (!row || row.customer_id) return null;
+    const project = await loadProject(projectId);
+    if (!project || !sameEmail(project.customer.email, customer.email)) return null;
+    const { data: claimed } = await db
+      .from("projects")
+      .update({ customer_id: customer.id })
+      .eq("id", projectId)
+      .is("customer_id", null)
+      .select("id")
+      .maybeSingle();
+    if (!claimed) return null; // someone else got there first
+    const filled = await customersRepo.findOrCreate({
+      email: customer.email,
+      name: project.customer.name || undefined,
+      phone: project.customer.phone,
+    });
+    if (row.quote_id) {
+      const { data: quote } = await db.from("quote_requests").select("attribution").eq("id", String(row.quote_id)).maybeSingle();
+      if (quote) await applyQuoteConsents(filled, quote.attribution);
+    }
+    await audit({
+      actor: { kind: "customer", id: customer.id, name: customer.name },
+      action: "project.claimed",
+      entity: "project",
+      entityId: projectId,
+      detail: { via: "sign-in link" },
+    });
+    return projectId;
+  } catch (err) {
+    console.error("[project] claiming a project on sign-in failed:", err);
+    return null;
+  }
+}
+
 /* ------------------------------------------------------------------ */
 /* Readiness context                                                   */
 /* ------------------------------------------------------------------ */
@@ -357,6 +436,20 @@ function attempt<T>(label: string, fn: () => T): T | undefined {
   }
 }
 
+/**
+ * The checklist as the gates should see it: an approved company F-gas item
+ * that rested on the settings certificate counts as back under review the
+ * moment that certificate stops covering the job (missing, or expiring
+ * before the last install day), without waiting for someone to open the
+ * compliance page (which then saves the same change: compliance-server).
+ */
+function withCompanyFgasReview(items: ComplianceItem[], project: Project, settings: PilotSettings, today: string): ComplianceItem[] {
+  const problem = companyFgasCertProblem(settings.company.fgasCompanyCert, project, today);
+  if (!problem) return items;
+  const changed = new Map(syncCompliance(items.filter((i) => i.key === "fgas-company"), project, new Date().toISOString(), undefined, { companyFgasProblem: problem }).map((c) => [c.id, c]));
+  return items.map((i) => changed.get(i.id) ?? i);
+}
+
 /** Everything outside the snapshot that a gate needs, read from the repositories. */
 export async function buildReadinessContext(project: Project, actor?: StaffMember): Promise<ReadinessContext> {
   const id = project.id;
@@ -379,7 +472,7 @@ export async function buildReadinessContext(project: Project, actor?: StaffMembe
     today,
     settings,
     ...(actor ? { actor } : {}),
-    compliance: compliance.map((c) => ({
+    compliance: withCompanyFgasReview(compliance, project, settings, today).map((c) => ({
       key: c.key,
       label: c.label,
       status: c.status,

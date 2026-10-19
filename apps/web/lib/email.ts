@@ -121,17 +121,17 @@ export function quoteEmail(input: QuoteEmailInput): { subject: string; html: str
     ? `reply to this email or call ${escapeHtml(input.supportPhone)}`
     : `reply to this email or write to ${escapeHtml(input.supportEmail)}`;
   const html = brandedEmail(`<p style="margin:0 0 14px">Hi ${escapeHtml(input.name)},</p>
-    <p style="margin:0 0 6px;color:#6e7482;font-size:14px">Your price for heating and cooling ${rooms}:</p>
+    <p style="margin:0 0 6px;color:#5d6371;font-size:14px">Your price for heating and cooling ${rooms}:</p>
     <p style="margin:0 0 6px;font-size:36px;font-weight:700">${total}</p>
     <p style="margin:0 0 16px;color:#454b58;font-size:14px">Installed over ${escapeHtml(input.installDays)}${input.vatLine ? ` · ${escapeHtml(input.vatLine)}` : ""} · valid until ${longDate(input.validUntil)}</p>
     <p style="margin:0 0 20px;color:#454b58">We confirm this price at your home survey. It only changes if the survey finds something your answers didn't show, and if it does, your proposal will say exactly what changed and why before you agree to anything.</p>
     <p style="margin:0 0 24px">
       <a href="${link}" style="display:inline-block;background:#a84508;color:#ffffff;text-decoration:none;font-weight:600;padding:12px 28px;border-radius:999px">View my quote</a>
     </p>
-    <p style="margin:0 0 6px;font-size:13px;color:#6e7482">Or copy this link:</p>
+    <p style="margin:0 0 6px;font-size:13px;color:#5d6371">Or copy this link:</p>
     <p style="margin:0 0 24px;font-size:13px"><a href="${link}" style="color:#a84508">${link}</a></p>
     <p style="margin:0 0 8px;color:#454b58"><strong>Next step:</strong> book your home survey from that page${survey ? ` (${escapeHtml(survey)})` : ""}, at a time that suits you. There's no obligation.</p>
     <p style="margin:0 0 28px;color:#454b58">Questions? Just ${contact}.</p>
-    <p style="margin:0 0 20px;color:#6e7482;font-size:12px">You're getting this because you asked for a price on our website. We only email you about this quote unless you asked for news and offers.</p>`);
+    <p style="margin:0 0 20px;color:#5d6371;font-size:12px">You're getting this because you asked for a price on our website. We only email you about this quote unless you asked for news and offers.</p>`);
   return { subject: `Your price: ${total} for ${rooms}`, html };
 }

@@ -82,7 +82,7 @@ export interface FieldMe {
   canSign: boolean;
   /** Ops can open the command centre (board-wide view). */
   canViewAll: boolean;
-  /** The same person for the domain's client-side checks (canRecord): roles and qualification kinds and expiry, no certificate numbers. */
+  /** The same person for the domain's client-side checks (canRecord): roles and their verified qualifications' kinds and expiry, no certificate numbers or files. */
   staff: StaffMember;
 }
 

@@ -142,7 +142,7 @@ export default async function AddressPage({ params }: { params: Promise<{ id: st
 
         <Link
           href={funnelHref}
-          className="mt-8 block w-full rounded-full bg-accent-600 px-5 py-3.5 text-center font-semibold text-white shadow-sm transition hover:bg-accent-700"
+          className="mt-8 block w-full rounded-full bg-accent-700 px-5 py-3.5 text-center font-semibold text-white shadow-sm transition hover:bg-accent-800"
         >
           Check the details, get my price
         </Link>

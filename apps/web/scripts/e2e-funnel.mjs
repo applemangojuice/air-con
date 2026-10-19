@@ -97,7 +97,7 @@ try {
   await page.waitForSelector("text=Step 5 of 5");
   const boxes = page.locator('input[type="checkbox"]');
   check("two separate consent boxes, both unticked", (await boxes.count()) === 2 && !(await boxes.nth(0).isChecked()) && !(await boxes.nth(1).isChecked()));
-  await page.fill('input[autocomplete="name"]', "E2E Tester");
+  await page.fill('input[autocomplete="name"]', "DEMO Funnel Tester");
   await page.click('button[type="submit"]');
   await page.waitForSelector("text=/Tick the first box/");
   check("saving without operational consent is refused with a reason", true);

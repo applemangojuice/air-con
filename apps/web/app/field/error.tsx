@@ -11,7 +11,7 @@ export default function FieldError({ reset }: { error: Error & { digest?: string
         Usually it&apos;s the signal. Anything you captured is safe on this phone and will sync when you&apos;re back online.
       </p>
       <div className="mt-5 grid gap-2 sm:grid-cols-2">
-        <button type="button" onClick={reset} className="min-h-12 rounded-full bg-accent-600 px-6 font-semibold text-white">
+        <button type="button" onClick={reset} className="min-h-12 rounded-full bg-accent-700 px-6 font-semibold text-white">
           Try again
         </button>
         <Link href="/field" className="flex min-h-12 items-center justify-center rounded-full border border-line bg-white px-6 font-semibold text-ink-900">

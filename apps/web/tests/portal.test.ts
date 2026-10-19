@@ -235,6 +235,14 @@ test("waitingCopy promises only the date the survey email gave", () => {
   assert.match(view.waitingCopy(p).body, /by Thu 22 Oct/);
 });
 
+test("waitingCopy promises a text on the way only when one will really go", () => {
+  const promise = view.onTheWayPromise;
+  assert.equal(promise("sms"), "We'll text you when we're on the way.");
+  assert.equal(promise("email"), "We'll email you when we're on the way.");
+  assert.equal(promise(null), "");
+  assert.doesNotMatch(JSON.stringify(view.waitingCopy(project(), "email")), /text you/);
+});
+
 test("install plan: three named days by default, extra days in the middle", () => {
   assert.deepEqual(view.installPlan(3).map((d) => d.title), ["Prep and drilling", "Units, pipes and power", "Testing and handover"]);
   const five = view.installPlan(5);
@@ -265,16 +273,20 @@ test("outstanding counts live invoices only", () => {
   );
 });
 
-test("personCard lists only qualifications held today, never the admin role", () => {
+test("personCard lists only qualifications held today and verified, never the admin role", () => {
+  const checked = { verifiedAt: "2026-01-05T09:00:00.000Z", mediaId: "media-cert" };
   const card = view.personCard(
     {
       name: "Sam (DEMO)",
       roles: ["admin", "tech-lead"],
       bio: "  Twenty years on the tools.  ",
       qualifications: [
-        { kind: "fgas-cat1", reference: "DEMO-1", expiresOn: "2030-01-01" },
-        { kind: "part-p", reference: "DEMO-2", expiresOn: "2020-01-01" },
-        { kind: "ipaf", reference: "" },
+        { kind: "fgas-cat1", reference: "DEMO-1", expiresOn: "2030-01-01", ...checked },
+        { kind: "part-p", reference: "DEMO-2", expiresOn: "2020-01-01", ...checked },
+        { kind: "ipaf", reference: "", ...checked },
+        // Typed in, never checked against the certificate: customers never see it.
+        { kind: "pasma", reference: "DEMO-3", expiresOn: "2030-01-01" },
+        { kind: "18th-edition", reference: "DEMO-4", verifiedAt: "2026-01-05T09:00:00.000Z" },
       ],
     },
     "2026-10-19",

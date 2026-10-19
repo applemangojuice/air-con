@@ -237,35 +237,6 @@ export function ConsentForm({ action }: { action: Action }) {
   );
 }
 
-export function EarlyStartForm({ action, requested }: { action: Action; requested: boolean }) {
-  const id = useId();
-  return (
-    <ActionForm action={action}>
-      <p className="mb-2 text-sm text-ink-700">
-        {requested
-          ? "They ticked “start early” on the portal. It only counts once their own email (with the early-start wording) or a signed form is on file."
-          : "If they've asked us by email or on the signed form to start early, record it here."}
-      </p>
-      <div className="grid gap-2 sm:grid-cols-[10rem_1fr_auto] sm:items-end">
-        <div>
-          <L htmlFor={`${id}-c`}>Evidence</L>
-          <select id={`${id}-c`} name="channel" defaultValue="email" className={compactInput}>
-            <option value="email">Their email</option>
-            <option value="paper">Signed form</option>
-          </select>
-        </div>
-        <div>
-          <L htmlFor={`${id}-r`} hint="(date and subject, or the document ref)">
-            Which one
-          </L>
-          <input id={`${id}-r`} name="evidenceRef" required minLength={3} maxLength={200} placeholder="e.g. 3 Nov, Re: Your contract" className={compactInput} />
-        </div>
-        <SubmitButton variant="secondary">Record</SubmitButton>
-      </div>
-    </ActionForm>
-  );
-}
-
 export function OneButton({ action, label, confirm, variant = "secondary" }: { action: Action; label: string; confirm?: string; variant?: "primary" | "secondary" }) {
   return (
     <ActionForm action={action} confirm={confirm}>

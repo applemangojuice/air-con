@@ -24,7 +24,7 @@ import { useMergedJob, useRefreshOnSync } from "./use-outbox";
  */
 
 const BTN = "min-h-12 rounded-full px-5 font-semibold disabled:opacity-40";
-const PRIMARY = `${BTN} bg-accent-600 text-white shadow-sm hover:bg-accent-700`;
+const PRIMARY = `${BTN} bg-accent-700 text-white shadow-sm hover:bg-accent-800`;
 const SECONDARY = `${BTN} border border-line bg-white text-ink-900 hover:bg-surface`;
 
 async function post(url: string, body: unknown): Promise<{ ok: true; data: Record<string, unknown> } | { ok: false; error: string; blockers?: Blocker[]; offline?: true }> {
@@ -117,7 +117,11 @@ function PackPreview({ pack, missing }: { pack: HandoverPackSnapshot; missing: s
         </ul>
       </div>
       <p className="text-sm text-ink-700">
-        Something not right later? {pack.contacts.find((c) => c.label === "Report a problem")?.phone ?? pack.company.phone} or report it from their project page.
+        Something not right later? {(() => {
+          const phone = pack.contacts.find((c) => c.label === "Report a problem")?.phone ?? pack.company.phone;
+          return phone ? `Call ${phone}` : `Email ${pack.company.email}`;
+        })()}{" "}
+        or report it from their project page.
       </p>
     </div>
   );

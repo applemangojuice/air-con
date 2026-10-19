@@ -109,7 +109,7 @@ export function termsSections(s: PublicSettings): TermsSection[] {
         pay.deposit,
         pay.balance,
         `${pay.methods} We send an invoice for every payment, and we never ask for card details by phone or email.`,
-        ...(s.finance.lenderConfigured ? [] : ["We don't offer finance."]),
+        ...(s.finance.offered ? [] : ["We don't offer finance."]),
       ],
     },
     {

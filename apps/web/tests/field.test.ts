@@ -217,7 +217,9 @@ const staffMember = (id: string, over: Partial<StaffMember> = {}): StaffMember =
 });
 const INSTALLER = staffMember("aa000000-0000-4000-8000-0000000000f1");
 const SUB = staffMember("aa000000-0000-4000-8000-0000000000f2", { external: true });
-const FGAS = staffMember("aa000000-0000-4000-8000-0000000000f3", { qualifications: [{ kind: "fgas-cat1", reference: "DEMO-F", expiresOn: "2030-12-31" }] });
+const FGAS = staffMember("aa000000-0000-4000-8000-0000000000f3", {
+  qualifications: [{ kind: "fgas-cat1", reference: "DEMO-F", expiresOn: "2030-12-31", verifiedAt: "2026-01-05T09:00:00.000Z", mediaId: "aa000000-0000-4000-8000-0000000000c1" }],
+});
 
 const CATALOGUE: CatalogueItem[] = [
   { id: "in", kind: "indoor", label: "DEMO indoor", model: "DEMO-IN", manufacturer: "Daikin", specs: { liquidPipeMm: 6.35, gasPipeMm: 9.52 }, costPence: null, status: "available", confidence: "provisional", sources: [], active: true },

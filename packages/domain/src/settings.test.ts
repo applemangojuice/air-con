@@ -4,6 +4,7 @@ import {
   DEFAULT_SETTINGS,
   TAX_CODES,
   effectiveTaxCode,
+  financeOffered,
   isInServiceArea,
   mergeSettings,
   isPlaceholderPhone,
@@ -49,7 +50,8 @@ test("defaults are the conservative pilot set", () => {
   assert.deepEqual(s.legal, { termsVersion: "pilot-draft-1", termsReviewed: false, cancellationReviewed: false });
   assert.equal(s.comms.smsSenderId, "DangItsHot");
   assert.equal(s.comms.smsSenderId.length <= 11, true); // alphanumeric sender id limit
-  assert.equal(s.finance.lenderConfigured, false);
+  assert.deepEqual(s.finance, {});
+  assert.equal(financeOffered(s), false);
   assert.equal(s.features.showPrototypeNav, false);
   // Schedule 2 details are business facts, never guessed: blank until set.
   assert.equal(s.company.geographicAddress, "");
@@ -230,4 +232,21 @@ test("effectiveTaxCode: outside scope until VAT registered", () => {
   assert.equal(effectiveTaxCode(mergeSettings({ tax: { vatRegistered: true, defaultTaxCode: "zero-esm" } })), "zero-esm");
   assert.equal(effectiveTaxCode(mergeSettings({ tax: { vatRegistered: true, defaultTaxCode: "reduced-5" } })), "reduced-5");
   assert.equal(effectiveTaxCode(mergeSettings({ tax: { vatRegistered: true } })), "standard-20");
+});
+
+test("finance shows only with every credit-promotion fact on record, and nothing worked out", () => {
+  const example =
+    "DEMO Representative example: borrowing £5,000 over 48 months at a representative 9.9% APR (fixed), 48 monthly payments of £125.85. Total amount payable £6,040.80.";
+  const full = { firmName: "DEMO Lending Ltd", frn: "123456", arrangement: "appointed-rep", approvalRef: "AR 987654", representativeExample: example };
+  assert.equal(financeOffered(mergeSettings({ finance: full })), true);
+  for (const key of Object.keys(full) as (keyof typeof full)[]) {
+    assert.equal(financeOffered(mergeSettings({ finance: { ...full, [key]: "" } })), false, `without ${key}`);
+  }
+  assert.equal(financeOffered(mergeSettings({ finance: { ...full, frn: "12AB" } })), false, "not an FCA firm reference");
+  assert.equal(financeOffered(mergeSettings({ finance: { ...full, arrangement: "trust-me" } })), false, "not a listed arrangement");
+  assert.equal(financeOffered(mergeSettings({ finance: { ...full, representativeExample: "11.9% APR" } })), false, "not a full example");
+  // The old switch on its own turns nothing on.
+  const legacy = mergeSettings({ finance: { lenderConfigured: true } });
+  assert.deepEqual(legacy.finance, {});
+  assert.equal(financeOffered(legacy), false);
 });

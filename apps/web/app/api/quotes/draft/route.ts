@@ -9,7 +9,7 @@ import { surveySchema } from "@/lib/schemas";
 import { getServiceClient } from "@/lib/supabase-server";
 
 const bodySchema = z.object({
-  email: z.string().trim().email().max(200),
+  email: z.string().trim().toLowerCase().email().max(200),
   survey: surveySchema,
 });
 

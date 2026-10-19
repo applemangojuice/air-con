@@ -217,7 +217,7 @@ function Overview({
       <button
         type="button"
         onClick={() => go({ s: "submit" })}
-        className="inline-flex min-h-14 w-full items-center justify-center rounded-full bg-accent-600 px-6 text-lg font-semibold text-white shadow-sm hover:bg-accent-700"
+        className="inline-flex min-h-14 w-full items-center justify-center rounded-full bg-accent-700 px-6 text-lg font-semibold text-white shadow-sm hover:bg-accent-800"
       >
         Check and submit
       </button>

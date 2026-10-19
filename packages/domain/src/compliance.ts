@@ -1,5 +1,6 @@
 import type { DesignRecord } from "./design-record.ts";
 import type { GateId, Project } from "./project.ts";
+import type { PilotSettings } from "./settings.ts";
 import { can, type StaffMember, type StaffRole } from "./staff.ts";
 
 /**
@@ -534,6 +535,47 @@ function clean(item: ComplianceItem): ComplianceItem {
  *    reason.
  * Automatic items follow the project's records and can't be approved by hand.
  */
+/* ------------------------------------------------------------------ */
+/* The company F-gas certificate                                       */
+/* ------------------------------------------------------------------ */
+
+const shortDate = (iso: string): string => {
+  const d = new Date(`${iso.slice(0, 10)}T12:00:00Z`);
+  return Number.isNaN(d.getTime()) ? iso : `${d.getUTCDate()} ${["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+};
+
+/**
+ * Why the company F-gas certificate in settings doesn't cover this job, or
+ * null when it does: a certifying body and a number on record, and an expiry
+ * (if it has one) no earlier than the last booked install day (today while
+ * nothing's booked). Refrigerant work is locked to certified holders, with
+ * no override (plan §6).
+ */
+export function companyFgasCertProblem(
+  cert: PilotSettings["company"]["fgasCompanyCert"],
+  project: Pick<Project, "booking">,
+  today: string,
+): string | null {
+  const last = [...(project.booking.dates ?? [])].sort().at(-1) ?? today.slice(0, 10);
+  if (!cert || !cert.body?.trim() || !cert.number?.trim()) return "There's no company F-gas certificate in settings.";
+  if (cert.expiresOn && cert.expiresOn.slice(0, 10) < last) {
+    return `The company F-gas certificate (${cert.body.trim()} ${cert.number.trim()}) expires on ${shortDate(cert.expiresOn)}, before the last install day (${shortDate(last)}).`;
+  }
+  return null;
+}
+
+/**
+ * The subcontracting route (plan §1, §10): the refrigerant work runs under a
+ * certified company, and its certificate is attached to the item. Without an
+ * attachment, the item rests on the certificate in settings.
+ */
+const restsOnSettingsCert = (item: Pick<ComplianceItem, "key" | "mediaIds">) => item.key === "fgas-company" && item.mediaIds.length === 0;
+
+/** What a review needs to know beyond the item: the company certificate's standing (companyFgasCertProblem). */
+export interface ComplianceReviewContext {
+  companyFgasProblem?: string | null;
+}
+
 export function reviewCompliance(
   item: ComplianceItem,
   to: ComplianceStatus,
@@ -541,6 +583,7 @@ export function reviewCompliance(
   note: string | undefined,
   overrideReason: string | undefined,
   now: string,
+  context: ComplianceReviewContext = {},
 ): { ok: true; item: ComplianceItem } | { ok: false; error: string } {
   const fail = (error: string) => ({ ok: false as const, error });
   if (!COMPLIANCE_STATUSES.includes(to)) return fail("Unknown status.");
@@ -572,6 +615,10 @@ export function reviewCompliance(
           return fail("Write the outcome in the note (for example \"PD checks passed\" or \"planning route needed\"): evidence alone can't approve this.");
         }
         if (!hasEvidence && !text) return fail("Attach the evidence, or write down what you checked, before approving.");
+        // A note can't stand in for the certificate itself: settings must hold a current one, or the subcontractor's is attached.
+        if (restsOnSettingsCert(item) && context.companyFgasProblem) {
+          return fail(`${context.companyFgasProblem} Add the current certificate in settings, or attach the certified company's certificate here if they do the refrigerant work.`);
+        }
       } else if (!hasEvidence && !text) {
         if (!override) return fail("Attach evidence or write a note. To approve without either, an admin overrides with a reason.");
         if (!reviewer.roles.includes("admin")) return fail("Only an admin can approve without evidence (with a reason).");
@@ -707,7 +754,13 @@ export function designCompatibilityVerdict(design: DesignRecord | null | undefin
  * and "equipment combination verified" from the approved design when one is
  * given (designCompatibilityVerdict). Returns only the items that changed.
  */
-export function syncCompliance(items: ComplianceItem[], project: Project, now: string, design?: DesignRecord | null): ComplianceItem[] {
+export function syncCompliance(
+  items: ComplianceItem[],
+  project: Project,
+  now: string,
+  design?: DesignRecord | null,
+  context: ComplianceReviewContext = {},
+): ComplianceItem[] {
   const changed: ComplianceItem[] = [];
   const set = (item: ComplianceItem, to: ComplianceStatus, by: string, at: string, note: string) => {
     const next: ComplianceItem = {
@@ -762,6 +815,11 @@ export function syncCompliance(items: ComplianceItem[], project: Project, now: s
         set(item, "under-review", "System", now, "Reopened automatically: the design is no longer the approved version, or its compatibility check changed.");
         continue;
       }
+    }
+    // Approved on the strength of the company certificate in settings, which no longer covers the job: back to review.
+    if (item.status === "approved" && restsOnSettingsCert(item) && context.companyFgasProblem) {
+      set(item, "under-review", "System", now, `Reopened automatically: ${context.companyFgasProblem}`);
+      continue;
     }
     if (
       item.key === "planning-pd" &&

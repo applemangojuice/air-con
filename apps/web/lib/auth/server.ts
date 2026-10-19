@@ -173,9 +173,10 @@ async function currentPath(fallback: string): Promise<string> {
 
 /**
  * For pages and server actions. Signed out → /login?next=<this page>.
- * Signed in without the permission → the "no access" page (never the data).
+ * Signed in without the permission (or any of several) → the "no access"
+ * page (never the data).
  */
-export async function requireStaff(perm?: Permission): Promise<StaffMember> {
+export async function requireStaff(perm?: Permission | readonly Permission[]): Promise<StaffMember> {
   const staff = await currentStaff();
   const gate = decideStaffGate(staff, perm);
   if (gate === "signed-out") {
@@ -358,6 +359,14 @@ export async function breakGlassSession(email: string, password: string): Promis
  * demo sign-in is allowed. Existing rows are left as they are, so a demo
  * account's qualifications can be edited to test the gates.
  */
+/** The DEMO row still holds one of its DEMO certificates unverified (saved by an older build). */
+function demoQualificationsStale(row: StaffMember, demo: StaffMember): boolean {
+  return demo.qualifications.some((d) => {
+    const held = row.qualifications.find((q) => q.kind === d.kind && q.reference === d.reference);
+    return !held || !held.verifiedAt || !held.mediaId;
+  });
+}
+
 export async function ensureDemoStaff(): Promise<Record<DemoRoleKey, StaffMember>> {
   if (!demoLoginAllowed(process.env)) throw new Error("Demo sign-in is disabled in this environment.");
   if (!getServiceClient()) return DEMO_STAFF;
@@ -370,6 +379,9 @@ export async function ensureDemoStaff(): Promise<Record<DemoRoleKey, StaffMember
       } catch {
         staff = (await staffRepo.get(demo.id)) ?? (await staffRepo.getByEmail(demo.email));
       }
+    } else if (staff.demo && demoQualificationsStale(staff, demo)) {
+      // A DEMO row saved before qualifications needed verifying: bring its DEMO certificates up to date.
+      staff = await staffRepo.update({ ...staff, qualifications: demo.qualifications }, null).catch(() => staff);
     }
     out[key] = staff ?? demo;
   }

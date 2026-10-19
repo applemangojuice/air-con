@@ -467,7 +467,7 @@ export function CompassPicker({
   const btn = (v: "north" | "east" | "south" | "west", label: string, cls: string) => (
     <label className={`absolute ${cls}`}>
       <input type="radio" name={name} value={v} checked={value === v} onChange={() => onChange(v)} className="peer sr-only" />
-      <span className="flex h-14 w-14 cursor-pointer items-center justify-center rounded-full border border-line bg-white text-lg font-bold text-ink-900 shadow-sm transition peer-checked:border-accent-600 peer-checked:bg-accent-600 peer-checked:text-white peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent-500">
+      <span className="flex h-14 w-14 cursor-pointer items-center justify-center rounded-full border border-line bg-white text-lg font-bold text-ink-900 shadow-sm transition peer-checked:border-accent-700 peer-checked:bg-accent-700 peer-checked:text-white peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent-500">
         <span aria-hidden>{label[0]}</span>
         <span className="sr-only">{label}</span>
       </span>

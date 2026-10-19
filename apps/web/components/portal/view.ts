@@ -51,7 +51,7 @@ export function customerSafeProject(project: Project): Project {
 /* Facts from settings                                                 */
 /* ------------------------------------------------------------------ */
 
-export function hubFacts(project: Project, settings: PilotSettings, today: string): HubFacts {
+export function hubFacts(project: Project, settings: PilotSettings, today: string, onTheWay: HubFacts["onTheWay"]): HubFacts {
   const stages = Object.fromEntries(PROJECT_STAGES.map((s) => [s, stageInfo(s, settings, project)])) as HubFacts["stages"];
   const cs = cancellationStatus(project, today, settings);
   return {
@@ -77,6 +77,7 @@ export function hubFacts(project: Project, settings: PilotSettings, today: strin
     },
     earlyStartWording: earlyStartWording(project.proposal.contractType),
     fees: { surveyShortNoticeGbp: rescheduleFeeGbp("survey", 0), installShortNoticeGbp: rescheduleFeeGbp("installation", 0) },
+    onTheWay,
   };
 }
 
@@ -134,7 +135,12 @@ export function proposalReadyBy(project: Project): string | null {
  * The calm line the "Your next step" card shows when customerNextAction is
  * null: what we're doing and when they'll hear. Never invents a date.
  */
-export function waitingCopy(project: Project): { title: string; body: string } {
+/** The on-my-way promise in the words of the channel it'll really go by (HubFacts.onTheWay). */
+export function onTheWayPromise(onTheWay: HubFacts["onTheWay"]): string {
+  return onTheWay === "sms" ? "We'll text you when we're on the way." : onTheWay === "email" ? "We'll email you when we're on the way." : "";
+}
+
+export function waitingCopy(project: Project, onTheWay: HubFacts["onTheWay"] = null): { title: string; body: string } {
   const p = project;
   if (p.closure.closed) {
     return p.closure.reason === "cancelled"
@@ -177,8 +183,8 @@ export function waitingCopy(project: Project): { title: string; body: string } {
       return {
         title: "You're all set",
         body: p.booking.dates.length
-          ? `See you ${blockLabel(p.booking.dates)}. We'll text you when we're on the way.`
-          : "We'll text you when we're on the way.",
+          ? `See you ${blockLabel(p.booking.dates)}.${onTheWayPromise(onTheWay) ? ` ${onTheWayPromise(onTheWay)}` : ""}`
+          : onTheWayPromise(onTheWay) || "We'll be in touch before the day with everything you need.",
       };
     case "handover":
       return { title: "Nearly there", body: "We're finishing the commissioning checks and your paperwork. Your handover pack lands here." };

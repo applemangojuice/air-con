@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useState, type ReactNode } from "react";
-import { TAX_CODES, schedule2Missing, type DiscountCode, type PilotSettings, type TaxCodeId } from "@aircon/domain";
+import { TAX_CODES, financeOffered, schedule2Missing, type DiscountCode, type FinanceArrangement, type PilotSettings, type TaxCodeId } from "@aircon/domain";
 import { Badge } from "@/components/kit/badge";
 import { Button } from "@/components/kit/button";
 import { ActionForm, SubmitButton } from "@/components/ops/command/action-form";
@@ -405,8 +405,43 @@ export function SettingsEditor({
           </div>
         </Group>
 
-        <Group id="other" title="Finance and features">
-          <Toggle label="A lender or broker is in place" hint="Finance examples stay hidden everywhere until this is on: they're a regulated promotion." checked={s.finance.lenderConfigured} onChange={(v) => patch("finance", { lenderConfigured: v })} />
+        <Group
+          id="finance"
+          title="Finance"
+          badge={financeOffered(s) ? <Badge tone="warn">Shown on quotes</Badge> : <Badge>Off</Badge>}
+          intro="A credit promotion is regulated (FSMA s21): finance appears on quotes only once every detail below is filled in, and only in the lender's own words. We never work out an APR or a monthly figure. Have the lender approve the wording before you fill it in."
+        >
+          <Text label="Lender or broker providing the credit" value={s.finance.firmName ?? ""} onChange={(v) => patch("finance", { firmName: v })} maxLength={120} placeholder="As the FCA register names them" />
+          <Text label="Their FCA firm reference number" value={s.finance.frn ?? ""} onChange={(v) => patch("finance", { frn: v.replace(/\s+/g, "") })} maxLength={7} placeholder="6 or 7 digits" />
+          <div>
+            <label className="block text-sm font-semibold text-ink-900">
+              How we may promote it
+              <select value={s.finance.arrangement ?? ""} onChange={(e) => patch("finance", { arrangement: (e.target.value || undefined) as FinanceArrangement | undefined })} className={CONTROL}>
+                <option value="">Not set</option>
+                <option value="authorised">We&apos;re FCA authorised for credit broking</option>
+                <option value="appointed-rep">We&apos;re an appointed representative for credit broking</option>
+                <option value="s21-approved">An authorised firm approved this promotion (s21)</option>
+              </select>
+            </label>
+          </div>
+          <Text
+            label={s.finance.arrangement === "s21-approved" ? "Approval reference and date" : s.finance.arrangement === "appointed-rep" ? "Our FCA register reference" : "Our FCA firm reference number"}
+            value={s.finance.approvalRef ?? ""}
+            onChange={(v) => patch("finance", { approvalRef: v })}
+            maxLength={120}
+          />
+          <Text
+            label="Representative example, exactly as the lender supplied it"
+            value={s.finance.representativeExample ?? ""}
+            onChange={(v) => patch("finance", { representativeExample: v })}
+            wide
+            area
+            maxLength={1500}
+            hint="Printed word for word on the quote, with who provides the credit and our status beside it."
+          />
+        </Group>
+
+        <Group id="other" title="Features">
           <Toggle label="Show the prototype navigation" hint="For demos only." checked={s.features.showPrototypeNav} onChange={(v) => patch("features", { showPrototypeNav: v })} />
         </Group>
       </div>

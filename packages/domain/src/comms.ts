@@ -52,6 +52,12 @@ export interface CommsEventDef {
   trigger: "auto" | "manual" | "cron";
   description: string;
   templateVersion: number;
+  /**
+   * Sent by email instead when a text can't reach the customer (no mobile
+   * that takes texts, or email is live and SMS isn't): the web layer's
+   * onTheWayChannel decides, and the copy that promises it reads the same.
+   */
+  fallback?: "email";
 }
 
 /**
@@ -92,6 +98,7 @@ export const COMMS_EVENTS: Record<CommsEventId, CommsEventDef> = {
     trigger: "auto",
     description: "The surveyor is on the way, with an ETA.",
     templateVersion: 1,
+    fallback: "email",
   },
   "survey-complete": {
     id: "survey-complete",
@@ -188,8 +195,9 @@ export const COMMS_EVENTS: Record<CommsEventId, CommsEventDef> = {
     channels: ["sms"],
     audience: "customer",
     trigger: "auto",
-    description: "The installer is on the way, with an ETA.",
+    description: "The installer is on the way, with an ETA (by email when a text can't reach them).",
     templateVersion: 1,
+    fallback: "email",
   },
   "install-day-update": {
     id: "install-day-update",

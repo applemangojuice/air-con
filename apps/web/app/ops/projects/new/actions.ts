@@ -49,7 +49,7 @@ const field = (fd: FormData, k: string) => {
 };
 
 export async function createPilotAction(fd: FormData): Promise<ActionResult> {
-  const staff = await requireStaff("projects.edit");
+  const staff = await requireStaff(["projects.edit", "projects.view-all"]);
   const parsed = schema.safeParse({
     requestId: field(fd, "requestId"),
     name: field(fd, "name"),

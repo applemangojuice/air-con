@@ -43,6 +43,8 @@ import {
   cleanObjectPath,
   createFileObjects,
   createMemoryObjects,
+  allowedContentTypes,
+  bucketTakesType,
   maxUploadBytes,
   signedFileUrl,
   verifyStorageSignature,
@@ -794,6 +796,10 @@ class LocalBucket {
     if (bytes.byteLength > maxUploadBytes(this.bucket)) {
       throw new LocalStorageError("The object exceeded the maximum allowed size", 413, "413");
     }
+    const storedType = contentType ?? type ?? "text/plain;charset=UTF-8";
+    if (!bucketTakesType(this.bucket, storedType)) {
+      throw new LocalStorageError(`mime type ${cleanContentType(storedType).split(";")[0]} is not supported`, 415, "415");
+    }
     const result = await this.db.store.exclusive(() =>
       this.db.objects.put(this.bucket, path, bytes, {
         contentType: cleanContentType(contentType ?? type ?? "text/plain;charset=UTF-8"),
@@ -1001,7 +1007,7 @@ class LocalStorageApi {
       owner: "",
       public: false,
       file_size_limit: maxUploadBytes(id),
-      allowed_mime_types: null,
+      allowed_mime_types: allowedContentTypes(id),
       created_at: epoch,
       updated_at: epoch,
     };
@@ -1036,6 +1042,8 @@ export interface LocalFilesHandle {
     upsert: boolean,
   ): Promise<"created" | "updated" | "exists">;
   maxBytes(bucket: string): number;
+  /** The bucket's allowed content types (Supabase's allowed_mime_types). */
+  accepts(bucket: string, contentType: string): boolean;
 }
 
 export class LocalClient {
@@ -1083,6 +1091,7 @@ export class LocalClient {
         return res.status;
       },
       maxBytes: maxUploadBytes,
+      accepts: bucketTakesType,
     };
   }
 

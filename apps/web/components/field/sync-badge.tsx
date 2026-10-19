@@ -58,7 +58,7 @@ export function SyncBadge() {
               type="button"
               disabled={state.items.length === 0 || state.syncing}
               onClick={() => void outbox?.flush(true)}
-              className="min-h-12 w-full rounded-full bg-accent-600 px-6 font-semibold text-white disabled:opacity-40"
+              className="min-h-12 w-full rounded-full bg-accent-700 px-6 font-semibold text-white disabled:opacity-40"
             >
               {state.syncing ? "Syncing…" : state.items.length ? "Sync now" : "Nothing to sync"}
             </button>

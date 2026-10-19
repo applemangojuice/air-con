@@ -63,7 +63,7 @@ export function StartProjectPanel({ quoteId, existingProjectId }: { quoteId: str
           {state.devLink && (
             <a
               href={state.devLink}
-              className="block w-full rounded-full bg-accent-600 px-5 py-3 text-center font-semibold text-white shadow-sm transition hover:bg-accent-700"
+              className="block w-full rounded-full bg-accent-700 px-5 py-3 text-center font-semibold text-white shadow-sm transition hover:bg-accent-800"
             >
               Development: open the sign-in link
             </a>
@@ -83,7 +83,7 @@ export function StartProjectPanel({ quoteId, existingProjectId }: { quoteId: str
             onClick={existingProjectId ? () => router.push(`/p/${existingProjectId}`) : start}
             disabled={state.status === "sending"}
             aria-busy={state.status === "sending" || undefined}
-            className="mt-5 block min-h-12 w-full rounded-full bg-accent-600 px-5 py-3 text-center font-semibold text-white shadow-sm transition hover:bg-accent-700 disabled:opacity-50"
+            className="mt-5 block min-h-12 w-full rounded-full bg-accent-700 px-5 py-3 text-center font-semibold text-white shadow-sm transition hover:bg-accent-800 disabled:opacity-50"
           >
             {state.status === "sending" ? "Setting up your project…" : existingProjectId ? "Open my project" : "Start my installation plan"}
           </button>

@@ -31,7 +31,7 @@ export default function GlobalError({
         }}
       >
         <h1 style={{ fontSize: 28, margin: 0 }}>Something broke</h1>
-        <p style={{ maxWidth: 420, color: "#6e7482" }}>
+        <p style={{ maxWidth: 420, color: "#5d6371" }}>
           A rare one: the page itself failed to load. Refreshing almost always
           fixes it.
         </p>
@@ -43,7 +43,7 @@ export default function GlobalError({
             padding: "12px 24px",
             borderRadius: 999,
             border: "none",
-            background: "#d55a0a",
+            background: "#a84508",
             color: "#fff",
             fontWeight: 600,
             fontSize: 16,

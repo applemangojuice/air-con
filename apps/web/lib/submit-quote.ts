@@ -1,6 +1,7 @@
-import type { PhotoKind, Survey, SurveyPhoto } from "@aircon/domain";
+import { uploadContentType, type PhotoKind, type Survey, type SurveyPhoto } from "@aircon/domain";
 import { CONSENT_VERSION } from "@/components/site/claims";
 import { getPhotoFile } from "./photo-registry";
+import { SURVEY_PHOTO_TYPES } from "./storage-buckets";
 import { getAttribution } from "./analytics-client";
 import type { QuoteDraft } from "./quote-draft";
 
@@ -76,10 +77,14 @@ export type UploadResult = { ok: true; path: string } | { ok: false; reason: "un
 export async function uploadPhotoFile(file: File, kind: PhotoKind): Promise<UploadResult> {
   try {
     const body = await shrinkImage(file);
+    const fileName = jpegName(file.name, body !== file);
+    // The type the bucket checks (some browsers leave it blank: the extension decides).
+    const contentType = uploadContentType(body.type, fileName);
+    if (!(SURVEY_PHOTO_TYPES as readonly string[]).includes(contentType)) return { ok: false, reason: "failed" };
     const signRes = await fetch("/api/uploads", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ fileName: jpegName(file.name, body !== file), kind }),
+      body: JSON.stringify({ fileName, kind, contentType }),
     });
     if (!signRes.ok) return { ok: false, reason: "failed" };
     const sign = (await signRes.json()) as { configured: boolean; path?: string; signedUrl?: string };
@@ -87,7 +92,7 @@ export async function uploadPhotoFile(file: File, kind: PhotoKind): Promise<Uplo
     if (!sign.signedUrl || !sign.path) return { ok: false, reason: "failed" };
     const put = await fetch(sign.signedUrl, {
       method: "PUT",
-      headers: { "content-type": body.type || "application/octet-stream" },
+      headers: { "content-type": contentType },
       body,
     });
     return put.ok ? { ok: true, path: sign.path } : { ok: false, reason: "failed" };
@@ -114,7 +119,9 @@ export async function shrinkImage(file: File): Promise<Blob> {
     if (typeof createImageBitmap !== "function" || !file.type.startsWith("image/")) return file;
     const bitmap = await createImageBitmap(file);
     const scale = Math.min(1, MAX_EDGE / Math.max(bitmap.width, bitmap.height));
-    if (scale === 1 && file.size < 1_500_000) {
+    const storable = (SURVEY_PHOTO_TYPES as readonly string[]).includes(uploadContentType(file.type, file.name));
+    // Small enough already, and a type the photo bucket stores: send it as it is. Anything else becomes a JPEG.
+    if (scale === 1 && file.size < 1_500_000 && storable) {
       bitmap.close();
       return file;
     }
@@ -129,7 +136,7 @@ export async function shrinkImage(file: File): Promise<Blob> {
     ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
     bitmap.close();
     const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.82));
-    return blob && blob.size > 0 && blob.size < file.size ? blob : file;
+    return blob && blob.size > 0 && (blob.size < file.size || !storable) ? blob : file;
   } catch {
     return file;
   }

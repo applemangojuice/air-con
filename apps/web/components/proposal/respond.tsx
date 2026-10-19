@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Button, Textarea } from "@/components/kit";
+import { reachUs } from "@/components/site/claims";
 import type { ProposalPageData } from "./types";
 
 /**
@@ -56,7 +57,7 @@ export function Respond({ data, onDone }: { data: ProposalPageData; onDone?: (ki
       <div role="status" className="rounded-2xl border border-sage-200 bg-sage-50 p-5 text-sage-900">
         <p className="font-semibold">Thanks, we&apos;ve got your request.</p>
         <p className="mt-1 text-sm">
-          We&apos;ll look at it and send you a revised proposal by email. If anything&apos;s urgent, call us on {data.company.phone}.
+          We&apos;ll look at it and send you a revised proposal by email. If anything&apos;s urgent, {reachUs(data.company)}.
         </p>
       </div>
     );
@@ -65,7 +66,7 @@ export function Respond({ data, onDone }: { data: ProposalPageData; onDone?: (ki
     return (
       <div role="status" className="rounded-2xl border border-line bg-white p-5">
         <p className="font-semibold text-ink-900">Thanks for letting us know.</p>
-        <p className="mt-1 text-sm text-ink-700">We won&apos;t chase you about this proposal. If you change your mind, call us on {data.company.phone}.</p>
+        <p className="mt-1 text-sm text-ink-700">We won&apos;t chase you about this proposal. If you change your mind, {reachUs(data.company)}.</p>
       </div>
     );
   }

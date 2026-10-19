@@ -6,11 +6,14 @@ import {
   cancellationStatus,
   earliestKitArrival,
   earliestStartForKit,
+  EARLY_START_WORDING_VERSION,
+  earlyStartEvidenceProblem,
   earlyStartRequestedOf,
   earlyStartWording,
   effectiveTaxCode,
   hasCurrentQualification,
   meetsRequirement,
+  qualificationStatus,
   type Blocker,
   type CancellationStatus,
   type CrewMember,
@@ -32,6 +35,7 @@ import { loadOpsProjects } from "./ops-server";
 import { buildReadinessContext, dispatch, londonToday, loadProject } from "./project-service";
 import { fail, syncKitStatus, type Outcome } from "./purchasing-server";
 import * as invoicesRepo from "./repo/invoices";
+import * as mediaRepo from "./repo/media";
 import * as issuesRepo from "./repo/issues";
 import * as proposalsRepo from "./repo/proposals";
 import * as purchaseOrdersRepo from "./repo/purchaseOrders";
@@ -58,6 +62,8 @@ export interface QualificationView {
   expiresOn?: string;
   /** Current on the day it's checked against (the install's first day, or today). */
   current: boolean;
+  /** Not checked against the certificate yet (or no certificate on file), so it counts for nothing. */
+  unverified?: boolean;
 }
 
 export interface TeamMemberView {
@@ -87,7 +93,19 @@ export interface BookingView {
   checkOn: string;
   earliestStart: string;
   cancellation: CancellationStatus & { copy: string };
-  earlyStart: { requested: boolean; evidenced: boolean; wording: string; evidenceRef?: string; recordedBy?: string };
+  earlyStart: {
+    requested: boolean;
+    evidenced: boolean;
+    wording: string;
+    evidenceRef?: string;
+    recordedBy?: string;
+    receivedOn?: string;
+    fromAddress?: string;
+    /** How many files of the copy are stored with the project. */
+    files: number;
+    /** The address on the contract, which an emailed request must come from. */
+    customerEmail?: string;
+  };
   blockers: Blocker[];
   team: TeamMemberView[];
   crewClashes: BookingClash[];
@@ -103,6 +121,8 @@ function qualificationsOf(s: StaffMember, on: string): QualificationView[] {
     reference: q.reference,
     ...(q.expiresOn ? { expiresOn: q.expiresOn } : {}),
     current: hasCurrentQualification({ qualifications: [q] }, q.kind, on),
+    // A typed number nobody checked against the certificate counts for nothing: say so beside it.
+    ...(qualificationStatus(q, on) === "unverified" ? { unverified: true } : {}),
   }));
 }
 
@@ -180,6 +200,10 @@ export async function loadBooking(projectId: string, staff: StaffMember): Promis
       evidenced: Boolean(project.proposal.earlyStart?.evidencedAt),
       wording: earlyStartWording(project.proposal.contractType),
       ...(project.proposal.earlyStart?.evidenceRef ? { evidenceRef: project.proposal.earlyStart.evidenceRef } : {}),
+      ...(project.proposal.earlyStart?.receivedOn ? { receivedOn: project.proposal.earlyStart.receivedOn } : {}),
+      ...(project.proposal.earlyStart?.fromAddress ? { fromAddress: project.proposal.earlyStart.fromAddress } : {}),
+      files: project.proposal.earlyStart?.mediaIds?.length ?? 0,
+      ...(project.customer.email ? { customerEmail: project.customer.email } : {}),
       ...(project.proposal.earlyStart?.recordedBy ? { recordedBy: project.proposal.earlyStart.recordedBy } : {}),
     },
     blockers: blockersFor(project, ctx, "booking"),
@@ -280,27 +304,71 @@ export async function requestDeposit(projectId: string, expectedTotalPence: numb
   return issueInvoice(projectId, { kind: "deposit", ...(expectedTotalPence !== undefined ? { expectedTotalPence } : {}), requestId }, staff);
 }
 
+/** The early-start evidence forms' fields (booking page and command centre), as the server reads them. */
+export function earlyStartEvidenceFromForm(form: FormData): EarlyStartEvidenceInput {
+  const str = (k: string) => {
+    const v = form.get(k);
+    return typeof v === "string" ? v.trim() : "";
+  };
+  return {
+    channel: str("channel") === "paper" ? "paper" : "email",
+    evidenceRef: str("evidenceRef"),
+    mediaIds: form.getAll("mediaId").map(String),
+    receivedOn: str("receivedOn"),
+    ...(str("fromAddress") ? { fromAddress: str("fromAddress").slice(0, 200) } : {}),
+    wordingConfirmed: str("wording") === "on",
+  };
+}
+
+export interface EarlyStartEvidenceInput {
+  channel: "email" | "paper";
+  /** Which email or form: its date and subject, or the form's reference. */
+  evidenceRef: string;
+  /** The copy, uploaded to this project: the email as a PDF or screenshot, or the signed form. */
+  mediaIds: string[];
+  /** The London day it reached us. */
+  receivedOn: string;
+  /** For an email: the address it came from. */
+  fromAddress?: string;
+  /** The person recording it checked it uses the early-start wording we gave the customer. */
+  wordingConfirmed: boolean;
+}
+
 /**
  * The customer's early-start request on a durable medium (their email with
  * the wording, or a signed form), recorded by the signed-in person who has
- * it. A request made by email or on paper (not ticked on the portal) is
- * recorded first, then its evidence.
+ * it, with the copy itself stored on the project (we carry the burden of
+ * proof). Everything is checked before anything is recorded; a request made
+ * by email or on paper (not ticked on the portal) is then recorded first,
+ * then its evidence. The one path for the booking page and the command
+ * centre.
  */
-export async function recordEarlyStartEvidence(
-  projectId: string,
-  input: { channel: "email" | "paper"; evidenceRef: string },
-  staff: StaffMember,
-): Promise<Outcome<Project>> {
-  const ref = input.evidenceRef.trim();
+export async function recordEarlyStartEvidence(projectId: string, input: EarlyStartEvidenceInput, staff: StaffMember): Promise<Outcome<Project>> {
+  const ref = input.evidenceRef.trim().slice(0, 200);
   if (!ref) return fail("Say which email or form it is (date and subject, or the form's reference).");
   const project = await loadProject(projectId);
   if (!project) return fail("Project not found.", 404);
+  // Only this project's own uploads count as its copy.
+  const wanted = [...new Set(input.mediaIds.filter((id) => typeof id === "string" && id.length <= 64))].slice(0, 8);
+  const media = wanted.length ? (await mediaRepo.listByIds(wanted)).filter((m) => m.projectId === projectId) : [];
+  const evidence = {
+    channel: input.channel,
+    mediaIds: media.map((m) => m.id),
+    receivedOn: input.receivedOn,
+    ...(input.fromAddress?.trim() ? { fromAddress: input.fromAddress.trim() } : {}),
+    // The version they were asked to use, once someone has checked the words.
+    wordingVersion: input.wordingConfirmed ? (project.proposal.earlyStart?.wordingVersion ?? EARLY_START_WORDING_VERSION) : "",
+  };
+  if (project.proposal.status === "accepted" && !project.proposal.earlyStart?.evidencedAt) {
+    const problem = earlyStartEvidenceProblem(project, evidence, londonToday());
+    if (problem) return fail(problem);
+  }
   if (!earlyStartRequestedOf(project)) {
     const req = await dispatch(projectId, { type: "early-start-requested", channel: input.channel }, staff);
     if ("error" in req) return fail(req.error, req.status, req.blockers);
   }
-  const r = await dispatch(projectId, { type: "early-start-evidenced", channel: input.channel, evidenceRef: ref.slice(0, 200), by: staff.name }, staff);
+  const r = await dispatch(projectId, { type: "early-start-evidenced", evidenceRef: ref, by: staff.name, ...evidence }, staff);
   if ("error" in r) return fail(r.error, r.status, r.blockers);
-  await audit({ actor: staff, action: "booking.early-start-evidence", entity: "project", entityId: projectId, detail: { channel: input.channel } });
+  await audit({ actor: staff, action: "booking.early-start-evidence", entity: "project", entityId: projectId, detail: { channel: input.channel, files: media.length, receivedOn: input.receivedOn } });
   return { ok: true, value: r.project, message: "Early-start request recorded with its evidence." };
 }

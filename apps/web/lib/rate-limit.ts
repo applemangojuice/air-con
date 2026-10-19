@@ -97,7 +97,8 @@ export function enforceRateLimit(
   limit: number,
   windowMs: number,
 ): Response | null {
-  const { ok, retryAfterSeconds } = rateLimit(`${scope}:${clientKey(request)}`, limit, windowMs);
+  // By /64 for IPv6, so one household's billions of addresses are one limit.
+  const { ok, retryAfterSeconds } = rateLimit(`${scope}:${rateLimitIdentity(clientKey(request))}`, limit, windowMs);
   if (ok) return null;
   return new Response(JSON.stringify({ error: "Too many requests" }), {
     status: 429,

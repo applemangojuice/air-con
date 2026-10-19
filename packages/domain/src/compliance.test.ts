@@ -4,6 +4,7 @@ import {
   COMPLIANCE_GATE_GROUPS,
   COMPLIANCE_TEMPLATE,
   addComplianceEvidence,
+  companyFgasCertProblem,
   complianceProgress,
   complianceTemplateFor,
   instantiateCompliance,
@@ -342,4 +343,30 @@ test("progress counts what's settled and what still holds a gate", () => {
   assert.equal(p.settled, 1);
   assert.equal(p.rejected, 1);
   assert.ok(p.statutoryOpen > 0);
+});
+
+test("company F-gas: approval rests on a current certificate in settings, or the subcontractor's attached; a lapse reopens it", () => {
+  const cert = { body: "DEMO REFCOM", number: "DEMO-CO-1", expiresOn: "2026-11-30" };
+  const booked = project((x) => (x.booking.dates = ["2026-11-25", "2026-11-26", "2026-12-01"]));
+  assert.equal(companyFgasCertProblem(cert, project(), "2026-10-18"), null, "nothing booked: current today");
+  assert.match(companyFgasCertProblem(cert, booked, "2026-10-18") ?? "", /expires on 30 Nov 2026, before the last install day \(1 Dec 2026\)/);
+  assert.match(companyFgasCertProblem(undefined, booked, "2026-10-18") ?? "", /no company F-gas certificate/);
+  assert.match(companyFgasCertProblem({ body: "", number: "X" }, booked, "2026-10-18") ?? "", /no company F-gas certificate/);
+  assert.equal(companyFgasCertProblem({ ...cert, expiresOn: undefined }, booked, "2026-10-18"), null, "no expiry on record");
+
+  const fgas = item("fgas-company", { status: "under-review" });
+  const problem = companyFgasCertProblem(cert, booked, "2026-10-18");
+  const noted = reviewCompliance(fgas, "approved", TECH, "Checked the certificate", undefined, NOW, { companyFgasProblem: problem });
+  assert.ok(!noted.ok && /expires on 30 Nov 2026[\s\S]*attach the certified company's certificate/.test(noted.error), "a note can't stand in for a lapsed certificate");
+  const sub = reviewCompliance({ ...fgas, mediaIds: ["m-sub-cert"] }, "approved", TECH, "Under DEMO Cool Ltd's certificate", undefined, NOW, { companyFgasProblem: problem });
+  assert.ok(sub.ok, "the subcontracting route: their certificate attached");
+  assert.ok(reviewCompliance(fgas, "approved", TECH, "Checked it", undefined, NOW, { companyFgasProblem: null }).ok, "a current certificate in settings");
+
+  // Approved on the settings certificate; the dates move past its expiry: it reopens, and the gate holds.
+  const approved = { ...fgas, status: "approved" as const, reviewedBy: TECH.name, reviewedAt: NOW };
+  const [reopened] = syncCompliance([approved], booked, NOW, undefined, { companyFgasProblem: problem });
+  assert.equal(reopened?.status, "under-review");
+  assert.match(reopened?.history?.at(-1)?.note ?? "", /Reopened automatically: The company F-gas certificate/);
+  assert.deepEqual(syncCompliance([{ ...approved, mediaIds: ["m-sub-cert"] }], booked, NOW, undefined, { companyFgasProblem: problem }), [], "the subcontractor's certificate still stands");
+  assert.deepEqual(syncCompliance([approved], booked, NOW, undefined, { companyFgasProblem: null }), []);
 });

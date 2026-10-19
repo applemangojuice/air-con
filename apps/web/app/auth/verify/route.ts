@@ -7,6 +7,7 @@ import { SESSION_COOKIE, verifySession, type Session } from "@/lib/auth/session"
 import { BRAND } from "@/lib/brand";
 import { escapeHtml } from "@/lib/email";
 import * as customersRepo from "@/lib/repo/customers";
+import { claimProjectOnSignIn } from "@/lib/project-service";
 import { getServiceClient } from "@/lib/supabase-server";
 
 /**
@@ -63,7 +64,7 @@ function confirmPage(token: string, subject: TokenSubject, current: Session | nu
   h1{font-size:22px;margin:0 0 8px}
   p{color:#5b6170;margin:0 0 24px;line-height:1.5}
   .warn{background:#fff4e8;border:1px solid #f2c79b;border-radius:16px;padding:12px 14px;color:#1d212b;text-align:left}
-  button{min-height:48px;padding:12px 32px;border:0;border-radius:999px;background:#d55a0a;color:#fff;font-size:16px;font-weight:600;cursor:pointer}
+  button{min-height:48px;padding:12px 32px;border:0;border-radius:999px;background:#a84508;color:#fff;font-size:16px;font-weight:600;cursor:pointer}
   button:hover{background:#a84508}
   a{display:inline-block;margin-top:20px;color:#5b6170}
 </style>
@@ -177,6 +178,8 @@ export async function POST(request: NextRequest) {
 
   const customer = subject.subjectId ? await customersRepo.get(subject.subjectId) : null;
   if (!customer) return redirectTo(request, "/portal?link=expired");
+  // The address is proven now: a project made under it that wasn't theirs yet (funnel) joins them.
+  await claimProjectOnSignIn(customer, subject.next);
   const projectIds = await customersRepo.projectIdsFor(customer.id);
   const cookie = await signedCookie(customerSession(customer, projectIds));
   if (!cookie) return redirectTo(request, "/portal?link=unavailable");

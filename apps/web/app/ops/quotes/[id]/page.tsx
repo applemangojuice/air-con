@@ -64,7 +64,7 @@ export default async function OpsQuoteDetailPage({
 
   async function setStatus(formData: FormData) {
     "use server";
-    await requireStaff("projects.edit");
+    await requireStaff(["projects.edit", "projects.view-all"]);
     const status = formData.get("status");
     if (typeof status !== "string" || !["new", "reviewed", "booked", "declined"].includes(status))
       return;
@@ -82,7 +82,7 @@ export default async function OpsQuoteDetailPage({
 
   async function addNote(formData: FormData) {
     "use server";
-    await requireStaff("projects.edit");
+    await requireStaff(["projects.edit", "projects.view-all"]);
     const note = String(formData.get("note") ?? "").trim();
     if (!note || note.length > 4000) return;
     const sb = getServiceClient();
@@ -93,7 +93,7 @@ export default async function OpsQuoteDetailPage({
 
   async function setNextAction(formData: FormData) {
     "use server";
-    await requireStaff("projects.edit");
+    await requireStaff(["projects.edit", "projects.view-all"]);
     const action = String(formData.get("action") ?? "").trim();
     const dueRaw = String(formData.get("due") ?? "").trim();
     const sb = getServiceClient();
@@ -233,7 +233,7 @@ export default async function OpsQuoteDetailPage({
               name="due"
               className="rounded-full border border-line bg-white px-3 py-1.5 text-sm outline-none focus:border-accent-500"
             />
-            <button className="rounded-full bg-accent-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-accent-700">
+            <button className="rounded-full bg-accent-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-accent-800">
               Set
             </button>
           </form>

@@ -12,7 +12,6 @@ import {
   TIME_KINDS,
   can,
   defaultsForKind,
-  earlyStartRequestedOf,
   isOpen,
   transitionIssue,
   type CancellationChannel,
@@ -20,6 +19,7 @@ import {
   type IssueKind,
   type IssueStatus,
   type Learning,
+  type Permission,
   type ProjectAction,
   type StaffMember,
   type TimeEntry,
@@ -27,7 +27,8 @@ import {
 import { done, refused, type ActionResult } from "@/components/ops/command/types";
 import { londonToUtcIso, slotIso } from "@/components/ops/command/model";
 import { audit } from "@/lib/audit";
-import { requireStaff } from "@/lib/auth/server";
+import { earlyStartEvidenceFromForm, recordEarlyStartEvidence } from "@/lib/booking-server";
+import { requireProjectAccess, requireStaff } from "@/lib/auth/server";
 import { recordCancellation } from "@/lib/cancellation-server";
 import { recordCertificate } from "@/lib/certificates-server";
 import { resend } from "@/lib/comms/outbox";
@@ -42,11 +43,12 @@ import { isUuid } from "@/lib/repo/base";
 
 /**
  * The command centre's actions (feature F7). Every one checks the signed-in
- * staff member's permission itself (server actions are reachable from any
- * route), validates its input with zod, and changes the project only through
- * project-service dispatch with that person as the actor, so the reducer's
- * gates and qualification checks apply and the audit log names them.
- * Refusals come back with the reducer's blockers for the form to show.
+ * staff member's permission and their access to the project itself (server
+ * actions are reachable from any route, and the page's own guard doesn't
+ * cover them), validates its input with zod, and changes the project only
+ * through project-service dispatch with that person as the actor, so the
+ * reducer's gates and qualification checks apply and the audit log names
+ * them. Refusals come back with the reducer's blockers for the form to show.
  */
 
 const uuid = z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
@@ -65,14 +67,32 @@ function refresh(projectId: string) {
   revalidatePath("/ops/projects");
 }
 
+/**
+ * The signed-in staff member, when they may change this project: the
+ * permission, and the project itself. requireProjectAccess re-reads the live
+ * staff row, so someone without the board-wide view (a subcontractor) only
+ * ever reaches the jobs they're assigned to, whatever their session said
+ * when it was signed. Null answers "not found", never a hint it exists.
+ */
+async function guard(projectId: string, perm: Permission = "projects.edit"): Promise<StaffMember | null> {
+  await requireStaff(perm);
+  if (!uuid.safeParse(projectId).success) return null;
+  const access = await requireProjectAccess(projectId, { perm });
+  return access?.kind === "staff" ? access.staff : null;
+}
+
+const notFound = () => refused("Project not found.");
+
 /** Guard + dispatch + the answer the form shows. */
-async function run(projectId: string, action: ProjectAction, success: string, perm: Parameters<typeof requireStaff>[0] = "projects.edit"): Promise<ActionResult> {
-  const staff = await requireStaff(perm);
+async function run(projectId: string, action: ProjectAction, success: string, perm: Permission = "projects.edit"): Promise<ActionResult> {
+  const staff = await guard(projectId, perm);
+  if (!staff) return notFound();
   return runAs(staff, projectId, action, success);
 }
 
+/** Dispatch as someone guard() already let in. */
 async function runAs(staff: StaffMember, projectId: string, action: ProjectAction, success: string): Promise<ActionResult> {
-  if (!uuid.safeParse(projectId).success) return refused("Project not found.");
+  if (!uuid.safeParse(projectId).success) return notFound();
   const result = await dispatch(projectId, action, staff);
   if ("error" in result) return refused(result.error, result.blockers);
   refresh(projectId);
@@ -84,7 +104,8 @@ async function runAs(staff: StaffMember, projectId: string, action: ProjectActio
 /* ------------------------------------------------------------------ */
 
 export async function setOwnerAction(projectId: string, fd: FormData): Promise<ActionResult> {
-  const staff = await requireStaff("projects.edit");
+  const staff = await guard(projectId);
+  if (!staff) return notFound();
   const staffId = field(fd, "staffId");
   if (!staffId) return runAs(staff, projectId, { type: "set-owner", staffId: "", name: "" }, "Owner cleared.");
   if (!uuid.safeParse(staffId).success) return refused("Pick someone from the list.");
@@ -120,7 +141,8 @@ export async function setNextActionAction(projectId: string, fd: FormData): Prom
 /* ------------------------------------------------------------------ */
 
 export async function assignSurveyorAction(projectId: string, fd: FormData): Promise<ActionResult> {
-  const staff = await requireStaff("projects.edit");
+  const staff = await guard(projectId);
+  if (!staff) return notFound();
   const id = field(fd, "staffId");
   if (!uuid.safeParse(id).success) return refused("Pick a surveyor.");
   const surveyor = await staffRepo.get(id);
@@ -136,7 +158,8 @@ const bookSchema = z.object({
 });
 
 export async function bookSurveyAction(projectId: string, fd: FormData): Promise<ActionResult> {
-  const staff = await requireStaff("projects.edit");
+  const staff = await guard(projectId);
+  if (!staff) return notFound();
   const parsed = bookSchema.safeParse({ date: field(fd, "date"), time: field(fd, "time"), mode: field(fd, "mode") || "in-person", surveyorId: field(fd, "surveyorId") });
   if (!parsed.success) return refused(firstIssue(parsed.error));
   const at = slotIso(parsed.data.date, parsed.data.time);
@@ -175,28 +198,16 @@ export async function documentsConsentAction(projectId: string, fd: FormData): P
   return run(projectId, { type: "documents-consent-recorded", channel }, "Recorded: the customer agreed to get documents by email.", "proposal.edit");
 }
 
-const earlySchema = z.object({
-  channel: z.enum(["email", "paper"]),
-  evidenceRef: text(200).min(3, "Say which email or form it is (date and subject, or the document reference)."),
-});
-
+/** Their early-start email or signed form, with the copy itself: the same path as the booking page (booking-server). */
 export async function earlyStartEvidenceAction(projectId: string, fd: FormData): Promise<ActionResult> {
-  const staff = await requireStaff("projects.edit");
-  const parsed = earlySchema.safeParse({ channel: field(fd, "channel"), evidenceRef: field(fd, "evidenceRef") });
-  if (!parsed.success) return refused(firstIssue(parsed.error));
-  const project = await loadProject(projectId);
-  if (!project) return refused("Project not found.");
-  // A customer who asks only now (by email or on the form) makes the request and its evidence at once.
-  if (!earlyStartRequestedOf(project)) {
-    const asked = await runAs(staff, projectId, { type: "early-start-requested", channel: parsed.data.channel }, "");
-    if (!asked.ok) return asked;
-  }
-  return runAs(
-    staff,
-    projectId,
-    { type: "early-start-evidenced", channel: parsed.data.channel, evidenceRef: parsed.data.evidenceRef, by: staff.name },
-    "Early-start request recorded on file.",
-  );
+  const staff = await guard(projectId);
+  if (!staff) return notFound();
+  const input = earlyStartEvidenceFromForm(fd);
+  if (input.evidenceRef.length < 3) return refused("Say which email or form it is (date and subject, or the document reference).");
+  const result = await recordEarlyStartEvidence(projectId, input, staff);
+  if (!result.ok) return refused(result.error, result.blockers as never);
+  refresh(projectId);
+  return done("Early-start request recorded on file, with its copy.");
 }
 
 export async function electricalCertAction(projectId: string, fd: FormData): Promise<ActionResult> {
@@ -212,8 +223,8 @@ export async function warrantyRegisteredAction(projectId: string, fd: FormData):
 
 /** The certificate's file and reference go into the customer's documents first; then the project is told. */
 async function certificateAction(projectId: string, kind: "electrical-installation" | "warranty-registration", fd: FormData): Promise<ActionResult> {
-  const staff = await requireStaff("projects.edit");
-  if (!uuid.safeParse(projectId).success) return refused("Project not found.");
+  const staff = await guard(projectId);
+  if (!staff) return notFound();
   const result = await recordCertificate(
     projectId,
     {
@@ -239,8 +250,9 @@ const pilotSchema = z.object({
 });
 
 export async function setPilotAction(projectId: string, fd: FormData): Promise<ActionResult> {
+  const staff = await guard(projectId);
+  if (!staff) return notFound();
   const parsed = pilotSchema.safeParse({ number: field(fd, "number"), label: field(fd, "label") });
-  const staff = await requireStaff("projects.edit");
   if (!parsed.success) return refused(firstIssue(parsed.error));
   // One household per pilot number: the pilots page and CSV line them up by it.
   const holder = await pilotNumberHolder(parsed.data.number, { projectId }).catch(() => undefined);
@@ -268,14 +280,17 @@ export async function setContactAction(projectId: string, fd: FormData): Promise
 }
 
 export async function closeProjectAction(projectId: string, fd: FormData): Promise<ActionResult> {
+  const staff = await guard(projectId);
+  if (!staff) return notFound();
   const cancelled = field(fd, "cancelled") === "on";
   const note = field(fd, "reason").trim().slice(0, 300);
   if (cancelled) {
     // A contract's cancellation is recorded with when and how it reached us, which starts the refund clock.
-    const project = isUuid(projectId) ? await loadProject(projectId) : null;
+    const project = await loadProject(projectId);
     if (project?.proposal.status === "accepted") return refused("There's a contract: use \"Record a cancellation\" so the refund deadline, the invoices and the customer's acknowledgement are handled.");
   }
-  return run(
+  return runAs(
+    staff,
     projectId,
     { type: "project-closed", ...(cancelled ? { reason: "cancelled" } : note ? { reason: note } : {}) },
     cancelled ? "Project marked cancelled." : "Project closed.",
@@ -284,8 +299,8 @@ export async function closeProjectAction(projectId: string, fd: FormData): Promi
 
 /** The customer cancelled their contract: when and how it reached us, then everything that follows (cancellation-server). */
 export async function cancellationAction(projectId: string, fd: FormData): Promise<ActionResult> {
-  const staff = await requireStaff("projects.edit");
-  if (!uuid.safeParse(projectId).success) return refused("Project not found.");
+  const staff = await guard(projectId);
+  if (!staff) return notFound();
   const receivedAt = londonToUtcIso(field(fd, "receivedOn"), field(fd, "receivedTime") || "09:00");
   if (!receivedAt) return refused("When did the cancellation reach us? Give the date (and time if you know it).");
   const channel = field(fd, "channel");
@@ -339,8 +354,8 @@ function kindDefaults(kind: IssueKind) {
 }
 
 export async function raiseIssueAction(projectId: string, fd: FormData): Promise<ActionResult> {
-  const staff = await requireStaff("projects.edit");
-  if (!uuid.safeParse(projectId).success) return refused("Project not found.");
+  const staff = await guard(projectId);
+  if (!staff) return notFound();
   const parsed = issueSchema.safeParse({
     kind: field(fd, "kind"),
     title: field(fd, "title"),
@@ -396,7 +411,8 @@ const transitionSchema = z.object({
 });
 
 export async function transitionIssueAction(projectId: string, fd: FormData): Promise<ActionResult> {
-  const staff = await requireStaff("projects.edit");
+  const staff = await guard(projectId);
+  if (!staff) return notFound();
   const parsed = transitionSchema.safeParse({ issueId: field(fd, "issueId"), to: field(fd, "to"), note: field(fd, "note") });
   if (!parsed.success) return refused(firstIssue(parsed.error));
   const issue = await issuesRepo.get(parsed.data.issueId);
@@ -433,8 +449,8 @@ const sendVariationSchema = z.object({
 
 /** The office checked a variation proposed on site: it goes to the customer, at this price. */
 export async function sendVariationAction(projectId: string, fd: FormData): Promise<ActionResult> {
-  const staff = await requireStaff("proposal.issue");
-  if (!uuid.safeParse(projectId).success) return refused("Project not found.");
+  const staff = await guard(projectId, "proposal.issue");
+  if (!staff) return notFound();
   const parsed = sendVariationSchema.safeParse({ issueId: field(fd, "issueId"), title: field(fd, "title"), description: field(fd, "description"), pounds: field(fd, "pounds") });
   if (!parsed.success) return refused(firstIssue(parsed.error));
   const pence = Math.round(Number(parsed.data.pounds.replace("£", "")) * 100);
@@ -460,8 +476,8 @@ const timeSchema = z.object({
 });
 
 export async function addTimeAction(projectId: string, fd: FormData): Promise<ActionResult> {
-  const staff = await requireStaff("projects.edit");
-  if (!uuid.safeParse(projectId).success) return refused("Project not found.");
+  const staff = await guard(projectId);
+  if (!staff) return notFound();
   const parsed = timeSchema.safeParse({
     staffId: field(fd, "staffId"),
     kind: field(fd, "kind"),
@@ -510,8 +526,8 @@ export async function addTimeAction(projectId: string, fd: FormData): Promise<Ac
 /* ------------------------------------------------------------------ */
 
 export async function addLearningAction(projectId: string, fd: FormData): Promise<ActionResult> {
-  const staff = await requireStaff("projects.edit");
-  if (!uuid.safeParse(projectId).success) return refused("Project not found.");
+  const staff = await guard(projectId);
+  if (!staff) return notFound();
   const answers = LEARNING_PROMPTS.map((p) => ({ promptId: p.id, answer: field(fd, `answer:${p.id}`).trim().slice(0, 1000) })).filter((a) => a.answer);
   if (answers.length === 0) return refused("Answer at least one of the questions.");
   const stage = field(fd, "stage");
@@ -553,11 +569,13 @@ const learningStatusSchema = z.object({
 
 /** Also used from the pilots dashboard. */
 export async function setLearningStatusAction(fd: FormData): Promise<ActionResult> {
-  const staff = await requireStaff("projects.edit");
+  await requireStaff("projects.edit");
   const parsed = learningStatusSchema.safeParse({ learningId: field(fd, "learningId"), status: field(fd, "status"), appliedNote: field(fd, "appliedNote") });
   if (!parsed.success) return refused(firstIssue(parsed.error));
   const l = await learningsRepo.get(parsed.data.learningId);
-  if (!l) return refused("Learning not found.");
+  // Only on a project this person may change (the learning's own).
+  const staff = l ? await guard(l.projectId) : null;
+  if (!l || !staff) return refused("Learning not found.");
   const { status, appliedNote } = parsed.data;
   if (status === "applied" && !appliedNote) return refused("Say what changed (the checklist step, engine constant or habit).");
   const next: Learning = { ...l, status };
@@ -581,11 +599,14 @@ export async function setLearningStatusAction(fd: FormData): Promise<ActionResul
 
 /** One more attempt of a stored message (same key, freshly minted link). Also used from /ops/messages. */
 export async function resendMessageAction(fd: FormData): Promise<ActionResult> {
-  const staff = await requireStaff("messages.send");
+  const signedIn = await requireStaff("messages.send");
   const id = field(fd, "messageId");
   if (!isUuid(id)) return refused("Message not found.");
   const message = await messagesRepo.get(id);
   if (!message) return refused("Message not found.");
+  // A project's message: only someone who may open that project. Team mail and sign-in links: the whole board only.
+  const staff = message.projectId ? await guard(message.projectId, "messages.send") : can(signedIn, "projects.view-all") ? signedIn : null;
+  if (!staff) return refused("Message not found.");
   const r = await resend(id);
   await audit({ actor: staff, action: "message.resend", entity: "message", entityId: id, detail: { event: message.event, status: r.status } });
   if (message.projectId) refresh(message.projectId);
