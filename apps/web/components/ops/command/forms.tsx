@@ -210,7 +210,7 @@ export function BookSurveyForm({
       <div className="mt-3">
         <SubmitButton>{moving ? "Move the survey" : "Book the survey"}</SubmitButton>
       </div>
-      <p className="mt-1.5 text-xs text-ink-500">Times are London time. The customer gets a confirmation email{moving ? " with the new time" : " with a calendar invite"}.</p>
+      <p className="mt-1.5 text-xs text-ink-500">Times are London time. The customer gets a confirmation email{moving ? " with the new time" : " with the date and time"}.</p>
     </ActionForm>
   );
 }

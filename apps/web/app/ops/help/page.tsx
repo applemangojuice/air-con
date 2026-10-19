@@ -93,7 +93,7 @@ const ROUTINES: Routine[] = [
       <>Pilot discount with its reason, the tax code, the date it&apos;s valid until.</>,
       <>A price above the customer&apos;s instant quote must say why, in words they&apos;ll read (&ldquo;you added a room&rdquo;).</>,
       <>
-        <B>Issue and email</B>. It sends the pre-contract information and the cancellation form. It won&apos;t issue until <P href="/ops/settings#company">Settings → Company</P> is complete and email works.
+        <B>Issue proposal</B>. It emails the pre-contract information and the cancellation form. It won&apos;t issue until <P href="/ops/settings#company">Settings → Company</P> is complete, the customer has agreed to documents by email, and email works.
       </>,
       <>The customer accepts, asks for changes or declines in their portal. Accepting emails them the contract.</>,
     ],

@@ -80,7 +80,7 @@ export const COMMS_EVENTS: Record<CommsEventId, CommsEventDef> = {
     channels: ["email"],
     audience: "customer",
     trigger: "auto",
-    description: "Survey booked or moved: date, time, what we'll check, what to have ready. Calendar invite attached.",
+    description: "Survey booked or moved: date, time, what we'll check, what to have ready.",
     templateVersion: 1,
   },
   "survey-reminder": {

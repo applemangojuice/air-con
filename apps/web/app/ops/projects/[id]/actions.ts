@@ -194,7 +194,7 @@ export async function bookSurveyAction(projectId: string, fd: FormData): Promise
     staff,
     projectId,
     { type: "ops-book-survey", scheduledFor: at, mode: parsed.data.mode, ...(surveyor ? { surveyor } : {}) },
-    "Survey booked. The customer gets a confirmation email with a calendar invite.",
+    "Survey booked. The customer gets a confirmation email with the date and time.",
   );
 }
 

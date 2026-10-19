@@ -41,7 +41,7 @@ async function liveChecks(): Promise<{ checks: Check[]; score: number; total: nu
         ? "All tables present."
         : `Missing: ${report.tables.filter((t) => !t.ok).map((t) => t.table).join(", ")}`
       : "SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY not set — demo mode, nothing saves.",
-    fix: "Run supabase/migrations 0001→0010 in the SQL editor; check /ops/status.",
+    fix: "In the Supabase SQL editor, run supabase/pilot-upgrade.sql (a brand-new database: 0001 to 0009 from supabase/migrations first); check /ops/status.",
   });
 
   checks.push({
