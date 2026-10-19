@@ -553,7 +553,9 @@ signatures record the verified `ctx.actor.name`, never a typed `by`.
 | `proposal-declined` | `{ reason }` | issued or changes-requested |
 | `proposal-accepted` | `{ proposalId, version, optionLabel, contractTotalPence, earlyStartRequested, earlyStartWordingVersion? }` | current proposal and version; proposal-accept gate. Sets `money.contractTotalPence`, `earlyStart`; install-only: `cancellationEndsOn = today + cancellationDays` (supply-and-install: set later by `kit-updated`) |
 | `proposal-expired` | `{}` | issued or changes-requested, and `validUntil < today` |
+| `pre-contract-info-sent` | `{ proposalId, messageId?, demo? }` | system (outbox, §H, §K29): the current version's issue email went; sets `preContractInfoSentAt` once |
 | `contract-confirmation-sent` | `{ messageId?, demo? }` | system (outbox, §H): accepted; sets `confirmationSentAt` once |
+| `cancellation-received` | `{ receivedAt, channel, evidenceRef }` | ops (§K29): accepted contract; records `cancellation` (refund due in 14 days) and closes as cancelled |
 | `early-start-requested` | `{ channel: "email" \| "paper" \| "portal" }` | accepted; install not started; idempotent |
 | `early-start-evidenced` | `{ channel: "email" \| "paper", evidenceRef, by }` | accepted; requested; signed-in `ctx.actor` (recorded as `recordedBy`); once |
 | `install-dates-set` (customer or ops) | `{ startDate, dates }` | accepted; install not started; `booking.installDays` working days in order; start ≥ today + `INSTALL_LEAD_DAYS`; start after the cancellation end unless early start requested (an unknown end is held at ready-to-install instead) |
@@ -1333,8 +1335,9 @@ changelog and the reasons, so nobody "fixes" a deliberate choice back.
     `early-start-requested` and `early-start-evidenced`. Proposal issue
     needs the consent, a customer email and complete Schedule 2 settings.
     Ready-to-install needs `confirmationSentAt`, which the outbox records
-    when the acceptance email is sent, or stored in demo mode (the event says
-    "demo mode", so it isn't passed off as delivered).
+    when the acceptance email is sent, or stored in demo mode on a demo
+    deployment only (the event says "demo mode", so it isn't passed off as
+    delivered; see §K29 for the delivered-only rule).
 15. **Cancellation period** (CCR regs 29–31, 36; was "today ≥
     cancellationEndsOn"). Supply-and-install is a sales contract: the period
     runs from delivery of the last of the kit, so it's unknown until
@@ -1465,3 +1468,68 @@ changelog and the reasons, so nobody "fixes" a deliberate choice back.
       offered for an end-of-day update, and the server refuses them there.
     - *Kit checked*: the email says "our team has checked", like the portal
       (the office often does it, not the installer).
+
+29. **Hardening review, batch 1 (before the first real customers).**
+    - *jsonb key order*: Postgres `jsonb` returns object keys shortest
+      first, then in byte order, so anything read from Supabase and compared
+      with a value built in code is compared as canonical JSON
+      (`canonicalJson` / `sameJson` in the domain's `json.ts`), never a plain
+      `JSON.stringify` (design content, proposal wording, catalogue,
+      purchasing, staff and settings audits). The local data backend returns
+      object and array columns in jsonb key order (`jsonbKeyOrder`), so the
+      tests and the e2e walk see what PostgREST returns.
+    - *Contract emails are facts only once delivered* (replaces part of §K14):
+      `preContractInfoSentAt` is recorded by the outbox when the issue email
+      for that proposal id is sent (`pre-contract-info-sent`), and
+      `confirmationSentAt` when the acceptance email is. A message stored as
+      demo counts only on a demo deployment or in development
+      (`demoLoginAllowed`), and says "demo mode". `proposal-accept` is blocked
+      (`pre-contract-info-not-sent`) until the issue email has gone; a live
+      deployment without email refuses to issue. The customer page says so
+      plainly instead of offering the accept flow.
+    - *Kit possession* (refines §K15): `kitSummary().deliveredTo` is
+      "customer" only when every required line's order goes to the
+      customer's home. Kit held in storage, by the installer or a
+      subcontractor starts no clock (`kit.deliveredTo = "elsewhere"`); it
+      reaches the customer with the crew, so install day 1 starts the period,
+      and the install can only start then on an evidenced early start.
+    - *Engine price*: `engineListNetPence(survey, settings)` takes off only
+      the tax the proposal adds back (effective tax code), so an unchanged
+      design's proposal total is the online price under every tax code.
+    - *Variations*: a yes needs the typed name and an "I agree to pay £X more"
+      press (`variationAgreeWording`), stored as `variation.acceptance` with
+      a sha256 of the change as shown, time, IP and browser; it creates a
+      customer-visible variation document and emails `variation-accepted`.
+      Variations are priced on the accepted option's tax code.
+    - *Frozen terms*: `ProposalRecord.terms` (payment terms and cancellation
+      days) and `termsText` (our terms, from `lib/legal/terms.ts`, the same
+      source as /terms) are frozen at issue and covered by the document hash.
+      `settingsForProposal` lays them over today's settings for the page, both
+      contract emails (which print the terms in full), the contract document
+      (which carries the text and its hash, also on the acceptance record) and
+      the deposit invoice (`agreedTerms`: the contract document's schedule).
+    - *Certificates are documents*: a `certificate` document kind (electrical
+      installation certificate, warranty registration) holds the file and the
+      reference; `electrical-cert-updated` "received" and `warranty-registered`
+      need its `documentId`, so "it's in your documents" is always true.
+    - *Building Regulations for the heat pump*: checklist items for its Part L
+      route before booking (scheme registration or building notice) and its
+      commissioning notice and compliance certificate before closing
+      (building control to confirm the route). Maintenance information counts
+      as provided only once the walkthrough, which now includes handing over
+      the manuals, is done. A weekly urgent team alert runs while an
+      electrical certificate is past its 30 days (`paperwork-overdue`).
+    - *Cancellation workflow*: `cancellation-received` records when and how
+      the customer's notice reached us and the refund deadline (14 days), and
+      closes the project as cancelled. `recordCancellation` voids unpaid
+      invoices, raises refund and collection tasks with owners and due dates,
+      cancels unplaced orders, flags placed ones, emails the customer
+      `cancellation-confirmed` and alerts the team; the pay page and card
+      payments take nothing on a cancelled contract. "Closed, cancelled"
+      without a record stays only for a withdrawal before any contract.
+    - *Public guarantee copy*: with no warranty facts in settings, the home
+      page and FAQ promise only that the proposal sets out which warranties
+      apply (`GUARANTEE_FALLBACK`), never a workmanship guarantee.
+    - *End-of-day sheet*: the installer's summary and update are theirs once
+      typed (`components/field/end-day-draft.ts`); a sync or refresh only
+      fills untouched fields, and nothing changes after the preview.

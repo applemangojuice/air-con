@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import {
+  CANCELLATION_CHANNELS,
   GATE_IDS,
   ISSUE_KIND_LABEL,
   LEARNING_PROMPTS,
@@ -14,6 +15,7 @@ import {
   earlyStartRequestedOf,
   isOpen,
   transitionIssue,
+  type CancellationChannel,
   type Issue,
   type IssueKind,
   type IssueStatus,
@@ -26,6 +28,7 @@ import { done, refused, type ActionResult } from "@/components/ops/command/types
 import { londonToUtcIso, slotIso } from "@/components/ops/command/model";
 import { audit } from "@/lib/audit";
 import { requireStaff } from "@/lib/auth/server";
+import { recordCancellation } from "@/lib/cancellation-server";
 import { recordCertificate } from "@/lib/certificates-server";
 import { resend } from "@/lib/comms/outbox";
 import { dispatch, loadProject, pilotNumberHolder } from "@/lib/project-service";
@@ -266,10 +269,39 @@ export async function setContactAction(projectId: string, fd: FormData): Promise
 export async function closeProjectAction(projectId: string, fd: FormData): Promise<ActionResult> {
   const cancelled = field(fd, "cancelled") === "on";
   const note = field(fd, "reason").trim().slice(0, 300);
+  if (cancelled) {
+    // A contract's cancellation is recorded with when and how it reached us, which starts the refund clock.
+    const project = isUuid(projectId) ? await loadProject(projectId) : null;
+    if (project?.proposal.status === "accepted") return refused("There's a contract: use \"Record a cancellation\" so the refund deadline, the invoices and the customer's acknowledgement are handled.");
+  }
   return run(
     projectId,
     { type: "project-closed", ...(cancelled ? { reason: "cancelled" } : note ? { reason: note } : {}) },
     cancelled ? "Project marked cancelled." : "Project closed.",
+  );
+}
+
+/** The customer cancelled their contract: when and how it reached us, then everything that follows (cancellation-server). */
+export async function cancellationAction(projectId: string, fd: FormData): Promise<ActionResult> {
+  const staff = await requireStaff("projects.edit");
+  if (!uuid.safeParse(projectId).success) return refused("Project not found.");
+  const receivedAt = londonToUtcIso(field(fd, "receivedOn"), field(fd, "receivedTime") || "09:00");
+  if (!receivedAt) return refused("When did the cancellation reach us? Give the date (and time if you know it).");
+  const channel = field(fd, "channel");
+  if (!(CANCELLATION_CHANNELS as readonly string[]).includes(channel)) return refused("How did the customer tell us?");
+  const result = await recordCancellation(projectId, { receivedAt, channel: channel as CancellationChannel, evidenceRef: field(fd, "evidenceRef") }, staff);
+  if (!result.ok) return refused(result.error, result.blockers as never);
+  refresh(projectId);
+  const c = result.project.cancellation!;
+  return done(
+    [
+      `Cancellation recorded. Refund due by ${c.refundDueBy}.`,
+      result.voided.length ? `Voided ${result.voided.join(", ")}.` : "",
+      result.tasks.length ? `${result.tasks.length} task${result.tasks.length === 1 ? "" : "s"} raised.` : "",
+      ...result.warnings,
+    ]
+      .filter(Boolean)
+      .join(" "),
   );
 }
 

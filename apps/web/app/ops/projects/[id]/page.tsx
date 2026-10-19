@@ -35,6 +35,7 @@ import { Facts, MessageBody, Note, Quiet, SectionCard } from "@/components/ops/c
 import {
   AssignSurveyorForm,
   BookSurveyForm,
+  CancellationForm,
   CloseForm,
   ConsentForm,
   ContactForm,
@@ -63,6 +64,7 @@ import {
   addNoteAction,
   assignSurveyorAction,
   bookSurveyAction,
+  cancellationAction,
   closeProjectAction,
   documentsConsentAction,
   earlyStartEvidenceAction,
@@ -319,7 +321,15 @@ export default async function CommandCentrePage({
             </div>
             <div className="mt-3">
               {p.closure.closed ? (
-                <Quiet>This project is closed{p.closure.closedAt ? ` (${fmtDate(p.closure.closedAt)})` : ""}. Nothing blocks it.</Quiet>
+                <>
+                  <Quiet>This project is closed{p.closure.closedAt ? ` (${fmtDate(p.closure.closedAt)})` : ""}. Nothing blocks it.</Quiet>
+                  {p.cancellation && (
+                    <Note tone="warn">
+                      Cancelled by the customer: received {fmtDate(p.cancellation.receivedAt)} by {p.cancellation.channel} ({p.cancellation.evidenceRef}). Refund due by{" "}
+                      {fmtDate(p.cancellation.refundDueBy)}.{p.cancellation.withinPeriod ? "" : " It arrived after the cancellation period ended: take advice before refunding."}
+                    </Note>
+                  )}
+                </>
               ) : (
                 <BlockerList
                   blockers={nextGroup?.blockers ?? []}
@@ -334,7 +344,7 @@ export default async function CommandCentrePage({
               {/* Ready to close: the one next action, here rather than only in the Admin panel. */}
               {gate === "closed" && !p.closure.closed && canEdit && (nextGroup?.blockers ?? []).every((b) => b.severity !== "block") && (
                 <div className="mt-3 rounded-2xl border border-line bg-surface/40 p-3">
-                  <CloseForm action={bind(closeProjectAction)} />
+                  <CloseForm action={bind(closeProjectAction)} contracted={p.proposal.status === "accepted"} />
                 </div>
               )}
             </div>
@@ -878,9 +888,14 @@ export default async function CommandCentrePage({
               <Disclosure summary="Edit contact and access">
                 <ContactForm action={bind(setContactAction)} current={p.customer} />
               </Disclosure>
+              {!p.closure.closed && p.proposal.status === "accepted" && (
+                <Disclosure summary="Record a cancellation">
+                  <CancellationForm action={bind(cancellationAction)} today={today} />
+                </Disclosure>
+              )}
               {!p.closure.closed && (
                 <Disclosure summary="Close the project">
-                  <CloseForm action={bind(closeProjectAction)} />
+                  <CloseForm action={bind(closeProjectAction)} contracted={p.proposal.status === "accepted"} />
                 </Disclosure>
               )}
             </div>

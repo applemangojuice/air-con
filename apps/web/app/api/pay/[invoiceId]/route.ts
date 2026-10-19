@@ -45,6 +45,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ inv
   if (owed <= 0) return back("nothing-due");
 
   const project = await loadProject(invoice.projectId);
+  // A cancelled contract takes no more money (reg 34): anything paid is refunded.
+  if (project?.closure.reason === "cancelled") return back("cancelled-contract");
   const session = await createCheckoutSession({
     // Charge what's still owed after payments and credit notes, never more.
     invoice: { ...invoice, paidPence: invoice.totalPence - owed },

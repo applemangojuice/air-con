@@ -1758,3 +1758,26 @@ test("dayUpdateLabel: one 'Day N done' prefix, never two", () => {
   assert.equal(dayUpdateLabel(2, "day 2: units up"), "day 2: units up");
   assert.equal(dayUpdateLabel(1, "Day 12 was long"), "Day 1 done: Day 12 was long");
 });
+
+test("cancellation-received: when and how it reached us, the refund deadline, and the project closes as cancelled", () => {
+  const before = walk("proposal-viewed");
+  refuses(before, { type: "cancellation-received", receivedAt: "2026-10-27T09:00:00.000Z", channel: "email", evidenceRef: "Email 27 Oct" }, "2026-10-27T10:00:00.000Z", { actor: ADMIN }, /no contract to cancel/);
+  const accepted = walk("contract-confirmation-sent");
+  const c = { type: "cancellation-received", receivedAt: "2026-10-29T18:30:00.000Z", channel: "email", evidenceRef: "Email 29 Oct, 'Cancel please'" } as const;
+  refuses(accepted, { ...c, evidenceRef: "x" }, "2026-10-30T09:00:00.000Z", { actor: ADMIN }, /where the cancellation is on file/);
+  refuses(accepted, { ...c, channel: "fax" } as never, "2026-10-30T09:00:00.000Z", { actor: ADMIN }, /How did the customer tell us/);
+  refuses(accepted, { ...c, receivedAt: "2026-11-30T09:00:00.000Z" }, "2026-10-30T09:00:00.000Z", { actor: ADMIN }, /hasn't happened yet/);
+  refuses(accepted, { ...c, receivedAt: "2026-10-01T09:00:00.000Z" }, "2026-10-30T09:00:00.000Z", { actor: ADMIN }, /before the contract/);
+  const p = step(accepted, c, "2026-10-30T09:00:00.000Z", { actor: ADMIN });
+  assert.deepEqual(p.closure, { closed: true, closedAt: "2026-10-30T09:00:00.000Z", reason: "cancelled" });
+  assert.equal(p.cancellation?.receivedAt, "2026-10-29T18:30:00.000Z");
+  assert.equal(p.cancellation?.refundDueBy, "2026-11-12", "14 days after the day it reached us");
+  assert.equal(p.cancellation?.withinPeriod, true);
+  assert.equal(p.cancellation?.recordedBy, ADMIN.name);
+  assert.match(p.events.at(-1)!.label, /We received your cancellation on .*Any refund is due by/);
+  assert.equal(customerNextAction(p), null);
+  refuses(p, { type: "install-dates-set", startDate: INSTALL_DATES[0]!, dates: INSTALL_DATES }, T.dates, {}, /closed/);
+  // Late at night still counts as that day.
+  const late = step(accepted, { ...c, receivedAt: "2026-10-28T23:30:00.000Z" }, "2026-10-30T09:00:00.000Z", { actor: ADMIN });
+  assert.equal(late.cancellation?.refundDueBy, "2026-11-11");
+});

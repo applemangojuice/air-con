@@ -182,6 +182,17 @@ export interface CommsData {
     /** The contract total with this change, when known. */
     newContractTotalPence?: number;
   };
+  "cancellation-confirmed": {
+    /** When the cancellation reached us (an instant), and how. */
+    receivedAt: string;
+    channel: string;
+    refundDueBy: string;
+    /** What they've paid us (net of any refunds so far), to come back. */
+    paidPence: number;
+    /** We supplied equipment that's with them, or with us for them. */
+    collectEquipment?: boolean;
+    withinPeriod?: boolean;
+  };
   "issue-update": { title: string; update: string; nextStep?: string; dueOn?: string; issueNumber?: number };
   "handover-ready": { electricalCertPending?: boolean };
   "certificate-issued": { kind: "electrical-certificate" | "warranty-confirmation" };
@@ -282,6 +293,7 @@ const PORTAL_PATH: Record<CommsEventId, string | null> = {
   "install-day-update": "#install",
   "variation-approval": "#install",
   "variation-accepted": "/documents",
+  "cancellation-confirmed": "",
   "issue-update": "",
   "handover-ready": "#handover",
   "certificate-issued": "/documents",
@@ -1260,6 +1272,25 @@ const TEMPLATES: { [E in CommsEventId]: Renderer<E> } = {
       cta: "See the change in your documents",
     };
   },
+
+  // The acknowledgement of a cancellation: a durable record of when it reached us and what happens next.
+  "cancellation-confirmed": (ctx, d) => ({
+    subject: "We've received your cancellation",
+    body: [
+      { p: `Thanks for letting us know. We received your cancellation on ${dayLong(d.receivedAt.slice(0, 10))}${d.channel ? ` (by ${d.channel === "in-person" ? "telling us in person" : d.channel})` : ""}, and your contract for the work at ${place(ctx)} is cancelled.` },
+      {
+        p: d.paidPence > 0
+          ? `We'll refund the ${money(d.paidPence)} you've paid by ${dayLong(d.refundDueBy)} at the latest, the same way you paid. If you'd asked us to start early and work was done, we'll explain any deduction for that work in writing first.`
+          : "You haven't paid us anything, so there's nothing to refund, and nothing more is due.",
+      },
+      ...(d.collectEquipment ? [{ p: "We'll collect the equipment we supplied, at our cost. We'll be in touch to agree a time." } as Block] : []),
+      ...(d.withinPeriod === false
+        ? [{ p: "Your cancellation reached us after the cancellation period had ended. We'll be in touch about what that means for your contract." } as Block]
+        : []),
+      { p: `Any questions, ${reach(ctx.settings)}.` },
+    ],
+    cta: "Open your project",
+  }),
 
   "issue-update": (ctx, d) => ({
     subject: `Update: ${d.title}`,

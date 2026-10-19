@@ -327,7 +327,53 @@ export function ContactForm({ action, current }: { action: Action; current: { em
   );
 }
 
-export function CloseForm({ action }: { action: Action }) {
+/** The customer cancelled their contract: when and how it reached us, and where it's on file. */
+export function CancellationForm({ action, today }: { action: Action; today: string }) {
+  const id = useId();
+  return (
+    <ActionForm
+      action={action}
+      confirm="Record the cancellation? The project closes as cancelled, unpaid invoices are voided, the refund and collection tasks are raised and the customer is emailed an acknowledgement."
+    >
+      <p className="mb-2 text-xs text-ink-500">
+        Any clear statement counts: an email, a letter, a call. The refund is due within 14 days of the day it reached us.
+      </p>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <div>
+          <L htmlFor={`${id}-d`}>Reached us on</L>
+          <input id={`${id}-d`} name="receivedOn" type="date" required max={today} defaultValue={today} className={compactInput} />
+        </div>
+        <div>
+          <L htmlFor={`${id}-t`} hint="(if known)">
+            At
+          </L>
+          <input id={`${id}-t`} name="receivedTime" type="time" className={compactInput} />
+        </div>
+        <div>
+          <L htmlFor={`${id}-c`}>How</L>
+          <select id={`${id}-c`} name="channel" required defaultValue="email" className={compactInput}>
+            <option value="email">Email</option>
+            <option value="phone">Phone call</option>
+            <option value="letter">Letter</option>
+            <option value="in-person">In person</option>
+            <option value="portal">Their project page</option>
+          </select>
+        </div>
+        <div>
+          <L htmlFor={`${id}-e`} hint="(the email's date and subject, the letter, the call note)">
+            On file as
+          </L>
+          <input id={`${id}-e`} name="evidenceRef" required minLength={3} maxLength={200} className={compactInput} />
+        </div>
+      </div>
+      <div className="mt-2">
+        <SubmitButton variant="secondary">Record the cancellation</SubmitButton>
+      </div>
+    </ActionForm>
+  );
+}
+
+export function CloseForm({ action, contracted = false }: { action: Action; contracted?: boolean }) {
   const id = useId();
   return (
     <ActionForm action={action} confirm="Close this project? Delivery steps stop; money, certificates and aftercare can still be recorded.">
@@ -340,10 +386,14 @@ export function CloseForm({ action }: { action: Action }) {
         </div>
         <SubmitButton variant="secondary">Close project</SubmitButton>
       </div>
-      <label className="mt-2 flex min-h-10 items-center gap-2 text-sm text-ink-700">
-        <input type="checkbox" name="cancelled" className="h-4 w-4 accent-accent-600" />
-        The customer cancelled (closes it now, whatever&apos;s outstanding)
-      </label>
+      {contracted ? (
+        <p className="mt-2 text-xs text-ink-500">Customer cancelling the contract? Use &ldquo;Record a cancellation&rdquo; instead.</p>
+      ) : (
+        <label className="mt-2 flex min-h-10 items-center gap-2 text-sm text-ink-700">
+          <input type="checkbox" name="cancelled" className="h-4 w-4 accent-accent-600" />
+          The customer withdrew before any contract (closes it now)
+        </label>
+      )}
     </ActionForm>
   );
 }

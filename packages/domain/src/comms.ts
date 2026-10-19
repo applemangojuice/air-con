@@ -34,6 +34,7 @@ export type CommsEventId =
   | "install-day-update"
   | "variation-approval"
   | "variation-accepted"
+  | "cancellation-confirmed"
   | "issue-update"
   | "handover-ready"
   | "certificate-issued"
@@ -212,6 +213,14 @@ export const COMMS_EVENTS: Record<CommsEventId, CommsEventDef> = {
     audience: "customer",
     trigger: "auto",
     description: "The customer's copy of a change they agreed to: what changes, the price, and the record of their yes.",
+    templateVersion: 1,
+  },
+  "cancellation-confirmed": {
+    id: "cancellation-confirmed",
+    channels: ["email"],
+    audience: "customer",
+    trigger: "auto",
+    description: "Acknowledges the customer's cancellation: when it reached us, the refund and its deadline, and collecting any equipment.",
     templateVersion: 1,
   },
   "issue-update": {

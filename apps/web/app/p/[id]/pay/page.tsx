@@ -30,6 +30,7 @@ const CARD_NOTICE: Record<string, string> = {
   failed: "We couldn't open the card payment page just now. Try again in a minute, or pay by bank transfer.",
   "nothing-due": "There's nothing left to pay on that invoice.",
   "not-payable": "That invoice can't be paid online.",
+  "cancelled-contract": "Your contract is cancelled, so there's nothing to pay.",
 };
 
 /**
@@ -84,7 +85,9 @@ export default async function PayPage({
     listDocuments(id, { customerVisibleOnly: true }),
   ]);
   const today = londonToday();
-  const payable = payableInvoices(invoices);
+  // A cancelled contract asks for nothing (reg 34): what's paid is refunded, nothing more is due.
+  const cancelled = project.closure.reason === "cancelled";
+  const payable = cancelled ? [] : payableInvoices(invoices);
   const settled = invoices.filter((i) => (i.status === "paid" || i.status === "part-paid") && !payable.some((p) => p.id === i.id));
   const card = cardAvailability();
   const bank = settings.payments.methods.includes("bank-transfer") ? settings.company.bank : undefined;
@@ -115,7 +118,7 @@ export default async function PayPage({
           {project.customer.postcode ? `, ${project.customer.postcode}` : ""}
         </p>
         <h1 className="mt-1 font-display text-3xl leading-tight text-ink-900 sm:text-4xl">
-          {payable.length ? `Hi ${first}, here's what's due` : `You're all paid up, ${first}`}
+          {cancelled ? `Your contract is cancelled, ${first}` : payable.length ? `Hi ${first}, here's what's due` : `You're all paid up, ${first}`}
         </h1>
 
         <div aria-live="polite">
@@ -134,7 +137,11 @@ export default async function PayPage({
 
         {payable.length === 0 ? (
           <section className="mt-6 rounded-2xl border border-line bg-white p-5">
-            <p className="text-ink-900">Nothing is waiting to be paid. We only ask for money with an invoice, and you&apos;ll get an email when one is ready.</p>
+            <p className="text-ink-900">
+              {cancelled
+                ? `Nothing is due, and nothing can be paid here.${project.cancellation ? ` We received your cancellation on ${fmtDate(project.cancellation.receivedAt)}; anything you've paid is refunded by ${fmtDate(project.cancellation.refundDueBy)}, the same way you paid.` : ""}`
+                : "Nothing is waiting to be paid. We only ask for money with an invoice, and you'll get an email when one is ready."}
+            </p>
             <LinkButton href={`/p/${id}`} variant="secondary" className="mt-4">
               Back to your project
             </LinkButton>

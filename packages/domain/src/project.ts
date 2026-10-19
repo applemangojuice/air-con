@@ -223,6 +223,36 @@ export interface ProjectEvent {
   feeGbp?: number;
 }
 
+/** The London calendar date (yyyy-mm-dd) of an instant. */
+function londonDateOf(iso: string): string {
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/London", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date(iso));
+  const get = (t: string) => parts.find((x) => x.type === t)?.value ?? "";
+  return `${get("year")}-${get("month")}-${get("day")}`;
+}
+
+/** How a customer told us they're cancelling. Any clear statement counts (CCR reg 32(3)). */
+export type CancellationChannel = "email" | "letter" | "phone" | "in-person" | "portal";
+export const CANCELLATION_CHANNELS: readonly CancellationChannel[] = ["email", "letter", "phone", "in-person", "portal"];
+
+/**
+ * A cancellation of the contract, recorded when it reached us: the proof of
+ * when and how (reg 32(5) puts that on the customer, but we keep it), and
+ * the refund deadline it sets (reg 34: 14 days after the day we were told).
+ */
+export interface CancellationRecord {
+  /** When the customer's notice reached us (not when it was recorded). */
+  receivedAt: string;
+  channel: CancellationChannel;
+  /** The email's date and subject, the letter, the call note: where the notice is on file. */
+  evidenceRef: string;
+  recordedAt: string;
+  recordedBy?: string;
+  /** Inside the statutory cancellation period when it arrived (or the period hadn't started). */
+  withinPeriod: boolean;
+  /** The last day for the refund: 14 days after the day the notice reached us. */
+  refundDueBy: string;
+}
+
 export interface CrewMember {
   staffId: string;
   name: string;
@@ -411,6 +441,8 @@ export interface Project {
     warrantyDueOn?: string;
   };
   closure: { closed: boolean; closedAt?: string; reason?: string };
+  /** The customer's cancellation of the contract, as received (cancellation-received). */
+  cancellation?: CancellationRecord;
   aftercare: {
     checkIn7dSentAt?: string;
     feedbackRequestedAt?: string;
@@ -1695,6 +1727,8 @@ export type ProjectAction =
   | { type: "set-owner"; staffId: string; name: string }
   | { type: "set-customer-contact"; email?: string; phone?: string; accessNotes?: string; parkingNotes?: string }
   | { type: "project-closed"; reason?: string }
+  /** Ops: the customer's cancellation reached us (when, how, where it's on file). Closes the project as cancelled. */
+  | { type: "cancellation-received"; receivedAt: string; channel: CancellationChannel; evidenceRef: string }
   | { type: "note"; text: string };
 
 export type ApplyResult = { ok: true; project: Project } | { ok: false; error: string; blockers?: Blocker[] };
@@ -2666,6 +2700,35 @@ export function applyProjectAction(project: Project, action: ProjectAction, now:
       log(
         "project-closed",
         cancelled ? "Project cancelled." : "All wrapped up. Thanks for having us, and we're still here if you need anything.",
+        "ops",
+      );
+      return ok();
+    }
+
+    case "cancellation-received": {
+      if (p.proposal.status !== "accepted") return err("There's no contract to cancel: an open proposal is simply declined.");
+      if (!CANCELLATION_CHANNELS.includes(action.channel)) return err("How did the customer tell us?");
+      const evidenceRef = action.evidenceRef.trim();
+      if (evidenceRef.length < 3) return err("Say where the cancellation is on file (the email's date and subject, the letter, or the call note).");
+      const received = Date.parse(action.receivedAt);
+      if (!Number.isFinite(received)) return err("When did the cancellation reach us?");
+      if (received > Date.parse(now) + 5 * 60_000) return err("A cancellation can't be recorded for a time that hasn't happened yet.");
+      if (p.proposal.acceptedAt && received < Date.parse(p.proposal.acceptedAt)) return err("That's before the contract was made.");
+      const receivedOn = londonDateOf(new Date(received).toISOString());
+      const cs = cancellationStatus(p, receivedOn, settings);
+      p.cancellation = {
+        receivedAt: new Date(received).toISOString(),
+        channel: action.channel,
+        evidenceRef,
+        recordedAt: now,
+        ...(staff?.name ? { recordedBy: staff.name } : {}),
+        withinPeriod: !cs.ended,
+        refundDueBy: addDays(receivedOn, 14),
+      };
+      p.closure = { closed: true, closedAt: now, reason: "cancelled" };
+      log(
+        "cancellation-received",
+        `We received your cancellation on ${fmtDate(receivedOn)}. Your contract is cancelled. Any refund is due by ${fmtDate(p.cancellation.refundDueBy)}.`,
         "ops",
       );
       return ok();
