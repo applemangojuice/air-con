@@ -175,6 +175,8 @@ const PO: PurchaseOrder = {
     { id: "l2", catalogueItemId: "demo-out-25", label: "Outdoor 2.5 kW", qty: 2, unitCostPence: 90_000, actualUnitCostPence: 92_000, receivedQty: 2, inspectedQty: 2, damagedQty: 0, serials: [], required: true },
     { id: "l3", catalogueItemId: "demo-pipe-5", label: "Pipe kit", qty: 2, unitCostPence: 6_000, receivedQty: 2, inspectedQty: 2, damagedQty: 0, serials: [], required: true },
     { id: "l4", label: "Condensate pump (added on day 2)", qty: 1, unitCostPence: 8_500, actualUnitCostPence: 9_000, receivedQty: 1, inspectedQty: 1, damagedQty: 0, serials: [], required: false },
+    // Van stock from the bill of materials: planned, so never "unplanned".
+    { id: "l5", label: "Fixings pack", qty: 1, unitCostPence: 0, receivedQty: 1, inspectedQty: 1, damagedQty: 0, serials: [], required: false, category: "consumables" },
   ],
   expectedTotalPence: 260_500,
   shippingPence: 2_500,

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { generateQuote } from "./pricing.ts";
 import {
+  dayUpdateLabel,
   CANCELLATION_RULE_STATUS,
   EARLY_START_WORDING_VERSION,
   REVIEW_REQUEST_DAYS,
@@ -819,7 +820,7 @@ test("kit-updated needs a confirmed booking and keeps customer wording conservat
     "Your kit is ordered.",
     "The supplier has confirmed your kit for Fri 13 Nov.",
     "Your kit has been delivered. Your cancellation period now runs until the end of Fri 27 Nov.",
-    "Your kit has been checked by your installer.", // the clock started at delivery and doesn't move
+    "Your kit has been checked by our team.", // the clock started at delivery and doesn't move
   ]);
   assert.equal(p.kit.deliveredAt, T.kit);
   const dispatched = step(walk("kit-confirmed"), { type: "kit-updated", status: "dispatched", shortages: 0 }, T.kit, { actor: ADMIN });
@@ -1628,4 +1629,11 @@ test("a migrated project keeps moving through the v2 reducer", () => {
   const p = migrateProject(v1(V1_VISITED));
   const r = applyProjectAction(p, { type: "install-dates-set", startDate: "2026-07-21", dates: ["2026-07-21", "2026-07-22", "2026-07-23"].slice(0, p.booking.installDays) }, "2026-07-15T10:00:00.000Z", ctx("2026-07-15"));
   assert.ok(r.ok, r.ok ? "" : r.error);
+});
+
+test("dayUpdateLabel: one 'Day N done' prefix, never two", () => {
+  assert.equal(dayUpdateLabel(1, "Holes drilled and sealed."), "Day 1 done: Holes drilled and sealed.");
+  assert.equal(dayUpdateLabel(1, "Day 1 done: holes drilled."), "Day 1 done: holes drilled.");
+  assert.equal(dayUpdateLabel(2, "day 2: units up"), "day 2: units up");
+  assert.equal(dayUpdateLabel(1, "Day 12 was long"), "Day 1 done: Day 12 was long");
 });

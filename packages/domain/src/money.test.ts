@@ -18,6 +18,7 @@ import {
   type Invoice,
   type InvoiceLine,
   type Payment,
+  variationsBillableAlone,
 } from "./money.ts";
 import { DEFAULT_SETTINGS, mergeSettings } from "./settings.ts";
 
@@ -186,4 +187,17 @@ test("due dates: deposits on issue, others after the payment terms; overdue only
   assert.equal(isInvoiceOverdue(due, [due], "2026-10-20"), false);
   const paid = { ...due, paidPence: 1_000, status: "paid" as const };
   assert.equal(isInvoiceOverdue(paid, [paid], "2026-11-01"), false);
+});
+
+test("variationsBillableAlone: a balance invoice covers what was accepted before it; later ones bill alone", () => {
+  const v1 = { id: "v1", variation: { decidedAt: "2026-10-20T10:00:00.000Z" } };
+  const v2 = { id: "v2", variation: { decidedAt: "2026-10-28T10:00:00.000Z" } };
+  const v3 = { id: "v3", variation: { decidedAt: "2026-10-21T10:00:00.000Z" } };
+  assert.deepEqual(variationsBillableAlone([v1, v2], []).map((v) => v.id), ["v1", "v2"], "nothing invoiced yet: both can go alone");
+  const balance = { kind: "balance" as const, status: "issued" as const, issuedAt: "2026-10-25T09:00:00.000Z" };
+  assert.deepEqual(variationsBillableAlone([v1, v2], [balance]).map((v) => v.id), ["v2"], "v1 is on the balance; v2 came after it");
+  const own = { kind: "variation" as const, status: "issued" as const, issueId: "v3", issuedAt: "2026-10-22T09:00:00.000Z" };
+  assert.deepEqual(variationsBillableAlone([v3], [own]).map((v) => v.id), [], "already billed on its own");
+  const voided = { ...balance, status: "void" as const };
+  assert.deepEqual(variationsBillableAlone([v1], [voided]).map((v) => v.id), ["v1"], "a void balance covers nothing");
 });

@@ -24,6 +24,7 @@ import {
   type ProposalRecord,
   type StaffMember,
   type TaxCodeId,
+  variationsBillableAlone,
 } from "@aircon/domain";
 import { audit, type AuditActorInput } from "./audit";
 import { demoLoginAllowed } from "./auth/access";
@@ -162,11 +163,17 @@ export function planInvoices(input: {
   if (contract && !balance.available) balance.reason = "Everything on the contract is already invoiced.";
 
   // Variations not yet billed on their own (the balance picks them up otherwise).
-  const unbilled = variations.filter((v) => !issued.some((i) => i.issueId === v.id));
+  const unbilled = variationsBillableAlone(variations, issued);
   const variation = plan(
     "variation",
     [],
-    unbilled.length ? "Pick the variation to bill." : variations.length ? "Every accepted variation is billed." : "No accepted variations.",
+    unbilled.length
+      ? "Pick the variation to bill."
+      : variations.length
+        ? issued.some((i) => i.kind === "balance")
+          ? "Every accepted variation is billed (the balance invoice includes them)."
+          : "Every accepted variation is billed."
+        : "No accepted variations.",
     { variations: unbilled.map((v) => ({ id: v.id, number: v.number, title: v.title, totalPence: v.variation?.totalDeltaPence ?? 0 })) },
   );
   if (unbilled.length) variation.available = true;

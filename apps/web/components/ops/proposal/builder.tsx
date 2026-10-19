@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { defaultOptionFor, guaranteeLines, proposalIssueErrors, type Blocker, type OptionContext, type ProposalRecord } from "@aircon/domain";
 import { BlockerList, Button, Card, Fieldset, Input, Textarea } from "@/components/kit";
@@ -18,6 +17,7 @@ import {
 import { ListEditor } from "./fields";
 import { formFromRecord, optionFormFrom, previewOption, recordFromForm, type OptionForm } from "./model";
 import { OptionEditor } from "./option-editor";
+import { reloadProposalPage } from "./reload";
 
 /**
  * The proposal builder: edit a draft, see the price and margin move as you
@@ -52,7 +52,6 @@ const LIVE_CODES = new Set(["margin-below-minimum", "validity-passed", "proposal
 
 export function ProposalBuilder(props: BuilderProps) {
   const { projectId, proposal, canSeeMargins, canIssue, isAdmin } = props;
-  const router = useRouter();
   const [form, setForm] = useState(() => formFromRecord(proposal));
   const [tab, setTab] = useState(form.options[0]?.designVariantId ?? "");
   const [save, setSave] = useState<SaveState>({ kind: "saved" });
@@ -188,8 +187,13 @@ export function ProposalBuilder(props: BuilderProps) {
     }
     try {
       const result = await issueAction(projectId, proposal.id);
+      if (result.ok) {
+        // Stay busy while the page reloads into the issued version (see reload.ts).
+        setIssue({ busy: true, result });
+        reloadProposalPage(projectId);
+        return;
+      }
       setIssue({ busy: false, result });
-      if (result.ok) router.refresh();
     } catch {
       setIssue({ busy: false, result: { ok: false, error: "Couldn't reach the server. Nothing was sent: try again." } });
     }
@@ -316,7 +320,7 @@ export function ProposalBuilder(props: BuilderProps) {
               </>
             )}
             {projectBlockers.length > 0 && <BlockerList blockers={projectBlockers} empty={null} />}
-            <Fixes {...props} blockers={projectBlockers} />
+            <Fixes {...props} blockers={projectBlockers} flushEdits={flush} />
           </div>
           <div className="mt-5 space-y-3 border-t border-line pt-5">
             {canIssue ? (
@@ -363,7 +367,7 @@ export function ProposalBuilder(props: BuilderProps) {
         </Card>
 
         {(isAdmin || proposal.marginOverride || proposal.taxOverride) && (belowMin || proposal.marginOverride || ctx.settings.tax.vatRegistered) && (
-          <Overrides projectId={projectId} proposal={proposal} isAdmin={isAdmin} showMargin={belowMin || Boolean(proposal.marginOverride)} showTax={ctx.settings.tax.vatRegistered} />
+          <Overrides projectId={projectId} proposal={proposal} flushEdits={flush} isAdmin={isAdmin} showMargin={belowMin || Boolean(proposal.marginOverride)} showTax={ctx.settings.tax.vatRegistered} />
         )}
 
         <Card>
@@ -437,8 +441,7 @@ function SaveStatus({ state, onRetry }: { state: SaveState; onRetry: () => void 
 }
 
 /** One-tap fixes for the blockers a builder can clear without leaving the page; links for the rest. */
-function Fixes(props: BuilderProps) {
-  const router = useRouter();
+function Fixes(props: BuilderProps & { flushEdits: () => Promise<boolean> }) {
   const codes = new Set(props.blockers.map((b) => b.code));
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -447,14 +450,21 @@ function Fixes(props: BuilderProps) {
     setBusy(true);
     setMsg(null);
     try {
-      const r = await fn();
-      if (!r.ok) setMsg(r.error);
-      else router.refresh();
+      // Save any edits first: the page reloads with the fix applied (see reload.ts).
+      if (!(await props.flushEdits())) {
+        setMsg("Save the draft first: it didn't save (see above).");
+      } else {
+        const r = await fn();
+        if (r.ok) {
+          reloadProposalPage(props.projectId);
+          return;
+        }
+        setMsg(r.error);
+      }
     } catch {
       setMsg("Couldn't reach the server. Try again.");
-    } finally {
-      setBusy(false);
     }
+    setBusy(false);
   };
   const items: React.ReactNode[] = [];
   if (codes.has("documents-consent-missing")) {
@@ -534,8 +544,21 @@ function Fixes(props: BuilderProps) {
   );
 }
 
-function Overrides({ projectId, proposal, isAdmin, showMargin, showTax }: { projectId: string; proposal: ProposalRecord; isAdmin: boolean; showMargin: boolean; showTax: boolean }) {
-  const router = useRouter();
+function Overrides({
+  projectId,
+  proposal,
+  flushEdits,
+  isAdmin,
+  showMargin,
+  showTax,
+}: {
+  projectId: string;
+  proposal: ProposalRecord;
+  flushEdits: () => Promise<boolean>;
+  isAdmin: boolean;
+  showMargin: boolean;
+  showTax: boolean;
+}) {
   const [margin, setMargin] = useState(proposal.marginOverride?.reason ?? "");
   const [tax, setTax] = useState(proposal.taxOverride?.reason ?? "");
   const [msg, setMsg] = useState<string | null>(null);
@@ -544,14 +567,21 @@ function Overrides({ projectId, proposal, isAdmin, showMargin, showTax }: { proj
     setBusy(true);
     setMsg(null);
     try {
-      const r = await overrideAction(projectId, proposal.id, kind, reason);
-      if (!r.ok) setMsg(r.error);
-      else router.refresh();
+      // Save edits before the override changes the draft (it moves the draft's revision on), then reload with it.
+      if (!(await flushEdits())) {
+        setMsg("Save the draft first: it didn't save (see above).");
+      } else {
+        const r = await overrideAction(projectId, proposal.id, kind, reason);
+        if (r.ok) {
+          reloadProposalPage(projectId);
+          return;
+        }
+        setMsg(r.error);
+      }
     } catch {
       setMsg("Couldn't reach the server. Try again.");
-    } finally {
-      setBusy(false);
     }
+    setBusy(false);
   };
   const block = (kind: "margin" | "tax", title: string, value: string, setValue: (v: string) => void, current?: { reason: string; by: string; at: string }) => (
     <div className="space-y-2">

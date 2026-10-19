@@ -7,7 +7,7 @@ import * as staffRepo from "@/lib/repo/staff";
 import * as tokensRepo from "@/lib/repo/tokens";
 import { requireDb } from "@/lib/supabase-server";
 import { withLegacyContact } from "@/lib/legacy-contact";
-import { isAdminEmail, isPlausibleEmail, linkMayCarryToken, normaliseEmail, safeNextPath } from "./access";
+import { isAdminEmail, isPlausibleEmail, linkMayCarryToken, linkMayShowOnScreen, normaliseEmail, safeNextPath } from "./access";
 import { base64urlEncode } from "./session";
 
 /**
@@ -21,7 +21,8 @@ import { base64urlEncode } from "./session";
  *    address, and are minted when the email is sent, never stored.
  *  * Sending goes through the outbox (`magic-link` event). Where email
  *    isn't configured the link comes back for the screen instead, but only
- *    on a developer's machine, or for DEMO accounts on a demo deployment:
+ *    on a developer's machine, or on a demo deployment for DEMO accounts and
+ *    reserved addresses (example.com, .invalid, …) no real person can own:
  *    showing a real person's link on screen would let anyone sign in as them.
  *  * Unknown and inactive addresses get no link and no hint (the page says
  *    the same thing either way).
@@ -127,10 +128,10 @@ export async function issueMagicLink(input: {
     console.error("[auth] magic link send failed:", err);
   }
 
-  const onScreenAllowed =
-    process.env.NODE_ENV !== "production" || (process.env.ALLOW_DEMO_LOGIN === "1" && isDemo);
   // Relative, so the on-screen link works on whatever host is serving this page.
-  return !live && onScreenAllowed ? { sent, devLink: verifyPath(token.raw) } : { sent };
+  return linkMayShowOnScreen({ env: process.env, emailLive: live, email, demoAccount: isDemo })
+    ? { sent, devLink: verifyPath(token.raw) }
+    : { sent };
 }
 
 /**

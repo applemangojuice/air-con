@@ -16,6 +16,7 @@ import {
   earlyStartWording,
   engineListNetPence,
   guaranteeLines,
+  withSettingsWording,
   hasCurrentQualification,
   measuredToEngineSurvey,
   pricingInputsOf,
@@ -607,14 +608,14 @@ async function showProposalMedia(record: ProposalRecord): Promise<void> {
  * the proposal document frozen.
  */
 export async function issueDraft(projectId: string, proposalId: string, staff: StaffMember): Promise<Result<{ version: number }>> {
-  const record = await proposalsRepo.get(proposalId);
-  if (!record || record.projectId !== projectId) return fail("Proposal not found", 404);
-  if (record.status !== "draft") return fail("This version has already been issued.");
+  const stored = await proposalsRepo.get(proposalId);
+  if (!stored || stored.projectId !== projectId) return fail("Proposal not found", 404);
+  if (stored.status !== "draft") return fail("This version has already been issued.");
   const project = await loadProject(projectId);
   if (!project) return fail("Project not found", 404);
   if (project.proposal.status === "accepted") return fail("The proposal is accepted. Changes now go through a variation.");
   const approved = await designsRepo.approvedForProject(projectId);
-  if (!approved || approved.id !== record.designId) {
+  if (!approved || approved.id !== stored.designId) {
     return fail(
       approved
         ? `This draft was built on an earlier design. Design version ${approved.version} is the approved one: start the draft again from it.`
@@ -624,6 +625,8 @@ export async function issueDraft(projectId: string, proposalId: string, staff: S
   }
   const settings = await getSettings();
   const today = londonToday();
+  // Settings saved since the draft's last edit (guarantees, warranty, terms) still reach the customer.
+  let record = withSettingsWording(stored, settings);
   const errors = proposalIssueErrors(record, settings, today);
   if (errors.length) return fail("The proposal isn't ready to issue yet.", 422, { errors });
 
@@ -631,6 +634,16 @@ export async function issueDraft(projectId: string, proposalId: string, staff: S
   const ctx = await buildReadinessContext(project, staff);
   const gate = blockersFor(project, ctx, "proposal-issue");
   if (gate.some((b) => b.severity === "block")) return fail("The project isn't ready for a proposal yet.", 409, { blockers: gate });
+
+  // Write the refreshed wording before the issue email reads the record.
+  if (JSON.stringify([record.warranty, record.guarantees, record.termsVersion]) !== JSON.stringify([stored.warranty, stored.guarantees, stored.termsVersion])) {
+    try {
+      record = await proposalsRepo.update(record);
+    } catch (err) {
+      console.error(`[proposal] couldn't refresh ${proposalId}'s wording from settings:`, err);
+      return fail("The proposal couldn't be updated from settings. Nothing was issued; try again.", 500);
+    }
+  }
 
   const contractType = record.contractType ?? "supply-and-install";
   const result = await dispatch(

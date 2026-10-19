@@ -624,7 +624,8 @@ export function addComplianceEvidence(
   return { ok: true, item: clean(next) };
 }
 
-const lastEventAt = (p: Project, type: string) => [...p.events].reverse().find((e) => e.type === type)?.at;
+const lastEvent = (p: Project, type: string) => [...p.events].reverse().find((e) => e.type === type);
+const lastEventAt = (p: Project, type: string) => lastEvent(p, type)?.at;
 
 /**
  * Bring the automatic items into line with the project's own records, and
@@ -697,7 +698,9 @@ export function syncCompliance(items: ComplianceItem[], project: Project, now: s
         done = { by: project.handover.commissionedBy ?? "Technical lead", at: project.handover.commissionedAt ?? now };
       }
       if (auto === "warranty-registered" && project.handover.warrantyRegistered) {
-        done = { by: "Recorded on the project", at: lastEventAt(project, "warranty-registered") ?? now };
+        // Whoever recorded the registration ("Approved by DEMO Ada"), never a phrase that reads as a name.
+        const e = lastEvent(project, "warranty-registered");
+        done = { by: e?.actorName ?? "the office", at: e?.at ?? now };
       }
       if (done && item.status !== "approved") {
         set(item, "approved", done.by, done.at, `Updated automatically: ${AUTO_SOURCE[auto]}.`);

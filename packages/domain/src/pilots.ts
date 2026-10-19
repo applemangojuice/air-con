@@ -347,8 +347,13 @@ export function pilotMetrics(input: {
         }).length
       : 0;
 
+  // Lines nobody planned: not on the design's bill of materials. Van-stock
+  // consumables are on the bill (purchasing marks them not required, since the
+  // van carries them), so they don't count.
   const unplannedMaterials = sum(
-    (input.purchaseOrders ?? []).filter((po) => po.status !== "cancelled").map((po) => (po.lines ?? []).filter((l) => !l.required).length),
+    (input.purchaseOrders ?? [])
+      .filter((po) => po.status !== "cancelled")
+      .map((po) => (po.lines ?? []).filter((l) => !l.required && l.category !== "consumables").length),
   );
   const customerChanges =
     p.events.filter((e) => e.type === "proposal-changes-requested").length +

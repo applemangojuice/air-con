@@ -163,6 +163,21 @@ export default async function CommandCentrePage({
   const progress = rec.job ? runsheetProgress(rec.job) : null;
   // Money
   const outstanding = Math.max(0, p.money.invoicedPence - p.money.paidPence);
+  // The deposit as the booking gate sees it: due from the contract and settings
+  // before anyone has invoiced it, so "Not required" never shows while it blocks.
+  const depositDue = ctx.money?.depositDuePence ?? 0;
+  const depositPaid = ctx.money?.depositPaidPence ?? 0;
+  const depositFact: ReactNode =
+    p.booking.depositStatus === "paid" || (depositDue > 0 && depositPaid >= depositDue) ? (
+      "Paid"
+    ) : depositDue > 0 ? (
+      <span key="d">
+        <Money pence={depositDue} /> due{depositPaid > 0 ? <>, <Money pence={depositPaid} /> paid</> : null}
+        {p.booking.depositStatus === "requested" ? " (invoiced)" : " (not invoiced yet)"}
+      </span>
+    ) : (
+      plain(p.booking.depositStatus)
+    );
   // Issues
   const openIssues = rec.issues.filter(isOpen);
   const kindDefaults = issueKindDefaults();
@@ -317,6 +332,12 @@ export default async function CommandCentrePage({
                 />
               )}
               {gate && nextGroup && <BlockerLinks blockers={nextGroup.blockers.map((b) => b.code)} projectId={id} />}
+              {/* Ready to close: the one next action, here rather than only in the Admin panel. */}
+              {gate === "closed" && !p.closure.closed && canEdit && (nextGroup?.blockers ?? []).every((b) => b.severity !== "block") && (
+                <div className="mt-3 rounded-2xl border border-line bg-surface/40 p-3">
+                  <CloseForm action={bind(closeProjectAction)} />
+                </div>
+              )}
             </div>
             {laterGroups.length > 0 && (
               <Disclosure summary={`Later gates (${laterGroups.reduce((n, g) => n + g.blockers.length, 0)} items)`} className="mt-3">
@@ -425,12 +446,12 @@ export default async function CommandCentrePage({
             </SectionCard>
 
             {/* Booking */}
-            <SectionCard id="booking" title="Booking and crew" status={p.booking.status} primary={{ href: "/ops/calendar", label: "Open the calendar", note: "Dates and crew are set there" }}>
+            <SectionCard id="booking" title="Booking and crew" status={p.booking.status} primary={{ href: `/ops/projects/${id}/booking`, label: "Dates, crew and deposit", note: "The calendar shows every job" }}>
               <Facts
                 items={[
                   ["Dates", p.booking.dates.length ? p.booking.dates.map((d) => fmtDay(d)).join(", ") : null],
                   ["Crew", p.booking.crew.length ? p.booking.crew.map((c) => crewLabel(c.name, ROLE_LABEL[c.role], c.external)).join("; ") : null],
-                  ["Deposit", plain(p.booking.depositStatus)],
+                  ["Deposit", depositFact],
                   ["Prep ticked", `${p.booking.prep.filter((i) => i.confirmable && i.done).length} of ${p.booking.prep.filter((i) => i.confirmable).length}`],
                 ]}
               />
@@ -919,7 +940,7 @@ function BlockerLinks({ blockers, projectId }: { blockers: string[]; projectId: 
     else if (c === "compliance" || c === "compliance-missing") areas.set("compliance", { href: `/ops/projects/${projectId}/compliance`, label: "Compliance" });
     else if (c.startsWith("kit")) areas.set("kit", { href: `/ops/projects/${projectId}/kit`, label: "Kit" });
     else if (["no-fgas-engineer", "no-electrician", "no-tech-lead", "dates-not-chosen", "dates-inside-cancellation", "booking-not-confirmed"].includes(c))
-      areas.set("calendar", { href: "/ops/calendar", label: "Calendar" });
+      areas.set("booking", { href: `/ops/projects/${projectId}/booking`, label: "Booking" });
     else if (c === "deposit-unpaid" || c === "balance-outstanding" || c === "money-unknown" || c === "not-fully-invoiced")
       areas.set("money", { href: `/ops/projects/${projectId}/money`, label: "Money" });
     else if (c === "issue") areas.set("issues", { href: `/ops/projects/${projectId}/issues`, label: "Issues" });

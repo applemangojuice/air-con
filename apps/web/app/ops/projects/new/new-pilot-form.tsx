@@ -203,7 +203,7 @@ export function NewPilotForm({
           {devLink && (
             <div role="status" className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
               <p>{devLink.message}</p>
-              <p className="mt-2 font-semibold">Development only: the customer&apos;s link</p>
+              <p className="mt-2 font-semibold">Email isn&apos;t set up: the customer&apos;s link (DEMO or development only)</p>
               <p className="mt-1 break-all font-mono text-xs">{devLink.link}</p>
               <a href={devLink.href} className="mt-3 inline-flex min-h-10 items-center font-semibold text-accent-700 underline">
                 Open the project

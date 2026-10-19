@@ -131,7 +131,7 @@ export interface ProposalRecord {
   createdAt: string;
   /** Who supplies the kit; decides the cancellation clock and copy. supply-and-install when absent. */
   contractType?: ContractType;
-  /** Guarantee and after-sales statements, frozen from settings when the draft was last saved. */
+  /** Guarantee and after-sales statements, from settings while a draft (withSettingsWording), frozen at issue. */
   guarantees?: string[];
   /** Internal notes for the team. Never shown to the customer. */
   internalNotes?: string;
@@ -213,6 +213,23 @@ export function guaranteeLines(settings: PilotSettings, manufacturerText?: strin
     "None of this affects your statutory rights: the equipment must be as described and of satisfactory quality, and our work done with reasonable care and skill.",
   );
   return out;
+}
+
+/**
+ * A draft with its settings-derived wording (manufacturer's warranty,
+ * guarantee lines, terms version) taken from the settings as they are now.
+ * A draft follows settings until it's issued, so issuing refreshes it: a
+ * guarantee or terms change saved after the draft's last edit must still
+ * reach the customer. Issued versions are frozen and returned unchanged.
+ */
+export function withSettingsWording(record: ProposalRecord, settings: PilotSettings): ProposalRecord {
+  if (record.status !== "draft") return record;
+  return {
+    ...record,
+    warranty: settings.warranty.manufacturerSummary?.trim() || null,
+    guarantees: guaranteeLines(settings),
+    termsVersion: settings.legal.termsVersion,
+  };
 }
 
 export interface InstallDayPlan {
@@ -317,14 +334,21 @@ export function pipeNoteFor(room: Pick<RoomDesignInput, "pipeRunM" | "heightDiff
   return parts.join(" ");
 }
 
-function unitHighlights(item: CatalogueItem | undefined): string[] {
+/**
+ * The unit's points for its room card: the catalogue blurb, then the facts
+ * from its specs that the blurb doesn't already make (a card that says
+ * "As quiet as 19 dB(A)… with Wi-Fi app control" doesn't then say "19 dB on
+ * its quietest setting" and "App control" as well).
+ */
+export function unitHighlights(item: Pick<CatalogueItem, "customerBlurb" | "specs"> | undefined): string[] {
   if (!item) return [];
   const out: string[] = [];
-  if (item.customerBlurb?.trim()) out.push(item.customerBlurb.trim());
+  const blurb = item.customerBlurb?.trim() ?? "";
+  if (blurb) out.push(blurb);
   const db = item.specs?.soundPressureLowDb;
-  if (typeof db === "number") out.push(`${trimNum(db)} dB on its quietest setting`);
-  if (typeof item.specs?.heatingKw === "number") out.push("Heats in winter as well as cooling in summer");
-  if (item.specs?.wifi) out.push("App control");
+  if (typeof db === "number" && !/\bdB\b/i.test(blurb)) out.push(`${trimNum(db)} dB on its quietest setting`);
+  if (typeof item.specs?.heatingKw === "number" && !/\bheat/i.test(blurb)) out.push("Heats in winter as well as cooling in summer");
+  if (item.specs?.wifi && !/\b(app|wi-?fi)\b/i.test(blurb)) out.push("App control");
   return out;
 }
 

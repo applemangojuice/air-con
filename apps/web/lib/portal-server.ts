@@ -412,7 +412,7 @@ export async function customerHomes(): Promise<{ name: string; email: string; ho
 export type LinkTarget = { kind: "project"; projectId: string } | { kind: "document"; documentId: string } | { kind: "email"; email: string };
 
 export interface LinkResult {
-  /** Development only: the link itself, since nothing was emailed. */
+  /** Development, or a DEMO address on a demo deployment: the link itself, since nothing was emailed. */
   devLink?: string;
   emailLive: boolean;
 }

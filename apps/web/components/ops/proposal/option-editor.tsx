@@ -14,7 +14,7 @@ import {
 } from "@aircon/domain";
 import { AnnotatedImage } from "@/components/annotate/annotated-image";
 import { Badge, Button, Card, Fieldset, Input, Select, Textarea } from "@/components/kit";
-import { money } from "@/lib/format";
+import { money, unitWord } from "@/lib/format";
 import type { EngineReference, ProposalMedia } from "@/lib/proposal-server";
 import { ListEditor, NumberField, PoundsInput } from "./fields";
 import type { OptionForm, OptionPreview } from "./model";
@@ -335,11 +335,6 @@ function Figure({ label, value, hint, valueClass = "text-ink-900" }: { label: st
   );
 }
 
-/** "3 day" → "3 days"; "11 m" and "2 each" stay as they are. */
-function unitWord(unit: string, qty: number): string {
-  if (qty === 1 || ["m", "each", "kg", "g"].includes(unit) || unit.endsWith("s")) return unit;
-  return `${unit}s`;
-}
 
 const CATEGORY_LABEL: Record<CostLine["category"], string> = {
   equipment: "Equipment",

@@ -21,7 +21,9 @@ import {
   proposalIssueErrors,
   recomputeOption,
   reviseProposal,
+  unitHighlights,
   whyThisSize,
+  withSettingsWording,
   withoutDiscountLine,
   type AcceptanceRecord,
   type OptionContext,
@@ -168,6 +170,17 @@ test("guaranteeLines: says plainly when no extended warranty is offered, and nev
   const zero = guaranteeLines(mergeSettings({ warranty: { workmanshipYears: 0, manufacturerSummary: null } }));
   assert.match(zero.join(" "), /don't offer a separate guarantee on our workmanship/);
   assert.match(zero.join(" "), /manufacturer's standard warranty terms/);
+});
+
+test("withSettingsWording: a draft picks up settings saved after its last edit; issued versions stay frozen", () => {
+  const stale = { status: "draft", warranty: null, guarantees: guaranteeLines(DEFAULT_SETTINGS), termsVersion: "old-terms" } as unknown as ProposalRecord;
+  const fresh = withSettingsWording(stale, READY);
+  assert.deepEqual(fresh.guarantees, guaranteeLines(READY));
+  assert.equal(fresh.warranty, "DEMO: five years' parts once registered.");
+  assert.equal(fresh.termsVersion, READY.legal.termsVersion);
+  assert.doesNotMatch(fresh.guarantees!.join(" "), /don't offer an extended warranty/);
+  const issued = { ...stale, status: "issued" } as ProposalRecord;
+  assert.equal(withSettingsWording(issued, READY), issued, "an issued version never changes");
 });
 
 test("installPlan: three days by default, sensible for one, two and four", () => {
@@ -484,4 +497,15 @@ test("price lines: whole pounds for every system but the last, which takes the r
   assert.equal(systems.length, 2);
   assert.equal(systems[0]!.amountPence % 100, 0);
   assert.equal(systems.reduce((a, l) => a + l.amountPence, 0), o.pricing.netPence);
+});
+
+test("unitHighlights: spec facts the blurb already makes aren't repeated", () => {
+  const specs = { soundPressureLowDb: 19, heatingKw: 3.2, wifi: true } as unknown as CatalogueItem["specs"];
+  assert.deepEqual(unitHighlights({ customerBlurb: "As quiet as 19 dB(A) on its lowest setting, with Wi-Fi app control built in.", specs }), [
+    "As quiet as 19 dB(A) on its lowest setting, with Wi-Fi app control built in.",
+    "Heats in winter as well as cooling in summer",
+  ]);
+  assert.deepEqual(unitHighlights({ customerBlurb: "", specs }), ["19 dB on its quietest setting", "Heats in winter as well as cooling in summer", "App control"]);
+  assert.deepEqual(unitHighlights({ customerBlurb: "Heats and cools a big room.", specs: { wifi: false } as unknown as CatalogueItem["specs"] }), ["Heats and cools a big room."]);
+  assert.deepEqual(unitHighlights(undefined), []);
 });

@@ -245,6 +245,27 @@ export function invoiceOutstanding(invoice: Invoice, all: Invoice[]): number {
   return Math.max(0, invoice.totalPence - invoice.paidPence + credited);
 }
 
+/**
+ * Accepted variations that can still go on an invoice of their own: not
+ * already billed on one, and not covered by a balance invoice (a live balance
+ * invoice issued after the variation was accepted includes it). Without the
+ * second rule, issuing the balance would leave the same variation on offer
+ * to bill again.
+ */
+export function variationsBillableAlone<V extends { id: string; variation?: { decidedAt?: string } }>(
+  acceptedVariations: V[],
+  invoices: Pick<Invoice, "kind" | "status" | "issueId" | "issuedAt">[],
+): V[] {
+  const live = invoices.filter((i) => i.status !== "void" && i.status !== "draft");
+  const balanceIssued = live.filter((i) => i.kind === "balance" && i.issuedAt).map((i) => i.issuedAt!);
+  return acceptedVariations.filter((v) => {
+    if (live.some((i) => i.issueId === v.id)) return false;
+    const decided = v.variation?.decidedAt;
+    // An acceptance with no time on record predates any balance we can compare it with: treat it as included.
+    return !balanceIssued.some((at) => !decided || decided <= at);
+  });
+}
+
 /** Every number the money page and the portal lead with. */
 export function moneySummary(
   invoices: Invoice[],

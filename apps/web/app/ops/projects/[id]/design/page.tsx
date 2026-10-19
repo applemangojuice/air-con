@@ -131,7 +131,9 @@ export default async function DesignPage({ params }: { params: Promise<{ id: str
             )}
           </div>
           <DesignStudio
-            key={design.id}
+            // Remount per version and per status: approving signs the same version in place, and the
+            // studio must then leave edit mode instead of offering to change what was just signed.
+            key={`${design.id}:${design.status}`}
             projectId={id}
             design={design}
             catalogue={data.catalogue}

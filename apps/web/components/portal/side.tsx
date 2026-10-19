@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { DOCUMENT_KIND_LABEL } from "@aircon/domain";
-import { fmtDay, fmtDayTime, money } from "@/lib/format";
+import { fmtDay, fmtInstantDay, money } from "@/lib/format";
 import { primaryCls } from "./bits";
 import { useHub } from "./controller";
 import type { HubData } from "./types";
@@ -175,7 +175,7 @@ export function UpdatesFeed({ data }: { data: HubData }) {
               <span aria-hidden className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${i === 0 ? "bg-accent-500" : "bg-line"}`} />
               <span className="min-w-0 text-[15px] leading-relaxed text-ink-900">
                 {e.label}
-                <span className="block text-xs text-ink-500">{fmtDayTime(e.at).replace(/, \d\d:\d\d$/, "")}</span>
+                <span className="block text-xs text-ink-500">{fmtInstantDay(e.at)}</span>
               </span>
             </li>
           ))}

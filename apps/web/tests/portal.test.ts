@@ -213,7 +213,7 @@ test("kit steps never run ahead of what someone recorded", () => {
   assert.equal(steps[1]!.label, "Supplier confirmed for Mon 2 Nov");
   p.kit = { status: "inspected", deliveredAt: "2026-11-02T10:00:00.000Z", inspectedAt: "2026-11-03T08:00:00.000Z", shortages: 0 };
   assert.deepEqual(view.kitSteps(p).map((s) => s.done), [true, true, true, true]);
-  assert.match(view.kitHeadline(p), /checked by your installer/);
+  assert.match(view.kitHeadline(p), /checked by our team/);
 });
 
 test("waitingCopy promises only the date the survey email gave", () => {

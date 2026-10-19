@@ -1,9 +1,9 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button, type ButtonVariant } from "@/components/kit";
 import { reviseAction, startDraftAction } from "@/app/ops/projects/[id]/proposal/actions";
+import { reloadProposalPage } from "./reload";
 
 /** Start a draft from the design, or revise an issued version: one tap, then the builder opens. */
 export function ProposalActionButton({
@@ -19,7 +19,6 @@ export function ProposalActionButton({
   children: React.ReactNode;
   variant?: ButtonVariant;
 }) {
-  const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   async function go() {
@@ -27,13 +26,16 @@ export function ProposalActionButton({
     setError(null);
     try {
       const r = kind === "start" ? await startDraftAction(projectId) : await reviseAction(projectId, proposalId ?? "");
-      if (!r.ok) setError(r.error);
-      else router.refresh();
+      if (r.ok) {
+        // Stay busy: the page reloads into the builder (see reload.ts for why it's a full load).
+        reloadProposalPage(projectId);
+        return;
+      }
+      setError(r.error);
     } catch {
       setError("Couldn't reach the server. Try again.");
-    } finally {
-      setBusy(false);
     }
+    setBusy(false);
   }
   return (
     <div className="space-y-2">

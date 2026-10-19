@@ -112,7 +112,8 @@ export function DocSheet({
           <dl className="shrink-0 text-sm sm:text-right">
             <dt className="sr-only">Document</dt>
             <dd className="font-display text-2xl leading-tight text-ink-900">{doc.title}</dd>
-            <dd className="mt-1 text-ink-500">{DOCUMENT_KIND_LABEL[doc.kind]}</dd>
+            {/* The kind, unless the title already says it ("Commissioning certificate" twice). */}
+            {DOCUMENT_KIND_LABEL[doc.kind].toLowerCase() !== doc.title.trim().toLowerCase() && <dd className="mt-1 text-ink-500">{DOCUMENT_KIND_LABEL[doc.kind]}</dd>}
             <div className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 sm:justify-end">
               <dt className="text-ink-500">Ref</dt>
               <dd className="font-semibold tabular-nums">{doc.ref}</dd>

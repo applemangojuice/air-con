@@ -12,7 +12,9 @@ import {
   isAdminEmail,
   isAssigned,
   isPlausibleEmail,
+  isReservedDemoAddress,
   linkMayCarryToken,
+  linkMayShowOnScreen,
   maskEmail,
   parseAdminEmails,
   relinkEmail,
@@ -268,6 +270,28 @@ test("demo sign-in: outside production, or production with ALLOW_DEMO_LOGIN=1 on
   assert.equal(demoLoginAllowed({ ...real, DEMO_DEPLOYMENT: "yes" }), false, "exactly 1");
   assert.equal(demoLoginAllowed({ ...real, NODE_ENV: "development" }), true, "dev is always demo-able");
   assert.equal(demoLoginRefusedOnRealData({ NODE_ENV: "production" }), false);
+});
+
+test("reserved demo addresses: example domains and .example/.invalid/.test only", () => {
+  for (const ok of ["demo.pat@example.com", "A@EXAMPLE.ORG", "x@mail.example.net", "x@demo.dang.invalid", "x@shop.test", "x@foo.example"]) {
+    assert.equal(isReservedDemoAddress(ok), true, ok);
+  }
+  for (const no of ["pat@gmail.com", "x@example.co.uk", "x@notexample.com", "x@example.com.evil.io", "x@testing.io", "", null, "example.com"]) {
+    assert.equal(isReservedDemoAddress(no), false, String(no));
+  }
+});
+
+test("on-screen sign-in links: dev, or a demo deployment for DEMO accounts and reserved addresses; never with email live", () => {
+  const demoProd = { NODE_ENV: "production", ALLOW_DEMO_LOGIN: "1" };
+  const base = { emailLive: false, demoAccount: false };
+  assert.equal(linkMayShowOnScreen({ ...base, env: { NODE_ENV: "development" }, email: "pat@gmail.com" }), true);
+  assert.equal(linkMayShowOnScreen({ ...base, env: { NODE_ENV: "development" }, email: "pat@gmail.com", emailLive: true }), false);
+  assert.equal(linkMayShowOnScreen({ ...base, env: demoProd, email: "demo.pat@example.com" }), true, "DEMO household");
+  assert.equal(linkMayShowOnScreen({ ...base, env: demoProd, email: "x@demo.dang.invalid", demoAccount: true }), true, "DEMO team");
+  assert.equal(linkMayShowOnScreen({ ...base, env: demoProd, email: "pat@gmail.com" }), false, "a real person's link never shows");
+  assert.equal(linkMayShowOnScreen({ ...base, env: { NODE_ENV: "production" }, email: "demo.pat@example.com" }), false, "not a demo deployment");
+  const realDb = { ...demoProd, SUPABASE_URL: "https://x.supabase.co", SUPABASE_SERVICE_ROLE_KEY: "k" };
+  assert.equal(linkMayShowOnScreen({ ...base, env: realDb, email: "demo.pat@example.com" }), false, "demo refused on real data");
 });
 
 test("a staff record written by a demo session is demo too", () => {

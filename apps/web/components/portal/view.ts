@@ -231,7 +231,7 @@ export function kitHeadline(project: Project): string {
     case "inspected":
       return k.shortages > 0
         ? `Checked by your installer, with ${k.shortages} item${k.shortages === 1 ? "" : "s"} still to come.`
-        : "Delivered and checked by your installer against your design.";
+        : "Delivered and checked by our team against your design.";
   }
 }
 

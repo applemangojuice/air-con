@@ -1692,6 +1692,15 @@ export function rescheduleFeeGbp(kind: "survey" | "installation", daysNotice: nu
  * rest are the system's. Date-change fees apply only to the customer's own
  * changes; when we move a date it's on us.
  */
+/**
+ * The updates-feed line for an end-of-day update: "Day 2 done: …", without
+ * doubling the prefix when the installer already wrote "Day 2 done: …".
+ */
+export function dayUpdateLabel(n: number, text: string): string {
+  const t = text.trim();
+  return new RegExp(`^day\\s*${n}\\b`, "i").test(t) ? t : `Day ${n} done: ${t}`;
+}
+
 export function applyProjectAction(project: Project, action: ProjectAction, now: string, ctx?: ReadinessContext): ApplyResult {
   // Projects are JSON snapshots by design, so JSON is a faithful deep clone.
   const p: Project = JSON.parse(JSON.stringify(project)) as Project;
@@ -2207,7 +2216,7 @@ export function applyProjectAction(project: Project, action: ProjectAction, now:
           log("kit-updated", `Your kit has been delivered.${toCome}${periodNote}`, "ops");
           break;
         case "inspected":
-          log("kit-updated", `Your kit has been checked by your installer.${toCome}${periodNote}`, "field");
+          log("kit-updated", `Your kit has been checked by our team.${toCome}${periodNote}`, "field");
           break;
       }
       return ok();
@@ -2268,7 +2277,7 @@ export function applyProjectAction(project: Project, action: ProjectAction, now:
       }
       log(
         "install-day-ended",
-        day.customerUpdate ? `Day ${action.n} done: ${day.customerUpdate.text}` : `Day ${action.n} wrapped up.`,
+        day.customerUpdate ? dayUpdateLabel(action.n, day.customerUpdate.text) : `Day ${action.n} wrapped up.`,
         "field",
       );
       return ok();

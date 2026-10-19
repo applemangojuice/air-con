@@ -151,7 +151,11 @@ type Session =
 - `issueMagicLink({ email, kind, next?, ttlMinutes? }) → { sent, devLink? }`
   sends via the outbox (`magic-link` event). Unknown or inactive addresses
   get nothing and no hint. `devLink` (shown on screen when no email provider
-  is set up) only in development, or for DEMO staff on a demo deployment.
+  is set up) only in development, or on a demo deployment
+  (`ALLOW_DEMO_LOGIN=1`) for DEMO staff and for reserved demo addresses
+  (`example.com`/`.org`/`.net`, `.example`, `.invalid`, `.test`: see
+  `linkMayShowOnScreen` in `lib/auth/access.ts`). Never for a real address,
+  and never once email is live.
 - `customerLink(projectId, path, recipient) → absolute URL` carries a fresh
   30-day token **only when `recipient` is the project's customer's own
   address**; anyone else gets the plain page URL. The outbox calls it at the
@@ -1233,6 +1237,14 @@ other event is sent by its owner with `notify`.
   pilots dashboard shows the row. It also checks isolation: a second
   customer can't open the first project (404), and an external installer
   can't see margin.
+- As built: `BASE_URL=http://localhost:3330 pnpm --filter @aircon/web
+  test:e2e:pilot` against a fresh `LOCAL_DATA_DIR` (phases A to L, about 150
+  checks, screenshots in `SHOTS_DIR`; `E2E_UNTIL=<letter>` stops after a
+  phase). Phones are 390x844, ops 1280x800. Install day 1 is started early
+  from the field app (the 5-day lead time means booked dates are never
+  today). The Stripe webhook with a secret set and the seed route with demo
+  sign-in off are covered by `tests/security-routes.test.ts`, since a running
+  server's env can't be flipped.
 
 ## J. Out of scope (don't build)
 

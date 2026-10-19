@@ -79,7 +79,7 @@ import { renderMessage, templateContext } from "./comms/templates";
 import { createDocument, currentDocument, listDocuments } from "./documents-server";
 import { appMode } from "./env-mode";
 import type { SyncOp, SyncResult } from "./field-outbox";
-import { fmtDate } from "./format";
+import { fmtDate, londonDateOf } from "./format";
 import { signedMediaUrls } from "./media-server";
 import { buildReadinessContext, dispatch, loadProject, londonToday } from "./project-service";
 import { db, isUniqueViolation, isUuid, must, nowIso, type Row } from "./repo/base";
@@ -1230,7 +1230,8 @@ export async function dayPhotos(projectId: string, staff: StaffMember, n: number
   const day = project.install.days.find((d) => d.n === n);
   const date = day?.date ?? project.booking.dates[n - 1];
   const items = (await mediaRepo.listForProject(projectId)).filter(
-    (m) => (m.source === "install" || m.source === "handover") && m.contentType.startsWith("image/") && (!date || m.takenAt.slice(0, 10) === date),
+    // The London day the photo was taken on (a photo at 00:30 BST is that day's, not the UTC day before).
+    (m) => (m.source === "install" || m.source === "handover") && m.contentType.startsWith("image/") && (!date || londonDateOf(m.takenAt) === date),
   );
   const urls = await signedMediaUrls(items);
   return items.map((m) => ({ id: m.id, url: urls.get(m.id) ?? null, caption: m.caption, tag: m.tag, customerVisible: m.customerVisible, takenAt: m.takenAt }));

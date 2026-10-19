@@ -42,7 +42,7 @@ function Sent({ state, again, phone, email, byEmail }: { state: Extract<State, {
     <div className="space-y-4" role="status" aria-live="polite">
       {state.devLink ? (
         <div className="rounded-2xl border border-accent-100 bg-accent-50 p-5">
-          <p className="text-xs font-bold uppercase tracking-wide text-accent-700">Development: email isn&apos;t set up</p>
+          <p className="text-xs font-bold uppercase tracking-wide text-accent-700">Email isn&apos;t set up here (DEMO)</p>
           <p className="mt-1 text-sm text-ink-700">Nothing was emailed. Here&apos;s the link it would have sent. It works once.</p>
           <a href={state.devLink} className={`${primaryCls()} mt-3`}>
             Open my sign-in link

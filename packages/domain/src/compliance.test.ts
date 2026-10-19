@@ -238,12 +238,14 @@ test("sync approves the auto items from the project's records, and reopens them"
   const p = project((x) => {
     x.design = { status: "approved", designId: "d", version: 2, approvedAt: NOW, approvedBy: "DEMO Tess" };
     x.handover.warrantyRegistered = true;
+    x.events.push({ at: NOW, type: "warranty-registered", label: "Warranty registered.", actor: "ops", actorName: "DEMO Ada" });
   });
   const changed = syncCompliance(items, p, NOW);
   const byKey = Object.fromEntries(changed.map((c) => [c.key, c]));
   assert.equal(byKey["design-approval"]?.status, "approved");
   assert.equal(byKey["design-approval"]?.reviewedBy, "DEMO Tess");
   assert.equal(byKey["warranty-registration"]?.status, "approved");
+  assert.equal(byKey["warranty-registration"]?.reviewedBy, "DEMO Ada", "approved by the person who recorded it, not a phrase");
   assert.equal(byKey["commissioning-approval"], undefined, "not commissioned yet");
 
   // Idempotent: nothing more to change.

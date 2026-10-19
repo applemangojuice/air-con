@@ -14,7 +14,7 @@ import {
 } from "@aircon/domain";
 import { Badge, Card, EmptyState, Money, Section, Stat, StatusChip } from "@/components/kit";
 import { requireProjectAccess, requireStaff } from "@/lib/auth/server";
-import { fmtDate, fmtDay } from "@/lib/format";
+import { fmtDate, fmtDay, unitWord } from "@/lib/format";
 import { loadKit } from "@/lib/purchasing-server";
 import { isUuid } from "@/lib/repo/base";
 import { ActionForm } from "../booking/_f5/action-form";
@@ -162,7 +162,7 @@ function customerKitLine(status: string, expected?: string): string {
     case "delivered":
       return "Your kit has been delivered.";
     case "inspected":
-      return "Your kit has been checked by your installer.";
+      return "Your kit has been checked by our team.";
     default:
       return "Nothing yet.";
   }
@@ -250,7 +250,7 @@ function OrderCard({
                   <td className="text-ink-700 sm:py-2.5 sm:text-right">
                     <span className="text-xs text-ink-500 sm:hidden">Qty </span>
                     {l.qty}
-                    {l.unit ? ` ${l.unit}` : ""}
+                    {l.unit ? ` ${unitWord(l.unit, l.qty)}` : ""}
                   </td>
                   <td className="text-ink-700 sm:py-2.5 sm:text-right">
                     <span className="text-xs text-ink-500 sm:hidden">Each </span>

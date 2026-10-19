@@ -258,6 +258,38 @@ export function relinkEmail(before: string | null | undefined, after: string | n
   return next;
 }
 
+/**
+ * An address that can never belong to a real person: the reserved example
+ * domains (RFC 2606 / 6761: example.com, .org, .net and anything under
+ * .example, .invalid, .test). DEMO households and the DEMO team use them.
+ */
+export function isReservedDemoAddress(email: string | null | undefined): boolean {
+  const clean = normaliseEmail(email ?? "");
+  const at = clean.lastIndexOf("@");
+  if (at < 1 || !isPlausibleEmail(clean)) return false;
+  const domain = clean.slice(at + 1).replace(/\.$/, "");
+  if (["example.com", "example.org", "example.net"].some((d) => domain === d || domain.endsWith(`.${d}`))) return true;
+  return /\.(example|invalid|test)$/.test(domain);
+}
+
+/**
+ * May a sign-in link be shown on screen instead of emailed? Only where no
+ * email provider is set up, and then only on a developer's machine, or on a
+ * demo deployment (demo sign-in allowed) for a DEMO account or a reserved
+ * address that no real person can own. Showing a real person's link would
+ * let anyone sign in as them.
+ */
+export function linkMayShowOnScreen(input: {
+  env: Record<string, string | undefined>;
+  emailLive: boolean;
+  email: string;
+  demoAccount: boolean;
+}): boolean {
+  if (input.emailLive) return false;
+  if (input.env.NODE_ENV !== "production") return true;
+  return demoLoginAllowed(input.env) && (input.demoAccount || isReservedDemoAddress(input.email));
+}
+
 /** "jo.bloggs@example.com" → "j***@example.com", for confirming who a link is for without revealing it. */
 export function maskEmail(email: string): string {
   const clean = normaliseEmail(email);

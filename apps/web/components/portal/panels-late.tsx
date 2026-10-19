@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useId, useRef, useState } from "react";
 import { handoverDeadlines } from "@aircon/domain";
 import { Textarea } from "@/components/kit/form";
-import { fmtDate, fmtDay, fmtDayTime, money } from "@/lib/format";
+import { fmtDate, fmtDay, fmtInstantDay, fmtInstantDayTime, money } from "@/lib/format";
 import {
   ActionFeedback,
   Callout,
@@ -204,7 +204,7 @@ export function InstallPanel({ data, state }: PanelProps) {
             {updates.map((d) => (
               <li key={d.n} className="space-y-3 rounded-2xl border border-line bg-white p-4">
                 <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">
-                  Day {d.n} · {fmtDayTime(d.customerUpdate!.sentAt)}
+                  Day {d.n} · {fmtInstantDayTime(d.customerUpdate!.sentAt)}
                 </p>
                 <p className="text-[15px] leading-relaxed text-ink-900">{d.customerUpdate!.text}</p>
                 <PhotoGrid photos={d.customerUpdate!.mediaIds.map((id) => data.photos[id] ?? { id, url: null })} label={`Photos from day ${d.n}`} />
@@ -226,7 +226,7 @@ export function InstallPanel({ data, state }: PanelProps) {
                 </span>
                 <span className="text-sm text-ink-500">
                   {i.variation!.status === "accepted" ? "You said yes" : "You said no"}
-                  {i.variation!.decidedAt ? `, ${fmtDay(i.variation!.decidedAt)}` : ""} · {i.variation!.totalDeltaPence >= 0 ? "+" : ""}
+                  {i.variation!.decidedAt ? `, ${fmtInstantDay(i.variation!.decidedAt)}` : ""} · {i.variation!.totalDeltaPence >= 0 ? "+" : ""}
                   {money(i.variation!.totalDeltaPence)}
                 </span>
               </li>
@@ -296,7 +296,7 @@ export function HandoverPanel({ data, state, goTo }: PanelProps) {
           The install is complete. A qualified engineer now tests and commissions your system, in heating and cooling, and signs it off.
         </Callout>
       ) : (
-        <Callout tone="good" title={`Commissioned${commissionedAt ? ` on ${fmtDay(commissionedAt)}` : ""}`}>
+        <Callout tone="good" title={`Commissioned${commissionedAt ? ` on ${fmtInstantDay(commissionedAt)}` : ""}`}>
           Tested, measured and signed off{commissionedBy ? ` by ${commissionedBy}` : ""}
           {data.commissioning?.qualificationRef ? " (F-gas certified)" : ""}
           {data.commissioning?.systems ? `: ${data.commissioning.systems} system${data.commissioning.systems === 1 ? "" : "s"} checked` : ""}.
@@ -320,7 +320,7 @@ export function HandoverPanel({ data, state, goTo }: PanelProps) {
         h.status !== "pending" && <p className="text-[15px] text-ink-700">Your handover pack is being put together. It&apos;ll appear here.</p>
       )}
       {h.signoff && (
-        <Callout tone={h.signoff.outcome === "all-good" ? "good" : "info"} title={`Signed off by ${h.signoff.name}, ${fmtDay(h.signoff.at)}`}>
+        <Callout tone={h.signoff.outcome === "all-good" ? "good" : "info"} title={`Signed off by ${h.signoff.name}, ${fmtInstantDay(h.signoff.at)}`}>
           {h.signoff.outcome === "all-good"
             ? "All good. Enjoy it."
             : `${h.signoff.snagCount} snag${h.signoff.snagCount === 1 ? "" : "s"} to put right. Each one has an owner and a date, below.`}
@@ -376,7 +376,7 @@ export function HandoverPanel({ data, state, goTo }: PanelProps) {
                   <span className="block text-sm text-ink-500">
                     {s.status === "resolved" || s.status === "closed"
                       ? s.resolvedAt
-                        ? `Fixed ${fmtDay(s.resolvedAt)}`
+                        ? `Fixed ${fmtInstantDay(s.resolvedAt)}`
                         : "Fixed"
                       : s.dueOn
                         ? `We'll fix it by ${fmtDay(s.dueOn)}`
@@ -415,7 +415,7 @@ function Feedback({ data }: { data: PanelProps["data"] }) {
       <div className="space-y-2 rounded-2xl border border-line bg-white p-4 sm:p-5">
         <Sub>Your feedback</Sub>
         <p className="text-[15px] text-ink-700">
-          You gave us <span className="font-semibold text-ink-900">{given.score} out of 10</span> on {fmtDay(given.at)}. Thank you: we read every word.
+          You gave us <span className="font-semibold text-ink-900">{given.score} out of 10</span> on {fmtInstantDay(given.at)}. Thank you: we read every word.
         </p>
         {given.comments && <q className="block text-[15px] italic text-ink-700">{given.comments}</q>}
         <ActionFeedback message={message} />
@@ -599,7 +599,7 @@ function ReportProblem({ data }: { data: PanelProps["data"] }) {
                   <IssueChip status={i.status} />
                 </div>
                 <p className="text-sm text-ink-500">
-                  Reported {fmtDay(i.raisedAt)}
+                  Reported {fmtInstantDay(i.raisedAt)}
                   {i.resolution ? ` · ${i.resolution}` : ""}
                 </p>
               </li>

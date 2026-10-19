@@ -365,8 +365,12 @@ function OnMyWaySheet({ open, onClose, data }: { open: boolean; onClose: () => v
 function ArriveSheet({ open, onClose, data, running }: { open: boolean; onClose: () => void; data: FieldJob; running: boolean }) {
   const router = useRouter();
   const online = useOnline();
-  const n = data.header.nextDay ?? 1;
   const [phase, setPhase] = useState<"ready" | "working" | "started" | "refused" | "offline">("ready");
+  // The day being started, held once the tap happens: the refresh after a
+  // successful start moves header.nextDay on, and the sheet must keep saying
+  // which day it started (not fall back to "day 1").
+  const [startedN, setStartedN] = useState<number | null>(null);
+  const n = phase !== "ready" && startedN !== null ? startedN : (data.header.nextDay ?? 1);
   const [blockers, setBlockers] = useState<Blocker[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [gpsNote, setGpsNote] = useState<string | null>(null);
@@ -375,6 +379,7 @@ function ArriveSheet({ open, onClose, data, running }: { open: boolean; onClose:
   useEffect(() => {
     if (!open) {
       setPhase("ready");
+      setStartedN(null);
       setBlockers([]);
       setError(null);
       setGpsNote(null);
@@ -382,6 +387,7 @@ function ArriveSheet({ open, onClose, data, running }: { open: boolean; onClose:
   }, [open]);
 
   async function arrive() {
+    setStartedN(n);
     setPhase("working");
     const fix = await locate();
     setGpsNote(fix ? (fix.accuracyM && fix.accuracyM >= 1 ? `Location recorded (within about ${fix.accuracyM} m).` : "Location recorded.") : "No location: that's fine, it's optional.");
