@@ -104,8 +104,12 @@ watches (Vercel → Project → Settings → Git → Production Branch).
      `VIDEO_SURVEYS_ENABLED=1`; only then do `OPENAI_API_KEY` /
      `ANTHROPIC_API_KEY` matter.
 
-   Never set `ALLOW_DEMO_LOGIN`, `DEMO_DEPLOYMENT` or `DATA_BACKEND` on the
-   live business: they're for demo deployments and local development.
+   Never set `ALLOW_DEMO_LOGIN`, `DEMO_DEPLOYMENT`, `DATA_BACKEND` or
+   `LOCAL_DATA_DIR` on the live business: they're for demo deployments and
+   local development (`.env.example` keeps them commented out). As a
+   backstop, demo sign-in and the demo seed refuse themselves on any
+   database holding a real quote, customer or team member, whatever the
+   settings say, and `/ops/launch` goes red until the settings are removed.
 
    Redeploy after changing any of them (Vercel → Deployments → Redeploy).
 
