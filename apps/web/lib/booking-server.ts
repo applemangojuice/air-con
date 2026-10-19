@@ -28,7 +28,7 @@ import {
 } from "@aircon/domain";
 import { bookingClashes, workingDatesFrom, type BookingClash } from "@/app/ops/calendar/calendar-model";
 import { audit } from "./audit";
-import { demoLoginAllowed } from "./auth/access";
+import { demoModeAllowed } from "./auth/demo-guard";
 import { agreedTerms, creditedInFull, issueInvoice, planInvoices, type InvoicePlan } from "./money-server";
 import { listDocuments } from "./documents-server";
 import { loadOpsProjects } from "./ops-server";
@@ -131,7 +131,7 @@ const REQUIREMENTS: StepRequirement[] = ["fgas", "electrical", "tech-lead"];
 
 /** Everyone who can be put on a crew (active; DEMO accounts only where demo sign-in is allowed). */
 async function teamList(): Promise<StaffMember[]> {
-  const all = await staffRepo.list({ activeOnly: true, ...(demoLoginAllowed(process.env) ? {} : { includeDemo: false }) });
+  const all = await staffRepo.list({ activeOnly: true, ...((await demoModeAllowed()) ? {} : { includeDemo: false }) });
   return all.filter((s) => s.roles.some((r) => r !== "surveyor") || s.roles.includes("admin"));
 }
 

@@ -233,6 +233,48 @@ export function demoLoginAllowed(env: Record<string, string | undefined>): boole
   return !supabase || env.DEMO_DEPLOYMENT === "1";
 }
 
+/**
+ * What a Supabase database holds that no demo put there (lib/auth/demo-guard.ts
+ * looks): quotes that aren't the demo seed's, customers on an address a real
+ * person could own, and staff who aren't DEMO accounts. Any one of them is
+ * real people's data.
+ */
+export interface RealRecords {
+  quotes: number;
+  customers: number;
+  staff: number;
+}
+
+/**
+ * Demo sign-in, the demo seed and the demo-mode fallbacks (simulated card
+ * payments, demo-stored emails counting as sent), with what the database
+ * actually holds taken into account. The env flags first (demoLoginAllowed);
+ * then, on a Supabase database, only while it holds nothing real. Flags are a
+ * claim (DEMO_DEPLOYMENT=1 copied onto the live business, or a laptop's dev
+ * server pointed at the live database): this checks it, so a demo admin can
+ * never open a real customer's record. `records` is null when the database
+ * couldn't be asked, which is a no.
+ */
+export function demoAllowedWithData(
+  env: Record<string, string | undefined>,
+  backend: string,
+  records: RealRecords | null,
+): boolean {
+  if (!demoLoginAllowed(env)) return false;
+  if (backend !== "supabase") return true;
+  return records !== null && records.quotes === 0 && records.customers === 0 && records.staff === 0;
+}
+
+/** "real quotes and customers" for the logs and /ops/launch; "" when there are none. */
+export function describeRealRecords(records: RealRecords): string {
+  const found = [records.quotes > 0 && "quotes", records.customers > 0 && "customers", records.staff > 0 && "team members"].filter(
+    (x): x is string => Boolean(x),
+  );
+  if (!found.length) return "";
+  const list = found.length === 1 ? found[0]! : `${found.slice(0, -1).join(", ")} and ${found[found.length - 1]}`;
+  return `real ${list}`;
+}
+
 /** ALLOW_DEMO_LOGIN=1 set in production, but refused because the database is real (for the boot warning). */
 export function demoLoginRefusedOnRealData(env: Record<string, string | undefined>): boolean {
   return env.NODE_ENV === "production" && env.ALLOW_DEMO_LOGIN === "1" && !demoLoginAllowed(env);
@@ -269,7 +311,9 @@ export function securityWarnings(env: Record<string, string | undefined>): strin
       "ALLOW_DEMO_LOGIN=1 is set on a Supabase database, so demo sign-in is REFUSED. Set DEMO_DEPLOYMENT=1 only if that database holds nothing real.",
     );
   } else if (demoLoginAllowed(env)) {
-    out.push("DEMO sign-in is ON in production: anyone can sign in as a demo admin. Only for a deployment with nothing real in it.");
+    out.push(
+      "DEMO sign-in is ON in production: anyone can sign in as a demo admin. Only for a deployment with nothing real in it (it refuses itself on a database that holds a real quote, customer or team member).",
+    );
   }
   if (!sessionSecretUsable(env)) {
     out.push(

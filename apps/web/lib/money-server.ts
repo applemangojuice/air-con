@@ -37,7 +37,7 @@ import {
   variationsBillableAlone,
 } from "@aircon/domain";
 import { audit, type AuditActorInput } from "./audit";
-import { demoLoginAllowed } from "./auth/access";
+import { demoModeAllowed } from "./auth/demo-guard";
 import { notify } from "./comms/outbox";
 import { createDocument, listDocuments } from "./documents-server";
 import { money } from "./format";
@@ -105,12 +105,13 @@ export interface MoneyView {
 }
 
 /** Card payments: live/test Stripe, or (where demo sign-in is allowed and Stripe isn't set up) the labelled simulator. */
-export function cardAvailability(): MoneyView["card"] {
+export async function cardAvailability(): Promise<MoneyView["card"]> {
   const configured = stripeConfigured();
   return {
     available: configured,
     mode: stripeMode(),
-    simulate: !configured && demoLoginAllowed(process.env),
+    // Never on a database holding anything real, whatever the flags say (lib/auth/demo-guard).
+    simulate: !configured && (await demoModeAllowed()),
   };
 }
 
@@ -296,7 +297,7 @@ export async function loadMoney(projectId: string): Promise<MoneyView | null> {
     summary: moneySummary(invoices, payments, project.money.contractTotalPence),
     plans: planInvoices({ project, invoices, issues, settings: agreed, taxCode, ...(deposit !== undefined ? { contractDepositPence: deposit } : {}) }),
     taxCode,
-    card: cardAvailability(),
+    card: await cardAvailability(),
     today: londonToday(),
   };
 }
@@ -486,7 +487,7 @@ export async function finishIssue(invoice: Invoice, actor: Issuer): Promise<{ in
   const warnings: string[] = [];
   const project = await loadProject(inv.projectId);
   if (!project) return { invoice: inv, warning: "The project couldn't be read." };
-  const card = cardAvailability();
+  const card = await cardAvailability();
 
   if (!inv.documentId) {
     try {
@@ -1003,7 +1004,7 @@ async function applyRefund(
  * everywhere; refused anywhere real.
  */
 export async function simulateCardPayment(projectId: string, invoiceId: string, requestId: string, who: string): Promise<Outcome<{ payment: Payment; duplicate: boolean }>> {
-  if (!cardAvailability().simulate) return fail("Simulated payments are only available in demo mode.", 403);
+  if (!(await cardAvailability()).simulate) return fail("Simulated payments are only available in demo mode.", 403);
   const invoice = await invoicesRepo.get(invoiceId);
   if (!invoice || invoice.projectId !== projectId) return fail("That invoice isn't on this project.", 404);
   const all = await invoicesRepo.listForProject(projectId);

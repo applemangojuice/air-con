@@ -84,3 +84,33 @@ test("demo seed: refused (404) wherever demo sign-in isn't allowed", async () =>
     }
   }
 });
+
+test("demo seed: refused (404) on a Supabase database it can't prove holds nothing real, whatever the flags say", async () => {
+  const { resetDemoGuardCache } = await import("../lib/auth/demo-guard.ts");
+  const env = process.env as Record<string, string | undefined>;
+  const before = { NODE_ENV: env.NODE_ENV, ALLOW_DEMO_LOGIN: env.ALLOW_DEMO_LOGIN, DEMO_DEPLOYMENT: env.DEMO_DEPLOYMENT };
+  const req = () => new Request("http://localhost:3000/api/dev/seed", { method: "POST", headers: { "x-dih-seed": "login", origin: "http://localhost:3000" } });
+  const errors = console.error;
+  try {
+    console.error = () => {};
+    resetDemoGuardCache();
+    // Every flag on, and a database that can't be asked (a name that never resolves): it must not be reset.
+    Object.assign(env, { NODE_ENV: "production", ALLOW_DEMO_LOGIN: "1", DEMO_DEPLOYMENT: "1" });
+    env.SUPABASE_URL = "https://demo-seed.supabase.invalid";
+    env.SUPABASE_SERVICE_ROLE_KEY = "not-a-key";
+    assert.equal((await seed.POST(req())).status, 404, "ALLOW_DEMO_LOGIN=1 and DEMO_DEPLOYMENT=1 on Supabase");
+    // A laptop's dev server pointed at a Supabase database: the login page's button used to reset it.
+    env.NODE_ENV = "development";
+    resetDemoGuardCache();
+    assert.equal((await seed.POST(req())).status, 404, "development against Supabase");
+  } finally {
+    console.error = errors;
+    resetDemoGuardCache();
+    delete env.SUPABASE_URL;
+    delete env.SUPABASE_SERVICE_ROLE_KEY;
+    for (const [k, v] of Object.entries(before)) {
+      if (v === undefined) delete env[k];
+      else env[k] = v;
+    }
+  }
+});

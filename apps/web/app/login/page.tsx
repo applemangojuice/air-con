@@ -5,7 +5,8 @@ import { Logo } from "@/components/site/logo";
 import { breakGlassEnabled, safeNextPath, staffLanding } from "@/lib/auth/access";
 import { DEMO_ROLE_KEYS, DEMO_ROLE_LABEL } from "@/lib/auth/demo-staff";
 import { currentStaff } from "@/lib/auth/server";
-import { appMode, isDemoLoginAllowed } from "@/lib/env-mode";
+import { demoModeAllowed } from "@/lib/auth/demo-guard";
+import { appMode } from "@/lib/env-mode";
 import { PILOT_MIGRATION, pilotSchemaStatus } from "@/lib/schema-check";
 import { demoSignIn } from "./actions";
 import { DemoSeedButton } from "./demo-seed";
@@ -45,7 +46,8 @@ export default async function LoginPage({ searchParams }: { searchParams: Search
   const signedOut = first(sp.signedOut) === "1";
 
   const staff = await currentStaff();
-  const demoAllowed = isDemoLoginAllowed();
+  // Off on any database holding something real, whatever the flags say (lib/auth/demo-guard).
+  const demoAllowed = await demoModeAllowed();
   const breakGlass = breakGlassEnabled(process.env);
   const mode = appMode();
   // Supabase connected but the pilot migration never ran: say so here, where

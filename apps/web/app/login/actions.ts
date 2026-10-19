@@ -8,7 +8,7 @@ import { isDemoRoleKey } from "@/lib/auth/demo-staff";
 import { issueMagicLink } from "@/lib/auth/magic";
 import { breakGlassSession, ensureDemoStaff, setSession, staffSession } from "@/lib/auth/server";
 import { emailConfigured } from "@/lib/email";
-import { isDemoLoginAllowed } from "@/lib/env-mode";
+import { demoModeAllowed } from "@/lib/auth/demo-guard";
 import { rateLimitIdentity } from "@/lib/rate-limit";
 import { sharedRateLimits } from "@/lib/rate-limit-shared";
 import { pilotSchemaStatus } from "@/lib/schema-check";
@@ -87,7 +87,7 @@ export async function requestMagicLink(_prev: LinkState, form: FormData): Promis
 
 export async function demoSignIn(form: FormData): Promise<void> {
   const role = field(form, "role");
-  if (!isDemoLoginAllowed() || !isDemoRoleKey(role)) redirect("/login");
+  if (!isDemoRoleKey(role) || !(await demoModeAllowed())) redirect("/login");
   const team = await ensureDemoStaff();
   const staff = team[role];
   await setSession(staffSession(staff));

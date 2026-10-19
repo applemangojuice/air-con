@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ROLE_LABEL, bankHolidayName } from "@aircon/domain";
 import { Badge, EmptyState, PageHeader } from "@/components/kit";
 import { requireStaff } from "@/lib/auth/server";
-import { demoLoginAllowed } from "@/lib/auth/access";
+import { demoModeAllowed } from "@/lib/auth/demo-guard";
 import { fmtDay } from "@/lib/format";
 import { loadOpsProjects, loadPurchaseOrdersByProject } from "@/lib/ops-server";
 import { londonToday } from "@/lib/project-service";
@@ -62,7 +62,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
     ? await Promise.all([
         loadOpsProjects({ includeClosed: true }),
         loadPurchaseOrdersByProject(),
-        staffRepo.list({ activeOnly: true, ...(demoLoginAllowed(process.env) ? {} : { includeDemo: false }) }),
+        staffRepo.list({ activeOnly: true, ...((await demoModeAllowed()) ? {} : { includeDemo: false }) }),
       ])
     : [[], new Map(), []];
   const all = projects.flatMap(({ id, project }) => eventsForProject(project, posByProject.get(id) ?? []));

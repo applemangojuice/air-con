@@ -181,7 +181,14 @@ lookup always both run.
 **Demo sign-in** (`/login` "Try as…", one fictional DEMO account per role,
 `lib/auth/demo-staff.ts`): `demoLoginAllowed(env)` is true outside
 production; in production only with `ALLOW_DEMO_LOGIN=1`, and on a Supabase
-database only with `DEMO_DEPLOYMENT=1` too. A staff row written by a demo
+database only with `DEMO_DEPLOYMENT=1` too. The flags are a claim, so
+`demoModeAllowed()` (`lib/auth/demo-guard.ts`) checks it: on any Supabase
+database, in any environment, demo sign-in, the seed, simulated card
+payments and demo-stored emails counting as sent all stay off while the
+database holds a quote not from the seed, a customer on a non-reserved
+address or a non-DEMO staff row (a database that can't be asked is a no).
+Every place a demo account or demo behaviour reaches stored data uses it,
+not the env check. A staff row written by a demo
 session is itself `demo` (`taintedByDemo`), and demo rows stop working when
 demo sign-in is off. `instrumentation.ts` logs unsafe sign-in configuration
 at boot (`securityWarnings`).
@@ -1323,8 +1330,9 @@ changelog and the reasons, so nobody "fixes" a deliberate choice back.
     output (`/.//evil.com`). Production ignores a `SESSION_SECRET` under 32
     characters and an `OPS_PASSWORD` under 20; break-glass has per-IP,
     per-email and global limits and audits failures. Demo sign-in is refused
-    on a Supabase database without `DEMO_DEPLOYMENT=1`, and staff rows a demo
-    session writes are demo. `instrumentation.ts` logs all of this at boot.
+    on a Supabase database without `DEMO_DEPLOYMENT=1`, and on any Supabase
+    database holding real records whatever the flags say (`demoModeAllowed`),
+    and staff rows a demo session writes are demo. `instrumentation.ts` logs all of this at boot.
 13. **Sign-in tokens are never stored.** Message bodies keep
     `LINK_PLACEHOLDER` plus `linkPath`; the link is minted when a provider
     takes the message (first send, retry, resend), so a stored, demo or

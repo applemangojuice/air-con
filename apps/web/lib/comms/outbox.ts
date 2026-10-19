@@ -1,5 +1,5 @@
 import type { CommsEventId } from "@aircon/domain";
-import { demoLoginAllowed } from "@/lib/auth/access";
+import { demoModeAllowed } from "@/lib/auth/demo-guard";
 import { customerLink } from "@/lib/auth/magic";
 import { appUrl } from "@/lib/brand";
 import { emailConfigured, sendEmail, teamInbox } from "@/lib/email";
@@ -66,7 +66,7 @@ function realOutbox(): Outbox | null {
     // facts (preContractInfoSentAt, confirmationSentAt). A demo store counts
     // only on a demo deployment or in development, where nothing is real.
     onDelivered: async (message, status) => {
-      const next = followUpForDelivered(message, status, { demoCounts: demoLoginAllowed(process.env) });
+      const next = followUpForDelivered(message, status, { demoCounts: await demoModeAllowed() });
       if (!next) return;
       const result = await dispatch(next.projectId, next.action, { kind: "system", name: "outbox" });
       if ("error" in result) console.error(`[outbox] couldn't record ${next.action.type} on ${next.projectId}:`, result.error);

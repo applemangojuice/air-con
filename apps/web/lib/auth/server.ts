@@ -18,6 +18,7 @@ import {
   type AssignmentView,
   type ProjectAccess,
 } from "./access";
+import { demoModeAllowed } from "./demo-guard";
 import { QUOTE_OWNER_COOKIE, readQuoteOwner } from "./quote-owner";
 import { DEMO_STAFF, demoStaffById, isDemoStaffId, type DemoRoleKey } from "./demo-staff";
 import {
@@ -144,12 +145,13 @@ async function staffForSession(session: StaffSession): Promise<StaffMember | nul
     return demoLoginAllowed(env) ? (demoStaffById(session.staffId) ?? null) : null;
   }
   let staff = await staffRepo.get(session.staffId);
-  if (!staff && isDemoStaffId(session.staffId) && demoLoginAllowed(env)) {
+  if (!staff && isDemoStaffId(session.staffId) && (await demoModeAllowed(env))) {
     // A demo row lost to a reset (or a memory backend on another instance): recreate it.
     const team = await ensureDemoStaff();
     staff = Object.values(team).find((s) => s.id === session.staffId) ?? null;
   }
-  if (staff?.demo && !demoLoginAllowed(env)) return null; // demo accounts die with demo mode
+  // Demo accounts die with demo mode, and on a database that holds anything real (lib/auth/demo-guard).
+  if (staff?.demo && !(await demoModeAllowed(env))) return null;
   return staff && staff.active ? staff : null;
 }
 
@@ -368,7 +370,7 @@ function demoQualificationsStale(row: StaffMember, demo: StaffMember): boolean {
 }
 
 export async function ensureDemoStaff(): Promise<Record<DemoRoleKey, StaffMember>> {
-  if (!demoLoginAllowed(process.env)) throw new Error("Demo sign-in is disabled in this environment.");
+  if (!(await demoModeAllowed())) throw new Error("Demo sign-in is disabled in this environment.");
   if (!getServiceClient()) return DEMO_STAFF;
   const out = {} as Record<DemoRoleKey, StaffMember>;
   for (const [key, demo] of Object.entries(DEMO_STAFF) as [DemoRoleKey, StaffMember][]) {

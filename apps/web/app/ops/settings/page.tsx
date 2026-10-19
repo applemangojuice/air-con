@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { mergeSettings } from "@aircon/domain";
 import { EmptyState, PageHeader } from "@/components/kit/layout";
-import { demoLoginAllowed } from "@/lib/auth/access";
+import { demoModeAllowed } from "@/lib/auth/demo-guard";
 import { requireStaff } from "@/lib/auth/server";
 import { fmtInstant } from "@/components/ops/command/model";
 import * as settingsRepo from "@/lib/repo/settings";
@@ -45,7 +45,7 @@ export default async function SettingsPage() {
         title="Settings"
         subtitle={row?.updatedAt ? `Last saved ${fmtInstant(row.updatedAt, { year: true })}${row.updatedBy ? ` by ${row.updatedBy}` : ""}.` : "Never saved: these are the cautious defaults."}
       />
-      <SettingsEditor initial={settings} loadedAt={row?.updatedAt ?? ""} action={saveSettingsAction} demoReset={demoLoginAllowed(process.env)} />
+      <SettingsEditor initial={settings} loadedAt={row?.updatedAt ?? ""} action={saveSettingsAction} demoReset={await demoModeAllowed()} />
     </main>
   );
 }

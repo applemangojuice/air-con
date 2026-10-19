@@ -1,4 +1,3 @@
-import { demoLoginAllowed } from "./auth/access";
 import { emailConfigured } from "./email";
 import { isPlaceholderValue, realEnv } from "./env-placeholders";
 import { dataBackend } from "./supabase-server";
@@ -38,9 +37,4 @@ export function appMode(env: Record<string, string | undefined> = process.env): 
 /** True when everything is live: the only state that needs no banner. */
 export function isFullyLive(mode: AppMode = appMode()): boolean {
   return mode.data === "supabase" && mode.email === "live" && mode.sms === "live" && mode.payments === "live";
-}
-
-/** The "Try as…" demo sign-in (contract §C): off in production unless ALLOW_DEMO_LOGIN=1. */
-export function isDemoLoginAllowed(): boolean {
-  return demoLoginAllowed(process.env);
 }

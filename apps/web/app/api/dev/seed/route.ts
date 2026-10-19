@@ -1,4 +1,4 @@
-import { demoLoginAllowed } from "@/lib/auth/access";
+import { demoModeAllowed } from "@/lib/auth/demo-guard";
 import { requireStaffApi } from "@/lib/auth/server";
 import { audit } from "@/lib/audit";
 import { isDevSeedRequest, resetDemoData } from "@/lib/demo-seed";
@@ -9,8 +9,10 @@ import { getServiceClient } from "@/lib/supabase-server";
  * POST /api/dev/seed: delete and rebuild the DEMO pilots (plan §J, "reset
  * demo data", development and demo deployments only).
  *
- * Allowed only where demo sign-in is (lib/auth/access demoLoginAllowed:
- * never on a real production database), and then only for:
+ * Allowed only where demo sign-in is (lib/auth/demo-guard demoModeAllowed:
+ * never on a production database without DEMO_DEPLOYMENT=1, and never on
+ * any Supabase database that holds a real quote, customer or team member,
+ * whatever the flags say), and then only for:
  *  * a signed-in admin, or
  *  * in development, the login page's "Load demo pilots" button (a
  *    same-origin request carrying `x-dih-seed: login`; the custom header
@@ -25,7 +27,7 @@ export const dynamic = "force-dynamic";
 const notFound = () => Response.json({ error: "Not found" }, { status: 404 });
 
 export async function POST(request: Request): Promise<Response> {
-  if (!demoLoginAllowed(process.env)) return notFound();
+  if (!(await demoModeAllowed())) return notFound();
 
   let actor: Awaited<ReturnType<typeof requireStaffApi>> | null = null;
   if (!isDevSeedRequest(process.env, request)) {

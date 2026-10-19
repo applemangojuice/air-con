@@ -63,7 +63,7 @@ export default async function PayPage({
   const sessionId = typeof sp.session === "string" ? sp.session : undefined;
   if (sessionId && /^cs_[A-Za-z0-9_]+$/.test(sessionId)) {
     returned = "pending";
-    const card = cardAvailability();
+    const card = await cardAvailability();
     if (card.available) {
       const s = await retrieveCheckoutSession(sessionId);
       if (s.ok && s.value.metadata?.project_id === id) {
@@ -90,7 +90,7 @@ export default async function PayPage({
   const cancelled = project.closure.reason === "cancelled";
   const payable = cancelled ? [] : payableInvoices(invoices);
   const settled = invoices.filter((i) => (i.status === "paid" || i.status === "part-paid") && !payable.some((p) => p.id === i.id));
-  const card = cardAvailability();
+  const card = await cardAvailability();
   const bank = settings.payments.methods.includes("bank-transfer") ? settings.company.bank : undefined;
   const cardOn = card.available && settings.payments.methods.includes("card");
   const docOf = (docId?: string) => (docId ? documents.find((d) => d.id === docId) : undefined);

@@ -28,7 +28,8 @@ import {
   type VariationAcceptance,
 } from "@aircon/domain";
 import { audit } from "./audit";
-import { demoLoginAllowed, isPlausibleEmail, normaliseEmail } from "./auth/access";
+import { isPlausibleEmail, normaliseEmail } from "./auth/access";
+import { demoModeAllowed } from "./auth/demo-guard";
 import { issueMagicLink } from "./auth/magic";
 import { getSession, requireProjectAccess, type ProjectAccess } from "./auth/server";
 import { notify } from "./comms/outbox";
@@ -130,7 +131,7 @@ export async function noSurveyorDates(excludeProjectId: string, today: string): 
   const db = getServiceClient();
   if (!db) return [];
   const [staff, rows] = await Promise.all([
-    staffRepo.list({ activeOnly: true, ...(demoLoginAllowed(process.env) ? {} : { includeDemo: false }) }),
+    staffRepo.list({ activeOnly: true, ...((await demoModeAllowed()) ? {} : { includeDemo: false }) }),
     db.from("projects").select("id, completed, project").not("install_on", "is", null).gte("install_on", addDays(today, -21)),
   ]);
   if (rows.error) throw new Error(`no-surveyor dates: ${rows.error.message}`);
@@ -334,7 +335,7 @@ export async function loadHub(projectId: string, access: ProjectAccess): Promise
 
   return {
     // How "on the way" will reach them: the same rule the outbox sends by (lib/comms/on-the-way.ts).
-    ...hubFacts(project, settings, today, onTheWayChannel(raw.customer, { sms: smsConfigured(), email: emailConfigured() }), cardAvailability()),
+    ...hubFacts(project, settings, today, onTheWayChannel(raw.customer, { sms: smsConfigured(), email: emailConfigured() }), await cardAvailability()),
     project,
     today,
     nowIso,

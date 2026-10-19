@@ -48,7 +48,7 @@ import {
   type SurveyRecord,
 } from "@aircon/domain";
 import { audit } from "./audit";
-import { demoLoginAllowed } from "./auth/access";
+import { demoModeAllowed } from "./auth/demo-guard";
 import { CANCELLATION_NOTICE_VERSION, LEGAL_REVIEW_NOTE, cancellationForm, cancellationInstructions } from "./comms/legal-text";
 import { notify } from "./comms/outbox";
 import { createDocument, listDocuments } from "./documents-server";
@@ -624,7 +624,7 @@ export async function issueDraft(projectId: string, proposalId: string, staff: S
   if (stored.status !== "draft") return fail("This version has already been issued.");
   // The issue email is the customer's durable copy of the pre-contract
   // information: on a live deployment it has to be able to go.
-  if (!emailConfigured() && !demoLoginAllowed(process.env)) {
+  if (!emailConfigured() && !(await demoModeAllowed())) {
     return fail(
       "Email isn't set up, so the proposal and its pre-contract information can't reach the customer. Add RESEND_API_KEY and EMAIL_FROM in Vercel (see /ops/status), then issue it.",
       503,

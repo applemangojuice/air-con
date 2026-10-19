@@ -48,6 +48,7 @@ import {
 } from "@aircon/domain";
 import { cardFromProject, type BoardCard } from "@/components/ops/board/board-model";
 import { demoLoginAllowed } from "./auth/access";
+import { demoModeAllowed } from "./auth/demo-guard";
 import { sessionSecretUsable } from "./auth/session";
 import { dispatchDue, notify } from "./comms/outbox";
 import { emailConfigured } from "./email";
@@ -702,7 +703,11 @@ export async function goLiveChecks(): Promise<GoLiveCheck[]> {
   const env = process.env;
   const checks: GoLiveCheck[] = [];
   const backend = dataBackend();
-  const demoMode = demoLoginAllowed(env);
+  // The demo flags, and whether they actually take effect: on a database
+  // holding anything real they don't (lib/auth/demo-guard), so the checks
+  // below judge it as the live business it is.
+  const demoFlags = demoLoginAllowed(env);
+  const demoMode = await demoModeAllowed(env);
   // Really set: an .env.example placeholder counts as missing.
   const has = (k: string) => Boolean(realEnv(env, k));
 
@@ -940,13 +945,18 @@ export async function goLiveChecks(): Promise<GoLiveCheck[]> {
     checks.push({
       id: "demo-data",
       label: "No DEMO data on the live system",
-      level: demoMode ? "amber" : demoProjects ? "red" : "green",
+      level: demoMode ? "amber" : demoFlags || demoProjects ? "red" : "green",
       detail: demoMode
         ? `Demo sign-in is on (development or ALLOW_DEMO_LOGIN=1), with ${demoProjects} DEMO project${demoProjects === 1 ? "" : "s"}. Turn it off before real customers arrive.`
-        : demoProjects
-          ? `${demoProjects} DEMO project${demoProjects === 1 ? "" : "s"} on the live database.`
-          : "No DEMO projects.",
-      fix: demoMode ? "Remove ALLOW_DEMO_LOGIN from Vercel and redeploy." : "Delete the DEMO projects (their quotes have source 'demo') before go-live.",
+        : demoFlags
+          ? "The demo sign-in settings are on, but this database holds real records, so demo sign-in is refused. Remove the settings so nobody turns it back on by clearing the database."
+          : demoProjects
+            ? `${demoProjects} DEMO project${demoProjects === 1 ? "" : "s"} on the live database.`
+            : "No DEMO projects.",
+      fix:
+        demoMode || demoFlags
+          ? "Vercel → Project → Settings → Environment Variables: delete ALLOW_DEMO_LOGIN and DEMO_DEPLOYMENT, then Deployments → Redeploy."
+          : "Delete the DEMO projects (their quotes have source 'demo') before go-live.",
     });
   }
   return checks;
