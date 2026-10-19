@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { invoiceOutstanding, outstandingPence, type StaffMember } from "@aircon/domain";
+import { createIssue, invoiceOutstanding, outstandingPence, type StaffMember } from "@aircon/domain";
 import { registerAppResolver } from "./helpers/resolve-app.ts";
 
 // Credit notes and refunds on the real money module, in-memory backend, on DEMO 3
@@ -12,6 +12,10 @@ const { resetDemoData } = await import("../lib/demo-seed/index.ts");
 const { issueInvoice, loadMoney, payableInvoices, recordRefund } = await import("../lib/money-server.ts");
 const { loadReadinessContext } = await import("../lib/project-service.ts");
 const invoicesRepo = await import("../lib/repo/invoices.ts");
+const issuesRepo = await import("../lib/repo/issues.ts");
+const { loadProject } = await import("../lib/project-service.ts");
+const { decideVariation } = await import("../lib/portal-server.ts");
+const { sendVariation } = await import("../lib/variation-server.ts");
 
 const OFFICE: StaffMember = { id: "aa000000-0000-4000-8000-0000000000c1", email: "office@demo.dang.invalid", name: "DEMO Office", roles: ["admin"], external: false, active: true, qualifications: [] };
 const today = () => new Date().toISOString().slice(0, 10);
@@ -72,4 +76,81 @@ test("refunding a paid deposit issues a credit note with it, so it's never asked
   assert.ok(owed.ok && !owed.value.creditNote);
   all = await invoicesRepo.listForProject(id);
   assert.equal(invoiceOutstanding(all.find((i) => i.id === deposit.id)!, all), 5_000);
+});
+
+/** A variation that takes £40.50 off, checked by the office and accepted by the customer on their page. */
+async function acceptReduction(id: string): Promise<string> {
+  const project = (await loadProject(id))!;
+  const draft = await issuesRepo.insert(
+    createIssue({
+      id: crypto.randomUUID(),
+      projectId: id,
+      number: await issuesRepo.nextNumber(id),
+      kind: "variation",
+      title: "DEMO: no trunking needed",
+      raisedBy: { kind: "staff", name: "DEMO Tech" },
+      raisedAt: new Date().toISOString(),
+      variation: { description: "DEMO: no trunking needed", priceDeltaNetPence: -4_050, taxCode: "outside-scope", officeReview: true },
+    }),
+  );
+  const sent = await sendVariation(id, draft.id, { description: "DEMO: no trunking needed", priceDeltaNetPence: -4_050 }, OFFICE);
+  assert.ok(sent.ok, !sent.ok ? sent.error : "");
+  const accepted = await decideVariation(id, { customerId: project.customer.customerId! }, draft.id, "accept", { name: "Jordan Okafor", agreed: true });
+  assert.ok(accepted.ok, JSON.stringify(accepted));
+  return draft.id;
+}
+
+/** Everything the customer is asked to pay, plus what they've paid already. */
+const askedInTotal = async (id: string) => {
+  const all = await invoicesRepo.listForProject(id);
+  const paid = all.filter((i) => i.kind !== "credit-note").reduce((s, i) => s + i.paidPence, 0);
+  return paid + payableInvoices(all).reduce((s, i) => s + i.owedPence, 0);
+};
+
+test("a variation that takes money off, billed on its own before the balance, is a credit note: the customer pays the agreed price", async () => {
+  const id = await demo3();
+  const contract = (await loadProject(id))!.money.contractTotalPence!;
+  const variationId = await acceptReduction(id);
+  const before = (await loadMoney(id))!;
+  const balanceWithReduction = before.plans.balance.totalPence;
+  assert.deepEqual(before.plans.variation.variations?.map((v) => [v.id, v.totalPence]), [[variationId, -4_050]]);
+
+  const issued = await issueInvoice(id, { kind: "variation", issueId: variationId, requestId: rid() }, OFFICE);
+  assert.ok(issued.ok, !issued.ok ? issued.error : "");
+  // Never a negative "invoice": a credit note tied to the variation.
+  assert.equal(issued.value.kind, "credit-note");
+  assert.equal(issued.value.totalPence, -4_050);
+  assert.equal(issued.value.issueId, variationId);
+  assert.equal(issued.value.dueOn, undefined);
+  assert.match(issued.message ?? "", /credit on their account/);
+  const after = (await loadMoney(id))!;
+  assert.deepEqual(after.plans.variation.variations, [], "billed: not on offer again");
+  assert.equal(after.summary.toInvoicePence, before.summary.toInvoicePence, "it bills the variation, not the contract");
+  // The balance bills the full figure; the credit comes off what they pay.
+  assert.equal(after.plans.balance.totalPence, balanceWithReduction + 4_050);
+  const balance = await issueInvoice(id, { kind: "balance", earlyReason: "DEMO", requestId: rid(), expectedTotalPence: after.plans.balance.totalPence }, OFFICE);
+  assert.ok(balance.ok, !balance.ok ? balance.error : "");
+  const all = await invoicesRepo.listForProject(id);
+  const asked = payableInvoices(all);
+  assert.deepEqual(asked.map((i) => [i.kind, i.owedPence, i.creditPence]), [["balance", balanceWithReduction, 4_050]]);
+  assert.equal(await askedInTotal(id), contract - 4_050, "the agreed price, not the old one");
+  assert.equal(outstandingPence(all), balanceWithReduction);
+  assert.equal((await loadReadinessContext(id))!.money?.unbilledPence, 0, "nothing left to bill");
+});
+
+test("a variation that takes money off, accepted after the balance went out, comes off the balance as credit", async () => {
+  const id = await demo3();
+  const contract = (await loadProject(id))!.money.contractTotalPence!;
+  const plan = (await loadMoney(id))!.plans.balance;
+  const balance = await issueInvoice(id, { kind: "balance", earlyReason: "DEMO", requestId: rid(), expectedTotalPence: plan.totalPence }, OFFICE);
+  assert.ok(balance.ok, !balance.ok ? balance.error : "");
+  const variationId = await acceptReduction(id);
+  assert.equal((await loadReadinessContext(id))!.money?.unbilledPence, 0, "a reduction is never billed as money owed");
+  const issued = await issueInvoice(id, { kind: "variation", issueId: variationId, requestId: rid() }, OFFICE);
+  assert.ok(issued.ok, !issued.ok ? issued.error : "");
+  assert.equal(issued.value.kind, "credit-note");
+  const all = await invoicesRepo.listForProject(id);
+  assert.deepEqual(payableInvoices(all).map((i) => [i.kind, i.owedPence, i.creditPence]), [["balance", plan.totalPence - 4_050, 4_050]]);
+  assert.equal(await askedInTotal(id), contract - 4_050);
+  assert.deepEqual((await loadMoney(id))!.plans.variation.variations, []);
 });

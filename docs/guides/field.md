@@ -67,11 +67,25 @@ Everything you do saves on the phone first, then sends by itself.
   back in signal.
 - **1 needs attention** (red): something was turned down. Tap the badge to
   see what and why, then fix it or tell the office.
+- **Keep open · 3 waiting** (red): the phone's storage didn't take these
+  (a private tab, storage full, or the browser dropped it). They're only in
+  this page: keep it open and get signal until it says **All synced**. The
+  capture itself says **Not kept on phone: keep open**.
 
 Tap the badge any time for the list and **Sync now**. While anything is
 waiting, don't clear the browser's data or switch to a private tab: it lives
-on that phone until it's sent. (Signing out is safe: it sends next time you
-sign in on that phone.)
+on that phone until it's sent.
+
+**Lending your phone.** Every capture is saved under the person who made
+it, and only sends while they're signed in on that phone. Sign out with
+something still waiting and it stays on the phone, under your name, until
+you sign in there again; if a colleague signs in on it meanwhile, your
+captures wait for you (the badge's list says "Captured by …"), and theirs go
+under their name. The **Me** page warns before you sign out with anything
+waiting and offers **Sync now**: use it when you can.
+
+Photos and videos upload on their own, so readings, issues and clock taps
+never wait behind a slow upload.
 
 **These need signal**, because the server checks them: starting a day,
 ending a day, the "on my way" text, commissioning sign-off and the
@@ -228,7 +242,9 @@ price change, £ before VAT** → **Send to the office**.
    would have helped, what confused the customer. Optional, but it's how
    the next job goes better.
 
-Ending the day stops your clock. It needs signal.
+Ending the day stops your clock. It needs signal. If someone else on the
+crew has already ended the day from their phone, yours says so, sends no
+second update and still stops your clock.
 
 ## 9. The electrician
 
@@ -280,10 +296,14 @@ clear it.
    fall. Type the figure and the manual page → **Set target**. Readings
    already taken are judged against what you set.
 2. **Ready to sign?** lists what's left: unfinished steps, targets not set,
-   readings to review.
+   readings to review, and anything for this job still on your phone (the
+   certificate is made from what the server has, so **Sign** waits for it to
+   sync: **Sync first**).
 3. Review every **Needs review** reading.
 4. **Sign as \<your name\>**. That completes the install and issues the
-   commissioning certificate. It can't be undone from the field.
+   commissioning certificate. It can't be undone from the field. If a
+   reading arrived from another phone since your screen loaded, signing is
+   refused and names it: check the results again, then sign.
 
 ## 11. Handover with the family
 

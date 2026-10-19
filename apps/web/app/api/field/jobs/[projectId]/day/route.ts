@@ -59,6 +59,6 @@ export async function POST(request: Request, { params }: Params): Promise<Respon
   if (b.action === "learnings") return answer(() => saveLearnings(projectId, staff, b.n, b.answers));
   return answer(async () => {
     const result = await endDay(projectId, staff, b);
-    return { ok: true, email: result.email, learningsSaved: result.learningsSaved };
+    return { ok: true, email: result.email, learningsSaved: result.learningsSaved, alreadyEnded: result.alreadyEnded, clockStopped: result.clockStopped };
   });
 }

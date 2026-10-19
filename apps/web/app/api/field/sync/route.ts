@@ -20,6 +20,8 @@ const id = z.string().min(8).max(100).regex(/^[A-Za-z0-9_-]+$/);
 const at = z.string().min(10).max(40);
 const projectId = z.string().uuid();
 const uuid = z.string().uuid();
+/** Who made the capture on the phone: the server sends it back unsaved unless that's who's signed in. */
+const by = z.object({ id: z.string().min(1).max(100), name: z.string().max(200) }).optional();
 
 const opSchema = z.discriminatedUnion("type", [
   z.object({
@@ -32,6 +34,7 @@ const opSchema = z.discriminatedUnion("type", [
     note: z.string().max(1000).optional(),
     mediaId: uuid.optional(),
     gps: z.object({ lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180) }).optional(),
+    by,
     at,
   }),
   z.object({
@@ -42,6 +45,7 @@ const opSchema = z.discriminatedUnion("type", [
     outcome: z.enum(["pass", "fail", "blocked", "na"]),
     reason: z.string().max(1000).optional(),
     issueId: uuid.optional(),
+    by,
     at,
   }),
   z.object({
@@ -52,9 +56,10 @@ const opSchema = z.discriminatedUnion("type", [
     dayN: z.number().int().min(1).max(30).optional(),
     note: z.string().max(300).optional(),
     gps: z.object({ lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180) }).optional(),
+    by,
     at,
   }),
-  z.object({ type: z.literal("time-stop"), id, projectId, entryId: uuid, at }),
+  z.object({ type: z.literal("time-stop"), id, projectId, entryId: uuid, by, at }),
   z.object({
     type: z.literal("issue"),
     id: uuid,
@@ -66,6 +71,7 @@ const opSchema = z.discriminatedUnion("type", [
     blocking: z.boolean(),
     mediaIds: z.array(uuid).max(6),
     variation: z.object({ description: z.string().trim().min(3).max(2000), priceDeltaNetPence: z.number().int().min(-10_000_000).max(10_000_000) }).optional(),
+    by,
     at,
   }),
 ]);

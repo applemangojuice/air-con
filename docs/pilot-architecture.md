@@ -174,9 +174,14 @@ type Session =
 - The email is the customer's identity. When `set-customer-contact` changes
   it, `dispatch` moves the project to the customer record for the new
   address (`customers.findOrCreate`, then `projects.customer_id`), so the old
-  customer loses access at once. Clearing the email moves nothing and sends
-  nothing. v2 never borrows contact details from the quote; only v1
-  snapshots do (`lib/legacy-contact.ts`).
+  customer loses access at once. Clearing the email detaches the project
+  (`customer_id` null in the same save), so whoever owned the removed
+  address loses access at once too, and sends nothing: a project's sign-in
+  link only ever goes to the project's own current email. Customer messages
+  follow the project's contact at the moment they're sent (§K39): a corrected
+  address gets the message, the old one never again. v2 never borrows
+  contact details from the quote; only v1 snapshots do
+  (`lib/legacy-contact.ts`).
 
 **Staff bootstrap:** `ADMIN_EMAILS` (comma list). The first sign-in from
 such an email creates an admin `staff` row. Break-glass: when
@@ -2045,3 +2050,60 @@ changelog and the reasons, so nobody "fixes" a deliberate choice back.
       releases; the Server Actions denial of service among them), pinned
       exactly because the hydration patch is keyed to the version
       (`patches/next@15.5.28.patch`, applied unchanged).
+39. **Pre-launch review, round 3 (nine findings, fixed before the first
+    real customers).**
+    - *Customer messages follow the project's contact at send time*
+      (`outbox-core`): a customer message about a project is re-resolved
+      against `project.customer` when the cron, **Retry** or **Send again**
+      sends it. Written to an address staff have since corrected, it goes to
+      the new one as a copy keyed `readdressedKey` (`<key>|to=<address>`,
+      so each address gets an occurrence at most once) and the old row stops
+      being retried; written to one they removed, nothing goes. A notify for
+      an occurrence that went to an old address sends to the new one too
+      (it used to come back "duplicate"). `followUpForDelivered` records
+      the pre-contract information and the contract confirmation only for a
+      delivery to the project's current email. `resendMessageAction` says
+      where it went.
+    - *Clearing the email detaches the project*: `dispatch` writes
+      `customer_id` null in the same save (`emailCleared`), so whoever owned
+      the removed address loses access at once, and a project's sign-in
+      link (`customerEmailForProject`) only ever goes to the project's own
+      current email, never the customer record's.
+    - *A variation that takes money off is a credit note* (`issueInvoice`):
+      billed on its own it's issued as a `credit-note` with the variation's
+      `issueId` (`creditPurpose` correction), which counts towards the price
+      and as account credit, as a variation invoice would; `moneySummary`
+      leaves it out of contract invoicing. No invoice is ever issued with a
+      negative total, nor a credit note with a positive one.
+    - *Issuing locks the draft* (`proposalsRepo.updateIfUnchanged`, a
+      compare-and-set on `updated_at`): `issueDraft` takes the revision the
+      issuer's builder saw, refuses if a colleague saved since, and bumps the
+      revision with a compare-and-set before dispatch, so a save that lands
+      meanwhile is refused and the issue email, the issued record and the
+      frozen document carry one set of prices. `saveDraft` and
+      `setOverride` write with the same compare-and-set. A refused issue
+      gives the revision back.
+    - *Commissioning signs only what the server has*: the screen disables
+      **Sign** (and says why) while anything for the job is on the phone,
+      flushes first, and sends every evidence id it showed (`seen`);
+      `signCommissioning` refuses, naming it, when the latest capture of any
+      slot isn't among them (`unseenEvidence`).
+    - *The outbox's storage can fail* (`idb-connection`): every IndexedDB
+      call waits for its transaction to commit, and a dropped connection is
+      reopened and the write tried once more. A write that still fails keeps
+      the item in memory but marks it not kept (`state().durable`), so the
+      badge says **Keep open · N waiting** and the slot says so; the survey
+      photo queue does the same. `navigator.storage.persist()` is asked for.
+    - *Captures belong to their author*: every op and photo is stamped
+      `by` (who's signed in, from `FieldIdentity` / `useMergedJob`) and only
+      sends while that person is signed in on the phone (`heldForAuthor`);
+      the sync route refuses (retryable) an op whose `by` isn't the session.
+      The Me page warns before signing out with captures waiting.
+    - *Ending a day a colleague already ended* stops this person's own clock
+      and says so (`alreadyEnded`), sharing and sending nothing; a refusal
+      refreshes the stale page.
+    - *Ops never wait behind uploads*: the outbox runs ops and photos in two
+      single-flight lanes; only an op that uses a photo (and later captures
+      of the same slot) waits for it. Sync requests time out after 30 s,
+      media requests after 30 s, and an upload with no progress for a minute
+      is aborted and retried (`STALL_TIMEOUT_MS`).

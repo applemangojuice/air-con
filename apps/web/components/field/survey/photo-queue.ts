@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PhotoTag } from "@aircon/domain";
+import { idbConnection, type IdbConnection } from "@/lib/idb-connection";
 import { MediaUploadError, uploadMedia, type UploadedMedia, type UploadProgress } from "@/lib/media-client";
 
 /**
@@ -32,34 +33,36 @@ export interface PendingPhoto {
 const DB_NAME = "dih-survey-photos";
 const STORE = "uploads";
 
-function openDb(): Promise<IDBDatabase | null> {
-  return new Promise((resolve) => {
-    if (typeof indexedDB === "undefined") return resolve(null);
+function openSurveyDb(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    if (typeof indexedDB === "undefined") return reject(new Error("No IndexedDB"));
     try {
       const req = indexedDB.open(DB_NAME, 1);
       req.onupgradeneeded = () => {
         if (!req.result.objectStoreNames.contains(STORE)) req.result.createObjectStore(STORE, { keyPath: "localId" });
       };
       req.onsuccess = () => resolve(req.result);
-      req.onerror = () => resolve(null);
-      req.onblocked = () => resolve(null);
-    } catch {
-      resolve(null);
+      req.onerror = () => reject(req.error ?? new Error("IndexedDB failed to open"));
+      req.onblocked = () => reject(new Error("IndexedDB blocked"));
+    } catch (err) {
+      reject(err);
     }
   });
 }
 
-function tx<T>(db: IDBDatabase, mode: IDBTransactionMode, run: (store: IDBObjectStore) => IDBRequest<T>): Promise<T | null> {
-  return new Promise((resolve) => {
-    try {
-      const t = db.transaction(STORE, mode);
-      const req = run(t.objectStore(STORE));
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => resolve(null);
-    } catch {
-      resolve(null);
-    }
-  });
+/**
+ * One request on the queue's connection (which reopens itself if the
+ * browser dropped it), waiting for it to commit. Null when it failed even
+ * after a reopen: `onFail` hears, so the screen stops saying it's kept.
+ */
+async function tx<T>(conn: IdbConnection, mode: IDBTransactionMode, run: (store: IDBObjectStore) => IDBRequest<T>, onFail: () => void): Promise<T | null> {
+  try {
+    return await conn.run(mode, STORE, run);
+  } catch (err) {
+    console.error("[survey photos] couldn't save on this phone:", err);
+    onFail();
+    return null;
+  }
 }
 
 type Stored = Omit<PendingPhoto, "status" | "progress" | "error"> & { status: "queued" | "failed"; error?: string };
@@ -85,7 +88,9 @@ export interface PhotoQueueOptions {
 export function usePhotoQueue({ projectId, onUploaded }: PhotoQueueOptions) {
   const [items, setItems] = useState<PendingPhoto[]>([]);
   const [persistent, setPersistent] = useState(true);
-  const dbRef = useRef<IDBDatabase | null>(null);
+  const dbRef = useRef<IdbConnection | null>(null);
+  // A write the phone refused: from then on the screen says these photos aren't kept here.
+  const lost = useCallback(() => setPersistent(false), []);
   const itemsRef = useRef<PendingPhoto[]>([]);
   const running = useRef(false);
   const onUploadedRef = useRef(onUploaded);
@@ -127,7 +132,7 @@ export function usePhotoQueue({ projectId, onUploaded }: PhotoQueueOptions) {
             },
           });
           failures.current = 0;
-          if (dbRef.current) await tx(dbRef.current, "readwrite", (s) => s.delete(next.localId));
+          if (dbRef.current) await tx(dbRef.current, "readwrite", (s) => s.delete(next.localId), lost);
           commit(itemsRef.current.filter((p) => p.localId !== next.localId));
           onUploadedRef.current(next.target, item, next.localId);
         } catch (err) {
@@ -137,7 +142,7 @@ export function usePhotoQueue({ projectId, onUploaded }: PhotoQueueOptions) {
           const retryable = !(err instanceof MediaUploadError) || err.retryable;
           patch(next.localId, { status: "failed", error: message, progress: undefined });
           const failed = itemsRef.current.find((p) => p.localId === next.localId);
-          if (dbRef.current && failed) await tx(dbRef.current, "readwrite", (s) => s.put(toStored(failed)));
+          if (dbRef.current && failed) await tx(dbRef.current, "readwrite", (s) => s.put(toStored(failed)), lost);
           if (retryable) {
             failures.current += 1;
             const wait = Math.min(60_000, 5_000 * 2 ** Math.min(4, failures.current - 1));
@@ -152,7 +157,7 @@ export function usePhotoQueue({ projectId, onUploaded }: PhotoQueueOptions) {
     } finally {
       running.current = false;
     }
-  }, [commit, patch]);
+  }, [commit, patch, lost]);
 
   const retryAll = useCallback(() => {
     commit(itemsRef.current.map((p) => (p.status === "failed" ? { ...p, status: "queued", error: undefined } : p)));
@@ -184,10 +189,10 @@ export function usePhotoQueue({ projectId, onUploaded }: PhotoQueueOptions) {
         status: "queued",
       }));
       commit([...itemsRef.current, ...fresh]);
-      if (dbRef.current) for (const p of fresh) await tx(dbRef.current, "readwrite", (s) => s.put(toStored(p)));
+      if (dbRef.current) for (const p of fresh) await tx(dbRef.current, "readwrite", (s) => s.put(toStored(p)), lost);
       void pump();
     },
-    [commit, projectId, pump],
+    [commit, projectId, pump, lost],
   );
 
   /** Drop a photo that hasn't uploaded yet (stops it if it's on its way). */
@@ -195,21 +200,25 @@ export function usePhotoQueue({ projectId, onUploaded }: PhotoQueueOptions) {
     async (localId: string) => {
       aborts.current.get(localId)?.abort();
       commit(itemsRef.current.filter((p) => p.localId !== localId));
-      if (dbRef.current) await tx(dbRef.current, "readwrite", (s) => s.delete(localId));
+      if (dbRef.current) await tx(dbRef.current, "readwrite", (s) => s.delete(localId), lost);
     },
-    [commit],
+    [commit, lost],
   );
 
   // Pick up anything left from last time, for this project.
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const db = await openDb();
+      const conn = idbConnection(openSurveyDb);
+      const db = await conn.ready().then(
+        () => conn,
+        () => null,
+      );
       if (cancelled) return;
       dbRef.current = db;
       setPersistent(Boolean(db));
       if (!db) return;
-      const stored = ((await tx(db, "readonly", (s) => s.getAll())) ?? []) as Stored[];
+      const stored = ((await tx(db, "readonly", (s) => s.getAll(), lost)) ?? []) as Stored[];
       const mine = stored.filter((p) => p.projectId === projectId && p.blob instanceof Blob);
       if (mine.length === 0 || cancelled) return;
       const known = new Set(itemsRef.current.map((p) => p.localId));
@@ -223,7 +232,7 @@ export function usePhotoQueue({ projectId, onUploaded }: PhotoQueueOptions) {
       window.removeEventListener("online", online);
       if (retryTimer.current) clearTimeout(retryTimer.current);
     };
-  }, [commit, projectId, pump, retryAll]);
+  }, [commit, projectId, pump, retryAll, lost]);
 
   return { items, add, retry, retryAll, remove, persistent };
 }

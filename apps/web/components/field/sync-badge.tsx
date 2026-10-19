@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { badgeState, getFieldOutbox } from "@/lib/field-outbox";
+import { authorOf, badgeState, getFieldOutbox } from "@/lib/field-outbox";
 import { Sheet, SlotPortal } from "./sheet";
 import { useOutboxState } from "./use-outbox";
 
@@ -50,7 +50,7 @@ export function SyncBadge() {
         description={
           state.durable
             ? "Captures are kept here until the server confirms them, even if the page is closed."
-            : "This browser won't keep captures if the page closes (private browsing or storage blocked). Keep this page open until everything has synced."
+            : "This phone isn't keeping some of these if the page closes (private browsing, storage blocked or full, or the browser dropped its storage). Keep this page open until everything has synced."
         }
         footer={
           state.online ? (
@@ -82,6 +82,13 @@ export function SyncBadge() {
                     <p className="text-sm text-ink-500">
                       {i.kind === "media" ? "Photo" : i.op?.type === "evidence" ? "Capture" : i.op?.type === "step-status" ? "Outcome" : i.op?.type?.startsWith("time") ? "Clock" : "Issue"} · added {ago(i.createdAt)}
                     </p>
+                    {(() => {
+                      // Someone else's capture, made before they signed out: it waits for them.
+                      const by = authorOf(i);
+                      return by && state.signedIn && by.id !== state.signedIn.id ? (
+                        <p className="mt-1 text-sm font-medium text-ink-900">Captured by {by.name}: it sends when they sign in on this phone, never under anyone else&apos;s name.</p>
+                      ) : null;
+                    })()}
                     {i.lastError && <p className={`mt-1 text-sm ${i.state === "failed" ? "font-medium text-red-800" : "text-ink-700"}`}>{i.lastError}</p>}
                   </div>
                   {i.state === "failed" ? (

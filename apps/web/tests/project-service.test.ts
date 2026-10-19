@@ -12,6 +12,7 @@ const { claimProjectOnSignIn, createProjectForQuote, dispatch, loadProject, pilo
 const { customerLink, consumeToken } = await import("../lib/auth/magic.ts");
 const { requireDb } = await import("../lib/supabase-server.ts");
 const customersRepo = await import("../lib/repo/customers.ts");
+const { sendSignInLink } = await import("../lib/portal-server.ts");
 
 /** DEMO people only. */
 const OPS: StaffMember = {
@@ -64,15 +65,40 @@ test("a corrected email moves the project to that address's customer: links sign
   assert.equal(tokenOf(await customerLink(id, `/p/${id}`, "someone@example.test")), null);
 });
 
-test("clearing the email leaves the project where it is and sends no token anywhere", async () => {
-  const id = await projectFor("keep@example.test");
-  const before = (await loadProject(id))?.customer.customerId;
+test("clearing the email detaches whoever owned it: no access, no sign-in link, no token anywhere", async () => {
+  const wrong = "wrong.person@example.test";
+  const id = await projectFor(wrong);
+  const owner = (await customersRepo.getByEmail(wrong))!;
+  assert.equal(await customerIdOf(id), owner.id);
+  assert.deepEqual(await customersRepo.projectIdsFor(owner.id), [id]);
+  const linksTo = async (email: string) =>
+    ((await requireDb().from("messages").select("id").eq("event", "magic-link").eq("to_address", email)).data ?? []).length;
+  const before = await linksTo(wrong);
+
   const result = await dispatch(id, { type: "set-customer-contact", email: "" }, OPS);
   assert.ok("project" in result, JSON.stringify(result));
   assert.equal(result.project.customer.email, undefined);
-  assert.equal(result.project.customer.customerId, before, "no relink on a cleared address");
+  assert.equal(result.project.customer.customerId, undefined, "the snapshot forgets them");
   // v2 never falls back to the quote's address.
   assert.equal((await loadProject(id))?.customer.email, undefined);
+  // The row's customer_id (the access authority) is cleared in the same save.
+  assert.equal(await customerIdOf(id), null);
+  assert.deepEqual(await customersRepo.projectIdsFor(owner.id), [], "their /portal no longer lists it");
+
+  // "Email me a sign-in link" on the project or one of its documents sends nothing, to anyone.
+  await sendSignInLink({ kind: "project", projectId: id });
+  assert.equal(await linksTo(wrong), before, "the removed address gets no link");
+  assert.equal(((await requireDb().from("login_tokens").select("id").eq("next_path", `/p/${id}`)).data ?? []).length, 0);
+  // Their own sign-in still works, but this household isn't theirs any more.
+  await sendSignInLink({ kind: "email", email: wrong });
+  assert.deepEqual(await customersRepo.projectIdsFor(owner.id), []);
+  assert.equal(await claimProjectOnSignIn(owner, `/p/${id}`), null, "and they can't claim it back from an old link");
+
+  // The right address, once staff type it, owns the project.
+  const fixed = await dispatch(id, { type: "set-customer-contact", email: "right.family@example.test" }, OPS);
+  assert.ok("project" in fixed, JSON.stringify(fixed));
+  const right = (await customersRepo.getByEmail("right.family@example.test"))!;
+  assert.equal(await customerIdOf(id), right.id);
 });
 
 const consentsAt = (at: string, marketing: boolean) => ({

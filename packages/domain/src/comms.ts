@@ -337,6 +337,24 @@ export function idempotencyKey(
 }
 
 /**
+ * Marks a key as the same occurrence sent to a different address: staff
+ * corrected the customer's email or mobile after the first message was
+ * written, so that message went (or would have gone) to the old one.
+ */
+export const READDRESS_SEPARATOR = "|to=";
+
+/** The occurrence's own key, without any re-addressing suffix. */
+export function baseIdempotencyKey(key: string): string {
+  const i = key.indexOf(READDRESS_SEPARATOR);
+  return i < 0 ? key : key.slice(0, i);
+}
+
+/** The key for this occurrence sent to `to` instead: one message per occurrence per address, ever. */
+export function readdressedKey(key: string, to: string): string {
+  return `${baseIdempotencyKey(key)}${READDRESS_SEPARATOR}${to.trim().toLowerCase()}`;
+}
+
+/**
  * Stands in for a sign-in link in every stored body. Sign-in tokens are
  * minted when a message is actually handed to a provider and never stored
  * (the database keeps only sha256(token)), so a stored message, a demo

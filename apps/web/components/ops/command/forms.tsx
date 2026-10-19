@@ -727,7 +727,7 @@ export function LearningStatusForm({ action, learningId, status }: { action: Act
 
 export function ResendForm({ action, messageId, label }: { action: Action; messageId: string; label: string }) {
   return (
-    <ActionForm action={action} confirm={label === "Send again" ? "Send this message to the customer again?" : undefined}>
+    <ActionForm action={action} confirm={label === "Send again" ? "Send this message again? It goes to the email or mobile on the project now." : undefined}>
       <input type="hidden" name="messageId" value={messageId} />
       <SubmitButton variant="secondary" busyLabel="Sending…">
         {label}

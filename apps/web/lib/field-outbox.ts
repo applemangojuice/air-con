@@ -1,4 +1,5 @@
 import type { IssueKind, MediaItem, PhotoTag, Severity, StepOutcome } from "@aircon/domain";
+import { askForPersistentStorage, idbConnection } from "./idb-connection.ts";
 
 /**
  * The phone's outbox (F6): evidence, step outcomes, clock events, issues
@@ -12,10 +13,21 @@ import type { IssueKind, MediaItem, PhotoTag, Severity, StepOutcome } from "@air
  *   const photo = await outbox.enqueueMedia({ projectId, blob, tag: "gauge", … }, "Gauge photo");
  *   await outbox.enqueue({ type: "evidence", id: newId(), projectId, specId, mediaId: photo, at }, "Gauge photo");
  *
- * Photos go first (POST /api/media, PUT, confirm, through lib/media-client)
- * and the ops that use them wait, holding a `local:` placeholder that's
- * swapped for the real media id once it lands. Everything else goes in
- * batches to POST /api/field/sync.
+ * Photos upload in their own lane (POST /api/media, PUT, confirm, through
+ * lib/media-client), and only the ops that use one wait for it, holding a
+ * `local:` placeholder that's swapped for the real media id once it lands.
+ * Everything else goes straight away in batches to POST /api/field/sync,
+ * never behind a slow upload (a safety issue mustn't wait for a video).
+ *
+ * Every capture is stamped with who made it (`by`, from the signed-in
+ * person the field pages tell the outbox about) and only ever sends while
+ * that person is signed in on the phone: a capture queued before a sign-out
+ * waits for its own author, never goes under the next person's name.
+ *
+ * Nothing claims to be safe on the phone unless IndexedDB took it: a write
+ * that fails (the browser dropped the connection, storage full) is retried
+ * on a fresh connection once, and otherwise the item is marked not kept, so
+ * the badge and the slot say "keep this page open" instead of "saved".
  *
  * The queue logic is pure (top half of this file) and tested in node; the
  * IndexedDB store and the browser wiring are the bottom half, used only in
@@ -29,7 +41,13 @@ import type { IssueKind, MediaItem, PhotoTag, Severity, StepOutcome } from "@air
 
 export type TimeKind = "install" | "travel" | "commissioning" | "handover";
 
-export type SyncOp =
+/** Who made a capture (staff id and name): it only sends while they're signed in. */
+export interface CapturedBy {
+  id: string;
+  name: string;
+}
+
+export type SyncOp = (
   | {
       type: "evidence";
       id: string;
@@ -57,7 +75,8 @@ export type SyncOp =
       mediaIds: string[];
       variation?: { description: string; priceDeltaNetPence: number };
       at: string;
-    };
+    }
+) & { by?: CapturedBy };
 
 export type SyncResult =
   | { id: string; ok: true; duplicate?: boolean }
@@ -73,6 +92,7 @@ export interface MediaJob {
   roomId?: string;
   caption?: string;
   customerVisible?: boolean;
+  by?: CapturedBy;
 }
 
 export interface QueueItem {
@@ -122,24 +142,51 @@ export function resolvePlaceholder(op: SyncOp, localId: string, mediaId: string)
 /** Oldest first: the order things happened is the order the server hears them. */
 export const byCreated = (a: QueueItem, b: QueueItem) => a.createdAt - b.createdAt || a.id.localeCompare(b.id);
 
-/** The next photo to upload: due, not failed, oldest first. */
-export function nextMedia(items: QueueItem[], now: number, force = false): QueueItem | undefined {
-  return [...items].sort(byCreated).find((i) => i.kind === "media" && i.state === "queued" && (force || i.nextAttemptAt <= now));
+/** Who made this item, if the phone knew (older items have no stamp). */
+export const authorOf = (item: QueueItem): CapturedBy | undefined => item.op?.by ?? item.media?.by;
+
+/**
+ * Is this item waiting for its own author to sign in? `signedIn` is who's
+ * signed in on the phone (null: not known yet, so nothing stamped goes;
+ * undefined: don't check). Unstamped items go as they always did.
+ */
+export function heldForAuthor(item: QueueItem, signedIn: string | null | undefined): boolean {
+  if (signedIn === undefined) return false;
+  const by = authorOf(item);
+  return Boolean(by && by.id !== signedIn);
+}
+
+/** The next photo to upload: due, not failed, its author signed in, oldest first. */
+export function nextMedia(items: QueueItem[], now: number, force = false, signedIn?: string | null): QueueItem | undefined {
+  return [...items]
+    .sort(byCreated)
+    .find((i) => i.kind === "media" && i.state === "queued" && (force || i.nextAttemptAt <= now) && !heldForAuthor(i, signedIn));
 }
 
 /**
  * The next batch for /api/field/sync: due ops whose photos have landed, in
- * order, at most `max`. A time-stop waits for its own start when both are
- * queued (the start is older, so it's in the same batch or an earlier one).
+ * order, at most `max`, only the signed-in person's own (`signedIn`). A
+ * time-stop waits for its own start when both are queued (the start is
+ * older, so it's in the same batch or an earlier one). An op waiting for a
+ * photo holds back only later captures of the same slot (the latest capture
+ * is the one that counts), never anything else.
  */
-export function nextBatch(items: QueueItem[], now: number, opts: { max?: number; force?: boolean } = {}): QueueItem[] {
+export function nextBatch(items: QueueItem[], now: number, opts: { max?: number; force?: boolean; signedIn?: string | null } = {}): QueueItem[] {
   const max = opts.max ?? 50;
   const out: QueueItem[] = [];
+  const slotsWaiting = new Set<string>();
+  const slotOf = (op: SyncOp) => (op.type === "evidence" ? `${op.projectId}:${op.specId}` : null);
   for (const item of [...items].sort(byCreated)) {
     if (out.length >= max) break;
     if (item.kind !== "op" || !item.op || item.state !== "queued") continue;
+    const slot = slotOf(item.op);
+    if (placeholdersIn(item.op).length) {
+      if (slot) slotsWaiting.add(slot);
+      continue;
+    }
+    if (slot && slotsWaiting.has(slot)) continue;
     if (!opts.force && item.nextAttemptAt > now) continue;
-    if (placeholdersIn(item.op).length) continue;
+    if (heldForAuthor(item, opts.signedIn)) continue;
     out.push(item);
   }
   return out;
@@ -208,6 +255,8 @@ export function badgeState(input: { online: boolean; items: QueueItem[]; storage
   const failed = input.items.filter((i) => i.state === "failed").length;
   const waiting = input.items.length - failed;
   if (failed > 0) return { tone: "attention", text: `${failed} need${failed === 1 ? "s" : ""} attention`, waiting, failed };
+  // Waiting, but only in this page's memory: closing it loses them.
+  if (waiting > 0 && input.storageOk === false) return { tone: "attention", text: `Keep open · ${waiting} waiting`, waiting, failed };
   if (!input.online) return { tone: "offline", text: waiting ? `Offline · ${waiting} waiting` : "Offline", waiting, failed };
   if (waiting > 0) return { tone: "waiting", text: `${waiting} waiting to sync`, waiting, failed };
   return { tone: "ok", text: input.storageOk === false ? "Synced (not saved offline)" : "All synced", waiting, failed };
@@ -241,9 +290,10 @@ export function newOpId(): string {
 
 export interface OutboxStore {
   all(): Promise<QueueItem[]>;
+  /** Resolves once it's really on the phone (the write committed); rejects when it isn't. */
   put(item: QueueItem): Promise<void>;
   delete(id: string): Promise<void>;
-  /** False when the store can't persist (private browsing, storage blocked). */
+  /** False when the store can't persist (private browsing, storage blocked, its last write failed). */
   readonly durable: boolean;
 }
 
@@ -260,17 +310,8 @@ export function memoryStore(): OutboxStore {
 const DB_NAME = "dih-field-outbox";
 const STORE = "items";
 
-function idbRequest<T>(req: IDBRequest<T>): Promise<T> {
-  return new Promise((resolve, reject) => {
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
-
-/** IndexedDB, one object store keyed by id. Rejects (and the caller falls back to memory) where IndexedDB isn't usable. */
-export async function indexedDbStore(): Promise<OutboxStore> {
-  if (typeof indexedDB === "undefined") throw new Error("No IndexedDB");
-  const db = await new Promise<IDBDatabase>((resolve, reject) => {
+function openOutboxDb(): Promise<IDBDatabase> {
+  return new Promise<IDBDatabase>((resolve, reject) => {
     const open = indexedDB.open(DB_NAME, 1);
     open.onupgradeneeded = () => {
       if (!open.result.objectStoreNames.contains(STORE)) open.result.createObjectStore(STORE, { keyPath: "id" });
@@ -279,12 +320,35 @@ export async function indexedDbStore(): Promise<OutboxStore> {
     open.onerror = () => reject(open.error);
     open.onblocked = () => reject(new Error("IndexedDB blocked"));
   });
-  const tx = (mode: IDBTransactionMode) => db.transaction(STORE, mode).objectStore(STORE);
+}
+
+/**
+ * IndexedDB, one object store keyed by id, on a connection that reopens
+ * itself (idb-connection). Rejects (and the caller falls back to memory)
+ * where IndexedDB isn't usable at all; a write that still fails after a
+ * reopen rejects, and `durable` says so until a write works again.
+ */
+export async function indexedDbStore(): Promise<OutboxStore> {
+  if (typeof indexedDB === "undefined") throw new Error("No IndexedDB");
+  const conn = idbConnection(openOutboxDb);
+  await conn.ready();
+  let failing = false;
+  const write = async <T>(request: (s: IDBObjectStore) => IDBRequest<T>) => {
+    try {
+      await conn.run("readwrite", STORE, request);
+      failing = false;
+    } catch (err) {
+      failing = true;
+      throw err;
+    }
+  };
   return {
-    durable: true,
-    all: () => idbRequest(tx("readonly").getAll() as IDBRequest<QueueItem[]>),
-    put: async (item) => void (await idbRequest(tx("readwrite").put(item))),
-    delete: async (id) => void (await idbRequest(tx("readwrite").delete(id))),
+    get durable() {
+      return !failing;
+    },
+    all: () => conn.run("readonly", STORE, (s) => s.getAll() as IDBRequest<QueueItem[]>),
+    put: (item) => write((s) => s.put(item)),
+    delete: (id) => write((s) => s.delete(id)),
   };
 }
 
@@ -306,7 +370,10 @@ export interface OutboxState {
   items: QueueItem[];
   online: boolean;
   syncing: boolean;
+  /** Everything waiting is really on the phone (false: some of it is only in this page's memory). */
   durable: boolean;
+  /** Who's signed in on this phone, as the field pages said (null until one has). */
+  signedIn: CapturedBy | null;
   /** Ops the server acknowledged since this page loaded: shown as saved until the page's data catches up. */
   acked: SyncOp[];
   lastSyncedAt?: number;
@@ -324,13 +391,21 @@ export class SendError extends Error {
 export class FieldOutbox {
   private items: QueueItem[] = [];
   private loaded: Promise<void>;
-  private flushing: Promise<void> | null = null;
+  /** Two lanes, each single-flight: ops never wait behind an upload. */
+  private opsFlight: Promise<void> | null = null;
+  private mediaFlight: Promise<void> | null = null;
+  /** Asked again while a lane was running: run it once more when it finishes. */
+  private opsAgain: boolean | null = null;
+  private mediaAgain: boolean | null = null;
   private listeners = new Set<(s: OutboxState) => void>();
   private acked: SyncOp[] = [];
-  private syncing = false;
   private lastSyncedAt?: number;
   /** Local photo id → its server media id, for ops queued after the photo landed. */
   private landed = new Map<string, string>();
+  /** Items only in memory: the phone's storage refused them. */
+  private unsaved = new Set<string>();
+  private signedIn: CapturedBy | null = null;
+  private isLoaded = false;
 
   private readonly deps: OutboxDeps;
 
@@ -344,7 +419,10 @@ export class FieldOutbox {
       .catch(() => {
         this.items = [];
       })
-      .then(() => this.emit());
+      .then(() => {
+        this.isLoaded = true;
+        this.emit();
+      });
   }
 
   ready(): Promise<void> {
@@ -355,11 +433,24 @@ export class FieldOutbox {
     return {
       items: this.items,
       online: this.deps.online(),
-      syncing: this.syncing,
-      durable: this.deps.store.durable,
+      syncing: Boolean(this.opsFlight || this.mediaFlight),
+      // Not known until the store has opened: don't warn before then.
+      durable: !this.isLoaded || (this.deps.store.durable && this.unsaved.size === 0),
+      signedIn: this.signedIn,
       acked: this.acked,
       ...(this.lastSyncedAt ? { lastSyncedAt: this.lastSyncedAt } : {}),
     };
+  }
+
+  /**
+   * Who's signed in on this phone (every field page says). New captures are
+   * stamped with it, and only their own author's captures send.
+   */
+  setSignedIn(who: CapturedBy | null): void {
+    if (who?.id === this.signedIn?.id && who?.name === this.signedIn?.name) return;
+    this.signedIn = who ? { id: who.id, name: who.name } : null;
+    this.emit();
+    if (who) void this.flush(true);
   }
 
   subscribe(listener: (s: OutboxState) => void): () => void {
@@ -373,18 +464,24 @@ export class FieldOutbox {
     for (const l of this.listeners) l(s);
   }
 
-  private async save(item: QueueItem): Promise<void> {
+  /** Keep it (in memory at once, on the phone if the store takes it). False when it's only in memory. */
+  private async save(item: QueueItem): Promise<boolean> {
     this.items = [...this.items.filter((i) => i.id !== item.id), item].sort(byCreated);
     try {
       await this.deps.store.put(item);
+      this.unsaved.delete(item.id);
+      return true;
     } catch (err) {
       console.error("[outbox] couldn't save to this phone:", err);
+      this.unsaved.add(item.id);
+      return false;
     }
   }
 
   private async drop(ids: string[]): Promise<void> {
     const set = new Set(ids);
     this.items = this.items.filter((i) => !set.has(i.id));
+    for (const id of ids) this.unsaved.delete(id);
     for (const id of ids) {
       try {
         await this.deps.store.delete(id);
@@ -394,10 +491,15 @@ export class FieldOutbox {
     }
   }
 
-  /** Queue an op. Resolves once it's safely on the phone; sending happens in the background. */
+  /**
+   * Queue an op, stamped with who's signed in. Resolves once it's queued:
+   * on the phone, or (when the phone's storage refused it) in this page's
+   * memory, which `state().durable` and the badge then say. Sending happens
+   * in the background.
+   */
   async enqueue(op: SyncOp, label: string): Promise<void> {
     await this.loaded;
-    let resolved = op;
+    let resolved: SyncOp = op.by || !this.signedIn ? op : { ...op, by: this.signedIn };
     for (const local of placeholdersIn(op)) {
       const real = this.landed.get(local);
       if (real) resolved = resolvePlaceholder(resolved, local, real);
@@ -411,7 +513,8 @@ export class FieldOutbox {
   async enqueueMedia(media: MediaJob, label: string): Promise<string> {
     await this.loaded;
     const id = newOpId();
-    await this.save({ id, kind: "media", media, label, projectId: media.projectId, createdAt: this.deps.now(), attempts: 0, nextAttemptAt: 0, state: "queued" });
+    const stamped = media.by || !this.signedIn ? media : { ...media, by: this.signedIn };
+    await this.save({ id, kind: "media", media: stamped, label, projectId: media.projectId, createdAt: this.deps.now(), attempts: 0, nextAttemptAt: 0, state: "queued" });
     this.emit();
     void this.flush();
     return `${LOCAL_MEDIA_PREFIX}${id}`;
@@ -432,42 +535,101 @@ export class FieldOutbox {
     this.emit();
   }
 
-  /** Send what's due. Single-flight: a second call while one runs waits for it. `force` ignores the backoff (we just came online). */
-  flush(force = false): Promise<void> {
-    if (this.flushing) return this.flushing;
-    this.flushing = this.run(force).finally(() => {
-      this.flushing = null;
-      this.syncing = false;
-      this.emit();
-    });
-    return this.flushing;
+  /**
+   * Send what's due: ops and photos in two lanes side by side, so no op
+   * waits behind an upload. Each lane is single-flight, and a call while it
+   * runs makes it go round once more when it finishes (nothing queued in
+   * between is left for the next tick). Resolves when both lanes are idle.
+   * `force` ignores the backoff (we just came online).
+   */
+  async flush(force = false): Promise<void> {
+    await Promise.all([this.flushOps(force), this.flushMedia(force)]);
+    // A landed photo may have set its ops going after the ops lane went idle: wait for that too.
+    while (this.opsFlight || this.mediaFlight) await Promise.all([this.opsFlight, this.mediaFlight]);
   }
 
-  private async run(force: boolean): Promise<void> {
+  private flushOps(force: boolean): Promise<void> {
+    if (this.opsFlight) {
+      this.opsAgain = Boolean(this.opsAgain) || force;
+      return this.opsFlight;
+    }
+    this.opsFlight = (async () => {
+      let next: boolean | null = force;
+      try {
+        while (next !== null) {
+          this.opsAgain = null;
+          await this.runOps(next);
+          next = this.opsAgain;
+        }
+      } finally {
+        this.opsFlight = null;
+        this.opsAgain = null;
+        this.emit();
+      }
+    })();
+    this.emit();
+    return this.opsFlight;
+  }
+
+  private flushMedia(force: boolean): Promise<void> {
+    if (this.mediaFlight) {
+      this.mediaAgain = Boolean(this.mediaAgain) || force;
+      return this.mediaFlight;
+    }
+    this.mediaFlight = (async () => {
+      let next: boolean | null = force;
+      try {
+        while (next !== null) {
+          this.mediaAgain = null;
+          await this.runMedia(next);
+          next = this.mediaAgain;
+        }
+      } finally {
+        this.mediaFlight = null;
+        this.mediaAgain = null;
+        this.emit();
+      }
+    })();
+    this.emit();
+    return this.mediaFlight;
+  }
+
+  /** Whose captures may send now: the signed-in person's (null until a field page says who that is). */
+  private author(): string | null {
+    return this.signedIn?.id ?? null;
+  }
+
+  private async runMedia(force: boolean): Promise<void> {
     await this.loaded;
     if (!this.deps.online()) return;
-    this.syncing = true;
-    this.emit();
+    for (let rounds = 0; rounds < 40; rounds++) {
+      const media = nextMedia(this.items, this.deps.now(), force, this.author());
+      if (!media?.media) return;
+      try {
+        const mediaId = await this.deps.upload(media.media);
+        this.landed.set(media.id, mediaId);
+        for (const changed of afterMediaUploaded(this.items, media.id, mediaId)) await this.save(changed);
+        await this.drop([media.id]);
+        this.emit();
+        // The ops that were waiting for it can go now.
+        void this.flushOps(false);
+      } catch (err) {
+        const retryable = !(err && typeof err === "object" && "retryable" in err && (err as { retryable: boolean }).retryable === false);
+        const message = err instanceof Error ? err.message : "The photo didn't upload.";
+        const [next] = failBatch([media], message, this.deps.now(), { permanent: !retryable });
+        await this.save(next!);
+        this.emit();
+        if (retryable) return; // signal's gone: stop and wait
+      }
+    }
+  }
+
+  private async runOps(force: boolean): Promise<void> {
+    await this.loaded;
+    if (!this.deps.online()) return;
     for (let rounds = 0; rounds < 40; rounds++) {
       const now = this.deps.now();
-      const media = nextMedia(this.items, now, force);
-      if (media?.media) {
-        try {
-          const mediaId = await this.deps.upload(media.media);
-          this.landed.set(media.id, mediaId);
-          for (const changed of afterMediaUploaded(this.items, media.id, mediaId)) await this.save(changed);
-          await this.drop([media.id]);
-        } catch (err) {
-          const retryable = !(err && typeof err === "object" && "retryable" in err && (err as { retryable: boolean }).retryable === false);
-          const message = err instanceof Error ? err.message : "The photo didn't upload.";
-          const [next] = failBatch([media], message, this.deps.now(), { permanent: !retryable });
-          await this.save(next!);
-          if (retryable) return; // signal's gone: stop and wait
-        }
-        this.emit();
-        continue;
-      }
-      const batch = nextBatch(this.items, now, { force });
+      const batch = nextBatch(this.items, now, { force, signedIn: this.author() });
       if (!batch.length) break;
       let results: SyncResult[];
       try {
@@ -503,8 +665,13 @@ export class FieldOutbox {
 
 let singleton: FieldOutbox | null = null;
 
+/** A sync request that hasn't answered in this long is treated as no signal (and retried), never left hanging. */
+export const SYNC_TIMEOUT_MS = 30_000;
+
 async function postBatch(ops: SyncOp[]): Promise<SyncResult[]> {
   let res: Response;
+  const abort = new AbortController();
+  const timer = setTimeout(() => abort.abort(), SYNC_TIMEOUT_MS);
   try {
     res = await fetch("/api/field/sync", {
       method: "POST",
@@ -512,11 +679,16 @@ async function postBatch(ops: SyncOp[]): Promise<SyncResult[]> {
       body: JSON.stringify({ ops }),
       credentials: "same-origin",
       cache: "no-store",
+      signal: abort.signal,
     });
   } catch {
+    clearTimeout(timer);
     throw new SendError("No connection. It'll send when you're back in signal.", null);
   }
   const body = (await res.json().catch(() => null)) as { results?: SyncResult[]; error?: string } | null;
+  clearTimeout(timer);
+  // Cut off before the answer arrived: the server may have saved some (every op is idempotent), so retry them all.
+  if (!body && abort.signal.aborted) throw new SendError("No connection. It'll send when you're back in signal.", null);
   if (!res.ok || !body?.results) throw new SendError(body?.error ?? `The server said no (${res.status}).`, res.status);
   return body.results;
 }
@@ -530,16 +702,14 @@ export function getFieldOutbox(): FieldOutbox {
     .then(resolveStore)
     .catch(() => resolveStore(memoryStore()));
   // A store that waits for IndexedDB to open (or fail) before the first call.
-  let durable = false;
+  let opened: OutboxStore | null = null;
+  void storePromise.then((s) => (opened = s));
+  askForPersistentStorage();
   const lazy: OutboxStore = {
     get durable() {
-      return durable;
+      return opened ? opened.durable : false;
     },
-    all: async () => {
-      const s = await storePromise;
-      durable = s.durable;
-      return s.all();
-    },
+    all: async () => (await storePromise).all(),
     put: async (i) => (await storePromise).put(i),
     delete: async (id) => (await storePromise).delete(id),
   };

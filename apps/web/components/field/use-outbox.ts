@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { EvidenceRecord, InstallJobV2, StepStatusRecord } from "@aircon/domain";
 import { getFieldOutbox, LOCAL_MEDIA_PREFIX, type OutboxState, type QueueItem, type SyncOp } from "@/lib/field-outbox";
+import { useFieldIdentity } from "./field-identity";
 
 /**
  * React glue for the outbox: the live queue state, and the runsheet as the
@@ -13,7 +14,7 @@ import { getFieldOutbox, LOCAL_MEDIA_PREFIX, type OutboxState, type QueueItem, t
  * "saved".
  */
 
-const EMPTY: OutboxState = { items: [], online: true, syncing: false, durable: true, acked: [] };
+const EMPTY: OutboxState = { items: [], online: true, syncing: false, durable: true, signedIn: null, acked: [] };
 
 export function useOutboxState(): OutboxState {
   const [state, setState] = useState<OutboxState>(EMPTY);
@@ -94,6 +95,8 @@ function statusFromOp(op: Extract<SyncOp, { type: "step-status" }>, by: { id: st
 /** The server's job with this phone's acknowledged and waiting captures laid over it. */
 export function useMergedJob(job: InstallJobV2 | null, me: { id: string; name: string }): MergedJob | null {
   const state = useOutboxState();
+  // Every screen with a job on it says who's signed in, so captures are stamped with them (field-identity).
+  useFieldIdentity(me);
   return useMemo(() => {
     if (!job) return null;
     const have = new Set(job.evidence.map((e) => e.id));
@@ -110,7 +113,7 @@ export function useMergedJob(job: InstallJobV2 | null, me: { id: string; name: s
           refused.set(op.specId, item.lastError ?? "Not saved.");
           return;
         }
-        evidence.push(recordFromOp(op, me));
+        evidence.push(recordFromOp(op, op.by ?? me));
         have.add(op.id);
         if (pending) waiting.add(op.id);
         const url = previewFor(op.mediaId, state.items);
@@ -121,7 +124,7 @@ export function useMergedJob(job: InstallJobV2 | null, me: { id: string; name: s
           refused.set(`step:${op.stepId}`, item.lastError ?? "Not saved.");
           return;
         }
-        statuses.push(statusFromOp(op, me));
+        statuses.push(statusFromOp(op, op.by ?? me));
         haveStatus.add(op.id);
         if (pending) waiting.add(op.id);
       }
@@ -131,4 +134,11 @@ export function useMergedJob(job: InstallJobV2 | null, me: { id: string; name: s
     evidence.sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
     return { job: { ...job, evidence, stepStatuses: statuses }, waiting, refused, previews: previewsBySpec };
   }, [job, me, state.acked, state.items]);
+}
+
+/** Is everything waiting really on this phone? False: some of it is only in this page's memory (keep it open). */
+export function useOutboxDurable(): boolean {
+  const [durable, setDurable] = useState(true);
+  useEffect(() => getFieldOutbox().subscribe((s) => setDurable(s.durable)), []);
+  return durable;
 }

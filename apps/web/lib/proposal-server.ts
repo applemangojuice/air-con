@@ -5,7 +5,6 @@ import {
   blockersFor,
   buildCostLines,
   can,
-  canonicalJson,
   cancellationCopy,
   cancellationStatus,
   customerSafeProposal,
@@ -480,8 +479,9 @@ export async function saveDraft(
   patch: DraftPatch,
   staff: StaffMember,
 ): Promise<Result<{ revision: number; pricingErrors: Record<string, string>; proposal: ProposalRecord }>> {
-  const stored = await proposalsRepo.get(proposalId);
-  if (!stored || stored.projectId !== projectId) return fail("Proposal not found", 404);
+  const read = await proposalsRepo.getStamped(proposalId);
+  const stored = read?.record;
+  if (!read || !stored || stored.projectId !== projectId) return fail("Proposal not found", 404);
   if (stored.status !== "draft") {
     return fail(
       stored.status === "superseded"
@@ -565,13 +565,20 @@ export async function saveDraft(
   if (notes) next.internalNotes = notes;
   else delete next.internalNotes;
 
-  // Optimistic: only if nobody saved in between (the revision is in the record).
-  const latest = await proposalsRepo.get(proposalId);
-  if (!latest || latest.status !== "draft" || (latest.draftRevision ?? 0) !== patch.revision) {
-    return fail("Someone else saved this draft a moment ago. Reload to see their changes (yours weren't saved).", 409);
+  // Optimistic, and atomic: only if nobody has written the row since it was
+  // read (a colleague's save, or a colleague issuing it, which bumps the
+  // revision first), so a save can never land under an issue in progress.
+  const saved = await proposalsRepo.updateIfUnchanged(next, read.updatedAt);
+  if (!saved) {
+    const latest = await proposalsRepo.get(proposalId);
+    return fail(
+      latest && latest.status !== "draft"
+        ? "This version has just been issued, so it can't change (yours weren't saved). Revise it to make a new version."
+        : "Someone else saved this draft a moment ago. Reload to see their changes (yours weren't saved).",
+      409,
+    );
   }
-  const saved = await proposalsRepo.update(next);
-  return { ok: true, revision: saved.draftRevision ?? 0, pricingErrors, proposal: saved };
+  return { ok: true, revision: saved.record.draftRevision ?? 0, pricingErrors, proposal: saved.record };
 }
 
 /** An admin's margin or tax override on a draft, with a reason (or null to clear it). */
@@ -583,8 +590,9 @@ export async function setOverride(
   staff: StaffMember,
 ): Promise<Result> {
   if (!staff.roles.includes("admin")) return fail("Only an admin can record an override.", 403);
-  const stored = await proposalsRepo.get(proposalId);
-  if (!stored || stored.projectId !== projectId) return fail("Proposal not found", 404);
+  const read = await proposalsRepo.getStamped(proposalId);
+  const stored = read?.record;
+  if (!read || !stored || stored.projectId !== projectId) return fail("Proposal not found", 404);
   if (stored.status !== "draft") return fail("Overrides can only be set on a draft.");
   const next: ProposalRecord = { ...stored };
   const value = reason?.trim() ? { reason: reason.trim(), by: staff.name, at: new Date().toISOString() } : null;
@@ -593,7 +601,10 @@ export async function setOverride(
     else delete next.marginOverride;
   } else if (value) next.taxOverride = value;
   else delete next.taxOverride;
-  await proposalsRepo.update(next);
+  // Never over a save or an issue that landed since the read.
+  if (!(await proposalsRepo.updateIfUnchanged(next, read.updatedAt))) {
+    return fail("The draft changed a moment ago (a save, or someone issuing it). Reload and set the override again.", 409);
+  }
   await audit({ actor: staff, action: `proposal.${kind}-override`, entity: "proposal", entityId: proposalId, detail: { reason: value?.reason ?? null } });
   return { ok: true };
 }
@@ -617,11 +628,29 @@ async function showProposalMedia(record: ProposalRecord): Promise<void> {
  * dispatch, which sends the issue email with the pre-contract information),
  * then the record is marked issued, the older live version superseded and
  * the proposal document frozen.
+ *
+ * What's issued is exactly what the issuer saw (`revision`, from their
+ * builder) and nothing a colleague saves meanwhile: before anything is sent
+ * the draft is locked by a compare-and-set that bumps its revision, so a
+ * save that lands while it's being issued is refused ("someone else saved"),
+ * and a save that landed first refuses the issue. The issue email (built
+ * from the stored row during dispatch) and the frozen document therefore
+ * carry the same prices the customer accepts. If the issue is refused after
+ * the lock, the revision goes back so the issuer's builder keeps saving.
  */
-export async function issueDraft(projectId: string, proposalId: string, staff: StaffMember): Promise<Result<{ version: number }>> {
-  const stored = await proposalsRepo.get(proposalId);
-  if (!stored || stored.projectId !== projectId) return fail("Proposal not found", 404);
+export async function issueDraft(
+  projectId: string,
+  proposalId: string,
+  staff: StaffMember,
+  opts: { revision?: number } = {},
+): Promise<Result<{ version: number }>> {
+  const read = await proposalsRepo.getStamped(proposalId);
+  const stored = read?.record;
+  if (!read || !stored || stored.projectId !== projectId) return fail("Proposal not found", 404);
   if (stored.status !== "draft") return fail("This version has already been issued.");
+  if (opts.revision !== undefined && (stored.draftRevision ?? 0) !== opts.revision) {
+    return fail("Someone else saved this draft since you last loaded it. Nothing was issued: reload to see their changes, then issue.", 409);
+  }
   // The issue email is the customer's durable copy of the pre-contract
   // information: on a live deployment it has to be able to go.
   if (!emailConfigured() && !(await demoModeAllowed())) {
@@ -658,17 +687,20 @@ export async function issueDraft(projectId: string, proposalId: string, staff: S
   const gate = blockersFor(project, ctx, "proposal-issue");
   if (gate.some((b) => b.severity === "block")) return fail("The project isn't ready for a proposal yet.", 409, { blockers: gate });
 
-  // Write the refreshed wording before the issue email reads the record.
-  if (
-    canonicalJson([record.warranty, record.guarantees, record.termsVersion, record.terms, record.termsText]) !==
-    canonicalJson([stored.warranty, stored.guarantees, stored.termsVersion, stored.terms, stored.termsText])
-  ) {
-    try {
-      record = await proposalsRepo.update(record);
-    } catch (err) {
-      console.error(`[proposal] couldn't refresh ${proposalId}'s wording from settings:`, err);
-      return fail("The proposal couldn't be updated from settings. Nothing was issued; try again.", 500);
+  // Lock it, with the refreshed wording, before the issue email reads the
+  // record: only if nobody has written it since our read (see above).
+  const revision = stored.draftRevision ?? 0;
+  let lockedAt: string;
+  try {
+    const locked = await proposalsRepo.updateIfUnchanged({ ...record, draftRevision: revision + 1 }, read.updatedAt);
+    if (!locked) {
+      return fail("Someone saved this draft while you were issuing it. Nothing was issued: reload to see their changes, then issue.", 409);
     }
+    record = locked.record;
+    lockedAt = locked.updatedAt;
+  } catch (err) {
+    console.error(`[proposal] couldn't lock ${proposalId} to issue it:`, err);
+    return fail("The proposal couldn't be updated from settings. Nothing was issued; try again.", 500);
   }
 
   const contractType = record.contractType ?? "supply-and-install";
@@ -677,7 +709,13 @@ export async function issueDraft(projectId: string, proposalId: string, staff: S
     { type: "proposal-issued", proposalId, version: record.version, validUntil: record.validUntil, optionCount: record.options.length, contractType },
     staff,
   );
-  if ("error" in result) return fail(result.error, result.status, result.blockers ? { blockers: result.blockers } : {});
+  if ("error" in result) {
+    // Not issued: give the draft its revision back, so the issuer's own builder keeps saving.
+    await proposalsRepo
+      .updateIfUnchanged({ ...record, draftRevision: revision }, lockedAt)
+      .catch((err) => console.error(`[proposal] couldn't unlock ${proposalId}:`, err));
+    return fail(result.error, result.status, result.blockers ? { blockers: result.blockers } : {});
+  }
 
   const issuedAt = result.project.proposal.issuedAt ?? new Date().toISOString();
   let issued: ProposalRecord = { ...record, status: "issued", issuedAt, issuedBy: staff.name };

@@ -151,7 +151,7 @@ export async function loadProject(id: string): Promise<Project | null> {
 }
 
 /** The flat columns, recomputed from the snapshot. Column names are the v1 ones, kept. */
-function denormalise(p: Project, blocked?: boolean) {
+function denormalise(p: Project, blocked?: boolean, detachCustomer?: boolean) {
   return {
     schema_version: PROJECT_SCHEMA_VERSION,
     customer_name: p.customer.name || "",
@@ -166,8 +166,9 @@ function denormalise(p: Project, blocked?: boolean) {
     next_action: p.nextAction?.text ?? null,
     next_action_at: p.nextAction?.dueOn ?? null,
     value_pence: p.money.contractTotalPence ?? Math.round(p.quoteSummary.totalGbp * 100),
-    // Never cleared from here: customerLink may have attached one the snapshot hasn't seen.
-    ...(isUuid(p.customer.customerId) ? { customer_id: p.customer.customerId } : {}),
+    // Cleared only when staff remove the email (relinkCustomer): otherwise
+    // customerLink may have attached one the snapshot hasn't seen.
+    ...(detachCustomer ? { customer_id: null } : isUuid(p.customer.customerId) ? { customer_id: p.customer.customerId } : {}),
     ...(blocked === undefined ? {} : { blocked }),
     updated_at: new Date().toISOString(),
     project: p,
@@ -178,11 +179,11 @@ type WriteResult = { ok: true } | { ok: false; conflict: boolean; error: string;
 
 async function writeProject(
   project: Project,
-  opts: { expectedUpdatedAt?: string | null; blocked?: boolean },
+  opts: { expectedUpdatedAt?: string | null; blocked?: boolean; detachCustomer?: boolean },
 ): Promise<WriteResult> {
   const db = getServiceClient();
   if (!db) return { ok: false, conflict: false, error: "No database connected" };
-  let q = db.from("projects").update(denormalise(project, opts.blocked)).eq("id", project.id);
+  let q = db.from("projects").update(denormalise(project, opts.blocked, opts.detachCustomer)).eq("id", project.id);
   if (opts.expectedUpdatedAt) q = q.eq("updated_at", opts.expectedUpdatedAt);
   const { data, error } = await q.select("id");
   if (error) return { ok: false, conflict: false, error: error.message, ...(isPilotNumberClash(error) ? { pilotClash: true } : {}) };
@@ -608,11 +609,24 @@ export async function loadReadinessContext(projectId: string, actor?: StaffMembe
  * the project moves to the customer record for the new address (found or
  * created), so links sent there sign in as that customer, never as whoever
  * owned the old address, and the old customer's sessions lose the project at
- * once (the row's customer_id decides access). Clearing the email moves
- * nothing; with no address, nothing is sent. Null when the customer record
- * couldn't be read or written: then the change mustn't be saved.
+ * once (the row's customer_id decides access). Clearing the email detaches
+ * the project from every customer (`emailCleared`; dispatch writes
+ * customer_id null in the same save): staff remove a wrong address on
+ * purpose, so whoever owns it loses the project at once and gets no sign-in
+ * link for it again. With no address, nothing is sent. Null when the
+ * customer record couldn't be read or written: then the change mustn't be
+ * saved.
  */
+function emailCleared(before: Project, after: Project): boolean {
+  const usable = (e: string | undefined) => isPlausibleEmail(normaliseEmail(e ?? ""));
+  return usable(before.customer.email) && !usable(after.customer.email);
+}
+
 async function relinkCustomer(before: Project, after: Project): Promise<Project | null> {
+  if (emailCleared(before, after)) {
+    const { customerId: _removed, ...customer } = after.customer;
+    return { ...after, customer };
+  }
   const email = relinkEmail(before.customer.email, after.customer.email);
   if (!email) return after;
   try {
@@ -664,10 +678,12 @@ export async function dispatch(projectId: string, action: ProjectAction, actorIn
     const next = await relinkCustomer(row.project, result.project);
     if (!next) return { error: "Couldn't link the new email address to a customer record. Please try again.", status: 502 };
     const movedTo = next.customer.customerId !== row.project.customer.customerId ? next.customer.customerId : undefined;
+    const detached = emailCleared(row.project, next);
 
     const write = await writeProject(next, {
       expectedUpdatedAt: row.updatedAt,
       blocked: isBlocked(next, ctx),
+      detachCustomer: detached,
     });
     if (!write.ok && write.conflict) continue; // someone saved in between: re-read and re-apply
     if (!write.ok && write.pilotClash && next.pilot) {
@@ -688,6 +704,7 @@ export async function dispatch(projectId: string, action: ProjectAction, actorIn
         action,
         ...(row.schemaVersion < PROJECT_SCHEMA_VERSION ? { migratedFrom: row.schemaVersion } : {}),
         ...(movedTo ? { customerId: movedTo } : {}),
+        ...(detached ? { customerDetached: true } : {}),
       },
     });
     try {

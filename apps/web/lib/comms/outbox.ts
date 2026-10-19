@@ -66,7 +66,10 @@ function realOutbox(): Outbox | null {
     // facts (preContractInfoSentAt, confirmationSentAt). A demo store counts
     // only on a demo deployment or in development, where nothing is real.
     onDelivered: async (message, status) => {
-      const next = followUpForDelivered(message, status, { demoCounts: await demoModeAllowed() });
+      if (message.event !== "proposal-issued" && message.event !== "proposal-accepted") return;
+      // Only a copy that reached the project's current email is the customer's.
+      const current = message.projectId ? (await loadProject(message.projectId))?.customer.email : undefined;
+      const next = followUpForDelivered(message, status, { demoCounts: await demoModeAllowed(), currentEmail: current });
       if (!next) return;
       const result = await dispatch(next.projectId, next.action, { kind: "system", name: "outbox" });
       if ("error" in result) console.error(`[outbox] couldn't record ${next.action.type} on ${next.projectId}:`, result.error);

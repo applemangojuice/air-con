@@ -3,6 +3,7 @@ import {
   FOLLOW_UP_EVENTS,
   LINK_PLACEHOLDER,
   idempotencyKey,
+  readdressedKey,
   type CommsEventId,
   type MessageRecord,
   type PilotSettings,
@@ -38,6 +39,14 @@ import { linkPathFor, renderMessage, templateContext, type CommsData, type Rende
  * review link in settings. `onDelivered` hears about every message that was
  * sent or stored in demo mode, however it got there (first send, cron
  * retry, resend), so a delivery can be recorded on the project.
+ *
+ * A customer's message about their project follows the project's contact
+ * details at the moment it's sent, never the address it was written to.
+ * When staff correct a wrong email or mobile, the cron and resend send the
+ * same message to the new address (a new row, keyed `readdressedKey`, so
+ * each address gets it at most once) and the old one stops being retried;
+ * when they remove it, nothing goes. A notify for an occurrence that went
+ * to an old address sends it to the new one too.
  */
 
 export type Channel = MessageRecord["channel"];
@@ -189,6 +198,27 @@ export function addressFor(channel: Channel, r: Recipient): string | null {
 
 const asRecipient = (to: string | Recipient): Recipient => (typeof to === "string" ? { email: to } : to);
 
+/** Pure: the same address on this channel? Emails ignore case; phones compare normalised. */
+export function sameAddress(channel: Channel, a: string, b: string): boolean {
+  if (channel === "email") return a.trim().toLowerCase() === b.trim().toLowerCase();
+  return (normaliseUkPhone(a) ?? a.trim()) === (normaliseUkPhone(b) ?? b.trim());
+}
+
+/** Pure: does this message go to whatever contact details its project has now? (Magic links go to whoever asked.) */
+export function followsProjectContact(m: Pick<MessageRecord, "event" | "projectId">): boolean {
+  return Boolean(m.projectId) && m.event !== "magic-link" && COMMS_EVENTS[m.event]?.audience === "customer";
+}
+
+/** Pure: the project's current address for a channel, or null when it has none. */
+export function currentAddressFor(channel: Channel, project: Pick<Project, "customer">): string | null {
+  return addressFor(channel, { email: project.customer.email, phone: project.customer.phone });
+}
+
+const channelWord = (channel: Channel) => (channel === "email" ? "email" : "mobile number");
+
+/** How a stored message is being sent: by notify itself, the cron, or a person pressing Retry / Send again. */
+type SendMode = "first" | "cron" | "resend";
+
 export function createOutbox(deps: OutboxDeps) {
   const log = deps.log ?? ((m: string, e?: unknown) => console.error(`[outbox] ${m}`, e ?? ""));
 
@@ -271,18 +301,79 @@ export function createOutbox(deps: OutboxDeps) {
     }
   }
 
+  /**
+   * The customer's address changed after `m` was written: never send it to
+   * the old one. Send the same message to `current` instead (or nothing,
+   * when the project has no address now), and stop retrying the old row.
+   */
+  async function readdress(m: MessageRecord, current: string | null, settings: PilotSettings | undefined, mode: SendMode): Promise<ChannelResult> {
+    const base = { channel: m.channel, key: m.idempotencyKey, messageId: m.id, to: m.to };
+    const stillTrying = m.status === "queued" || m.status === "failed";
+    if (!current) {
+      const error = `Not sent: the project has no ${channelWord(m.channel)} now, and a removed one never gets messages (this was written to ${m.to}).`;
+      if (stillTrying) await deps.store.update(m.id, { status: "skipped", error });
+      return { ...base, status: "skipped", error };
+    }
+    if (stillTrying) {
+      await deps.store.update(m.id, {
+        status: "skipped",
+        error: `Not sent to ${m.to}: the customer's ${channelWord(m.channel)} is now ${current}, so it goes there instead.`,
+      });
+    }
+    const key = readdressedKey(m.idempotencyKey, current);
+    const existing = await deps.store.findByKey(key);
+    if (existing) {
+      // Already sent (or on its way) to the new address. Only a person asks for it again.
+      if (mode !== "resend") return { channel: existing.channel, key, messageId: existing.id, to: existing.to, status: "duplicate" };
+      if (!(await deps.store.claim(existing.id, existing.updatedAt))) {
+        return { channel: existing.channel, key, messageId: existing.id, to: existing.to, status: "error", error: "That message is being sent right now" };
+      }
+      return dispatchMessage(existing, settings, undefined, mode);
+    }
+    const copy: MessageRecord = {
+      id: deps.newId(),
+      idempotencyKey: key,
+      event: m.event,
+      channel: m.channel,
+      templateVersion: m.templateVersion,
+      to: current,
+      bodyText: m.bodyText,
+      status: "queued",
+      attempts: 0,
+      createdAt: deps.now(),
+    };
+    if (m.projectId) copy.projectId = m.projectId;
+    if (m.subject !== undefined) copy.subject = m.subject;
+    if (m.bodyHtml !== undefined) copy.bodyHtml = m.bodyHtml;
+    if (m.linkPath !== undefined) copy.linkPath = m.linkPath;
+    const inserted = await deps.store.insert(copy);
+    if (!inserted.ok) {
+      return inserted.duplicate
+        ? { channel: copy.channel, key, to: current, status: "duplicate" }
+        : { channel: copy.channel, key, to: current, status: "error", error: inserted.error };
+    }
+    return dispatchMessage(copy, settings, undefined, mode);
+  }
+
   /** Send one stored message now and record what happened. `liveLink`: a magic link, on its first send only. */
-  async function dispatchMessage(m: MessageRecord, settings?: PilotSettings, liveLink?: string): Promise<ChannelResult> {
+  async function dispatchMessage(m: MessageRecord, settings?: PilotSettings, liveLink?: string, mode: SendMode = "first"): Promise<ChannelResult> {
     const base = { channel: m.channel, key: m.idempotencyKey, messageId: m.id, to: m.to };
     try {
       if (settings?.comms.disabledEvents.includes(m.event)) {
         await deps.store.update(m.id, { status: "skipped", error: "Event turned off in settings before it was sent" });
         return { ...base, status: "skipped" };
       }
+      const follows = followsProjectContact(m);
+      const project = m.projectId && (follows || FOLLOW_UP_EVENTS.has(m.event)) ? await deps.loadProject(m.projectId) : null;
       // A queued follow-up (or a resend) to someone who has opted out since.
-      if (FOLLOW_UP_EVENTS.has(m.event) && m.projectId && optedOut(m.event, await deps.loadProject(m.projectId))) {
+      if (FOLLOW_UP_EVENTS.has(m.event) && optedOut(m.event, project)) {
         await deps.store.update(m.id, { status: "skipped", error: OPTED_OUT });
         return { ...base, status: "skipped", error: OPTED_OUT };
+      }
+      // Written to an address staff have since corrected or removed.
+      if (follows && project) {
+        const current = currentAddressFor(m.channel, project);
+        if (!current || !sameAddress(m.channel, m.to, current)) return await readdress(m, current, settings, mode);
       }
       const provider = m.channel === "email" ? deps.email : deps.sms;
       if (!provider.configured()) {
@@ -375,6 +466,14 @@ export function createOutbox(deps: OutboxDeps) {
           continue;
         }
         const existing = await deps.store.findByKey(key);
+        if (existing && followsProjectContact(existing) && !opts.to && !sameAddress(channel, existing.to, to)) {
+          // This occurrence went to an address staff have since corrected: the new one gets it once too.
+          const again = readdressedKey(key, to);
+          const there = await deps.store.findByKey(again);
+          if (there) results.push({ channel, key: again, status: "duplicate", messageId: there.id, to: there.to });
+          else pending.push({ channel, key: again, to });
+          continue;
+        }
         if (existing) {
           results.push({ channel, key, status: "duplicate", messageId: existing.id, to: existing.to });
           continue;
@@ -456,11 +555,11 @@ export function createOutbox(deps: OutboxDeps) {
     for (const m of due) {
       try {
         if (!(await deps.store.claim(m.id, m.updatedAt))) continue; // another run has it
-        const r = await dispatchMessage(m, settings);
+        const r = await dispatchMessage(m, settings, undefined, "cron");
         if (r.status === "sent") summary.sent++;
         else if (r.status === "demo") summary.demo++;
         else if (r.status === "failed") summary.failed++;
-        else if (r.status === "skipped") summary.skipped++;
+        else if (r.status === "skipped" || r.status === "duplicate") summary.skipped++;
         else summary.errors++;
       } catch (err) {
         log(`dispatchDue: ${m.id}`, err);
@@ -470,13 +569,17 @@ export function createOutbox(deps: OutboxDeps) {
     return summary;
   }
 
-  /** A person pressed resend: one more attempt of the same message, same key, same body (with a freshly minted link). */
+  /**
+   * A person pressed resend: one more attempt of the same message, same key,
+   * same body (with a freshly minted link). If the customer's address has
+   * changed since, it goes to the new one (`to` in the result says where).
+   */
   async function resend(messageId: string): Promise<ChannelResult | { status: "error"; error: string }> {
     try {
       const m = await deps.store.get(messageId);
       if (!m) return { status: "error", error: "Message not found" };
       if (!(await deps.store.claim(m.id, m.updatedAt))) return { status: "error", error: "That message is being sent right now" };
-      return await dispatchMessage(m);
+      return await dispatchMessage(m, undefined, undefined, "resend");
     } catch (err) {
       log(`resend ${messageId} failed`, err);
       return { status: "error", error: err instanceof Error ? err.message : String(err) };

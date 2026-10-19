@@ -1,5 +1,6 @@
 import {
   CANCELLATION_RULE_STATUS,
+  baseIdempotencyKey,
   cancellationStatus,
   type CommsEventId,
   type MessageRecord,
@@ -309,9 +310,9 @@ export function commsForAction(project: Project, action: ProjectAction, actor?: 
   }
 }
 
-/** The occurrence a stored message was keyed on (idempotencyKey: event:project:discriminator:channel). */
+/** The occurrence a stored message was keyed on (idempotencyKey: event:project:discriminator:channel, maybe re-addressed). */
 function discriminatorOf(key: string): string {
-  const parts = key.split(":");
+  const parts = baseIdempotencyKey(key).split(":");
   return parts.length >= 4 ? parts.slice(2, -1).join(":") : "";
 }
 
@@ -330,14 +331,20 @@ function discriminatorOf(key: string): string {
  * nothing, so the gates hold until the email really goes. The actions
  * returned send nothing (commsForAction maps them to []) and are idempotent,
  * so this can't loop.
+ *
+ * Only a delivery to the project's current email counts (`currentEmail`):
+ * a copy that went to an address staff have since corrected or removed
+ * reached someone else, not the customer, so it's no durable medium.
  */
 export function followUpForDelivered(
-  message: Pick<MessageRecord, "id" | "event" | "channel" | "projectId" | "idempotencyKey">,
+  message: Pick<MessageRecord, "id" | "event" | "channel" | "projectId" | "idempotencyKey" | "to">,
   status: "sent" | "demo",
-  opts: { demoCounts: boolean },
+  opts: { demoCounts: boolean; currentEmail: string | null | undefined },
 ): { projectId: string; action: ProjectAction } | null {
   if (message.channel !== "email" || !message.projectId) return null;
   if (status === "demo" && !opts.demoCounts) return null;
+  const current = opts.currentEmail?.trim().toLowerCase();
+  if (!current || message.to.trim().toLowerCase() !== current) return null;
   const demo = status === "demo" ? { demo: true } : {};
   if (message.event === "proposal-issued") {
     const proposalId = discriminatorOf(message.idempotencyKey);

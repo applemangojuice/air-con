@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { EmptyState, LinkButton } from "@/components/kit";
 import { JobCard } from "@/components/field/job-card";
+import { FieldIdentity } from "@/components/field/field-identity";
 import { SyncBadge } from "@/components/field/sync-badge";
 import { firstName, fmtDay } from "@/components/field/format";
 import { requireStaff } from "@/lib/auth/server";
@@ -32,6 +33,7 @@ export default async function FieldTodayPage() {
   return (
     <>
       <SyncBadge />
+      <FieldIdentity id={staff.id} name={staff.name} />
       <header className="mb-5">
         <p className="text-sm font-semibold uppercase tracking-wide text-ink-500">Today{today ? ` · ${fmtDay(today)}` : ""}</p>
         <h1 className="font-display text-4xl leading-tight text-ink-900">Hi {firstName(staff.name)}</h1>

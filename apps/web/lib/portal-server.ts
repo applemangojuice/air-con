@@ -487,24 +487,24 @@ export interface LinkResult {
 }
 
 /**
- * The address a project's sign-in link goes to, with the customer record
- * made (and attached to the project) on first use: a v1 project or one
- * created before its customer existed. An address that already has a record
- * attaches nothing here: the project joins that customer when they use the
- * link (claimProjectOnSignIn). Null when there's no usable address.
+ * The address a project's sign-in link goes to: the project's own email,
+ * exactly, and nothing else. An empty one means staff removed it (maybe a
+ * wrong address someone else owns), so no link goes anywhere, whoever is
+ * still attached. The customer record is made (and attached to the project)
+ * on first use: a v1 project or one created before its customer existed. An
+ * address that already has a record attaches nothing here: the project joins
+ * that customer when they use the link (claimProjectOnSignIn). Null when
+ * there's no usable address.
  */
 async function customerEmailForProject(projectId: string): Promise<string | null> {
   const db = getServiceClient();
   if (!db || !isUuid(projectId)) return null;
   const { data: row } = await db.from("projects").select("id, customer_id").eq("id", projectId).maybeSingle();
   if (!row) return null;
-  if (row.customer_id) {
-    const customer = await customersRepo.get(String(row.customer_id));
-    if (customer && isPlausibleEmail(customer.email)) return customer.email;
-  }
   const project = await loadProject(projectId);
   const email = normaliseEmail(project?.customer.email ?? "");
   if (!project || !isPlausibleEmail(email)) return null;
+  if (row.customer_id) return email;
   if (await customersRepo.getByEmail(email)) return email;
   const customer = await customersRepo.findOrCreate({
     email,

@@ -65,7 +65,11 @@ export interface Invoice {
   issuedAt?: string;
   documentId?: string;
   notes?: string;
-  /** Variation invoices: the variation issue it bills. */
+  /**
+   * Variation invoices: the variation issue it bills. Also on a credit note
+   * that bills a variation taking money off the price (never a negative
+   * invoice): it counts towards the price and as account credit.
+   */
   issueId?: string;
   /** Credit notes: the invoice this one credits, when it's against one. */
   creditsInvoiceId?: string;
@@ -463,12 +467,13 @@ export function moneySummary(
   const refundedPence = -payments.filter((p) => p.status === "refunded").reduce((sum, p) => sum + p.amountPence, 0);
   const contract = contractTotalPence !== undefined && contractTotalPence > 0 ? contractTotalPence : null;
   const contractKinds = new Set(live.filter((i) => i.kind === "deposit" || i.kind === "balance").map((i) => i.id));
-  // Correcting credit notes cancel contract invoicing (to bill again); money off the price doesn't.
+  // Correcting credit notes cancel contract invoicing (to bill again); money off the price doesn't,
+  // and nor does a variation's credit note (issueId: it bills the variation, as a variation invoice would).
   const contractInvoiced = live
     .filter(
       (i) =>
         contractKinds.has(i.id) ||
-        (creditPurposeOf(i) === "correction" && (!i.creditsInvoiceId || contractKinds.has(i.creditsInvoiceId))),
+        (creditPurposeOf(i) === "correction" && !i.issueId && (!i.creditsInvoiceId || contractKinds.has(i.creditsInvoiceId))),
     )
     .reduce((sum, i) => sum + i.totalPence, 0);
   return {

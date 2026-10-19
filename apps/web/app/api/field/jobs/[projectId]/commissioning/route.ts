@@ -4,7 +4,7 @@ import { signCommissioning } from "@/lib/field-server";
 import { answer, json, notFound, projectIdSchema, readJson } from "../../../_lib/http";
 
 /**
- * POST /api/field/jobs/<projectId>/commissioning { notes? }
+ * POST /api/field/jobs/<projectId>/commissioning { notes?, seen? }
  * The tech lead signs: the record goes on the job, the install completes,
  * commissioning is signed on the project and the certificate is issued.
  * Refusals come back with the reason (and the gate's blockers).
@@ -21,10 +21,16 @@ export async function POST(request: Request, { params }: Params): Promise<Respon
   const { projectId } = await params;
   if (!projectIdSchema.safeParse(projectId).success) return notFound();
   if (!(await requireProjectAccess(projectId, { perm: "commissioning.sign" }))) return notFound();
-  const body = z.object({ notes: z.string().max(2000).optional() }).safeParse(await readJson(request));
+  const body = z
+    .object({
+      notes: z.string().max(2000).optional(),
+      // Every evidence id the signer's screen had from the server: a capture that arrived since is refused.
+      seen: z.array(z.string().min(1).max(100)).max(5000).optional(),
+    })
+    .safeParse(await readJson(request));
   if (!body.success) return json({ error: "Invalid request" }, 400);
   return answer(async () => {
-    const { certificate } = await signCommissioning(projectId, staff, body.data.notes);
+    const { certificate } = await signCommissioning(projectId, staff, body.data.notes, body.data.seen);
     return { ok: true, certificate };
   });
 }

@@ -21,7 +21,8 @@ import { parseReading } from "./capture";
 import { londonTime, personName, whenLabel } from "./format";
 import { HeaderTitle, SyncBadge } from "./sync-badge";
 import type { FieldJob } from "./types";
-import { useMergedJob, useRefreshOnSync } from "./use-outbox";
+import { getFieldOutbox } from "@/lib/field-outbox";
+import { useMergedJob, useOutboxState, useRefreshOnSync } from "./use-outbox";
 
 /**
  * Commissioning, for the tech lead: the results per system as the evidence
@@ -192,6 +193,10 @@ function ExceptionRow({ projectId, item, canReview }: { projectId: string; item:
   );
 }
 
+/** Why Sign waits: what's on the phone isn't on the server, and the certificate is made from the server's records. */
+const onPhoneText = (n: number) =>
+  `${n === 1 ? "1 capture for this job is" : `${n} captures for this job are`} still on this phone, not on the server. The certificate is made from what the server has: get signal and let them sync (tap the sync badge), then sign.`;
+
 const fmtNum = (v: number | undefined, unit: string) => (v === undefined ? "Not recorded" : `${v} ${unit}`);
 
 export function Commissioning({ data, certificateHref, holds = [] }: { data: FieldJob; certificateHref?: string; holds?: Blocker[] }) {
@@ -199,6 +204,9 @@ export function Commissioning({ data, certificateHref, holds = [] }: { data: Fie
   const router = useRouter();
   const { header, me } = data;
   const merged = useMergedJob(data.job, me);
+  const outboxState = useOutboxState();
+  // Captures for this job still on this phone (waiting, or refused): the screen shows them, the server hasn't got them.
+  const onPhone = outboxState.items.filter((i) => i.projectId === header.projectId).length;
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -223,7 +231,18 @@ export function Commissioning({ data, certificateHref, holds = [] }: { data: Fie
     setBusy(true);
     setError(null);
     setBlockers([]);
-    const r = await post(`/api/field/jobs/${header.projectId}/commissioning`, { notes });
+    // What's signed is what the server has: send anything still on this phone first, and never sign past it.
+    const outbox = getFieldOutbox();
+    await outbox.flush(true).catch(() => undefined);
+    const left = outbox.state().items.filter((i) => i.projectId === header.projectId).length;
+    if (left > 0) {
+      setBusy(false);
+      setError(onPhoneText(left));
+      return;
+    }
+    // Every capture this screen showed: the server refuses if a newer one has arrived (another crew phone).
+    const seen = (merged?.job.evidence ?? []).map((e) => e.id).filter((x): x is string => Boolean(x));
+    const r = await post(`/api/field/jobs/${header.projectId}/commissioning`, { notes, seen });
     setBusy(false);
     if (!r.ok) {
       setError(r.error);
@@ -278,7 +297,9 @@ export function Commissioning({ data, certificateHref, holds = [] }: { data: Fie
               <h2 id="readiness" className="font-display text-2xl text-ink-900">
                 Ready to sign?
               </h2>
-              {derived.errors.length === 0 && holds.length === 0 ? (
+              {derived.errors.length === 0 && holds.length === 0 && onPhone > 0 ? (
+                <p className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-base text-amber-900">{onPhoneText(onPhone)}</p>
+              ) : derived.errors.length === 0 && holds.length === 0 ? (
                 <p className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 font-medium text-emerald-800">Everything is in. Ready for your signature.</p>
               ) : (
                 <ul className="mt-3 space-y-2">
@@ -435,8 +456,8 @@ export function Commissioning({ data, certificateHref, holds = [] }: { data: Fie
                   <BlockerList blockers={blockers} />
                 </div>
               )}
-              <button type="button" disabled={busy || derived.errors.length + holds.length > 0} onClick={sign} className={`${PRIMARY} mt-3 w-full`}>
-                {busy ? "Signing…" : derived.errors.length + holds.length ? "Not ready to sign" : `Sign as ${personName(me.name)}`}
+              <button type="button" disabled={busy || derived.errors.length + holds.length + onPhone > 0} onClick={sign} className={`${PRIMARY} mt-3 w-full`}>
+                {busy ? "Signing…" : derived.errors.length + holds.length ? "Not ready to sign" : onPhone ? "Sync first" : `Sign as ${personName(me.name)}`}
               </button>
             </section>
           )}

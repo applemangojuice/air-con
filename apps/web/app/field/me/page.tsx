@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { QUALIFICATION_LABEL, REQUIREMENT_LABEL, ROLE_LABEL, meetsRequirement, qualificationStatus, type StepRequirement } from "@aircon/domain";
 import { Card, PageHeader } from "@/components/kit";
+import { FieldIdentity } from "@/components/field/field-identity";
+import { SignOut } from "@/components/field/sign-out";
 import { SyncBadge } from "@/components/field/sync-badge";
 import { fmtDate } from "@/components/field/format";
 import { requireStaff } from "@/lib/auth/server";
@@ -21,6 +23,7 @@ export default async function FieldMePage() {
   return (
     <>
       <SyncBadge />
+      <FieldIdentity id={staff.id} name={staff.name} />
       <PageHeader eyebrow="Me" title={staff.name} subtitle={`${staff.roles.map((r) => ROLE_LABEL[r]).join(", ")}${staff.external ? " · subcontractor" : ""}`} />
 
       <Link href="/field/help" className="mb-5 flex min-h-16 items-center justify-between gap-3 rounded-2xl border border-line bg-white px-4 py-3">
@@ -83,13 +86,11 @@ export default async function FieldMePage() {
         <h2 className="font-display text-xl text-ink-900">Account</h2>
         <p className="mt-2 text-base text-ink-700">{staff.email}</p>
         {staff.phone && <p className="text-base text-ink-700">{staff.phone}</p>}
-        <form action="/auth/logout" method="post" className="mt-4">
-          <input type="hidden" name="next" value="/login?signedOut=1" />
-          <button type="submit" className="min-h-12 w-full rounded-full border border-line bg-white px-6 font-semibold text-ink-900 hover:bg-surface">
-            Sign out
-          </button>
-        </form>
-        <p className="mt-3 text-sm text-ink-500">Anything still waiting to sync stays on this phone and sends next time you sign in here.</p>
+        <SignOut />
+        <p className="mt-3 text-sm text-ink-500">
+          Anything still waiting to sync stays on this phone and sends next time you sign in here, under your name only: if someone else signs in on
+          this phone, your captures wait for you.
+        </p>
       </Card>
     </>
   );

@@ -933,7 +933,7 @@ function EndDaySheet({ open, onClose, data, merged, n: liveN, clockEntryId }: { 
   async function send() {
     setBusy(true);
     setError(null);
-    const r = await post<{ email: { status: string } }>(`/api/field/jobs/${id}/day`, {
+    const r = await post<{ email: { status: string }; alreadyEnded?: boolean; clockStopped?: boolean }>(`/api/field/jobs/${id}/day`, {
       action: "end",
       n,
       summary,
@@ -947,10 +947,19 @@ function EndDaySheet({ open, onClose, data, merged, n: liveN, clockEntryId }: { 
     if (!r.ok) {
       setError(r.error);
       setBlockers(r.blockers ?? []);
+      // This page may be out of date (a colleague ended the day, the job moved on): show it as it is now.
+      router.refresh();
       return;
     }
     // The clock may still be on the phone (not yet synced): stop it there too.
     if (clockEntryId) await getFieldOutbox().enqueue({ type: "time-stop", id: newOpId(), projectId: id, entryId: clockEntryId, at: nowIso() }, "End of day: clock stopped");
+    if (r.data.alreadyEnded) {
+      // A colleague's phone ended it first: no second update, but this person's clock still stops.
+      setEmailStatus(`Day ${n} was already ended by someone else on the crew, so no update went from you. Your clock is stopped.`);
+      setStage("sent");
+      router.refresh();
+      return;
+    }
     const s = r.data.email.status;
     setEmailStatus(
       s === "sent" ? "Update emailed to the customer." : s === "demo" ? "Update recorded in demo mode: no email was actually sent." : s === "queued" ? "Update queued to send." : message.trim() ? "The update is on their portal; the email didn't go (check Messages in ops)." : "No update went to the customer.",

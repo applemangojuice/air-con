@@ -7,6 +7,7 @@ import { JobActions } from "@/components/field/job-actions";
 import { JobNav } from "@/components/field/job-nav";
 import type { FieldJob } from "@/components/field/types";
 import { LoadList, RamsAck } from "@/components/field/pack-bits";
+import { FieldIdentity } from "@/components/field/field-identity";
 import { HeaderTitle, SyncBadge } from "@/components/field/sync-badge";
 import { crewLabel, fmtDay, londonTime, telHref } from "@/components/field/format";
 import { requireProjectAccess, requireStaff } from "@/lib/auth/server";
@@ -74,6 +75,7 @@ export default async function JobPackPage({ params }: { params: Promise<{ projec
   return (
     <>
       <SyncBadge />
+      <FieldIdentity id={staff.id} name={staff.name} />
       <HeaderTitle>{h.customerName}</HeaderTitle>
       <JobNav projectId={projectId} active="pack" days={h.totalDays} />
 

@@ -53,7 +53,16 @@ says what to do instead. Approvals that need a professional are in
     - starting and ending a day, the on-my-way text, commissioning sign-off
       and handover sign-off need signal, because the server checks them;
     - anything waiting lives in that phone's browser: clearing its data or
-      using a private tab before it sends loses it;
+      using a private tab before it sends loses it. If the phone's storage
+      refuses a capture (Safari dropping it, storage full), it's only in that
+      page: the badge says **Keep open · N waiting** and the capture says
+      so, so keep the page open until it syncs;
+    - captures wait for the person who made them: one still waiting when its
+      author signs out sends only when they sign in on that phone again,
+      never under the next person's name;
+    - commissioning can't be signed while anything for that job is still on
+      the signer's phone, or over a reading that reached the server after
+      the screen loaded (reload and check, then sign);
     - refrigerant (F-gas) and electrical (Part P) steps are checked against
       the certificate on file on the day they reach the office, not the time
       the phone says: a reading taken offline the day before a certificate
@@ -108,7 +117,11 @@ says what to do instead. Approvals that need a professional are in
 24. **Customers sign in by email link only.** No passwords; one email
     address is one customer. A family sharing a home with two email
     addresses uses the one on the project (change it on the project to move
-    access).
+    access). Removing the email takes the project away from whoever owned
+    it at once: until a new address is typed, only the office can open the
+    project, and nothing is emailed. After a correction, messages still
+    waiting (and **Retry** / **Send again**) go to the new address with the
+    wording they were written with; the old address never gets them again.
 25. **No WhatsApp or live chat.** Families reply by email or phone you.
 26. **Service-level promises (credits for missed dates) are switched off**
     until they're worked out; the website makes no such promise.

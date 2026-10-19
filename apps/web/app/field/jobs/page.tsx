@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { EmptyState, PageHeader } from "@/components/kit";
 import { JobCard } from "@/components/field/job-card";
+import { FieldIdentity } from "@/components/field/field-identity";
 import { SyncBadge } from "@/components/field/sync-badge";
 import { requireStaff } from "@/lib/auth/server";
 import { listMyJobs } from "@/lib/field-server";
@@ -29,6 +30,7 @@ export default async function FieldJobsPage() {
   return (
     <>
       <SyncBadge />
+      <FieldIdentity id={staff.id} name={staff.name} />
       <PageHeader eyebrow="Jobs" title="My jobs" subtitle="Installs you're crewing and surveys you're doing, three weeks either side of today." />
       {!jobs && (
         <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-red-900">

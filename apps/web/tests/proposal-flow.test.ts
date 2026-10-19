@@ -338,3 +338,60 @@ test("payment terms are frozen at issue: a later settings change never changes t
   const fromDoc = agreedTerms(zero, issued, doc);
   assert.deepEqual([fromDoc.payments.depositPct, fromDoc.payments.balanceDueDays], [10, 14]);
 });
+
+test("issuing while a colleague's autosave lands: one set of prices issued, emailed and frozen, and nobody's 'Saved' is lost", async () => {
+  // Microtask steps: on the in-memory backend each database call takes a few.
+  const tick = async (n: number) => {
+    for (let i = 0; i < n; i++) await Promise.resolve();
+  };
+  const priceOf = (r: { options: { pricing: { totalPence: number } }[] }) => r.options[0]!.pricing.totalPence;
+  const branches = new Set<string>();
+  // Negative: the colleague's save starts first and the issue that many ticks later.
+  for (const delay of [-400, -100, -50, -25, -10, -5, 0, 5, 10, 25, 50, 100, 400]) {
+    await fresh();
+    const v1 = (await proposalsRepo.listForProject(DEMO2))[0]!;
+    const draftId = ((await server.reviseFrom(DEMO2, v1.id, ADMIN)) as { proposalId: string }).proposalId;
+    const s1 = await server.saveDraft(DEMO2, draftId, patchFrom(await proposalsRepo.get(draftId), { increaseReason: "DEMO" }), ADMIN);
+    assert.ok(s1.ok);
+    const seen = s1.proposal.draftRevision ?? 0;
+    const issuerPrice = priceOf(s1.proposal);
+    // Admin B, on the same draft in another browser, moves the margin from 35% to 50%.
+    const bPatch = patchFrom(await proposalsRepo.get(draftId), { increaseReason: "DEMO" });
+    bPatch.options = bPatch.options.map((o) => ({ ...o, pricingInputs: { basis: "cost-plus", targetMarginPct: 50 } }));
+    const [issued, saved] = await Promise.all([
+      tick(Math.max(0, -delay)).then(() => server.issueDraft(DEMO2, draftId, ADMIN, { revision: seen })),
+      tick(Math.max(0, delay)).then(() => server.saveDraft(DEMO2, draftId, bPatch, ADMIN)),
+    ]);
+    assert.ok(issued.ok !== saved.ok, `delay ${delay}: exactly one wins (issue ${JSON.stringify(issued)}, save ${saved.ok ? "ok" : saved.error})`);
+    const rec = (await proposalsRepo.get(draftId))!;
+    if (issued.ok) {
+      assert.match(saved.ok ? "" : saved.error, /issued|Someone else saved/, `delay ${delay}: the colleague is told`);
+      branches.add("issue");
+      assert.equal(rec.status, "issued");
+      assert.equal(priceOf(rec), issuerPrice, `delay ${delay}: what the issuer saw is what's issued`);
+      const email = (await messagesRepo.listForProject(DEMO2)).find((m) => m.event === "proposal-issued" && m.channel === "email" && m.idempotencyKey.includes(draftId));
+      assert.ok(email, `delay ${delay}: the issue email`);
+      assert.ok(email!.bodyText.includes(money(issuerPrice)), `delay ${delay}: the email quotes the issued price`);
+      const doc = (await listDocuments(DEMO2, { kind: "proposal" }))[0]!;
+      assert.equal((doc.snapshot as { proposal: { id: string; options: { pricing: { totalPence: number } }[] } }).proposal.options[0]!.pricing.totalPence, issuerPrice);
+    } else {
+      assert.match(issued.error, /Someone saved this draft|Someone else saved/, `delay ${delay}: the issuer is told`);
+      branches.add("save");
+      assert.equal(rec.status, "draft", `delay ${delay}: nothing issued`);
+      assert.equal(priceOf(rec), priceOf((saved as Extract<typeof saved, { ok: true }>).proposal), `delay ${delay}: the colleague's save stands`);
+      assert.ok(!(await messagesRepo.listForProject(DEMO2)).some((m) => m.event === "proposal-issued" && m.idempotencyKey.includes(draftId)), "no email");
+    }
+  }
+
+  assert.deepEqual([...branches].sort(), ["issue", "save"], "both orders were exercised");
+
+  // An issuer whose builder is behind (a colleague saved since) is refused before anything goes.
+  await fresh();
+  const v1 = (await proposalsRepo.listForProject(DEMO2))[0]!;
+  const draftId = ((await server.reviseFrom(DEMO2, v1.id, ADMIN)) as { proposalId: string }).proposalId;
+  const s = await server.saveDraft(DEMO2, draftId, patchFrom(await proposalsRepo.get(draftId), { increaseReason: "DEMO" }), ADMIN);
+  assert.ok(s.ok);
+  const behind = await server.issueDraft(DEMO2, draftId, ADMIN, { revision: (s.proposal.draftRevision ?? 0) - 1 });
+  assert.ok(!behind.ok && /since you last loaded it/.test(behind.error));
+  assert.equal((await proposalsRepo.get(draftId))!.status, "draft");
+});

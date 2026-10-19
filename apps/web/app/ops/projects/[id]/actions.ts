@@ -658,11 +658,21 @@ export async function resendMessageAction(fd: FormData): Promise<ActionResult> {
   const staff = message.projectId ? await guard(message.projectId, "messages.send") : can(signedIn, "projects.view-all") ? signedIn : null;
   if (!staff) return refused("Message not found.");
   const r = await resend(id);
-  await audit({ actor: staff, action: "message.resend", entity: "message", entityId: id, detail: { event: message.event, status: r.status } });
+  // The customer's address changed since it was written: it went to the new one (never the old).
+  const movedTo = "to" in r && r.to && r.to.trim().toLowerCase() !== message.to.trim().toLowerCase() ? r.to : null;
+  await audit({
+    actor: staff,
+    action: "message.resend",
+    entity: "message",
+    entityId: id,
+    detail: { event: message.event, status: r.status, ...(movedTo ? { readdressed: true } : {}) },
+  });
   if (message.projectId) refresh(message.projectId);
   revalidatePath("/ops/messages");
-  if (r.status === "sent") return done("Sent.");
-  if (r.status === "demo") return done("Recorded in demo mode: no email or SMS provider is set up, so nothing was delivered.");
+  const where = movedTo ? ` to ${movedTo}, the address on the project now (not ${message.to})` : "";
+  if (r.status === "sent") return done(`Sent${where}.`);
+  if (r.status === "demo") return done(`Recorded in demo mode${where}: no email or SMS provider is set up, so nothing was delivered.`);
+  if (r.status === "duplicate") return refused(`Already sent${where}. Open that message to send it again.`);
   if (r.status === "skipped") return refused(("error" in r && r.error) || "Not sent: the event is turned off, or the customer opted out.");
   return refused(("error" in r && r.error) || "The provider didn't accept it. It'll be retried automatically.");
 }

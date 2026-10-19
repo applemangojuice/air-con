@@ -14,6 +14,7 @@ import {
   generateQuote,
   idempotencyKey,
   mergeSettings,
+  readdressedKey,
   type CommsEventId,
   type PilotSettings,
   type Project,
@@ -769,9 +770,9 @@ test("the issue email is the pre-contract one; the confirmation record never sen
     assert.deepEqual(commsForAction(p, action), [], action.type);
   }
   // Only the acceptance email, delivered by email to a project, records the confirmation.
-  const live = { demoCounts: false };
-  const demoDeployment = { demoCounts: true };
-  const m = { id: "m-1", event: "proposal-accepted" as const, channel: "email" as const, projectId: PROJECT_ID, idempotencyKey: `proposal-accepted:${PROJECT_ID}:prop-1:email` };
+  const live = { demoCounts: false, currentEmail: CUSTOMER.email };
+  const demoDeployment = { demoCounts: true, currentEmail: CUSTOMER.email };
+  const m = { id: "m-1", event: "proposal-accepted" as const, channel: "email" as const, projectId: PROJECT_ID, to: CUSTOMER.email, idempotencyKey: `proposal-accepted:${PROJECT_ID}:prop-1:email` };
   assert.deepEqual(followUpForDelivered(m, "sent", live), { projectId: PROJECT_ID, action: { type: "contract-confirmation-sent", messageId: "m-1" } });
   // Stored in demo mode is not delivered: it counts only on a demo deployment, and says so.
   assert.equal(followUpForDelivered(m, "demo", live), null);
@@ -785,6 +786,16 @@ test("the issue email is the pre-contract one; the confirmation record never sen
   assert.equal(followUpForDelivered(issueMail, "demo", live), null);
   assert.deepEqual(followUpForDelivered(issueMail, "demo", demoDeployment), { projectId: PROJECT_ID, action: { type: "pre-contract-info-sent", proposalId: "prop-1", messageId: "m-1", demo: true } });
   assert.equal(followUpForDelivered({ ...issueMail, channel: "sms", idempotencyKey: `proposal-issued:${PROJECT_ID}:prop-1:sms` }, "sent", live), null);
+  // Only a copy that reached the project's current email is the customer's durable medium.
+  assert.equal(followUpForDelivered({ ...issueMail, to: "typo.stranger@example.test" }, "sent", live), null, "went to an address since corrected");
+  assert.equal(followUpForDelivered(m, "sent", { demoCounts: false, currentEmail: undefined }), null, "the project has no email now");
+  assert.ok(followUpForDelivered({ ...m, to: " SAM@example.test " }, "sent", live), "case and spaces don't matter");
+  // A copy re-addressed to the corrected email still records its own proposal version.
+  const readdressed = { ...issueMail, to: "real.family@example.test", idempotencyKey: readdressedKey(issueMail.idempotencyKey, "real.family@example.test") };
+  assert.deepEqual(followUpForDelivered(readdressed, "sent", { demoCounts: false, currentEmail: "real.family@example.test" }), {
+    projectId: PROJECT_ID,
+    action: { type: "pre-contract-info-sent", proposalId: "prop-1", messageId: "m-1" },
+  });
   // And recording it twice changes nothing: the reducer keeps the first.
   const accepted = baseProject();
   accepted.proposal.status = "accepted";
@@ -1377,4 +1388,118 @@ test("on my way with no mobile goes by email instead of nowhere; with one, by te
   const smsOff = await harness({ email: true, sms: false });
   const e = await smsOff.outbox.notify("surveyor-on-my-way", { projectId: PROJECT_ID, data: { etaMinutes: 15, at: new Date().toISOString() }, discriminator: "s:15" });
   assert.deepEqual(e.results.map((x) => [x.channel, x.status]), [["email", "sent"]]);
+});
+
+/* ------------------------------------------------------------------ */
+/* A corrected address: messages follow the project, never the old one  */
+/* ------------------------------------------------------------------ */
+
+const TYPO = "typo.stranger@example.test";
+const REAL = "real.family@example.test";
+
+/** A project whose email starts as a typo someone else owns; `fix(email)` is staff correcting it on the project. */
+function typoProject() {
+  const p = baseProject();
+  p.customer.email = TYPO;
+  return { project: p, fix: (email: string | undefined) => (email ? (p.customer.email = email) : delete p.customer.email) };
+}
+
+/** Every address the email provider was asked to send to, accepted or not. */
+function attemptsOf(h: Awaited<ReturnType<typeof harness>>) {
+  const tried: string[] = [];
+  const send = h.deps.email.send;
+  h.deps.email.send = async (to, subject, html, o) => {
+    tried.push(to);
+    return send(to, subject, html, o);
+  };
+  return tried;
+}
+
+const invoiceData = { invoiceNumber: "DIH-0001", kind: "deposit", totalPence: 123_400, dueOn: "2026-11-01" } as never;
+
+test("Retry after correcting a wrong email sends to the new address, never the old one", async () => {
+  const { project, fix } = typoProject();
+  const h = await harness({ email: true, emailOk: [false], project, customerEmail: REAL });
+  const tried = attemptsOf(h);
+  const outbox = createOutbox(h.deps);
+  const first = await outbox.notify("invoice-issued", { projectId: PROJECT_ID, data: invoiceData, discriminator: "inv-1" });
+  assert.equal(first.status, "failed");
+  assert.deepEqual(tried, [TYPO]);
+  const oldId = first.results[0]!.messageId!;
+
+  fix(REAL);
+  const r = await outbox.resend(oldId);
+  assert.equal(r.status, "sent");
+  assert.equal("to" in r && r.to, REAL);
+  assert.deepEqual(tried, [TYPO, REAL], "the resend went to the corrected address only");
+  assert.equal(h.minted.at(-1)?.recipient, REAL, "the household's own sign-in link");
+  const old = (await h.store.get(oldId))!;
+  assert.equal(old.status, "skipped", "the old row stops being retried");
+  assert.match(old.error ?? "", new RegExp(`Not sent to ${TYPO}.*now ${REAL}`));
+  const copy = (await h.store.get((r as { messageId: string }).messageId))!;
+  assert.equal(copy.to, REAL);
+  assert.equal(copy.idempotencyKey, readdressedKey(old.idempotencyKey, REAL));
+  assert.equal(copy.bodyText, old.bodyText, "the same message");
+  assert.deepEqual(h.delivered.map((d) => d.id), [copy.id]);
+
+  // Pressing it again (on either row) sends the copy again, still never the old address.
+  await outbox.resend(oldId);
+  await outbox.resend(copy.id);
+  assert.deepEqual(tried, [TYPO, REAL, REAL, REAL]);
+  const { data: rows } = await h.db.from("messages").select("id");
+  assert.equal(rows!.length, 2, "one copy per address, ever");
+});
+
+test("after a correction, the same occurrence notified again reaches the new address once; the cron moves a failed one over", async () => {
+  const { project, fix } = typoProject();
+  const h = await harness({ email: true, emailOk: [false], project, customerEmail: REAL });
+  const tried = attemptsOf(h);
+  const first = await h.outbox.notify("invoice-issued", { projectId: PROJECT_ID, data: invoiceData, discriminator: "inv-2" });
+  assert.equal(first.status, "failed");
+  fix(REAL);
+  const again = await h.outbox.notify("invoice-issued", { projectId: PROJECT_ID, data: invoiceData, discriminator: "inv-2" });
+  assert.equal(again.status, "sent", "not 'duplicate' pointing at the old address");
+  assert.equal(again.results[0]!.to, REAL);
+  const thrice = await h.outbox.notify("invoice-issued", { projectId: PROJECT_ID, data: invoiceData, discriminator: "inv-2" });
+  assert.equal(thrice.status, "duplicate");
+  // The cron retries the old failed row: it never goes to the typo, and nothing is sent twice.
+  const later = new Date(Date.now() + 10 * 60_000).toISOString();
+  const summary = await h.outbox.dispatchDue(later);
+  assert.deepEqual(summary, { due: 1, sent: 0, demo: 0, failed: 0, skipped: 1, errors: 0 });
+  assert.deepEqual(tried, [TYPO, REAL]);
+  assert.equal((await h.store.get(first.results[0]!.messageId!))!.status, "skipped");
+
+  // A failed one the cron finds after a correction goes to the new address by itself.
+  const p2 = typoProject();
+  const h2 = await harness({ email: true, emailOk: [false], project: p2.project, customerEmail: REAL });
+  const tried2 = attemptsOf(h2);
+  const f = await h2.outbox.notify("proposal-issued", { projectId: PROJECT_ID, data: { version: 1, validUntil: "2026-12-03" }, discriminator: "prop-9" });
+  assert.equal(f.status, "failed");
+  p2.fix(REAL);
+  assert.deepEqual(await h2.outbox.dispatchDue(later), { due: 1, sent: 1, demo: 0, failed: 0, skipped: 0, errors: 0 });
+  assert.deepEqual(tried2, [TYPO, REAL]);
+});
+
+test("a removed address stays removed: a waiting message is never sent to it, and nothing goes", async () => {
+  const { project, fix } = typoProject();
+  const h = await harness({ email: true, emailOk: [false], project });
+  const tried = attemptsOf(h);
+  const first = await h.outbox.notify("invoice-issued", { projectId: PROJECT_ID, data: invoiceData, discriminator: "inv-3" });
+  fix(undefined);
+  const r = await h.outbox.resend(first.results[0]!.messageId!);
+  assert.equal(r.status, "skipped");
+  assert.match(("error" in r && r.error) || "", /no email now/);
+  const later = new Date(Date.now() + 10 * 60_000).toISOString();
+  assert.equal((await h.outbox.dispatchDue(later)).due, 0, "the old row stopped");
+  assert.deepEqual(tried, [TYPO]);
+
+  // A scheduled text written before the mobile changed goes to the new mobile when it's due.
+  const p = baseProject();
+  const hs = await harness({ email: true, sms: true, project: p });
+  const tomorrow = new Date(Date.now() + 86_400_000).toISOString();
+  const q = await hs.outbox.notify("survey-reminder", { projectId: PROJECT_ID, data: surveyBooked, discriminator: "rem-1", scheduledFor: tomorrow, channels: ["sms"] });
+  assert.equal(q.status, "queued");
+  p.customer.phone = "07700 900456";
+  await hs.outbox.dispatchDue(new Date(Date.now() + 2 * 86_400_000).toISOString());
+  assert.deepEqual(hs.sent.map((x) => [x.channel, x.to]), [["sms", "+447700900456"]]);
 });

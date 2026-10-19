@@ -39,6 +39,8 @@ registerAppResolver();
 const PROJECT = "6a6a6a6a-1111-4111-8111-00000000f601";
 const OTHER = "6b6b6b6b-2222-4222-8222-00000000f602";
 const MEDIA = "6c6c6c6c-3333-4333-8333-00000000f603";
+const AT0 = "2026-11-10T09:00:00.000Z";
+const INSTALLER_ID = "aa000000-0000-4000-8000-0000000000f1";
 
 /* ------------------------------------------------------------------ */
 /* The outbox queue (pure parts)                                       */
@@ -80,11 +82,13 @@ const mediaItem = (id: string, createdAt: number): QueueItem => ({
 
 test("outbox: batches go oldest first, skip ops waiting for photos, respect backoff", () => {
   const items = [
-    item(ev("c"), 3),
-    item(ev("a"), 1),
+    item(ev("c", { specId: "d1-c.reading" }), 3),
+    item(ev("a", { specId: "d1-a.reading" }), 1),
     item(ev("b", { mediaId: `${LOCAL_MEDIA_PREFIX}m1` }), 2),
-    item(ev("d"), 4, { nextAttemptAt: 10_000 }),
-    item(ev("e"), 5, { state: "failed" }),
+    item(ev("d", { specId: "d1-d.reading" }), 4, { nextAttemptAt: 10_000 }),
+    item(ev("e", { specId: "d1-e.reading" }), 5, { state: "failed" }),
+    // A later capture of the slot whose photo is still uploading waits for it: the latest capture is the one that counts.
+    item(ev("b2"), 6),
     mediaItem("m1", 0),
   ];
   assert.deepEqual(nextBatch(items, 5_000).map((i) => i.id), ["a", "c"]);
@@ -136,7 +140,7 @@ test("outbox: discarding a photo discards what waits for it; badge text is hones
   assert.equal((pending.get("d1-protection.floors")!.op as Extract<SyncOp, { type: "evidence" }>).value, 2);
 });
 
-test("outbox: photos upload first, ops follow with the real id; offline keeps everything; acks are remembered", async () => {
+test("outbox: ops that use a photo follow it with the real id; offline keeps everything; acks are remembered", async () => {
   let online = false;
   let now = 1_000;
   const sent: SyncOp[][] = [];
@@ -163,10 +167,115 @@ test("outbox: photos upload first, ops follow with the real id; offline keeps ev
   now += 10;
   await outbox.flush(true);
   assert.equal(outbox.state().items.length, 0);
-  assert.equal(sent.length, 1);
-  const first = sent[0]!.find((o) => o.id === "p1") as Extract<SyncOp, { type: "evidence" }>;
+  const first = sent.flat().find((o) => o.id === "p1") as Extract<SyncOp, { type: "evidence" }>;
   assert.equal(first.mediaId, MEDIA, "the placeholder became the real media id");
   assert.deepEqual(outbox.state().acked.map((o) => o.id).sort(), ["p1", "p2"]);
+});
+
+test("outbox: a slow upload never holds up the ops that don't use it (a safety issue, a clock stop)", async () => {
+  let release!: () => void;
+  const uploading = new Promise<void>((r) => (release = r));
+  const sent: SyncOp[] = [];
+  const outbox = new FieldOutbox({
+    store: memoryStore(),
+    now: () => 1_000,
+    online: () => true,
+    upload: async () => {
+      await uploading; // one bar of signal: the photo takes its time
+      return MEDIA;
+    },
+    send: async (ops) => {
+      sent.push(...ops);
+      return ops.map((o) => ({ id: o.id, ok: true as const }));
+    },
+  });
+  await outbox.ready();
+  const photo = await outbox.enqueueMedia({ projectId: PROJECT, blob: new Blob(["x"]), fileName: "d.jpg", tag: "progress", source: "install" }, "Damage photo");
+  const damage: SyncOp = { type: "issue", id: "7c7c7c7c-1111-4111-8111-00000000f6a1", projectId: PROJECT, kind: "damage", title: "DEMO: scuffed wall", severity: "low", blocking: false, mediaIds: [photo], at: AT0 };
+  const safety: SyncOp = { type: "issue", id: "7c7c7c7c-2222-4222-8222-00000000f6a2", projectId: PROJECT, kind: "safety", title: "DEMO: exposed live cable", severity: "critical", blocking: true, mediaIds: [], at: AT0 };
+  const stop: SyncOp = { type: "time-stop", id: "tstop-lane-1", projectId: PROJECT, entryId: "7c7c7c7c-3333-4333-8333-00000000f6a3", at: AT0 };
+  await outbox.enqueue(damage, "Damage");
+  await outbox.enqueue(safety, "Safety");
+  await outbox.enqueue(stop, "Clock stopped");
+  // Let the ops lane run while the upload is still going.
+  for (let i = 0; i < 50 && sent.length < 2; i++) await new Promise((r) => setImmediate(r));
+  assert.deepEqual(sent.map((o) => o.id), [safety.id, stop.id], "sent while the photo is still uploading");
+  assert.ok(outbox.state().items.some((i) => i.id === damage.id), "the issue with the photo waits for it");
+  release();
+  await outbox.flush();
+  assert.deepEqual(sent.map((o) => o.id), [safety.id, stop.id, damage.id]);
+  assert.deepEqual((sent[2] as Extract<SyncOp, { type: "issue" }>).mediaIds, [MEDIA]);
+  assert.equal(outbox.state().items.length, 0);
+});
+
+test("outbox: captures are stamped with who made them and only ever send while that person is signed in", async () => {
+  const sent: SyncOp[] = [];
+  const outbox = new FieldOutbox({
+    store: memoryStore(),
+    now: () => 1_000,
+    online: () => true,
+    upload: async () => MEDIA,
+    send: async (ops) => {
+      sent.push(...ops);
+      return ops.map((o) => ({ id: o.id, ok: true as const }));
+    },
+  });
+  await outbox.ready();
+  const IVO = { id: INSTALLER_ID, name: "DEMO Ivo (installer)" };
+  const ELI = { id: "aa000000-0000-4000-8000-0000000000e1", name: "DEMO Eli (electrician)" };
+  outbox.setSignedIn(IVO);
+  await outbox.enqueue(ev("ivo-fall", { specId: "d2-condensate.fall", value: 23 }), "Condensate fall");
+  await outbox.flush();
+  assert.equal(sent.length, 1, "while Ivo is signed in, his capture goes");
+  assert.deepEqual(sent[0]!.by, IVO, "stamped with who made it");
+
+  // Ivo's next capture is still on the phone when he signs out and Eli signs in.
+  outbox.setSignedIn(null);
+  await outbox.enqueue(ev("ivo-torque", { specId: "d2-flare.torque", value: 18, by: IVO }), "Flare torque");
+  outbox.setSignedIn(ELI);
+  await outbox.flush(true);
+  assert.equal(sent.length, 1, "never sent under Eli's session");
+  assert.equal(outbox.state().items.length, 1);
+  assert.equal(nextBatch(outbox.state().items, 1_000, { signedIn: ELI.id }).length, 0);
+  assert.equal(nextBatch(outbox.state().items, 1_000, { signedIn: null }).length, 0, "nobody known yet: nothing stamped goes");
+  // Eli's own capture goes, under him.
+  await outbox.enqueue(ev("eli-ir", { specId: "d2-electrical.ir" }), "Insulation resistance");
+  await outbox.flush();
+  assert.deepEqual(sent.map((o) => [o.id, o.by?.id]), [["ivo-fall", IVO.id], ["eli-ir", ELI.id]]);
+  // Ivo signs back in: his capture goes, as his.
+  outbox.setSignedIn(IVO);
+  await outbox.flush(true);
+  assert.deepEqual(sent.at(-1), { ...ev("ivo-torque", { specId: "d2-flare.torque", value: 18 }), by: IVO });
+  assert.equal(outbox.state().items.length, 0);
+});
+
+test("outbox: a capture the phone's storage refuses is never shown as kept; a later good write clears it", async () => {
+  let refuse = true;
+  const inner = memoryStore();
+  const flaky: typeof inner = {
+    get durable() {
+      return true;
+    },
+    all: () => inner.all(),
+    put: async (i) => {
+      if (refuse) throw new DOMException("The database connection is closing.", "InvalidStateError");
+      return inner.put(i);
+    },
+    delete: (id) => inner.delete(id),
+  };
+  const outbox = new FieldOutbox({ store: flaky, now: () => 1_000, online: () => false, upload: async () => MEDIA, send: async () => [] });
+  await outbox.ready();
+  assert.equal(outbox.state().durable, true);
+  await outbox.enqueue(ev("lost-1", { specId: "d3-vacuum.reading", value: 380 }), "Vacuum");
+  assert.equal(outbox.state().items.length, 1, "still queued in this page, so it sends if there's signal");
+  assert.equal(outbox.state().durable, false, "but not claimed as kept on the phone");
+  assert.equal(badgeState({ online: false, items: outbox.state().items, storageOk: outbox.state().durable }).text, "Keep open · 1 waiting");
+  assert.equal((await inner.all()).length, 0);
+  // Storage works again: the next write of that item (a retry) puts it on the phone.
+  refuse = false;
+  await outbox.retry("lost-1");
+  assert.equal(outbox.state().durable, true);
+  assert.equal((await inner.all()).length, 1);
 });
 
 test("outbox: a signed-out batch is kept and retried, a forbidden one parks for a person", async () => {
@@ -527,4 +636,76 @@ test("a surveyor on an install crew that day can't be given a survey on it", asy
   assert.equal(await surveyorClash(OTHER, { staffId: SUB.id, name: SUB.name }, "2026-11-11T10:00:00.000Z"), null, "not on that crew");
   assert.equal(await surveyorClash(PROJECT, { staffId: INSTALLER.id, name: INSTALLER.name }, "2026-11-11T10:00:00.000Z"), null, "its own install doesn't count");
   assert.equal(await surveyorClash(OTHER, { staffId: INSTALLER.id, name: INSTALLER.name }, undefined), null, "no survey date yet");
+});
+
+test("sync: a capture made by someone else on this phone is never saved under the signed-in person", async () => {
+  await seed("in-progress");
+  const byFgas: SyncOp = { type: "evidence", id: "ev-other-0001", projectId: PROJECT, specId: "d1-protection.floors", mediaId: MEDIA, at: AT, by: { id: FGAS.id, name: FGAS.name } };
+  const [held] = await field.processSyncBatch(INSTALLER, [byFgas]);
+  assert.equal(held!.ok, false);
+  assert.equal(!held!.ok && held!.permanent, false, "kept on the phone for its author, not dropped");
+  assert.match(!held!.ok ? held!.error : "", new RegExp(`Captured by ${FGAS.name}`));
+  assert.equal((await evidenceRepo.listForProject(PROJECT)).length, 0, "nothing recorded under the installer");
+  // Its own author sends it: recorded as theirs.
+  const [mine] = await field.processSyncBatch(FGAS, [byFgas]);
+  assert.equal(mine!.ok, true);
+  const rows = await evidenceRepo.listForProject(PROJECT);
+  assert.deepEqual(rows.map((r) => [r.id, r.byStaffId]), [[byFgas.id, FGAS.id]]);
+  // An unstamped op (queued before this update) still goes as it always did.
+  const [legacy] = await field.processSyncBatch(INSTALLER, [{ type: "time-start", id: "7a7a7a7a-eeee-4eee-8eee-00000000f6b1", projectId: PROJECT, kind: "install", dayN: 1, at: AT }]);
+  assert.equal(legacy!.ok, true);
+});
+
+test("ending a day a colleague already ended still stops this person's clock, and sends nothing twice", async () => {
+  await seed("in-progress", "2026-11-10T08:00:00.000Z");
+  const mine = "7a7a7a7a-ffff-4fff-8fff-00000000f6c1";
+  const theirs = "7a7a7a7a-ffff-4fff-8fff-00000000f6c2";
+  const startedAt = new Date(Date.now() - 2 * 3_600_000).toISOString();
+  await field.processSyncBatch(INSTALLER, [{ type: "time-start", id: mine, projectId: PROJECT, kind: "install", dayN: 1, at: startedAt }]);
+  await field.processSyncBatch(FGAS, [{ type: "time-start", id: theirs, projectId: PROJECT, kind: "install", dayN: 1, at: startedAt }]);
+  // The F-gas engineer's phone ends day 1 first.
+  const first = await field.endDay(PROJECT, FGAS, { n: 1, summary: "DEMO: pipes in.", customerText: "", mediaIds: [], learnings: [], clockEntryId: theirs });
+  assert.equal(first.alreadyEnded, false);
+  assert.equal(first.clockStopped, true);
+  // The installer's phone, loaded before that, still offers End day 1, with a photo picked.
+  const second = await field.endDay(PROJECT, INSTALLER, { n: 1, summary: "DEMO: tidy.", customerText: "DEMO: all done today.", mediaIds: [MEDIA], learnings: [], clockEntryId: mine });
+  assert.equal(second.alreadyEnded, true, "told it was already ended, not 'Day 1 hasn't started'");
+  assert.equal(second.clockStopped, true);
+  const entry = await timeRepo.get(mine);
+  assert.ok(entry?.endedAt, "the installer's clock stopped: no overnight entry");
+  assert.ok((entry?.minutes ?? 0) >= 119 && (entry?.minutes ?? 0) <= 121);
+  assert.equal((await mediaRepo.get(MEDIA))!.customerVisible, false, "nothing shared by the second phone");
+  const msgs = ((await requireDb().from("messages").select("event")).data ?? []) as { event: string }[];
+  assert.equal(msgs.filter((m) => m.event === "install-day-update").length, 0, "no second customer update");
+  // Someone else's clock is never stopped from this phone.
+  const third = await field.endDay(PROJECT, INSTALLER, { n: 1, summary: "", customerText: "", mediaIds: [], learnings: [], clockEntryId: theirs });
+  assert.equal(third.clockStopped, false);
+});
+
+test("commissioning: a capture the signer's screen didn't show is named, so the signature is never over it", () => {
+  const job = {
+    runsheet: [
+      { id: "s1", item: "System 1", evidence: [{ id: "c-added", kind: "number", label: "Refrigerant added" }] },
+      { id: "s2", evidence: [{ id: "c-vac", kind: "number", label: "Vacuum" }] },
+    ],
+    evidence: [
+      { id: "e1", specId: "c-added", value: 0, at: AT, by: "DEMO" },
+      { id: "e2", specId: "c-vac", value: 300, at: AT, by: "DEMO" },
+      // Re-weighed on another phone after the signer's screen loaded.
+      { id: "e3", specId: "c-added", value: 250, at: AT, by: "DEMO" },
+    ],
+  } as unknown as Parameters<typeof field.unseenEvidence>[0];
+  assert.deepEqual(field.unseenEvidence(job, ["e1", "e2"]), [{ specId: "c-added", label: "Refrigerant added, System 1" }]);
+  assert.deepEqual(field.unseenEvidence(job, ["e1", "e2", "e3"]), [], "seen everything: fine");
+  assert.deepEqual(field.unseenEvidence(job, ["e3", "e2"]), [], "an older capture superseded on screen doesn't matter");
+});
+
+test("a clock stopped on the night the clocks go back (25 October 2026) counts the real hours", () => {
+  // 23:30 BST on Saturday 24 October to 08:30 GMT on Sunday 25 October: 9 hours on the clock face, 10 worked
+  // (01:00 to 02:00 happens twice). Computed on instants, never wall-clock times.
+  assert.equal(field.clockMinutes("2026-10-24T22:30:00.000Z", "2026-10-25T08:30:00.000Z"), 600);
+  // 08:00 BST Saturday to 17:00 GMT Sunday: 34 hours elapsed, not the 33 the dates suggest.
+  assert.equal(field.clockMinutes("2026-10-24T07:00:00.000Z", "2026-10-25T17:00:00.000Z"), 34 * 60);
+  // A stop before its start (a phone's clock wrong) is never negative.
+  assert.equal(field.clockMinutes("2026-10-25T09:00:00.000Z", "2026-10-25T08:00:00.000Z"), 0);
 });

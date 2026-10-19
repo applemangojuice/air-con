@@ -189,7 +189,7 @@ export function ProposalBuilder(props: BuilderProps) {
       return;
     }
     try {
-      const result = await issueAction(projectId, proposal.id);
+      const result = await issueAction(projectId, proposal.id, revision.current);
       if (result.ok) {
         // Stay busy while the page reloads into the issued version (see reload.ts).
         setIssue({ busy: true, result });

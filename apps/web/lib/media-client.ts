@@ -153,20 +153,38 @@ async function withRetry<T>(attempts: number, signal: AbortSignal | undefined, r
   throw last instanceof MediaUploadError ? last : new MediaUploadError("The upload didn't go through. Check your signal and try again.", null, true);
 }
 
+/** A small request that hasn't answered in this long is a dead connection: give up and retry. */
+const REQUEST_TIMEOUT_MS = 30_000;
+/** An upload with no progress for this long has stalled (one bar of signal that's gone): abort and retry. */
+const STALL_TIMEOUT_MS = 60_000;
+/** However slow, no single upload attempt runs longer than this. */
+const UPLOAD_CAP_MS = 15 * 60_000;
+
 async function postJson<T>(url: string, body: unknown, signal?: AbortSignal): Promise<T> {
+  // The caller's signal (a person cancelling) plus our own timeout (a dead connection, retried).
+  const own = new AbortController();
+  const timer = setTimeout(() => own.abort(), REQUEST_TIMEOUT_MS);
+  const forward = () => own.abort();
+  signal?.addEventListener("abort", forward, { once: true });
+  const cleanup = () => {
+    clearTimeout(timer);
+    signal?.removeEventListener("abort", forward);
+  };
   let res: Response;
   try {
     res = await fetch(url, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(body),
-      signal,
+      signal: own.signal,
       credentials: "same-origin",
     });
   } catch {
+    cleanup();
     throw new MediaUploadError("No connection. We'll keep trying.", null, !signal?.aborted);
   }
   const data = (await res.json().catch(() => ({}))) as T & { error?: string };
+  cleanup();
   if (!res.ok) throw new MediaUploadError(data.error ?? `Request failed (${res.status}).`, res.status, retryableStatus(res.status));
   return data;
 }
@@ -175,7 +193,7 @@ async function postJson<T>(url: string, body: unknown, signal?: AbortSignal): Pr
  * PUT with progress (XHR: fetch can't report upload progress). A retry that
  * finds the object already there means an earlier attempt landed: success.
  */
-function putWithProgress(
+export function putWithProgress(
   url: string,
   blob: Blob,
   contentType: string,
@@ -186,7 +204,20 @@ function putWithProgress(
   return new Promise((resolveOuter, rejectOuter) => {
     const xhr = new XMLHttpRequest();
     const abort = () => xhr.abort();
-    const done = () => signal?.removeEventListener("abort", abort);
+    // No progress for a minute: the connection has stalled. Abort it (retryable), don't hang the queue.
+    let stalled = false;
+    let stall: ReturnType<typeof setTimeout> | undefined;
+    const watch = () => {
+      if (stall) clearTimeout(stall);
+      stall = setTimeout(() => {
+        stalled = true;
+        xhr.abort();
+      }, STALL_TIMEOUT_MS);
+    };
+    const done = () => {
+      if (stall) clearTimeout(stall);
+      signal?.removeEventListener("abort", abort);
+    };
     const resolve = () => {
       done();
       resolveOuter();
@@ -196,8 +227,12 @@ function putWithProgress(
       rejectOuter(err);
     };
     xhr.open("PUT", url);
+    xhr.timeout = UPLOAD_CAP_MS;
     xhr.setRequestHeader("content-type", contentType);
-    xhr.upload.onprogress = (e) => onProgress?.(e.loaded, e.lengthComputable ? e.total : blob.size);
+    xhr.upload.onprogress = (e) => {
+      watch();
+      onProgress?.(e.loaded, e.lengthComputable ? e.total : blob.size);
+    };
     xhr.onload = () => {
       const exists = xhr.status === 409 || (xhr.status === 400 && /already exists|duplicate/i.test(xhr.responseText));
       if ((xhr.status >= 200 && xhr.status < 300) || (attempt > 1 && exists)) {
@@ -209,8 +244,14 @@ function putWithProgress(
     };
     xhr.onerror = () => reject(new MediaUploadError("The connection dropped during the upload.", null, true));
     xhr.ontimeout = () => reject(new MediaUploadError("The upload timed out.", null, true));
-    xhr.onabort = () => reject(new MediaUploadError("Upload cancelled.", null, false));
+    xhr.onabort = () =>
+      reject(
+        stalled
+          ? new MediaUploadError("The upload stalled (no progress for a minute). It'll try again.", null, true)
+          : new MediaUploadError("Upload cancelled.", null, false),
+      );
     signal?.addEventListener("abort", abort, { once: true });
+    watch();
     xhr.send(blob);
   });
 }

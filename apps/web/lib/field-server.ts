@@ -1,4 +1,5 @@
 import {
+  isWrapUpDay,
   INSTALL_TEMPLATE_VERSION,
   ISSUE_KIND_LABEL,
   LINK_PLACEHOLDER,
@@ -1185,6 +1186,10 @@ async function syncIssue(ctx: BatchContext, op: Extract<SyncOp, { type: "issue" 
  * op: ok (with `duplicate` when it had already landed), or an error that's
  * `permanent` (the phone shows it and stops retrying) or not (retry later).
  */
+/** Why a capture by someone else stays on the phone. */
+export const heldForAuthorMessage = (name: string) =>
+  `Captured by ${name.trim() || "someone else"} on this phone: it's saved under their name only, so it sends when they sign in here again.`;
+
 export async function processSyncBatch(staff: StaffMember, ops: SyncOp[]): Promise<SyncResult[]> {
   const ctx: BatchContext = { staff, projects: new Map(), jobs: new Map() };
   const results: SyncResult[] = [];
@@ -1192,6 +1197,12 @@ export async function processSyncBatch(staff: StaffMember, ops: SyncOp[]): Promi
     try {
       if (!can(staff, "install.work")) {
         results.push(PERMANENT(op.id, "You don't have install permissions."));
+        continue;
+      }
+      // Captured by someone else on this phone (they signed out, this person signed in): it's
+      // theirs, and goes under their name only. Kept on the phone until they sign in again.
+      if (op.by && op.by.id !== staff.id) {
+        results.push({ id: op.id, ok: false, error: heldForAuthorMessage(op.by.name), permanent: false });
         continue;
       }
       const project = await projectFor(ctx, op.projectId);
@@ -1337,10 +1348,36 @@ export async function dayPhotoGroups(projectId: string, staff: StaffMember, n: n
   return { items: photos, groups: photoGroups(photos, job ? photoContexts(job) : new Map()) };
 }
 
+/** Minutes on a clock between two instants: real elapsed time, so a night the clocks go back counts its extra hour. */
+export function clockMinutes(startedAt: string, endedAt: string): number {
+  return Math.max(0, Math.round((Date.parse(endedAt) - Date.parse(startedAt)) / 60_000));
+}
+
+/** Stop this person's own running clock entry (never anyone else's). True when it was running and is now stopped. */
+async function stopOwnClock(staff: StaffMember, clockEntryId: string | undefined, end: string = nowIso()): Promise<boolean> {
+  if (!clockEntryId || !isUuid(clockEntryId)) return false;
+  const entry = await timeRepo.get(clockEntryId);
+  if (!entry || entry.staffId !== staff.id || entry.endedAt) return false;
+  await timeRepo.update({ ...entry, endedAt: end, minutes: clockMinutes(entry.startedAt, end) });
+  return true;
+}
+
+/** Has someone on the crew already ended this day (not the wrap-up day after commissioning, which is still to end)? */
+const endedAlready = (p: Project, n: number) => {
+  const day = p.install.days.find((d) => d.n === n);
+  return Boolean(day && day.status === "done" && !isWrapUpDay(p, day));
+};
+
 /**
  * End the day: share the picked photos with the customer, record the day's
  * summary and customer update (which emails it), save the learning answers
  * and stop the clock.
+ *
+ * On a two-person crew both phones offer "End day". When a colleague has
+ * already ended it, this one still stops its own clock (that's what End
+ * day promises) and says so (`alreadyEnded`), sharing nothing and sending
+ * no second update: never "Day N hasn't started" with the clock left
+ * running overnight.
  */
 export async function endDay(
   projectId: string,
@@ -1348,7 +1385,11 @@ export async function endDay(
   input: { n: number; summary: string; customerText: string; mediaIds: string[]; learnings: { promptId: string; answer: string }[]; clockEntryId?: string },
 ) {
   if (!can(staff, "install.work")) throw new FieldError("You don't have install permissions.", 403);
-  await projectForStaff(projectId, staff);
+  const before = await projectForStaff(projectId, staff);
+  if (endedAlready(before, input.n)) {
+    const clockStopped = await stopOwnClock(staff, input.clockEntryId);
+    return { project: before, email: { status: "not-sent" as SendStatus }, learningsSaved: 0, alreadyEnded: true, clockStopped };
+  }
   const mediaIds = [...new Set(input.mediaIds)].slice(0, 4);
   const media = await mediaRepo.listByIds(mediaIds);
   if (media.length !== mediaIds.length || media.some((m) => m.projectId !== projectId)) throw new FieldError("One of the photos isn't on this job.", 400);
@@ -1360,23 +1401,24 @@ export async function endDay(
   // Visibility only: never the whole row from this read (a drawing saved meanwhile stays).
   for (const m of media) if (!m.customerVisible) await mediaRepo.updateFields(m.id, { customerVisible: true });
   const text = input.customerText.trim();
-  const project = throwDispatch(
-    await dispatch(
-      projectId,
-      { type: "install-day-ended", n: input.n, summary: input.summary.trim() || `Day ${input.n} done.`, ...(text ? { customerUpdate: { text, mediaIds } } : {}) },
-      staff,
-    ),
+  const ended = await dispatch(
+    projectId,
+    { type: "install-day-ended", n: input.n, summary: input.summary.trim() || `Day ${input.n} done.`, ...(text ? { customerUpdate: { text, mediaIds } } : {}) },
+    staff,
   );
-  const learningsSaved = input.learnings.length ? await insertLearnings(projectId, staff, input.n, input.learnings) : 0;
-  if (input.clockEntryId && isUuid(input.clockEntryId)) {
-    const entry = await timeRepo.get(input.clockEntryId);
-    if (entry && entry.staffId === staff.id && !entry.endedAt) {
-      const end = nowIso();
-      await timeRepo.update({ ...entry, endedAt: end, minutes: Math.max(0, Math.round((Date.parse(end) - Date.parse(entry.startedAt)) / 60_000)) });
+  if ("error" in ended) {
+    // Both phones pressed it at once and the colleague's landed first: still stop this clock.
+    const now = await loadProject(projectId).catch(() => null);
+    if (now && endedAlready(now, input.n)) {
+      const clockStopped = await stopOwnClock(staff, input.clockEntryId);
+      return { project: now, email: { status: "not-sent" as SendStatus }, learningsSaved: 0, alreadyEnded: true, clockStopped };
     }
   }
+  const project = throwDispatch(ended);
+  const learningsSaved = input.learnings.length ? await insertLearnings(projectId, staff, input.n, input.learnings) : 0;
+  const clockStopped = await stopOwnClock(staff, input.clockEntryId);
   const email = text ? await messageStatus("install-day-update", projectId, `day-${input.n}`, "email") : { status: "not-sent" as SendStatus };
-  return { project, email, learningsSaved };
+  return { project, email, learningsSaved, alreadyEnded: false, clockStopped };
 }
 
 async function insertLearnings(projectId: string, staff: StaffMember, dayN: number, raw: { promptId: string; answer: string }[]): Promise<number> {
@@ -1522,7 +1564,26 @@ export async function commissioningHolds(projectId: string, staff: StaffMember):
  * refuses either step, the record is taken back off, so nothing claims to
  * be signed that isn't.
  */
-export async function signCommissioning(projectId: string, staff: StaffMember, notes?: string) {
+/**
+ * The latest capture per slot that the signer's screen didn't show: `seen`
+ * is every evidence id it had from the server. Something a crew phone (or
+ * this one) synced after the screen loaded isn't what they're signing for.
+ */
+export function unseenEvidence(job: Pick<InstallJobV2, "evidence" | "runsheet">, seen: string[]): { specId: string; label: string }[] {
+  const known = new Set(seen);
+  const latest = new Map<string, InstallJobV2["evidence"][number]>();
+  for (const e of job.evidence) latest.set(e.specId, e);
+  const labelOf = (specId: string) => {
+    for (const step of job.runsheet) {
+      const spec = step.evidence.find((x) => x.id === specId);
+      if (spec) return `${spec.label}${step.item ? `, ${step.item}` : ""}`;
+    }
+    return "a capture";
+  };
+  return [...latest.values()].filter((e) => e.id && !known.has(e.id)).map((e) => ({ specId: e.specId, label: labelOf(e.specId) }));
+}
+
+export async function signCommissioning(projectId: string, staff: StaffMember, notes?: string, seen?: string[]) {
   const project = await projectForStaff(projectId, staff);
   const now = nowIso();
   const today = londonToday();
@@ -1531,6 +1592,17 @@ export async function signCommissioning(projectId: string, staff: StaffMember, n
   if (!job) throw new FieldError("There's no runsheet for this job yet.", 409);
   const errors = commissioningSignErrors(job, staff, today);
   if (errors.length) throw new FieldError(errors.join(" "), 409);
+  // The signature is for what the signer saw: never over a reading that arrived since.
+  if (seen) {
+    const unseen = unseenEvidence(job, seen);
+    if (unseen.length) {
+      const names = unseen.slice(0, 3).map((u) => u.label).join("; ");
+      throw new FieldError(
+        `${unseen.length === 1 ? "A capture" : `${unseen.length} captures`} arrived since this screen loaded (${names}${unseen.length > 3 ? "…" : ""}). Check the results again, then sign.`,
+        409,
+      );
+    }
+  }
   // The certificate freezes the company's details: read them before anything is signed.
   const settings = await settingsForWrite();
   if (!settings) throw new FieldError(SETTINGS_UNAVAILABLE, 503);

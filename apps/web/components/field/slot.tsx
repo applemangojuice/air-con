@@ -6,6 +6,7 @@ import { canScanBarcodes, capturePhoto, captureValue, locate, parseReading, read
 import { SignaturePad, type SignaturePadHandle } from "./signature-pad";
 import { Sheet } from "./sheet";
 import { londonTime, personName } from "./format";
+import { useOutboxDurable } from "./use-outbox";
 
 /**
  * One evidence slot: the capture control for its kind (camera, reading,
@@ -38,7 +39,11 @@ const STATE_CHIP: Record<string, { text: string; tone: string }> = {
   missing: { text: "To do", tone: "bg-surface text-ink-700 border-line" },
 };
 
-function Chip({ state, waiting }: { state: SlotView["state"]; waiting: boolean }) {
+function Chip({ state, waiting, kept }: { state: SlotView["state"]; waiting: boolean; kept: boolean }) {
+  if (waiting && !kept) {
+    // The phone's storage refused it: it's only in this page until it syncs.
+    return <span className="shrink-0 rounded-full border border-red-200 bg-red-50 px-2.5 py-0.5 text-xs font-semibold text-red-800">Not kept on phone: keep open</span>;
+  }
   if (waiting) {
     return <span className="shrink-0 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-900">Waiting to sync</span>;
   }
@@ -53,6 +58,7 @@ const SECONDARY = `${BIG} border border-line bg-white text-ink-900 hover:bg-surf
 export function Slot({ projectId, step, slot, waiting, refused, imageUrl, disabledReason, meId }: SlotProps) {
   const { spec, state, record, review } = slot;
   const id = useId();
+  const kept = useOutboxDurable();
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -137,7 +143,7 @@ export function Slot({ projectId, step, slot, waiting, refused, imageUrl, disabl
             {spec.label}
           </p>
           <p id={`${id}-state`} className="text-sm text-ink-500">
-            {waiting ? "Confirmed: waiting to sync" : done ? `Confirmed · ${byLine}` : disabledReason ? "Not yet" : busy ? "Saving…" : "Tap to confirm"}
+            {waiting ? (kept ? "Confirmed: waiting to sync" : "Confirmed, but not kept on this phone: keep this page open until it syncs") : done ? `Confirmed · ${byLine}` : disabledReason ? "Not yet" : busy ? "Saving…" : "Tap to confirm"}
           </p>
           {refused && (
             <p role="alert" className="text-sm font-medium text-red-800">
@@ -168,7 +174,7 @@ export function Slot({ projectId, step, slot, waiting, refused, imageUrl, disabl
             {numeric ? ` · ${win ? `window ${win}${spec.window?.basis === "candidate" ? " (candidate, tech lead confirms)" : spec.window?.basis === "tech-lead" ? " (set by the tech lead)" : ""}` : "record the reading"}` : ""}
           </p>
         </div>
-        <Chip state={state} waiting={waiting} />
+        <Chip state={state} waiting={waiting} kept={kept} />
       </div>
 
       {captured && (

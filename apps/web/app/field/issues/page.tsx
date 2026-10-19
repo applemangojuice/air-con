@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { can } from "@aircon/domain";
 import { EmptyState, PageHeader } from "@/components/kit";
 import { IssueCard } from "@/components/field/issue-card";
+import { FieldIdentity } from "@/components/field/field-identity";
 import { SyncBadge } from "@/components/field/sync-badge";
 import { requireStaff } from "@/lib/auth/server";
 import { listMyIssues } from "@/lib/field-server";
@@ -24,6 +25,7 @@ export default async function FieldIssuesPage() {
   return (
     <>
       <SyncBadge />
+      <FieldIdentity id={staff.id} name={staff.name} />
       <PageHeader
         eyebrow="Issues"
         title="Open issues"

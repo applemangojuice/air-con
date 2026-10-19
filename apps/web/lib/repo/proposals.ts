@@ -13,7 +13,7 @@ const table = versionedTable<ProposalRecord>("proposals", (p) => ({
   accepted_at: p.acceptance?.at ?? null,
 }));
 
-export const { fromRow, toRow, get, listForProject, latestForProject, nextVersion, insert, update } = table;
+export const { fromRow, toRow, get, getStamped, listForProject, latestForProject, nextVersion, insert, update, updateIfUnchanged } = table;
 
 /** The version in front of the customer: the newest issued or accepted one. */
 export function liveForProject(projectId: string): Promise<ProposalRecord | null> {

@@ -314,7 +314,9 @@ acknowledgement. The refund is due within 14 days of the day it reached us.
 | An issue closed by mistake | **Issues** → **Reopen** |
 
 **Resending a message**: **Messages** → open it → **Retry** (failed) or
-**Send again** (sent). A family whose sign-in link has run out can ask for
+**Send again** (sent). It goes to the email or mobile on the project now:
+after you correct a wrong address, the message goes to the new one (shown
+as a new row), never again to the old one. A family whose sign-in link has run out can ask for
 a new one on your site's `/portal` page; every email we send also carries a
 fresh one.
 

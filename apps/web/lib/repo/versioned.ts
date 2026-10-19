@@ -92,5 +92,30 @@ export function versionedTable<T extends VersionedRecord>(
     return fromRow(data);
   }
 
-  return { fromRow, toRow, get, listForProject, latestForProject, nextVersion, insert, update };
+  /** One record with its row's `updated_at`: the token `updateIfUnchanged` compares. */
+  async function getStamped(id: string): Promise<{ record: T; updatedAt: string } | null> {
+    if (!isUuid(id)) return null;
+    const data = must(await db().from(table).select("*").eq("id", id).maybeSingle(), `${table} get`);
+    return data ? { record: fromRow(data), updatedAt: String((data as Row).updated_at) } : null;
+  }
+
+  /**
+   * Compare-and-set: write only if nobody has written the row since the
+   * read that gave `expectedUpdatedAt`. Null when someone has (re-read).
+   */
+  async function updateIfUnchanged(record: T, expectedUpdatedAt: string): Promise<{ record: T; updatedAt: string } | null> {
+    const data = must(
+      await db()
+        .from(table)
+        .update({ ...toRow(record), updated_at: nowIso() })
+        .eq("id", record.id)
+        .eq("updated_at", expectedUpdatedAt)
+        .select("*")
+        .maybeSingle(),
+      `${table} update`,
+    );
+    return data ? { record: fromRow(data), updatedAt: String((data as Row).updated_at) } : null;
+  }
+
+  return { fromRow, toRow, get, getStamped, listForProject, latestForProject, nextVersion, insert, update, updateIfUnchanged };
 }

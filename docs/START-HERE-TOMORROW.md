@@ -483,7 +483,12 @@ instead.
 
 **Resend a message.** **Messages** → filter by the family or the message
 type → open the message → **Retry** (if it failed) or **Send again** (if it
-went but they can't find it). Fix a wrong email or mobile first (below).
+went but they can't find it). Fix a wrong email or mobile first (below):
+**Retry** and **Send again** always go to the email or mobile on the
+project *now*, never the old one, and say so ("Sent to … , the address on
+the project now"). A message still waiting for the old address stops
+trying it and goes to the new one by itself; if you removed the address,
+nothing goes.
 
 **A family's link has expired.** The project → **Admin** box → **Email them
 a sign-in link**. Or ask them to open your site's `/portal` page, type their

@@ -130,12 +130,14 @@ export async function saveDraftAction(projectId: string, proposalId: string, pat
   }
 }
 
-export async function issueAction(projectId: string, proposalId: string): Promise<IssueResult> {
+export async function issueAction(projectId: string, proposalId: string, revision?: number): Promise<IssueResult> {
   const staff = await staffFor(projectId, "proposal.issue");
   if (!staff) return NOT_FOUND;
   if (!uuid.safeParse(proposalId).success) return { ok: false, error: "Proposal not found" };
+  // The draft revision the issuer's builder saw: what they see is what's issued.
+  const seen = Number.isSafeInteger(revision) && (revision as number) >= 0 ? { revision: revision as number } : {};
   try {
-    const result = await issueDraft(projectId, proposalId, staff);
+    const result = await issueDraft(projectId, proposalId, staff, seen);
     if (result.ok) {
       done(projectId);
       return { ok: true, version: result.version };

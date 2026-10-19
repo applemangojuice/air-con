@@ -205,8 +205,15 @@ function PlanCard({ plan, projectId }: { plan: InvoicePlan; projectId: string })
     return (
       <Card>
         <h3 className="font-semibold text-ink-900">Variation</h3>
-        <p className="mt-1 text-sm text-ink-500">Bill an accepted variation on its own (otherwise the balance invoice includes it).</p>
-        <ActionForm flash action={issueAction.bind(null, projectId)} submitLabel="Issue and email" confirm="Issue this variation invoice and email it to the customer?">
+        <p className="mt-1 text-sm text-ink-500">
+          Bill an accepted variation on its own (otherwise the balance invoice includes it). One that takes money off becomes a credit note on their account.
+        </p>
+        <ActionForm
+          flash
+          action={issueAction.bind(null, projectId)}
+          submitLabel="Issue"
+          confirm="Issue it? A variation that adds to the price is invoiced and emailed; one that takes money off becomes a credit note that comes off what they pay."
+        >
           <input type="hidden" name="kind" value="variation" />
           <fieldset className="mt-3">
             <legend className={label}>Which variation</legend>
@@ -405,7 +412,15 @@ function InvoiceRow({
             {inv.issuedBy ? ` · by ${inv.issuedBy}` : ""}
           </p>
           {inv.reason && <p className="text-sm text-ink-700">{inv.reason}</p>}
-          {purpose && <p className="text-xs text-ink-500">{purpose === "reduction" ? "Money off the price: never billed again" : "A correction: the balance bills the right figure"}</p>}
+          {purpose && (
+            <p className="text-xs text-ink-500">
+              {inv.issueId
+                ? "An accepted variation that takes money off: credit on their account, off what they pay"
+                : purpose === "reduction"
+                  ? "Money off the price: never billed again"
+                  : "A correction: the balance bills the right figure"}
+            </p>
+          )}
           {credited.length > 0 && <p className="text-sm text-ink-700">Credited: {credited.map((c) => c.number).join(", ")}</p>}
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:justify-end">

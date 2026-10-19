@@ -367,6 +367,8 @@ export async function issueInvoice(projectId: string, input: IssueInput, staff: 
   const taxCode = taxCodeFor(proposal, settings);
   let lines: InvoiceLine[];
   let extra: Partial<Invoice> = {};
+  // What it's issued as: a variation that takes money off becomes a credit note (never a negative invoice).
+  let kind: InvoiceKind = input.kind;
 
   if (input.kind === "credit-note") {
     const amount = Math.round(input.amountPence ?? 0);
@@ -403,8 +405,20 @@ export async function issueInvoice(projectId: string, input: IssueInput, staff: 
     const plans = planned();
     const v = plans.variation.variations?.find((x) => x.id === input.issueId);
     if (!v) return fail("Pick an accepted variation that isn't billed yet.");
-    lines = [invoiceLineFromTotal(`Variation ${v.number}: ${v.title}`, v.totalPence, v.taxCode)];
-    extra = { issueId: v.id };
+    if (v.totalPence < 0) {
+      // Money off the price: a credit note on the customer's account, tied to
+      // the variation (so it counts as billed, and towards the price, as a
+      // variation invoice would). The balance then bills the full figure and
+      // the credit comes off what they pay: never a negative "invoice" that
+      // nothing treats as credit.
+      kind = "credit-note";
+      const reason = `Variation ${v.number}: ${v.title}`;
+      lines = creditNoteLines(reason, -v.totalPence, v.taxCode);
+      extra = { issueId: v.id, reason, creditPurpose: "correction" };
+    } else {
+      lines = [invoiceLineFromTotal(`Variation ${v.number}: ${v.title}`, v.totalPence, v.taxCode)];
+      extra = { issueId: v.id };
+    }
   } else {
     const plan = planned()[input.kind];
     const early = input.earlyReason?.trim();
@@ -419,19 +433,21 @@ export async function issueInvoice(projectId: string, input: IssueInput, staff: 
 
   const totals = invoiceTotals(lines);
   if (totals.totalPence === 0 || lines.length === 0) return fail("Nothing to bill.");
+  // An invoice asks for money and a credit note gives it back: never the other way round.
+  if (kind === "credit-note" ? totals.totalPence > 0 : totals.totalPence < 0) return fail("Nothing to bill.");
   if (input.expectedTotalPence !== undefined && input.expectedTotalPence !== totals.totalPence) {
     return fail(`The amount changed since this page loaded (it's now ${money(totals.totalPence)}). Check it and issue again.`);
   }
 
   const now = new Date().toISOString();
   const today = londonToday();
-  const dueOn = invoiceDueOn(today, input.kind, agreed);
+  const dueOn = invoiceDueOn(today, kind, agreed);
   let invoice: Invoice;
   try {
     invoice = await invoicesRepo.insertNumbered({
       id: crypto.randomUUID(),
       projectId,
-      kind: input.kind,
+      kind,
       status: "issued",
       lines,
       ...totals,
@@ -451,7 +467,7 @@ export async function issueInvoice(projectId: string, input: IssueInput, staff: 
   } catch (err) {
     if (!(err instanceof invoicesRepo.InvoiceClashError)) throw err;
     // The number it was given goes unused: say so where the books can see it.
-    await audit({ actor: staff, action: "invoice.number-unused", entity: "invoice", entityId: err.number, detail: { projectId, kind: input.kind, why: err.clash } });
+    await audit({ actor: staff, action: "invoice.number-unused", entity: "invoice", entityId: err.number, detail: { projectId, kind, why: err.clash } });
     if (err.clash === "request") {
       const again = (await invoicesRepo.listForProject(projectId)).find((i) => i.requestId === input.requestId);
       if (again) return { ok: true, value: again, message: `Invoice ${again.number} is issued.` };
@@ -469,7 +485,10 @@ export async function issueInvoice(projectId: string, input: IssueInput, staff: 
   return {
     ok: true,
     value: finished.invoice,
-    message: `${input.kind === "credit-note" ? "Credit note" : "Invoice"} ${invoice.number} issued.`,
+    message:
+      kind === "credit-note" && input.kind === "variation"
+        ? `Credit note ${invoice.number} issued: the variation takes money off, so it's credit on their account and comes off what they pay.`
+        : `${kind === "credit-note" ? "Credit note" : "Invoice"} ${invoice.number} issued.`,
     ...(finished.warning ? { warning: finished.warning } : {}),
   };
 }
