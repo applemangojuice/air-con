@@ -1,5 +1,12 @@
 # Going live (and checking it worked)
 
+> **Founders: start with [START-HERE-TOMORROW.md](./START-HERE-TOMORROW.md).**
+> It's the same set-up as a plain-English checklist with exact clicks, time
+> estimates and screenshots, and it goes on to settings, staff, the
+> catalogue, the four pilot households and what to do when something goes
+> wrong. This page is the technical reference behind it. The day-to-day
+> guides are in [guides/](./guides/).
+
 This is the checklist for putting the pilot platform in front of real
 customers and installers. **`/ops/launch` is its live twin**: once you can
 sign in, it checks every setting, secret and table against the running site,
@@ -7,8 +14,10 @@ red, amber or green, each with the exact fix. Do the one-time setup below,
 sign in as the first admin, then work down `/ops/launch` until it's green.
 
 The pilot platform lives on the `claude/pilot-ops` branch until it's merged
-into `main`. Deploy whichever branch Vercel's production environment
-watches (Vercel → Project → Settings → Git → Production Branch).
+into `main` (START-HERE step 1: GitHub → Pull requests → New pull request →
+base `main` ← compare `claude/pilot-ops` → Merge). Vercel deploys whichever
+branch its production environment watches (Vercel → Project → Settings →
+Git → Production Branch, normally `main`).
 
 ## One-time setup
 
