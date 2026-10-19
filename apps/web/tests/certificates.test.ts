@@ -36,7 +36,8 @@ test("a certificate is recorded with its file: the document exists, is the custo
 
   // Someone else's file doesn't count either.
   const foreign = crypto.randomUUID();
-  await mediaRepo.insert({ id: foreign, projectId: crypto.randomUUID(), bucket: "project-media", storagePath: `x/${foreign}.pdf`, contentType: "application/pdf", tag: "document", source: "ops", takenAt: new Date().toISOString(), customerVisible: false, annotations: [], annotationsVersion: 0, locked: false });
+  const elsewhere = summary.projects.find((p) => p.id !== projectId)!.id;
+  await mediaRepo.insert({ id: foreign, projectId: elsewhere, bucket: "project-media", storagePath: `x/${foreign}.pdf`, contentType: "application/pdf", tag: "document", source: "ops", takenAt: new Date().toISOString(), customerVisible: false, annotations: [], annotationsVersion: 0, locked: false });
   assert.equal((await recordCertificate(projectId, { kind: "electrical-installation", reference: "DEMO-EIC-9", mediaIds: [foreign] }, admin)).ok, false);
 
   const file = crypto.randomUUID();

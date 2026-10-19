@@ -4,6 +4,7 @@ import type { Annotation, StaffMember } from "@aircon/domain";
 import { annotatedAlt, chipTextColour, describeAnnotations, legendEntries } from "../components/annotate/annotation-summary.ts";
 import { afterAwait, interceptTable, recordUpdates } from "./helpers/db-intercept.ts";
 import { registerAppResolver } from "./helpers/resolve-app.ts";
+import { ensureProjectRow } from "./helpers/rows.ts";
 
 process.env.DATA_BACKEND = "memory";
 delete process.env.SUPABASE_URL;
@@ -15,6 +16,9 @@ const mediaRepo = await import("../lib/repo/media.ts");
 const PROJECT = "6d6d6d6d-4444-4444-8444-000000000004";
 const OTHER = "7e7e7e7e-5555-4555-8555-000000000005";
 const MEDIA = "8f8f8f8f-6666-4666-8666-000000000006";
+// Media rows belong to projects that exist (media_project_id_fkey), as on Supabase.
+await ensureProjectRow(requireDb(), PROJECT);
+await ensureProjectRow(requireDb(), OTHER);
 
 /** DEMO people only. */
 const person = (roles: StaffMember["roles"], external = false): StaffMember => ({

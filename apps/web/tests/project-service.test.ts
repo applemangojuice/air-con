@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { generateQuote, type StaffMember } from "@aircon/domain";
 import { registerAppResolver } from "./helpers/resolve-app.ts";
+import { quoteRow } from "./helpers/rows.ts";
 
 // The real project service and magic links on the in-memory local backend.
 process.env.DATA_BACKEND = "memory";
@@ -28,7 +29,7 @@ async function projectFor(email: string): Promise<string> {
   const quoteId = crypto.randomUUID();
   await requireDb()
     .from("quote_requests")
-    .insert({ id: quoteId, customer_name: "DEMO Sam", email, source: "web", survey: DEMO_SURVEY, quote: generateQuote(DEMO_SURVEY) });
+    .insert(quoteRow({ id: quoteId, customer_name: "DEMO Sam", email, source: "web", survey: DEMO_SURVEY, quote: generateQuote(DEMO_SURVEY) }));
   const created = await createProjectForQuote(quoteId);
   assert.ok("id" in created, JSON.stringify(created));
   return created.id;
@@ -86,7 +87,7 @@ async function fromQuote(email: string, attribution: unknown, extra: { name?: st
   const quoteId = crypto.randomUUID();
   await requireDb()
     .from("quote_requests")
-    .insert({ id: quoteId, customer_name: extra.name ?? "DEMO Kim", email, phone: extra.phone ?? null, source: "web", survey: DEMO_SURVEY, quote: generateQuote(DEMO_SURVEY), attribution });
+    .insert(quoteRow({ id: quoteId, customer_name: extra.name ?? "DEMO Kim", email, phone: extra.phone ?? null, source: "web", survey: DEMO_SURVEY, quote: generateQuote(DEMO_SURVEY), attribution }));
   const created = await createProjectForQuote(quoteId, extra.actor ? { actor: extra.actor } : {});
   assert.ok("id" in created, JSON.stringify(created));
   return created.id;
@@ -165,7 +166,7 @@ test("pilot numbers belong to one household: the holder is found, except the pro
   const quoteId = crypto.randomUUID();
   await requireDb()
     .from("quote_requests")
-    .insert({ id: quoteId, customer_name: "DEMO Pilot Seven", email: "pilot7@example.test", source: "ops", survey: DEMO_SURVEY, quote: generateQuote(DEMO_SURVEY) });
+    .insert(quoteRow({ id: quoteId, customer_name: "DEMO Pilot Seven", email: "pilot7@example.test", source: "ops", survey: DEMO_SURVEY, quote: generateQuote(DEMO_SURVEY) }));
   const created = await createProjectForQuote(quoteId, { pilot: { number: 707, label: "DEMO seven" } });
   assert.ok("id" in created, JSON.stringify(created));
   assert.deepEqual(await pilotNumberHolder(707), { id: created.id, name: "DEMO Pilot Seven" }, "a second household can't take 707");
@@ -179,7 +180,7 @@ test("the database refuses a second household on a pilot number, even when the c
     const id = crypto.randomUUID();
     await requireDb()
       .from("quote_requests")
-      .insert({ id, customer_name: name, email: `${id.slice(0, 8)}@example.test`, source: "ops", survey: DEMO_SURVEY, quote: generateQuote(DEMO_SURVEY) });
+      .insert(quoteRow({ id, customer_name: name, email: `${id.slice(0, 8)}@example.test`, source: "ops", survey: DEMO_SURVEY, quote: generateQuote(DEMO_SURVEY) }));
     return id;
   };
   const first = await createProjectForQuote(await quote("DEMO Pilot Seventeen"), { pilot: { number: 717, label: "DEMO seventeen" } });

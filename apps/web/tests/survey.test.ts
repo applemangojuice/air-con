@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { PD_CHECKS, generateQuote, type MeasuredSurvey, type StaffMember, type Survey } from "@aircon/domain";
 import { registerAppResolver } from "./helpers/resolve-app.ts";
+import { quoteRow } from "./helpers/rows.ts";
 
 // The real survey server on the in-memory local backend: nothing touches disk or a real database.
 process.env.DATA_BACKEND = "memory";
@@ -40,17 +41,19 @@ const SELF: Survey = {
 async function newProject(opts: { phone?: string } = {}): Promise<string> {
   const db = requireDb();
   const quoteId = crypto.randomUUID();
-  const { error } = await db.from("quote_requests").insert({
-    id: quoteId,
-    customer_name: "Alex Rivers (DEMO)",
-    email: `demo.${quoteId.slice(0, 8)}@example.com`,
-    phone: opts.phone ?? null,
-    postcode: SELF.postcode,
-    address_line: SELF.addressLine,
-    survey: SELF,
-    quote: generateQuote(SELF),
-    source: "demo",
-  });
+  const { error } = await db.from("quote_requests").insert(
+    quoteRow({
+      id: quoteId,
+      customer_name: "Alex Rivers (DEMO)",
+      email: `demo.${quoteId.slice(0, 8)}@example.com`,
+      phone: opts.phone ?? null,
+      postcode: SELF.postcode,
+      address_line: SELF.addressLine,
+      survey: SELF,
+      quote: generateQuote(SELF),
+      source: "demo",
+    }),
+  );
   assert.equal(error, null);
   const created = await createProjectForQuote(quoteId);
   assert.ok("id" in created, "project created");
@@ -300,14 +303,15 @@ test("no signal at the door: a draft prepared online starts on the phone, and th
   if (!started.ok) return;
   assert.equal(started.created, false);
   assert.equal(started.draft.record.id, prepared.record.id);
-  assert.equal(started.draft.record.startedAt, startedOnPhone, "dated when it really began");
+  // The same instant (PostgREST writes a timestamptz back as "…+00:00", not the phone's "…Z").
+  assert.equal(Date.parse(started.draft.record.startedAt ?? ""), Date.parse(startedOnPhone), "dated when it really began");
   assert.equal(started.draft.updatedAt, saved.updatedAt, "the save token doesn't move, so the phone carries on saving");
   assert.equal(started.draft.record.data.wishes.notes, "Started with no signal (DEMO)");
   const project = (await loadProject(projectId))!;
   assert.equal(project.survey.status, "in-progress");
   const clock = await timeRepo.openForStaff(surveyor.id);
   assert.equal(clock?.projectId, projectId);
-  assert.equal(clock?.startedAt, startedOnPhone, "the survey clock runs from the phone's start");
+  assert.equal(Date.parse(clock?.startedAt ?? ""), Date.parse(startedOnPhone), "the survey clock runs from the phone's start");
   const next = await survey.saveDraft(projectId, edited, saved.updatedAt, surveyor);
   assert.ok(next.ok, "the phone's next save isn't a conflict");
 

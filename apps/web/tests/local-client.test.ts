@@ -3,9 +3,11 @@ import assert from "node:assert/strict";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createLocalClient, localBackendOf } from "../lib/db/local-client.ts";
 import { compareValues } from "../lib/db/local-filters.ts";
 import { cleanObjectPath, verifyStorageSignature } from "../lib/db/local-storage.ts";
+import { ensureProjectRow, insertProjectRow, projectRow, quoteRow } from "./helpers/rows.ts";
 
 const memory = () => createLocalClient({ backend: "memory" });
 
@@ -18,14 +20,33 @@ async function withTempDir(fn: (dir: string) => Promise<void>): Promise<void> {
   }
 }
 
+/** Fixed DEMO ids (uuids, as the columns are). */
+const P1 = "00000000-0000-4000-8000-0000000000a1";
+const P2 = "00000000-0000-4000-8000-0000000000a2";
+const uuid = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
+
+/** A properties row with every required column. */
+const propertyRow = (id: string, extra: Record<string, unknown> = {}) => ({
+  id,
+  intel: {},
+  address_line: `${id} Demo Street`,
+  address_key: id,
+  postcode: "SW16 2BE",
+  outcode: "SW16",
+  ...extra,
+});
+
+/** A message with every required column. */
+const messageRow = (key: string, extra: Record<string, unknown> = {}) => ({ idempotency_key: key, event: "survey-booked", channel: "email", to_address: "demo@example.test", ...extra });
+
 /** DEMO rows only: fictional people, fictional streets. */
 async function seedQuotes() {
   const db = memory();
   const { error } = await db.from("quote_requests").insert([
-    { customer_name: "DEMO Ada", email: "ada@example.test", status: "new", total_gbp: 4200, created_at: "2026-10-01T09:00:00.000Z", next_action_at: null },
-    { customer_name: "DEMO Bo", email: "bo@example.test", status: "draft", total_gbp: 3100, created_at: "2026-10-02T09:00:00.000Z", next_action_at: "2026-10-20T09:00:00Z" },
-    { customer_name: "DEMO Cy", email: "cy@example.test", status: "booked", total_gbp: 6900, created_at: "2026-10-03T09:00:00.000Z", next_action_at: "2026-10-18T09:00:00Z" },
-    { customer_name: null, email: "dee@example.test", status: null, total_gbp: 5000, created_at: "2026-10-04T09:00:00.000Z", next_action_at: null },
+    quoteRow({ customer_name: "DEMO Ada", email: "ada@example.test", status: "new", timeframe: "asap", total_gbp: 4200, created_at: "2026-10-01T09:00:00.000Z", next_action_at: null }),
+    quoteRow({ customer_name: "DEMO Bo", email: "bo@example.test", status: "draft", timeframe: "researching", total_gbp: 3100, created_at: "2026-10-02T09:00:00.000Z", next_action_at: "2026-10-20T09:00:00Z" }),
+    quoteRow({ customer_name: "DEMO Cy", email: "cy@example.test", status: "booked", timeframe: "1-3-months", total_gbp: 6900, created_at: "2026-10-03T09:00:00.000Z", next_action_at: "2026-10-18T09:00:00Z" }),
+    quoteRow({ customer_name: null, email: "dee@example.test", status: "reviewed", timeframe: null, total_gbp: 5000, created_at: "2026-10-04T09:00:00.000Z", next_action_at: null }),
   ]);
   assert.equal(error, null);
   return db;
@@ -37,8 +58,8 @@ test("filters: eq, neq (never NULL), in, is, not, comparisons, like, match, or, 
     ((await q).data as { email: string }[]).map((r) => r.email.split("@")[0]);
 
   assert.deepEqual(await names(db.from("quote_requests").select("email").eq("status", "new")), ["ada"]);
-  // SQL: NULL <> 'draft' is unknown, so dee's NULL status is excluded.
-  assert.deepEqual(await names(db.from("quote_requests").select("email").neq("status", "draft")), ["ada", "cy"]);
+  // SQL: NULL <> 'researching' is unknown, so dee's NULL timeframe is excluded.
+  assert.deepEqual(await names(db.from("quote_requests").select("email").neq("timeframe", "researching")), ["ada", "cy"]);
   assert.deepEqual(await names(db.from("quote_requests").select("email").in("status", ["new", "booked"])), ["ada", "cy"]);
   assert.deepEqual(await names(db.from("quote_requests").select("email").in("status", [])), []);
   assert.deepEqual(await names(db.from("quote_requests").select("email").is("next_action_at", null)), ["ada", "dee"]);
@@ -53,10 +74,10 @@ test("filters: eq, neq (never NULL), in, is, not, comparisons, like, match, or, 
   assert.deepEqual(await names(db.from("quote_requests").select("email").match({ status: "booked", total_gbp: 6900 })), ["cy"]);
   assert.deepEqual(await names(db.from("quote_requests").select("email").or("status.eq.draft,total_gbp.gte.6000")), ["bo", "cy"]);
   assert.deepEqual(
-    await names(db.from("quote_requests").select("email").or("status.is.null,and(status.eq.new,total_gbp.lt.5000)")),
+    await names(db.from("quote_requests").select("email").or("timeframe.is.null,and(status.eq.new,total_gbp.lt.5000)")),
     ["ada", "dee"],
   );
-  assert.deepEqual(await names(db.from("quote_requests").select("email").not("status", "in", "(new,draft)")), ["cy"]);
+  assert.deepEqual(await names(db.from("quote_requests").select("email").not("status", "in", "(new,draft)")), ["cy", "dee"]);
   assert.deepEqual(await names(db.from("quote_requests").select("email").filter("status", "in", "(draft,booked)")), ["bo", "cy"]);
 
   const bad = await db.from("quote_requests").select("email").or("status.nearly.new");
@@ -79,16 +100,22 @@ test("comparisons cast like Postgres: instants, numbers, booleans, uuids", () =>
 
 test("filters on arrays and JSON paths", async () => {
   const db = memory();
-  await db.from("staff").insert([
-    { email: "a@example.test", roles: ["installer", "fgas"], qualifications: { fgas: { expires: "2027-01-01" } } },
-    { email: "b@example.test", roles: ["surveyor"], qualifications: {} },
+  const staff = await db.from("staff").insert([
+    { email: "a@example.test", name: "DEMO A", roles: ["installer", "fgas"], qualifications: { fgas: { expires: "2027-01-01" } } },
+    { email: "b@example.test", name: "DEMO B", roles: ["surveyor"], qualifications: {} },
   ]);
+  assert.equal(staff.error, null);
   const cs = await db.from("staff").select("email").contains("roles", ["fgas"]);
   assert.deepEqual(cs.data, [{ email: "a@example.test" }]);
   const ov = await db.from("staff").select("email").overlaps("roles", ["surveyor", "admin"]);
   assert.deepEqual(ov.data, [{ email: "b@example.test" }]);
   const json = await db.from("staff").select("email, expires:qualifications->fgas->>expires").eq("qualifications->fgas->>expires", "2027-01-01");
   assert.deepEqual(json.data, [{ email: "a@example.test", expires: "2027-01-01" }]);
+  // `->` keeps jsonb: its literal must be JSON, as Postgres casts it.
+  const asJson = await db.from("staff").select("email").eq("qualifications->fgas->expires", '"2027-01-01"');
+  assert.deepEqual(asJson.data, [{ email: "a@example.test" }]);
+  const notJson = await db.from("staff").select("email").eq("qualifications->fgas->expires", "2027-01-01");
+  assert.equal(notJson.error?.code, "22P02", "invalid input syntax for type json");
 });
 
 test("order (nulls last ascending, first descending), multi-key, limit and range", async () => {
@@ -127,7 +154,7 @@ test("single and maybeSingle follow PostgREST errors", async () => {
   assert.equal(none.status, 406);
   assert.match(none.error?.details ?? "", /0 rows/);
 
-  const many = await db.from("quote_requests").select("email").not("status", "is", null).single();
+  const many = await db.from("quote_requests").select("email").not("timeframe", "is", null).single();
   assert.equal(many.error?.code, "PGRST116");
   assert.match(many.error?.details ?? "", /3 rows/);
 
@@ -139,7 +166,7 @@ test("single and maybeSingle follow PostgREST errors", async () => {
   assert.equal(maybeMany.error?.code, "PGRST116");
 });
 
-test("projection: listed keys only, * for all, missing columns read as null", async () => {
+test("projection: listed keys only, * for all, a column that isn't there is an error", async () => {
   const db = await seedQuotes();
   const listed = await db.from("quote_requests").select("email, total_gbp, phone").eq("status", "new").single();
   assert.deepEqual(listed.data, { email: "ada@example.test", total_gbp: 4200, phone: null });
@@ -148,6 +175,10 @@ test("projection: listed keys only, * for all, missing columns read as null", as
   const row = all.data as Record<string, unknown>;
   assert.equal(row.customer_name, "DEMO Ada");
   assert.ok(typeof row.id === "string");
+
+  const typo = await db.from("quote_requests").select("email, phnoe");
+  assert.equal(typo.error?.code, "42703");
+  assert.equal(typo.error?.message, "column quote_requests.phnoe does not exist");
 
   const embed = await db.from("quote_requests").select("id, projects(id)");
   assert.equal(embed.error?.code, "PGRST200");
@@ -164,21 +195,21 @@ test("count exact: head returns only the count; without head it counts before pa
   assert.equal(paged.count, 4);
   assert.equal((paged.data as unknown[]).length, 1);
 
-  const empty = await db.from("never_written").select("*", { count: "exact", head: true });
+  const empty = await db.from("ops_notes").select("*", { count: "exact", head: true });
   assert.equal(empty.count, 0);
 });
 
 test("insert: defaults, no data without select, rows with select", async () => {
   const db = memory();
-  const bare = await db.from("quote_requests").insert({ email: "e@example.test", total_gbp: 1 });
+  const bare = await db.from("quote_requests").insert(quoteRow({ email: "e@example.test", total_gbp: 1 }));
   assert.equal(bare.error, null);
   assert.equal(bare.data, null);
   assert.equal(bare.status, 201);
 
   const { data, error } = await db
     .from("quote_requests")
-    .insert({ email: "f@example.test", total_gbp: 2, booking: undefined, at: new Date("2026-10-18T10:00:00Z") })
-    .select("id, status, source, created_at, updated_at, at, booking")
+    .insert(quoteRow({ email: "f@example.test", total_gbp: 2, booking: undefined, booked_at: new Date("2026-10-18T10:00:00Z") }))
+    .select("id, status, source, created_at, booked_at, booking")
     .single();
   assert.equal(error, null);
   const row = data as Record<string, unknown>;
@@ -186,13 +217,15 @@ test("insert: defaults, no data without select, rows with select", async () => {
   assert.equal(row.status, "new", "SQL default for quote_requests.status");
   assert.equal(row.source, "web");
   assert.ok(!Number.isNaN(Date.parse(String(row.created_at))));
-  assert.equal(row.updated_at, null, "quote_requests has no updated_at column");
-  assert.equal(row.at, "2026-10-18T10:00:00.000Z", "Dates travel as ISO strings, like JSON over HTTP");
+  assert.equal(row.booked_at, "2026-10-18T10:00:00+00:00", "Dates travel as ISO strings and come back as PostgREST writes a timestamptz");
   assert.equal(row.booking, null);
+  assert.equal((await db.from("quote_requests").select("updated_at")).error?.code, "42703", "quote_requests has no updated_at column");
 
-  const staff = await db.from("staff").insert({ email: "g@example.test" }).select().single();
+  const staff = await db.from("staff").insert({ email: "g@example.test", name: "DEMO G" }).select().single();
   const s = staff.data as Record<string, unknown>;
   assert.ok(s.created_at && s.updated_at, "house tables get both stamps");
+  assert.deepEqual(s.roles, [], "and every other SQL default");
+  assert.equal(s.active, true);
 
   const settings = await db.from("settings").insert({ key: "company", value: { name: "DEMO Co" } }).select().single();
   assert.equal((settings.data as Record<string, unknown>).id, undefined, "settings is keyed by key, no id");
@@ -227,7 +260,7 @@ test("update with filters and select; refuses an unfiltered update", async () =>
 
 test("returned rows are copies: mutating them never touches the store", async () => {
   const db = memory();
-  await db.from("properties").insert({ id: "addr-1", intel: { marketing: { campaign: null } } });
+  assert.equal((await db.from("properties").insert(propertyRow("addr-1", { intel: { marketing: { campaign: null } } }))).error, null);
   const first = await db.from("properties").select("intel").eq("id", "addr-1").single();
   (first.data as { intel: { marketing: { campaign: string } } }).intel.marketing.campaign = "mutated";
   const again = await db.from("properties").select("intel").eq("id", "addr-1").single();
@@ -236,16 +269,18 @@ test("returned rows are copies: mutating them never touches the store", async ()
 
 test("upsert: merges on the conflict target, keeps id and created_at, honours ignoreDuplicates", async () => {
   const db = memory();
+  await ensureProjectRow(db, P1);
   const first = await db
     .from("compliance_items")
-    .upsert({ project_id: "p1", key: "dno", status: "todo" }, { onConflict: "project_id,key" })
+    .upsert({ project_id: P1, key: "dno", status: "todo" }, { onConflict: "project_id,key" })
     .select()
     .single();
+  assert.equal(first.error, null);
   const original = first.data as Record<string, unknown>;
 
   const second = await db
     .from("compliance_items")
-    .upsert({ project_id: "p1", key: "dno", status: "done" }, { onConflict: "project_id,key" })
+    .upsert({ project_id: P1, key: "dno", status: "done" }, { onConflict: "project_id,key" })
     .select()
     .single();
   const merged = second.data as Record<string, unknown>;
@@ -255,56 +290,78 @@ test("upsert: merges on the conflict target, keeps id and created_at, honours ig
 
   const ignored = await db
     .from("compliance_items")
-    .upsert({ project_id: "p1", key: "dno", status: "ignored" }, { onConflict: "project_id,key", ignoreDuplicates: true })
+    .upsert({ project_id: P1, key: "dno", status: "ignored" }, { onConflict: "project_id,key", ignoreDuplicates: true })
     .select();
   assert.deepEqual(ignored.data, []);
   const count = await db.from("compliance_items").select("*", { count: "exact", head: true });
   assert.equal(count.count, 1);
 
   // Default target is the primary key.
-  await db.from("properties").upsert([{ id: "addr-1", priority_score: 10 }, { id: "addr-2", priority_score: 20 }]);
-  await db.from("properties").upsert({ id: "addr-1", priority_score: 99 });
+  await db.from("properties").upsert([propertyRow("addr-1", { priority_score: 10 }), propertyRow("addr-2", { priority_score: 20 })]);
+  await db.from("properties").upsert(propertyRow("addr-1", { priority_score: 99 }));
   const rows = await db.from("properties").select("id, priority_score, priority_band").order("id");
   assert.deepEqual(rows.data, [
     { id: "addr-1", priority_score: 99, priority_band: "low" },
     { id: "addr-2", priority_score: 20, priority_band: "low" },
   ]);
 
-  const twice = await db.from("properties").upsert([{ id: "addr-3" }, { id: "addr-3" }]);
+  const twice = await db.from("properties").upsert([propertyRow("addr-3"), propertyRow("addr-3")]);
   assert.equal(twice.error?.code, "21000");
+
+  // ON CONFLICT's row is an INSERT first: a partial row is refused by NOT NULL even when it would merge.
+  const partial = await db.from("properties").upsert({ id: "addr-1", priority_score: 5 });
+  assert.equal(partial.error?.code, "23502");
+  assert.equal((await db.from("properties").select("priority_score").eq("id", "addr-1").single()).data?.priority_score, 99);
+});
+
+test("ON CONFLICT needs a unique constraint on exactly those columns", async () => {
+  const db = memory();
+  await ensureProjectRow(db, P1);
+  const noConstraint = await db.from("compliance_items").upsert({ project_id: P1, key: "dno" }, { onConflict: "key" });
+  assert.equal(noConstraint.error?.code, "42P10");
+  // A partial unique index (0013's pilot numbers) can't be named by ON CONFLICT either.
+  const partial = await db.from("projects").upsert({ id: P1, quote_id: crypto.randomUUID(), pilot_number: 4 }, { onConflict: "pilot_number" });
+  assert.equal(partial.error?.code, "42P10");
+  const order = await db.from("compliance_items").upsert({ project_id: P1, key: "dno" }, { onConflict: "key,project_id" });
+  assert.equal(order.error, null, "the same columns in another order are the same constraint");
 });
 
 test("unique constraints produce 23505 and leave the table untouched", async () => {
   const db = memory();
-  await db.from("projects").insert({ quote_id: "q1", customer_name: "DEMO" });
-  const dup = await db.from("projects").insert({ quote_id: "q1", customer_name: "DEMO again" }).select("id").single();
+  const q1 = uuid(1);
+  assert.equal((await db.from("quote_requests").insert(quoteRow({ id: q1 }))).error, null);
+  await insertProjectRow(db, { quote_id: q1, customer_name: "DEMO" });
+  const dup = await db.from("projects").insert({ quote_id: q1, project: {}, customer_name: "DEMO again", postcode: "SW16 2BE", current_stage: "quote" }).select("id").single();
   assert.equal(dup.error?.code, "23505");
   assert.equal(dup.status, 409);
   assert.match(dup.error?.message ?? "", /projects_quote_id_key/);
-  assert.match(dup.error?.details ?? "", /\(quote_id\)=\(q1\)/);
+  assert.match(dup.error?.details ?? "", new RegExp(`\\(quote_id\\)=\\(${q1}\\)`));
 
   // A bulk insert is all-or-nothing.
-  const batch = await db.from("messages").insert([
-    { idempotency_key: "k1" },
-    { idempotency_key: "k2" },
-    { idempotency_key: "k1" },
-  ]);
+  const batch = await db.from("messages").insert([messageRow("k1"), messageRow("k2"), messageRow("k1")]);
   assert.equal(batch.error?.code, "23505");
   const messages = await db.from("messages").select("*", { count: "exact", head: true });
   assert.equal(messages.count, 0);
 
   // Composite keys, and NULLs never collide.
-  await db.from("designs").insert([{ project_id: "p1", version: 1 }, { project_id: "p1", version: 2 }]);
-  const v1Again = await db.from("designs").insert({ project_id: "p1", version: 1 });
+  await ensureProjectRow(db, P1);
+  assert.equal((await db.from("designs").insert([{ project_id: P1, version: 1 }, { project_id: P1, version: 2 }])).error, null);
+  const v1Again = await db.from("designs").insert({ project_id: P1, version: 1 });
   assert.equal(v1Again.error?.code, "23505");
-  const nulls = await db.from("payments").insert([{ provider_ref: null }, { provider_ref: null }]);
-  assert.equal(nulls.error, null);
+  await insertProjectRow(db, { pilot_number: null });
+  await insertProjectRow(db, { pilot_number: null });
+  await insertProjectRow(db, { pilot_number: 7 });
+  const q77 = quoteRow();
+  assert.equal((await db.from("quote_requests").insert(q77)).error, null);
+  const seven = await db.from("projects").insert(projectRow(String(q77.id), { pilot_number: 7 }));
+  assert.equal(seven.error?.code, "23505");
+  assert.match(seven.error?.message ?? "", /projects_pilot_number_key/);
 
   // Primary keys too, and via update.
-  const { data } = await db.from("staff").insert({ email: "a@example.test" }).select("id").single();
-  const pk = await db.from("staff").insert({ id: (data as { id: string }).id, email: "b@example.test" });
+  const { data } = await db.from("staff").insert({ email: "a@example.test", name: "DEMO A" }).select("id").single();
+  const pk = await db.from("staff").insert({ id: (data as { id: string }).id, email: "b@example.test", name: "DEMO B" });
   assert.equal(pk.error?.code, "23505");
-  await db.from("staff").insert({ email: "c@example.test" });
+  await db.from("staff").insert({ email: "c@example.test", name: "DEMO C" });
   const clash = await db.from("staff").update({ email: "a@example.test" }).eq("email", "c@example.test");
   assert.equal(clash.error?.code, "23505");
 });
@@ -319,77 +376,210 @@ test("delete with filters returns removed rows; unfiltered delete is refused", a
   assert.equal(all.error?.code, "21000");
 });
 
+test("the schema: a table or column the migrations don't make is an error, as on Supabase", async () => {
+  const db = memory();
+  const table = await db.from("projectz").select("*");
+  assert.equal(table.error?.code, "42P01");
+  assert.equal(table.status, 404);
+  const write = await db.from("settings").insert({ key: "k", value: {}, valeu: 1 });
+  assert.equal(write.error?.code, "PGRST204");
+  assert.equal(write.error?.message, "Could not find the 'valeu' column of 'settings' in the schema cache");
+  const filter = await db.from("settings").select("key").eq("nope", 1);
+  assert.equal(filter.error?.code, "42703");
+  const order = await db.from("settings").select("key").order("nope");
+  assert.equal(order.error?.code, "42703");
+  const patch = await db.from("settings").update({ nope: 1 }).eq("key", "k");
+  assert.equal(patch.error?.code, "PGRST204");
+});
+
+test("values are cast to their column types, or refused where Postgres refuses them", async () => {
+  const db = memory();
+  await ensureProjectRow(db, P1);
+  const ok = await db
+    .from("issues")
+    .insert({ project_id: P1.toUpperCase(), number: "3", kind: 5, blocking: "yes", issue: { a: 1 } })
+    .select("project_id, number, kind, blocking")
+    .single();
+  assert.equal(ok.error, null);
+  assert.deepEqual(ok.data, { project_id: P1, number: 3, kind: "5", blocking: true }, "uuid lower-cased, text from a number, int and bool from strings");
+
+  const refused = async (row: Record<string, unknown>, code: string, message: RegExp) => {
+    const res = await db.from("issues").insert({ project_id: P1, number: 1, kind: "question", ...row });
+    assert.equal(res.error?.code, code, JSON.stringify(row));
+    assert.match(res.error?.message ?? "", message);
+  };
+  await refused({ number: 1.5 }, "22P02", /invalid input syntax for type integer: "1.5"/);
+  await refused({ number: 3_000_000_000 }, "22003", /out of range for type integer/);
+  await refused({ number: true }, "22P02", /type integer: "true"/);
+  await refused({ project_id: "p1" }, "22P02", /invalid input syntax for type uuid: "p1"/);
+  await refused({ blocking: "maybe" }, "22P02", /type boolean: "maybe"/);
+  await refused({ kind: "a\u0000b" }, "22P05", /unsupported Unicode escape sequence/);
+  await refused({ issue: { note: "a\u0000b" } }, "22P05", /unsupported Unicode escape sequence/);
+
+  const times = await db
+    .from("time_entries")
+    .insert({ project_id: P1, kind: "survey", started_at: "2026-10-19T13:00:00.120Z", ended_at: "2026-10-19T14:00:00+01:00" })
+    .select("started_at, ended_at")
+    .single();
+  assert.deepEqual(times.data, { started_at: "2026-10-19T13:00:00.12+00:00", ended_at: "2026-10-19T13:00:00+00:00" }, "PostgREST's timestamptz: UTC, trailing zeros dropped");
+  const junk = await db.from("time_entries").insert({ project_id: P1, kind: "survey", started_at: "soon" });
+  assert.equal(junk.error?.code, "22007");
+  const date = await db.from("projects").update({ install_on: "2026-10-20T23:30:00.000Z" }).eq("id", P1).select("install_on").single();
+  assert.deepEqual(date.data, { install_on: "2026-10-20" }, "a date column keeps a timestamp's date, as written");
+  const roles = await db.from("staff").insert({ email: "r@example.test", name: "DEMO R", roles: "admin" });
+  assert.equal(roles.error?.code, "22P02", "malformed array literal");
+});
+
+test("filters cast their literals too: a non-uuid against a uuid column is an error, not no rows", async () => {
+  const db = memory();
+  await ensureProjectRow(db, P1);
+  const badId = await db.from("projects").select("id").eq("id", "not-a-uuid");
+  assert.equal(badId.error?.code, "22P02");
+  assert.match(badId.error?.message ?? "", /invalid input syntax for type uuid: "not-a-uuid"/);
+  const nullId = await db.from("projects").select("id").eq("id", null as unknown as string);
+  assert.equal(nullId.error?.code, "22P02", "postgrest-js sends eq.null: the text 'null'");
+  const inList = await db.from("projects").select("id").in("id", [P1, "x"]);
+  assert.equal(inList.error?.code, "22P02");
+  const upper = await db.from("projects").select("id").eq("id", P1.toUpperCase());
+  assert.deepEqual(upper.data, [{ id: P1 }]);
+  const badInt = await db.from("projects").select("id").eq("pilot_number", "seven");
+  assert.equal(badInt.error?.code, "22P02");
+  const badTime = await db.from("projects").select("id").gte("created_at", "yesterday-ish");
+  assert.equal(badTime.error?.code, "22007");
+  const likeUuid = await db.from("projects").select("id").like("id", "0000%");
+  assert.equal(likeUuid.error?.code, "42883", "no LIKE on a uuid");
+  const sameInstant = await db.from("projects").select("id").lt("created_at", "2999-01-01");
+  assert.deepEqual(sameInstant.data, [{ id: P1 }]);
+});
+
+test("NOT NULL and check constraints", async () => {
+  const db = memory();
+  await ensureProjectRow(db, P1);
+  const missing = await db.from("media").insert({ project_id: P1, content_type: "image/jpeg", source: "survey" });
+  assert.equal(missing.error?.code, "23502");
+  assert.equal(missing.error?.message, 'null value in column "storage_path" of relation "media" violates not-null constraint');
+  // A bulk insert's missing keys are NULL (supabase-js defaultToNull), not the column default.
+  const bulk = await db.from("messages").insert([messageRow("a", { status: "demo" }), messageRow("b")]);
+  assert.equal(bulk.error?.code, "23502", "status is NOT NULL, and the second row says null");
+  const cleared = await db.from("projects").update({ customer_name: null }).eq("id", P1);
+  assert.equal(cleared.error?.code, "23502");
+
+  const negative = await db.from("time_entries").insert({ project_id: P1, kind: "install", started_at: "2026-10-19T09:00:00Z", minutes: -1 });
+  assert.equal(negative.error?.code, "23514");
+  assert.match(negative.error?.message ?? "", /time_entries_minutes_check/);
+  const status = await db.from("proposals").insert({ project_id: P1, status: "sent" });
+  assert.equal(status.error?.code, "23514");
+  const kind = await db.from("login_tokens").insert({ token_hash: "h", subject_kind: "robot", email: "x@example.test", expires_at: "2026-10-19T10:00:00Z" });
+  assert.equal(kind.error?.code, "23514");
+});
+
+test("foreign keys: rows point at rows that exist; deletes cascade, set null, or are refused", async () => {
+  const db = memory();
+  const orphan = await db.from("media").insert({ project_id: P2, storage_path: "x", content_type: "image/jpeg", source: "survey" });
+  assert.equal(orphan.error?.code, "23503");
+  assert.match(orphan.error?.details ?? "", /is not present in table "projects"/);
+
+  const quoteId = await ensureProjectRow(db, P1);
+  const { data: customer } = await db.from("customers").insert({ email: "demo.owner@example.test" }).select("id").single();
+  const customerId = (customer as { id: string }).id;
+  assert.equal((await db.from("projects").update({ customer_id: customerId }).eq("id", P1)).error, null);
+  const owner = await db.from("projects").update({ owner_staff_id: uuid(404) }).eq("id", P1);
+  assert.equal(owner.error?.code, "23503", "an owner who isn't on the staff table");
+  assert.equal((await db.from("media").insert({ project_id: P1, storage_path: "y", content_type: "image/jpeg", source: "survey" })).error, null);
+  assert.equal((await db.from("ops_notes").insert({ quote_id: quoteId, note: "DEMO" })).error, null);
+
+  // projects.quote_id has no ON DELETE: the quote can't go while its project is there.
+  const quoteFirst = await db.from("quote_requests").delete().eq("id", quoteId);
+  assert.equal(quoteFirst.error?.code, "23503");
+  assert.match(quoteFirst.error?.details ?? "", /still referenced from table "projects"/);
+
+  // A customer going leaves the project, unlinked (on delete set null).
+  assert.equal((await db.from("customers").delete().eq("id", customerId)).error, null);
+  assert.equal((await db.from("projects").select("customer_id").eq("id", P1).single()).data?.customer_id, null);
+
+  // The project going takes its media (on delete cascade); then the quote can go, with its notes.
+  assert.equal((await db.from("projects").delete().eq("id", P1)).error, null);
+  assert.equal((await db.from("media").select("id", { count: "exact", head: true })).count, 0);
+  assert.equal((await db.from("quote_requests").delete().eq("id", quoteId)).error, null);
+  assert.equal((await db.from("ops_notes").select("id", { count: "exact", head: true })).count, 0);
+});
+
 test("accepted proposals are immutable except for superseding", async () => {
   const db = memory();
+  await ensureProjectRow(db, P1);
   const record = { options: [{ id: "standard", totalPence: 450_000 }] };
-  await db.from("proposals").insert({ id: "pr1", project_id: "p1", version: 1, status: "accepted", record });
+  const pr1 = uuid(101);
+  assert.equal((await db.from("proposals").insert({ id: pr1, project_id: P1, version: 1, status: "accepted", record })).error, null);
 
   const edit = await db
     .from("proposals")
     .update({ record: { options: [{ id: "standard", totalPence: 1 }] } })
-    .eq("id", "pr1");
+    .eq("id", pr1);
   assert.equal(edit.error?.code, "P0001");
 
   const sneaky = await db
     .from("proposals")
     .update({ status: "superseded", record: { options: [] } })
-    .eq("id", "pr1");
+    .eq("id", pr1);
   assert.equal(sneaky.error?.code, "P0001");
 
-  const supersede = await db.from("proposals").update({ status: "superseded", record }).eq("id", "pr1");
+  const supersede = await db.from("proposals").update({ status: "superseded", record }).eq("id", pr1);
   assert.equal(supersede.error, null);
 });
 
 test("the accepted-proposal guard matches the SQL trigger, field for field", async () => {
   const db = memory();
+  await ensureProjectRow(db, P1);
+  await ensureProjectRow(db, P2);
   const acceptance = { optionId: "standard", totalPence: 450_000, name: "DEMO Sam", at: "2026-10-27T18:00:00.000Z" };
   const record = { options: [{ id: "standard", totalPence: 450_000 }], acceptance };
   const acceptedAt = "2026-10-27T18:00:00.000Z";
-  const fresh = async (id: string) => {
-    await db.from("proposals").insert({ id, project_id: "p1", version: Number(id.slice(2)), status: "accepted", record, accepted_at: acceptedAt });
-  };
+  const pr1 = uuid(201);
   const refused = async (id: string, patch: Record<string, unknown>, why: string) => {
     const res = await db.from("proposals").update(patch).eq("id", id);
     assert.equal(res.error?.code, "P0001", why);
   };
+  assert.equal((await db.from("proposals").insert({ id: pr1, project_id: P1, version: 1, status: "accepted", record, accepted_at: acceptedAt })).error, null);
 
   // Superseding may not touch what was agreed, or where and when it was agreed.
-  await fresh("pr1");
-  await refused("pr1", { status: "superseded", record: { ...record, acceptance: { ...acceptance, totalPence: 1 } } }, "acceptance");
-  await refused("pr1", { status: "superseded", record: { options: record.options } }, "acceptance dropped");
-  await refused("pr1", { status: "superseded", record, project_id: "p2" }, "project_id");
-  await refused("pr1", { status: "superseded", record, version: 9 }, "version");
-  await refused("pr1", { status: "superseded", record, accepted_at: "2026-10-28T09:00:00.000Z" }, "accepted_at");
-  await refused("pr1", { status: "declined", record }, "any status but superseded");
+  await refused(pr1, { status: "superseded", record: { ...record, acceptance: { ...acceptance, totalPence: 1 } } }, "acceptance");
+  await refused(pr1, { status: "superseded", record: { options: record.options } }, "acceptance dropped");
+  await refused(pr1, { status: "superseded", record, project_id: P2 }, "project_id");
+  await refused(pr1, { status: "superseded", record, version: 9 }, "version");
+  await refused(pr1, { status: "superseded", record, accepted_at: "2026-10-28T09:00:00.000Z" }, "accepted_at");
+  await refused(pr1, { status: "declined", record }, "any status but superseded");
   // Bookkeeping in the record is fine, and the same instant written another way is the same instant.
   const ok = await db
     .from("proposals")
     .update({ status: "superseded", record: { ...record, supersededBy: "pr2" }, accepted_at: "2026-10-27T18:00:00+00:00" })
-    .eq("id", "pr1");
+    .eq("id", pr1);
   assert.equal(ok.error, null);
 
   // Accepted, then superseded: still frozen.
-  await refused("pr1", { record: { ...record, options: [] } }, "options of a superseded acceptance");
-  await refused("pr1", { status: "draft" }, "un-superseding");
-  await refused("pr1", { record: { options: record.options } }, "dropping the acceptance after superseding");
-  const restated = await db.from("proposals").update({ status: "superseded", record: { ...record, supersededBy: "pr3" } }).eq("id", "pr1");
+  await refused(pr1, { record: { ...record, options: [] } }, "options of a superseded acceptance");
+  await refused(pr1, { status: "draft" }, "un-superseding");
+  await refused(pr1, { record: { options: record.options } }, "dropping the acceptance after superseding");
+  const restated = await db.from("proposals").update({ status: "superseded", record: { ...record, supersededBy: "pr3" } }).eq("id", pr1);
   assert.equal(restated.error, null, "re-stating it superseded, agreement untouched");
 
   // A superseded draft that was never accepted is ordinary data.
-  await db.from("proposals").insert({ id: "pd1", project_id: "p1", version: 7, status: "superseded", record: { options: [] } });
-  const free = await db.from("proposals").update({ status: "draft", record: { options: [{ id: "x" }] } }).eq("id", "pd1");
+  const pd1 = uuid(202);
+  assert.equal((await db.from("proposals").insert({ id: pd1, project_id: P1, version: 7, status: "superseded", record: { options: [] } })).error, null);
+  const free = await db.from("proposals").update({ status: "draft", record: { options: [{ id: "x" }] } }).eq("id", pd1);
   assert.equal(free.error, null);
 });
 
 test("surveys: one row per (project, version), so a double-tapped start can't make two drafts", async () => {
   const db = memory();
-  const first = await db.from("surveys").insert({ project_id: "p1", version: 1, status: "draft", data: {} });
+  await ensureProjectRow(db, P1);
+  await ensureProjectRow(db, P2);
+  const first = await db.from("surveys").insert({ project_id: P1, version: 1, status: "draft", data: {} });
   assert.equal(first.error, null);
-  const twin = await db.from("surveys").insert({ project_id: "p1", version: 1, status: "draft", data: {} });
+  const twin = await db.from("surveys").insert({ project_id: P1, version: 1, status: "draft", data: {} });
   assert.equal(twin.error?.code, "23505");
-  const next = await db.from("surveys").insert({ project_id: "p1", version: 2, status: "draft", data: {} });
+  const next = await db.from("surveys").insert({ project_id: P1, version: 2, status: "draft", data: {} });
   assert.equal(next.error, null);
-  const other = await db.from("surveys").insert({ project_id: "p2", version: 1, status: "draft", data: {} });
+  const other = await db.from("surveys").insert({ project_id: P2, version: 1, status: "draft", data: {} });
   assert.equal(other.error, null);
 });
 
@@ -397,7 +587,7 @@ test("throwOnError throws the PostgREST error", async () => {
   const db = memory();
   await assert.rejects(
     async () => {
-      await db.from("x").select("id").eq("id", "nope").single().throwOnError();
+      await db.from("projects").select("id").eq("id", uuid(9)).single().throwOnError();
     },
     (err: { code?: string }) => err.code === "PGRST116",
   );
@@ -406,9 +596,12 @@ test("throwOnError throws the PostgREST error", async () => {
 test("file backend persists across client instances and picks up outside edits", async () => {
   await withTempDir(async (dir) => {
     const a = createLocalClient({ backend: "file", dataDir: dir });
-    await Promise.all(
-      Array.from({ length: 25 }, (_, i) => a.from("ops_notes").insert({ quote_id: "q1", note: `DEMO note ${i}` })),
+    const quote = quoteRow();
+    assert.equal((await a.from("quote_requests").insert(quote)).error, null);
+    const results = await Promise.all(
+      Array.from({ length: 25 }, (_, i) => a.from("ops_notes").insert({ quote_id: quote.id, note: `DEMO note ${i}` })),
     );
+    assert.ok(results.every((r) => r.error === null));
     const onDisk = JSON.parse(await readFile(join(dir, "ops_notes.json"), "utf8")) as unknown[];
     assert.equal(onDisk.length, 25, "concurrent writes are serialised, none lost");
 
@@ -418,7 +611,7 @@ test("file backend persists across client instances and picks up outside edits",
 
     // An edit made outside the process (another server, a seed script) is seen.
     await new Promise((r) => setTimeout(r, 15));
-    await writeFile(join(dir, "ops_notes.json"), JSON.stringify([{ id: "n1", quote_id: "q2", note: "hand edit" }]));
+    await writeFile(join(dir, "ops_notes.json"), JSON.stringify([{ id: uuid(1), quote_id: quote.id, note: "hand edit" }]));
     const fresh = await a.from("ops_notes").select("note");
     assert.deepEqual(fresh.data, [{ note: "hand edit" }]);
 
@@ -510,7 +703,8 @@ test("storage: upload, list, remove, path traversal and unknown buckets", async 
     assert.deepEqual(removed.data?.map((r) => r.name), ["p1/sub/b.png"]);
     assert.deepEqual((await bucket.list("p1")).data?.map((e) => e.name), ["a.txt"], "empty folders are pruned");
 
-    for (const evil of ["../outside.txt", "p1/../../outside.txt", "p1/./x", "a\\b", ""]) {
+    // The last three are keys Supabase Storage refuses ("Invalid key"): only ASCII word characters and a few marks.
+    for (const evil of ["../outside.txt", "p1/../../outside.txt", "p1/./x", "a\\b", "", "p1/café.jpg", "p1/50%.jpg", "p1/#1.jpg"]) {
       assert.equal(cleanObjectPath(evil), null, evil);
       assert.ok((await bucket.upload(evil, "x")).error, `upload refused: ${evil}`);
       assert.ok((await bucket.createSignedUploadUrl(evil)).error, `signing refused: ${evil}`);
@@ -572,11 +766,12 @@ test("getServiceClient: Supabase first, then local (file in dev), else demo mode
 });
 
 test("jsonb columns come back in Postgres jsonb key order (shortest key first, then bytes), like PostgREST", async () => {
-  const db = memory();
+  const db: SupabaseClient = memory();
+  await ensureProjectRow(db, P1);
   const record = { label: "Good", id: "v1", tier: "good", systems: [{ roomIds: ["r1"], outdoorItemId: "o1" }], bom: [], verdict: { ok: true, at: "x" } };
-  const inserted = await db.from("designs").insert({ project_id: "p1", version: 1, record }).select("record").single();
+  const inserted = await db.from("designs").insert({ project_id: P1, version: 1, record }).select("record").single();
   assert.equal(inserted.error, null);
-  const read = await db.from("designs").select("*").eq("project_id", "p1").single();
+  const read = await db.from("designs").select("*").eq("project_id", P1).single();
   for (const got of [inserted.data, read.data] as { record: Record<string, unknown> }[]) {
     assert.deepEqual(Object.keys(got.record), ["id", "bom", "tier", "label", "systems", "verdict"]);
     assert.deepEqual(Object.keys((got.record.systems as Record<string, unknown>[])[0]), ["roomIds", "outdoorItemId"]);
@@ -587,6 +782,6 @@ test("jsonb columns come back in Postgres jsonb key order (shortest key first, t
   }
   // Callers get copies: changing what came back never changes the store.
   (read.data as { record: { label: string } }).record.label = "changed";
-  const again = await db.from("designs").select("record").eq("project_id", "p1").single();
+  const again = await db.from("designs").select("record").eq("project_id", P1).single();
   assert.equal((again.data as { record: { label: string } }).record.label, "Good");
 });

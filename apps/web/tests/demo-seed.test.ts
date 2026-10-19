@@ -9,6 +9,7 @@ import {
   type Project,
 } from "@aircon/domain";
 import { registerAppResolver } from "./helpers/resolve-app.ts";
+import { insertProjectRow, quoteRow } from "./helpers/rows.ts";
 
 // The real seed on the in-memory local backend: nothing touches disk or a real database.
 process.env.DATA_BACKEND = "memory";
@@ -201,9 +202,9 @@ test("reset on the local backend: writes everything, replaces only demo data, an
   // Someone's real (non-demo) quote and project: a reset must leave them alone.
   const realQuote = crypto.randomUUID();
   const realProject = crypto.randomUUID();
-  await db.from("quote_requests").insert({ id: realQuote, customer_name: "Real person", email: "real@example.org", source: "web", survey: {}, quote: {} });
-  await db.from("projects").insert({ id: realProject, quote_id: realQuote, project: { schemaVersion: 2 } });
-  await db.from("catalogue_items").insert({ id: "real-item", kind: "indoor", label: "Real item", item: {} });
+  assert.equal((await db.from("quote_requests").insert(quoteRow({ id: realQuote, customer_name: "Real person", email: "real@example.org", source: "web" }))).error, null);
+  await insertProjectRow(db, { id: realProject, quote_id: realQuote, project: { schemaVersion: 2 } });
+  assert.equal((await db.from("catalogue_items").insert({ id: "real-item", kind: "indoor", label: "Real item", item: {} })).error, null);
 
   const first = await resetDemoData({ now: NOW });
   assert.equal(first.projects.length, 5);

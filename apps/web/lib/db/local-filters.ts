@@ -65,14 +65,14 @@ const OPS = new Set<string>(["eq", "neq", "gt", "gte", "lt", "lte", "like", "ili
 /* Column paths                                                        */
 /* ------------------------------------------------------------------ */
 
-interface ColumnPath {
+export interface ColumnPath {
   column: string;
   /** JSON path steps after the column; `text` marks a final `->>`. */
   steps: string[];
   text: boolean;
 }
 
-function parseColumnPath(expr: string): ColumnPath {
+export function parseColumnPath(expr: string): ColumnPath {
   const parts = expr.split(/(->>|->)/);
   const column = parts[0].trim();
   const steps: string[] = [];

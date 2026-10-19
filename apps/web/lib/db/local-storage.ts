@@ -47,14 +47,23 @@ export function isBucketName(bucket: string): boolean {
 }
 
 /**
+ * The characters Supabase Storage accepts in an object key (storage-api
+ * `isValidKey`): ASCII letters, digits, `_`, `/`, space and `!-.*'()&$@=;:+,?`.
+ * Anything else ("café.jpg", "#", "%", "~") is "Invalid key" there, so it is here too.
+ */
+const SUPABASE_KEY_RE = /^(\w|\/|!|-|\.|\*|'|\(|\)| |&|\$|@|=|;|:|\+|,|\?)*$/;
+
+/**
  * Canonical object path, or null when unsafe. Collapses repeated and
  * leading/trailing slashes (as supabase-js does) and rejects `.` / `..`
- * segments, backslashes, control characters and our temp-file marker.
+ * segments, backslashes, control characters, characters Supabase Storage
+ * refuses in a key, and our temp-file marker.
  */
 export function cleanObjectPath(path: unknown): string | null {
   if (typeof path !== "string") return null;
   const p = path.replace(/\/+/g, "/").replace(/^\/|\/$/g, "");
   if (!p || p.length > 1024) return null;
+  if (!SUPABASE_KEY_RE.test(p)) return null;
   for (const segment of p.split("/")) {
     if (segment === "." || segment === "..") return null;
     if (/[\u0000-\u001f\u007f\\]/.test(segment)) return null;

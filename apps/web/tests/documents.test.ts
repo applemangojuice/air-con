@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { DEFAULT_SETTINGS, documentCompany, type DocumentRecord, type DocumentSnapshots, type Invoice } from "@aircon/domain";
 import { registerAppResolver } from "./helpers/resolve-app.ts";
+import { ensureProjectRow } from "./helpers/rows.ts";
 
 // The real modules, on the in-memory local backend.
 process.env.DATA_BACKEND = "memory";
@@ -121,8 +122,8 @@ test("isCustomerVisible: visible and not a draft", () => {
 
 test("createDocument: versions, supersession and listing on the local backend", async () => {
   const projectId = "5c5c5c5c-3333-4333-8333-000000000003";
-  // documents.project_id references projects: give it one (the memory backend doesn't check, Postgres would).
-  await requireDb().from("projects").insert({ id: projectId, quote_id: crypto.randomUUID(), project: {} });
+  // documents.project_id references projects: give it one (the local backend checks it, as Postgres does).
+  await ensureProjectRow(requireDb(), projectId);
 
   const surveySnapshot = { ...header, survey: { id: "s", projectId, version: 1, status: "submitted" as const, data: {} as never }, promises: ["DEMO"] };
   const first = await createDocument(projectId, "survey-report", surveySnapshot, { title: "Survey report", customerVisible: true, createdBy: "DEMO" });

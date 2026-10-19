@@ -13,6 +13,8 @@
 #   2. supabase-stubs.sql: storage/auth schemas, API roles, default grants
 #   3. supabase/migrations/*.sql in lexical order, each in one transaction
 #   4. 0010 again on the fresh schema: proves it's re-runnable
+#   4b. the schema against apps/web/lib/db/db-schema.generated.ts, which the
+#      local data backend enforces (UPDATE_SCHEMA=1 rewrites it from here)
 #   5. sanity.sql: one row in every new table, constraints, the proposal guard
 #   6. 0010 a third time, now over real rows: re-running never touches data
 #   7. 0013 again over real rows, then over data from before it: two households
@@ -119,6 +121,16 @@ done
 
 echo "==> re-apply 0010 (idempotency, empty schema)"
 apply "$PILOT_MIGRATION"
+
+# The local data backend enforces apps/web/lib/db/db-schema.generated.ts
+# (columns, types, NOT NULL, defaults, keys, foreign keys): it must be what
+# the migrations make. UPDATE_SCHEMA=1 rewrites it from this database.
+echo "==> local backend schema (db-schema.generated.ts)"
+if [[ "${UPDATE_SCHEMA:-0}" == 1 ]]; then
+  "${PSQL[@]}" -d "$DB" -f "$HERE/schema-dump.sql" | node "$HERE/schema-sync.mjs" --write
+else
+  "${PSQL[@]}" -d "$DB" -f "$HERE/schema-dump.sql" | node "$HERE/schema-sync.mjs" --check
+fi
 
 echo "==> sanity checks"
 # Query results go to /dev/null; \echo progress and the "ok: ..." notices still show.
