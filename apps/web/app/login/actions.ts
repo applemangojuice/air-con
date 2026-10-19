@@ -10,6 +10,7 @@ import { breakGlassSession, ensureDemoStaff, setSession, staffSession } from "@/
 import { emailConfigured } from "@/lib/email";
 import { isDemoLoginAllowed } from "@/lib/env-mode";
 import { rateLimit, rateLimitIdentity } from "@/lib/rate-limit";
+import { pilotSchemaStatus } from "@/lib/schema-check";
 import { getServiceClient } from "@/lib/supabase-server";
 
 /**
@@ -69,6 +70,11 @@ export async function requestMagicLink(_prev: LinkState, form: FormData): Promis
     return { status: "sent", email, emailLive: emailConfigured(), ...(result.devLink ? { devLink: result.devLink } : {}) };
   } catch (err) {
     console.error("[login] magic link failed:", err);
+    // Not a passing hiccup: the pilot migration hasn't been run (the banner above says how to fix it).
+    const schema = await pilotSchemaStatus().catch(() => null);
+    if (schema?.missingTables.some((t) => t === "staff" || t === "login_tokens")) {
+      return { status: "error", message: "Sign-in isn't set up on this database yet: its pilot migration hasn't been run (see the note above).", email };
+    }
     return { status: "error", message: "We couldn't send a link just now. Please try again.", email };
   }
 }

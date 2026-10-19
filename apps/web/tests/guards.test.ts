@@ -29,6 +29,8 @@ import {
 } from "../lib/auth/access.ts";
 import { DEMO_ROLE_KEYS, DEMO_STAFF, isDemoRoleKey, isDemoStaffId } from "../lib/auth/demo-staff.ts";
 import type { CustomerSession, StaffSession } from "../lib/auth/session.ts";
+import { cronSecret, isPlaceholderValue, placeholderKeys } from "../lib/env-placeholders.ts";
+import { stripeMode } from "../lib/providers/stripe.ts";
 
 /** DEMO people only. */
 const person = (id: string, over: Partial<StaffMember> = {}): StaffMember => ({
@@ -308,8 +310,36 @@ test("break-glass needs a long OPS_PASSWORD", () => {
   assert.equal(breakGlassEnabled({}), false);
   assert.equal(breakGlassEnabled({ OPS_PASSWORD: "" }), false);
   assert.equal(breakGlassEnabled({ OPS_PASSWORD: "hunter2" }), false);
-  assert.equal(breakGlassEnabled({ OPS_PASSWORD: "x".repeat(19) }), false);
-  assert.equal(breakGlassEnabled({ OPS_PASSWORD: "x".repeat(20) }), true);
+  assert.equal(breakGlassEnabled({ OPS_PASSWORD: "p4".repeat(10).slice(0, 19) }), false);
+  assert.equal(breakGlassEnabled({ OPS_PASSWORD: "p4".repeat(10) }), true);
+  // The .env.example placeholder (33 characters, in the public repo) never turns it on.
+  assert.equal(breakGlassEnabled({ OPS_PASSWORD: "at-least-twenty-random-characters" }), false);
+});
+
+test("template values from .env.example count as not set", () => {
+  for (const v of [
+    "generate-with-openssl-rand-hex-32",
+    "at-least-twenty-random-characters",
+    "generate-a-long-random-string",
+    "re_xxx",
+    "sk_test_xxx",
+    "whsec_xxx",
+    "ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "your-twilio-auth-token",
+    "your-service-role-key",
+    "https://YOUR-PROJECT.supabase.co",
+    "sk-ant-...",
+  ]) {
+    assert.equal(isPlaceholderValue(v), true, v);
+  }
+  for (const v of ["", ["re", "8sJk2LmQ9xYz"].join("_"), ["sk", "test", "51NzQ2pLk"].join("_"), ["AC", "0123456789abcdef".repeat(2)].join(""), "4f9c0e7a2b1d8c6e", "https://abcd1234.supabase.co"]) {
+    assert.equal(isPlaceholderValue(v), false, v);
+  }
+  assert.deepEqual(placeholderKeys({ RESEND_API_KEY: "re_xxx", STRIPE_SECRET_KEY: "sk_test_xxx", CRON_SECRET: "real-cron-6f1e" }), ["RESEND_API_KEY", "STRIPE_SECRET_KEY"]);
+  assert.equal(cronSecret({ CRON_SECRET: "generate-a-long-random-string" }), null, "the crons refuse a template secret");
+  assert.equal(cronSecret({ CRON_SECRET: "6f1e9a" }), "6f1e9a");
+  assert.equal(stripeMode("sk_test_xxx"), "demo");
+  assert.equal(stripeMode(["sk", "live", "51Nz"].join("_")), "live");
 });
 
 test("customer sign-in links only go to the customer's own address", () => {
@@ -369,7 +399,18 @@ test("DEMO team: one per role, fictional, and the qualified ones pass their gate
 test("securityWarnings: what the boot log shouts about in production", () => {
   const strong = "0123456789abcdef".repeat(4);
   assert.deepEqual(securityWarnings({ NODE_ENV: "development" }), [], "dev is quiet");
-  assert.deepEqual(securityWarnings({ NODE_ENV: "production", SESSION_SECRET: strong }), [], "a clean production config");
+  assert.deepEqual(securityWarnings({ NODE_ENV: "production", SESSION_SECRET: strong, CRON_SECRET: strong }), [], "a clean production config");
+  assert.match(securityWarnings({ NODE_ENV: "production", SESSION_SECRET: strong }).join(), /CRON_SECRET is not set: the daily jobs/);
+  const pasted = securityWarnings({
+    NODE_ENV: "production",
+    SESSION_SECRET: "generate-with-openssl-rand-hex-32",
+    OPS_PASSWORD: "at-least-twenty-random-characters",
+    CRON_SECRET: "generate-a-long-random-string",
+    RESEND_API_KEY: "re_xxx",
+  }).join("\n");
+  assert.match(pasted, /SESSION_SECRET is still the \.env\.example placeholder/);
+  assert.match(pasted, /OPS_PASSWORD is still the \.env\.example placeholder/);
+  assert.match(pasted, /CRON_SECRET, RESEND_API_KEY still hold \.env\.example placeholder values/);
   const all = securityWarnings({
     NODE_ENV: "production",
     SESSION_SECRET: "short",
@@ -408,4 +449,18 @@ test("a dead sign-in link never sends a customer to the team sign-in page", () =
   assert.equal(deadLinkLanding({ token: staffLink, session: staffSession, reason: "expired" }), "/ops/projects/p-1");
   assert.equal(deadLinkLanding({ token: null, session: staffSession, reason: "expired" }), "/ops");
   assert.equal(deadLinkLanding({ token: theirs, session: staffSession, reason: "expired" }), "/portal?link=expired", "a customer's link opened by staff");
+});
+
+test(".env.example ships no values: pasting it in can't set a public secret or a junk key", async () => {
+  const { readFileSync } = await import("node:fs");
+  const text = readFileSync(new URL("../.env.example", import.meta.url), "utf8");
+  const set = text
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l && !l.startsWith("#"))
+    .map((l) => /^([A-Z0-9_]+)=(.*)$/.exec(l))
+    .filter((m): m is RegExpExecArray => Boolean(m))
+    .filter((m) => m[2]!.trim() !== "");
+  assert.deepEqual(set.map((m) => m[1]), [], "every variable is blank (or commented out)");
+  assert.doesNotMatch(text, /^DATA_BACKEND=/m, "the local backend is opt-in, never pasted into Vercel");
 });

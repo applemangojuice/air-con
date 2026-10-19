@@ -5,6 +5,7 @@ import type { DesignRecord } from "./design-record.ts";
 import {
   UNKNOWN_SUPPLIER,
   advancePo,
+  earliestKitArrival,
   kitCustomerSummary,
   kitSummary,
   needOnSiteBy,
@@ -14,6 +15,7 @@ import {
   poTotals,
   posFromDesign,
   raiseReplacement,
+  recordPoActualCosts,
   recordPoDelivery,
   recordPoInspection,
   shiftWorkingDays,
@@ -306,4 +308,84 @@ test("kitSummary: kit at the customer's home only when every required line's ord
     assert.equal(s.shortages, 0, destination);
     assert.equal(s.deliveredTo, "elsewhere", `${destination}: reaches the customer at install`);
   }
+});
+
+test("kitSummary.receivedOn: the London day the last required line arrived, a replacement included", () => {
+  const delivered = (po: PurchaseOrder, at: string): PurchaseOrder => ({
+    ...po,
+    status: "delivered",
+    deliveredAt: at,
+    lines: po.lines.map((l) => ({ ...l, receivedQty: poLineEffectiveQty(l) })),
+  });
+  const all = pos();
+  assert.equal(kitSummary(all).receivedOn, undefined, "nothing here yet");
+  // Two suppliers, two days; the second arrived at 00:30 on the 21st in London (23:30 UTC on the 20th).
+  const both = [delivered(all[0]!, "2026-10-19T09:00:00.000Z"), ...all.slice(1).map((po) => delivered(po, "2026-10-20T23:30:00.000Z"))];
+  assert.equal(kitSummary(both).receivedOn, "2026-10-21");
+  // One still to come: no date.
+  assert.equal(kitSummary([delivered(all[0]!, NOW), ...all.slice(1)]).receivedOn, undefined);
+  // A replacement for a damaged unit: the last of the goods is the replacement's arrival.
+  const first = delivered(all[0]!, "2026-10-19T09:00:00.000Z");
+  const checked = recordPoInspection(first, { by: BY, lines: [{ lineId: first.lines[0]!.id, goodQty: 1, damagedQty: 1 }] }, NOW);
+  assert.ok(checked.ok);
+  if (!checked.ok) return;
+  const rep = raiseReplacement(checked.po, first.lines[0]!.id, 1, makeId, BY, NOW);
+  assert.ok(rep.ok);
+  if (!rep.ok) return;
+  const rest = all.slice(1).map((po) => delivered(po, "2026-10-19T10:00:00.000Z"));
+  assert.equal(kitSummary([rep.po, rep.replacement, ...rest]).receivedOn, undefined, "the replacement is still to come");
+  assert.equal(kitSummary([rep.po, delivered(rep.replacement, "2026-10-26T11:00:00.000Z"), ...rest]).receivedOn, "2026-10-26");
+});
+
+test("earliestKitArrival: delivered days, ETAs, order dates plus lead time, or today plus lead time", () => {
+  const today = "2026-10-19"; // Mon
+  assert.equal(earliestKitArrival([], today), "2026-10-26", "nothing ordered: five working days");
+  const [a, b] = pos();
+  assert.equal(earliestKitArrival([a!, b!], today), "2026-10-26");
+  assert.equal(earliestKitArrival([{ ...a!, leadDays: 2 }, { ...b!, leadDays: 1 }], today), "2026-10-21");
+  const placed = { ...a!, status: "confirmed" as const, eta: "2026-10-23" };
+  assert.equal(earliestKitArrival([placed, { ...b!, leadDays: 1 }], today), "2026-10-23");
+  const overdue = { ...a!, status: "ordered" as const, eta: "2026-10-12" };
+  assert.equal(earliestKitArrival([overdue], today), "2026-10-20", "an ETA that's passed: tomorrow at the earliest");
+  const noEta = { ...a!, status: "ordered" as const, orderedOn: "2026-10-16", leadDays: 3 };
+  assert.equal(earliestKitArrival([noEta], today), "2026-10-21");
+  const here = { ...a!, status: "delivered" as const, deliveredAt: "2026-10-15T10:00:00.000Z" };
+  assert.equal(earliestKitArrival([here, { ...b!, leadDays: 1 }], today), "2026-10-20");
+});
+
+test("poSchedule: a cancellation period waiting on the kit brings 'needed at the home' forward", () => {
+  const [po] = pos();
+  // Day 1 Wed 4 Nov; no early start: the kit must be at the home by Tue 20 Oct (4 Nov less 15 days).
+  const s = poSchedule(po!, "2026-11-04", "2026-10-19", undefined, { deliverBy: "2026-10-20" });
+  assert.equal(s.needOnSiteBy, "2026-10-20");
+  assert.equal(s.needFor, "cancellation-period");
+  assert.equal(s.orderBy, "2026-10-13");
+  assert.ok(s.flags.includes("order-late"), "ordering on the kit page's old 'order by' would be refused on day 1");
+  // Without it: two working days before day 1, as before.
+  const plain = poSchedule(po!, "2026-11-04", "2026-10-19");
+  assert.deepEqual([plain.needOnSiteBy, plain.needFor], ["2026-11-02", "install"]);
+  // Kit to our storage doesn't start the period at delivery, so the period doesn't move its date.
+  const stored = poSchedule({ ...po!, destination: "storage" }, "2026-11-04", "2026-10-19", undefined, { deliverBy: "2026-10-20" });
+  assert.equal(stored.needOnSiteBy, "2026-11-02");
+});
+
+test("recordPoActualCosts: what the supplier charged, per line, once the order is placed", () => {
+  const [po] = pos();
+  const line = po!.lines[0]!;
+  assert.match((recordPoActualCosts(po!, { by: BY, lines: [{ lineId: line.id, actualUnitCostPence: 36_000 }] }, NOW) as { error: string }).error, /once the order is placed/);
+  const ordered = advancePo(po!, "ordered", BY, NOW);
+  assert.ok(ordered.ok);
+  if (!ordered.ok) return;
+  const r = recordPoActualCosts(ordered.po, { by: BY, lines: [{ lineId: line.id, actualUnitCostPence: 36_000 }] }, NOW);
+  assert.ok(r.ok);
+  if (!r.ok) return;
+  assert.equal(r.po.lines[0]!.actualUnitCostPence, 36_000);
+  assert.match(r.po.history.at(-1)!.note, /Actual costs \(ex VAT\): .* £360\.00 each/);
+  assert.equal(poTotals(r.po).actualPence !== null, true);
+  assert.equal(recordPoActualCosts(r.po, { by: BY, lines: [{ lineId: line.id, actualUnitCostPence: 36_000 }] }, NOW).ok, false, "nothing changed");
+  const cleared = recordPoActualCosts(r.po, { by: BY, lines: [{ lineId: line.id, actualUnitCostPence: null }] }, NOW);
+  assert.ok(cleared.ok && cleared.po.lines[0]!.actualUnitCostPence === undefined);
+  assert.equal(recordPoActualCosts(r.po, { by: BY, lines: [{ lineId: "nope", actualUnitCostPence: 1 }] }, NOW).ok, false);
+  assert.equal(recordPoActualCosts(r.po, { by: BY, lines: [{ lineId: line.id, actualUnitCostPence: 12.5 }] }, NOW).ok, false);
+  assert.equal(recordPoActualCosts(r.po, { by: " ", lines: [{ lineId: line.id, actualUnitCostPence: 1 }] }, NOW).ok, false);
 });

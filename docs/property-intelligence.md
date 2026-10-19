@@ -16,7 +16,7 @@ Live surfaces:
 - **Per-address landing pages** (`/a/<property id>`, sample at `/a/demo`):
   the page each mailed letter points at. What we know, the proposed system,
   an indicative price, and a CTA into the prefilled funnel.
-- **Analytics platform** (`/ops/intel`, basic auth): coverage stats, install
+- **Analytics platform** (`/ops/intel`, staff sign-in): coverage stats, install
   pattern distribution, target-list filters, mailing CSV export with
   personalised URLs, campaign tagging, and the business case for any list.
 

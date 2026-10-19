@@ -13,7 +13,7 @@ import {
   type PriceLine,
 } from "./costing.ts";
 import type { DesignRecord, DesignVariant, RoomDesignInput } from "./design-record.ts";
-import type { ContractType } from "./project.ts";
+import type { ContractType, ReadinessContext } from "./project.ts";
 import { TAX_CODES, effectiveTaxCode, type PilotSettings, type TaxCodeId } from "./settings.ts";
 
 /**
@@ -272,6 +272,41 @@ export function settingsForProposal(settings: PilotSettings, record: Pick<Propos
     payments: { ...settings.payments, depositPct: t.depositPct, depositTiming: t.depositTiming, balanceDueDays: t.balanceDueDays, methods: [...t.methods] },
     scheduling: { ...settings.scheduling, cancellationDays: Math.max(t.cancellationDays, 14) },
   };
+}
+
+/**
+ * What the project's gates need to know about its latest proposal. Both
+ * readiness builders (project-service and the board's in-memory one) use
+ * this, so they can't drift apart.
+ */
+export function proposalCheckFor(
+  proposal: Pick<ProposalRecord, "options" | "marginOverride" | "taxOverride" | "validUntil">,
+  settings: PilotSettings,
+  todayIso: string,
+): NonNullable<ReadinessContext["proposalCheck"]> {
+  const options = proposal.options ?? [];
+  return {
+    belowMinMargin: options.some((o) => o.pricing?.belowMinMargin === true),
+    marginOverride: Boolean(proposal.marginOverride),
+    taxConfirmed: !settings.tax.vatRegistered || settings.tax.accountantConfirmed,
+    taxOverride: Boolean(proposal.taxOverride),
+    expired: Boolean(proposal.validUntil) && proposal.validUntil.slice(0, 10) < todayIso.slice(0, 10),
+    unpricedCostLines: options.reduce((n, o) => n + Math.max(0, o.pricing?.unpricedCostLines ?? 0), 0),
+  };
+}
+
+/**
+ * The payment schedule an accepted proposal froze at issue (its deposit
+ * percentage and timing, and the balance's due days), for the booking gate
+ * and the deposit due; undefined until there's a contract.
+ */
+export function agreedPaymentsFor(
+  proposal: Pick<ProposalRecord, "status" | "terms"> | null | undefined,
+  settings: PilotSettings,
+): ReadinessContext["agreedPayments"] {
+  if (!proposal || proposal.status !== "accepted") return undefined;
+  const p = settingsForProposal(settings, proposal).payments;
+  return { depositPct: p.depositPct, depositTiming: p.depositTiming, balanceDueDays: p.balanceDueDays };
 }
 
 /**
@@ -703,6 +738,12 @@ export function proposalIssueErrors(p: ProposalRecord, settings: PilotSettings, 
     }
     if (pr.belowMinMargin && !p.marginOverride?.reason.trim()) {
       errors.push(`${name}: the margin (${pr.grossMarginPct}%) is below the ${settings.pricing.minMarginPct}% minimum. Change the price, or an admin records an override with a reason.`);
+    } else if ((pr.unpricedCostLines ?? 0) > 0 && !p.marginOverride?.reason.trim()) {
+      // Fail closed: the margin on the priced lines alone overstates the real one.
+      const n = pr.unpricedCostLines;
+      errors.push(
+        `${name}: ${n} cost line${n === 1 ? " has" : "s have"} no price, so the ${settings.pricing.minMarginPct}% minimum margin can't be checked. ${n === 1 ? "Type its cost in the build-up (or price it" : "Type their costs in the build-up (or price them"} in the catalogue), or an admin records an override with a reason.`,
+      );
     }
     if (!(o.installDays >= 1)) errors.push(`${name}: set the install days.`);
     if (instantPence > 0 && pr.totalPence > instantPence) anyAboveInstant = true;

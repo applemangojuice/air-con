@@ -21,7 +21,7 @@ import { ActionForm } from "../booking/_f5/action-form";
 import { fmtLondon, isoToLondonLocal } from "../booking/_f5/action-state";
 import { JobHeader } from "../booking/_f5/job-header";
 import { PhotoUpload } from "../booking/_f5/photo-upload";
-import { advanceAction, cancelAction, deliveryAction, generateAction, inspectionAction, replacementAction, updateAction } from "./actions";
+import { actualCostsAction, advanceAction, cancelAction, deliveryAction, generateAction, inspectionAction, replacementAction, updateAction } from "./actions";
 
 export const metadata: Metadata = { title: "Kit · ops", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -56,7 +56,12 @@ export default async function KitPage({ params }: { params: Promise<{ id: string
   const { project: p, summary: s } = view;
   const live = view.orders.filter((o) => o.status !== "cancelled");
   const cancelled = view.orders.filter((o) => o.status === "cancelled");
-  const need = live.find((o) => o.schedule.needOnSiteBy)?.schedule.needOnSiteBy;
+  // The earliest date an order still has to meet (the cancellation period can bring it forward).
+  const needing = live
+    .filter((o) => o.schedule.needOnSiteBy && !["delivered", "inspected"].includes(o.status))
+    .sort((a, b) => a.schedule.needOnSiteBy!.localeCompare(b.schedule.needOnSiteBy!))[0];
+  const need = needing?.schedule.needOnSiteBy ?? live.find((o) => o.schedule.needOnSiteBy)?.schedule.needOnSiteBy;
+  const forPeriod = needing?.schedule.needFor === "cancellation-period";
   const nowLocal = isoToLondonLocal(new Date().toISOString());
 
   return (
@@ -77,12 +82,27 @@ export default async function KitPage({ params }: { params: Promise<{ id: string
         <Stat label="Delivered" value={`${s.deliveredLines} of ${s.requiredLines}`} tone={s.requiredLines > 0 && s.deliveredLines === s.requiredLines ? "success" : "neutral"} hint="Recorded by a person, never from an ETA" />
         <Stat label="Checked good" value={`${s.inspectedLines} of ${s.requiredLines}`} tone={s.requiredLines > 0 && s.inspectedLines === s.requiredLines ? "success" : "neutral"} />
         <Stat
-          label="Needed on site"
+          label={forPeriod ? "Needed at the home by" : "Needed on site"}
           value={need ? fmtDay(need) : "No dates yet"}
           tone={s.damaged > 0 ? "danger" : "neutral"}
-          hint={s.damaged > 0 ? `${s.damaged} damaged, not yet replaced` : p.booking.startDate ? `Install day 1: ${fmtDay(p.booking.startDate)}` : "Set install dates on Booking"}
+          hint={
+            s.damaged > 0
+              ? `${s.damaged} damaged, not yet replaced`
+              : forPeriod
+                ? `So their cancellation period has run by day 1 (${fmtDay(p.booking.startDate!)})`
+                : p.booking.startDate
+                  ? `Install day 1: ${fmtDay(p.booking.startDate)}`
+                  : "Set install dates on Booking"
+          }
         />
       </div>
+
+      {forPeriod && (
+        <p className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          No early start was requested, so the customer&apos;s cancellation period runs from the day the last of the kit reaches their home, and work can only start
+          once it has run. The order dates below allow for that. If the customer wants to start sooner, record their request on the Booking page.
+        </p>
+      )}
 
       <p className="mt-3 text-sm text-ink-500">
         Customer sees: <span className="font-medium text-ink-900">{customerKitLine(p.kit.status, p.kit.expectedDate)}</span>
@@ -181,7 +201,7 @@ function OrderCard({
   staffName,
   nowLocal,
 }: {
-  po: PurchaseOrder & { schedule: { needOnSiteBy?: string; orderBy?: string; flags: PoFlag[] } };
+  po: PurchaseOrder & { schedule: { needOnSiteBy?: string; orderBy?: string; needFor?: "install" | "cancellation-period"; flags: PoFlag[] } };
   projectId: string;
   staffName: string;
   nowLocal: string;
@@ -192,6 +212,12 @@ function OrderCard({
   const checking = po.status === "delivered" || (receiving && po.lines.some((l) => l.receivedQty > l.inspectedQty));
   const damaged = po.lines.filter((l) => l.damagedQty - (l.replacedQty ?? 0) > 0);
   const canCancel = po.lines.every((l) => l.receivedQty === 0) && !["delivered", "inspected"].includes(po.status);
+  // Actual costs: once the order is placed, from the supplier's invoice or confirmation.
+  const placed = !["required", "approved", "cancelled"].includes(po.status);
+  const actualLines = po.lines.filter((l) => typeof l.actualUnitCostPence === "number");
+  const actualKnown = actualLines.length;
+  const actualPence = actualLines.reduce((sum, l) => sum + l.actualUnitCostPence! * l.qty, 0);
+  const missingCost = po.lines.filter((l) => l.required && l.unitCostPence === null && typeof l.actualUnitCostPence !== "number").length;
 
   return (
     <Card as="article" padded={false} className="overflow-hidden">
@@ -212,7 +238,11 @@ function OrderCard({
         {(po.schedule.orderBy || po.schedule.flags.length > 0) && (
           <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
             {po.schedule.orderBy && ["required", "approved"].includes(po.status) && <Badge tone="neutral">Order by {fmtDay(po.schedule.orderBy)}</Badge>}
-            {po.schedule.needOnSiteBy && !["delivered", "inspected"].includes(po.status) && <Badge tone="neutral">Needed on site {fmtDay(po.schedule.needOnSiteBy)}</Badge>}
+            {po.schedule.needOnSiteBy && !["delivered", "inspected"].includes(po.status) && (
+              <Badge tone="neutral">
+                {po.schedule.needFor === "cancellation-period" ? "Needed at the home by" : "Needed on site"} {fmtDay(po.schedule.needOnSiteBy)}
+              </Badge>
+            )}
             {po.schedule.flags.map((f) => (
               <Badge key={f} tone={FLAG_TONE[f]} dot>
                 {PO_FLAG_TEXT[f]}
@@ -277,7 +307,19 @@ function OrderCard({
           Expected <Money pence={totals.expectedPence} className="font-semibold text-ink-900" />
           {totals.unpricedLines > 0 && ` (${totals.unpricedLines} line${totals.unpricedLines === 1 ? "" : "s"} not priced in the catalogue)`}
           {po.shippingPence > 0 && <>, including <Money pence={po.shippingPence} /> shipping</>}.
+          {actualKnown > 0 && (
+            <>
+              {" "}
+              Actual so far <Money pence={actualPence + po.shippingPence} className="font-semibold text-ink-900" /> ({actualKnown} of {po.lines.length} line{po.lines.length === 1 ? "" : "s"}
+              {po.shippingPence > 0 ? ", with shipping" : ""}).
+            </>
+          )}
         </p>
+        {missingCost > 0 && placed && (
+          <p className="mt-1 text-sm font-medium text-amber-800">
+            {missingCost} line{missingCost === 1 ? " has" : "s have"} no cost at all: enter what the supplier charged under &ldquo;Actual costs&rdquo;, or the pilot&apos;s margin stays unknown.
+          </p>
+        )}
       </div>
 
       {/* The next step */}
@@ -422,6 +464,39 @@ function OrderCard({
                   </ActionForm>
                 );
               })}
+            </Panel>
+          )}
+
+          {placed && (
+            <Panel title={`Actual costs${actualKnown ? ` (${actualKnown} of ${po.lines.length} entered)` : ""}`} open={missingCost > 0 && (po.status === "delivered" || po.status === "inspected")}>
+              <ActionForm flash action={actualCostsAction.bind(null, projectId)} submitLabel="Save actual costs" variant="secondary" busyLabel="Saving…">
+                <input type="hidden" name="poId" value={po.id} />
+                <p className="mb-3 text-sm text-ink-500">
+                  What the supplier charged per unit, ex VAT, from their invoice. The pilot&apos;s real cost and margin come from these; a blank box falls back to the
+                  expected cost.
+                </p>
+                <ul className="space-y-2">
+                  {po.lines.map((l) => (
+                    <li key={l.id} className="flex items-center justify-between gap-3">
+                      <label htmlFor={`act-${l.id}`} className="min-w-0 text-sm text-ink-900">
+                        {l.label}
+                        <span className="block text-xs text-ink-500">
+                          {l.qty} × expected {l.unitCostPence === null ? "not priced" : <Money pence={l.unitCostPence} />}
+                        </span>
+                      </label>
+                      <input
+                        id={`act-${l.id}`}
+                        name={`actual:${l.id}`}
+                        inputMode="decimal"
+                        defaultValue={typeof l.actualUnitCostPence === "number" ? (l.actualUnitCostPence / 100).toFixed(2) : ""}
+                        placeholder="£"
+                        aria-label={`Actual unit cost for ${l.label}, ex VAT, in pounds`}
+                        className={small.replace("w-20", "w-28")}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              </ActionForm>
             </Panel>
           )}
 

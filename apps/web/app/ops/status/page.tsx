@@ -178,7 +178,8 @@ function Banner({ report }: { report: HealthReport }) {
           Connected, but {missing} thing{missing === 1 ? "" : "s"} {missing === 1 ? "is" : "are"} missing
         </p>
         <p className="mt-1 text-sm text-red-600">
-          This is why data isn&apos;t being captured. Run the outstanding migrations below.
+          This is why data isn&apos;t being captured. Run the outstanding migrations below, in order (every file in{" "}
+          <code>supabase/migrations/</code>; the pilot platform&apos;s tables and columns come from <code>0010_pilot_platform.sql</code>).
         </p>
       </div>
     );

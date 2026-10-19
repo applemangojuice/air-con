@@ -4,7 +4,8 @@ import {
   blockersFor,
   cancellationCopy,
   cancellationStatus,
-  earliestInstallStart,
+  earliestKitArrival,
+  earliestStartForKit,
   earlyStartRequestedOf,
   earlyStartWording,
   effectiveTaxCode,
@@ -25,15 +26,18 @@ import {
 import { bookingClashes, workingDatesFrom, type BookingClash } from "@/app/ops/calendar/calendar-model";
 import { audit } from "./audit";
 import { demoLoginAllowed } from "./auth/access";
-import { issueInvoice, planInvoices, type InvoicePlan } from "./money-server";
+import { agreedTerms, issueInvoice, planInvoices, type InvoicePlan } from "./money-server";
+import { listDocuments } from "./documents-server";
 import { loadOpsProjects } from "./ops-server";
 import { buildReadinessContext, dispatch, londonToday, loadProject } from "./project-service";
 import { fail, syncKitStatus, type Outcome } from "./purchasing-server";
 import * as invoicesRepo from "./repo/invoices";
 import * as issuesRepo from "./repo/issues";
 import * as proposalsRepo from "./repo/proposals";
+import * as purchaseOrdersRepo from "./repo/purchaseOrders";
 import * as staffRepo from "./repo/staff";
 import { getSettings } from "./settings-server";
+import { fmtDay } from "./format";
 
 /**
  * Booking on the server (F5): install dates set on the customer's behalf,
@@ -70,6 +74,14 @@ export interface TeamMemberView {
 export interface BookingView {
   project: Project;
   settings: PilotSettings;
+  /**
+   * The payment schedule the customer agreed (the contract's frozen terms,
+   * agreedTerms), else today's settings before there's a contract. The
+   * deposit is planned and described from this, never from a later change.
+   */
+  payments: PilotSettings["payments"];
+  /** True when `payments` comes from an accepted contract. */
+  paymentsAgreed: boolean;
   today: string;
   /** The day qualifications are checked against: the last install day, or today. */
   checkOn: string;
@@ -105,7 +117,7 @@ async function teamList(): Promise<StaffMember[]> {
 export async function loadBooking(projectId: string, staff: StaffMember): Promise<BookingView | null> {
   const project = await loadProject(projectId);
   if (!project) return null;
-  const [settings, ctx, team, others, invoices, issues, proposal] = await Promise.all([
+  const [settings, ctx, team, others, invoices, issues, proposal, contracts, pos] = await Promise.all([
     getSettings(),
     buildReadinessContext(project, staff),
     teamList(),
@@ -113,6 +125,8 @@ export async function loadBooking(projectId: string, staff: StaffMember): Promis
     invoicesRepo.listForProject(projectId),
     issuesRepo.listForProject(projectId),
     proposalsRepo.acceptedForProject(projectId),
+    listDocuments(projectId, { kind: "contract" }),
+    purchaseOrdersRepo.listForProject(projectId),
   ]);
   const today = londonToday();
   const checkOn = project.booking.dates.at(-1) ?? today;
@@ -136,16 +150,30 @@ export async function loadBooking(projectId: string, staff: StaffMember): Promis
   const taxCode =
     (proposal?.acceptance ? proposal.options.find((o) => o.id === proposal.acceptance!.optionId)?.pricing?.taxCode : undefined) ??
     effectiveTaxCode(settings);
-  const plans = planInvoices({ project, invoices, issues, settings, taxCode });
+  // Planned on the terms the customer agreed, as the money page does.
+  const contractDoc = contracts.filter((d) => d.status === "final").sort((a, b) => b.version - a.version)[0];
+  const agreed = agreedTerms(settings, proposal, contractDoc);
+  const frozenDeposit = (contractDoc?.snapshot as { payments?: { depositPence?: unknown } } | undefined)?.payments?.depositPence;
+  const plans = planInvoices({
+    project,
+    invoices,
+    issues,
+    settings: agreed,
+    taxCode,
+    ...(typeof frozenDeposit === "number" && Number.isInteger(frozenDeposit) && frozenDeposit >= 0 ? { contractDepositPence: frozenDeposit } : {}),
+  });
   const depositInvoice = invoices.find((i) => i.kind === "deposit" && i.status !== "void" && i.status !== "draft");
   const cs = cancellationStatus(project, today, settings);
 
   return {
     project,
     settings,
+    payments: agreed.payments,
+    paymentsAgreed: Boolean(proposal && proposal.status === "accepted"),
     today,
     checkOn,
-    earliestStart: earliestInstallStart(project, today, settings),
+    // Lead time, the period once known, and (while it waits on delivery) the kit's earliest arrival plus the period.
+    earliestStart: earliestStartForKit(project, today, settings, earliestKitArrival(pos, today, settings.scheduling.workingDays)),
     cancellation: { ...cs, copy: cancellationCopy(project, { settings, today }) },
     earlyStart: {
       requested: earlyStartRequestedOf(project),
@@ -183,6 +211,19 @@ export async function setInstallDates(projectId: string, startDate: string, staf
   const settings = await getSettings();
   const dates = workingDatesFrom(startDate, project.booking.installDays, settings.scheduling.workingDays);
   if (dates[0] !== startDate) return fail("The first install day must be a working day.");
+  // Supply-and-install with no early start: the period runs from the kit's
+  // delivery, so day 1 has to wait for the orders' real delivery dates plus
+  // the period (the reducer only knows delivery can't be before tomorrow).
+  const today = londonToday();
+  if (!earlyStartRequestedOf(project) && !cancellationStatus(project, today, settings).endsOn) {
+    const arrival = earliestKitArrival(await purchaseOrdersRepo.listForProject(projectId), today, settings.scheduling.workingDays);
+    const floor = earliestStartForKit(project, today, settings, arrival);
+    if (startDate < floor) {
+      return fail(
+        `No early start was requested, so day 1 has to come after the cancellation period, which runs ${settings.scheduling.cancellationDays} days from the kit's delivery to the customer's home. The kit can't be there before ${fmtDay(arrival)} (the orders' dates and lead times), so the earliest start is ${fmtDay(floor)}. If the supplier can deliver sooner, put their date on the order's ETA (Kit page); if the customer wants to start sooner, record their early-start request.`,
+      );
+    }
+  }
   const others = (await loadOpsProjects()).map((o) => o.project);
   const clashes = bookingClashes({ projectId, dates, crew: project.booking.crew.map((c) => ({ staffId: c.staffId, name: c.name })) }, others);
   if (clashes.length) return fail(clashMessage(clashes));

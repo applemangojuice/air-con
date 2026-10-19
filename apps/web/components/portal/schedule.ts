@@ -1,7 +1,10 @@
 import {
+  DEFAULT_SUPPLIER_LEAD_DAYS,
   cancellationStatus,
   earliestInstallStart,
+  earliestStartForKit,
   earlyStartRequestedOf,
+  shiftWorkingDays,
   type PilotSettings,
   type Project,
 } from "@aircon/domain";
@@ -184,23 +187,25 @@ export type EarliestReason = "lead-time" | "cancellation-ends" | "awaiting-deliv
  * (earliestInstallStart: lead time, plus the cancellation period once its
  * end is known) with one addition for supply-and-install with no early
  * start: until the kit is delivered the period's end isn't known, but it is
- * at least the cancellation days after a delivery that can't happen before
- * tomorrow, so nothing earlier could ever pass the ready-to-install gate.
+ * at least the cancellation days after the earliest the kit can reach the
+ * customer's home (`kitArrivesOn`, from the orders: purchasing's
+ * earliestKitArrival; without it, today plus the supplier's usual lead
+ * time), so nothing earlier could ever pass the ready-to-install gate.
  * Offering it would only set the customer up for a move.
  */
 export function earliestOfferedStart(
   project: Project,
   today: string,
   settings: PilotSettings,
+  kitArrivesOn?: string,
 ): { date: string; reason: EarliestReason } {
-  const wd = workingDaysOf(settings);
   const base = earliestInstallStart(project, today, settings);
   if (earlyStartRequestedOf(project)) return { date: base, reason: "early-start" };
   const cs = cancellationStatus(project, today, settings);
   if (cs.endsOn) return { date: base, reason: base > addDays(today.slice(0, 10), 5) ? "cancellation-ends" : "lead-time" };
   if (cs.basis === "goods-delivery") {
-    // Delivered tomorrow at the earliest; the period includes its last day.
-    const floor = nextWorkingDay(addDays(today.slice(0, 10), settings.scheduling.cancellationDays + 2), wd);
+    const arrival = kitArrivesOn ?? shiftWorkingDays(today.slice(0, 10), DEFAULT_SUPPLIER_LEAD_DAYS, workingDaysOf(settings));
+    const floor = earliestStartForKit(project, today, settings, arrival);
     return floor > base ? { date: floor, reason: "awaiting-delivery" } : { date: base, reason: "lead-time" };
   }
   return { date: base, reason: "lead-time" };
@@ -244,13 +249,15 @@ export function installBlockOptions(input: {
   booked: string[];
   count?: number;
   horizonDays?: number;
+  /** The earliest the kit can reach the customer's home (earliestOfferedStart). */
+  kitArrivesOn?: string;
 }): InstallBlock[] {
   const { project, settings } = input;
   const wd = workingDaysOf(settings);
   const n = Math.max(1, project.booking.installDays || settings.scheduling.installBlockDays || 1);
   const busy = new Set(input.booked.map((d) => d.slice(0, 10)));
   const allowStraddle = n > longestRun(wd);
-  const start = earliestOfferedStart(project, input.today, settings).date;
+  const start = earliestOfferedStart(project, input.today, settings, input.kitArrivesOn).date;
   const until = addDays(input.today.slice(0, 10), input.horizonDays ?? 180);
   const count = input.count ?? INSTALL_BLOCK_OPTIONS;
 
@@ -284,6 +291,7 @@ export function blockProblem(input: {
   today: string;
   booked: string[];
   dates: string[];
+  kitArrivesOn?: string;
 }): string | null {
   const { project, settings } = input;
   const wd = workingDaysOf(settings);
@@ -294,7 +302,7 @@ export function blockProblem(input: {
     if (dates[i] !== addWorkingDays(dates[i - 1]!, 1, wd)) return "Install days must be back to back.";
   }
   if (!dates.every((d) => isWorkingDay(d, wd))) return "Install days must be working days.";
-  const earliest = earliestOfferedStart(project, input.today, settings).date;
+  const earliest = earliestOfferedStart(project, input.today, settings, input.kitArrivesOn).date;
   if (dates[0]! < earliest) return `The earliest we can start is ${shortDay(earliest)}.`;
   const busy = new Set(input.booked.map((d) => d.slice(0, 10)));
   if (dates.some((d) => busy.has(d))) return "Those dates have just been taken. Please pick another block.";

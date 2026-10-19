@@ -453,9 +453,19 @@ export interface Project {
     followUpsOptedOutAt?: string;
     serviceDueOn?: string;
   };
-  money: { contractTotalPence?: number; invoicedPence: number; paidPence: number; changeFeesPence: number };
+  money: {
+    contractTotalPence?: number;
+    invoicedPence: number;
+    paidPence: number;
+    changeFeesPence: number;
+    /** Payment ids already counted in paidPence: a retried apply can't count one twice. */
+    paymentIds?: string[];
+  };
   events: ProjectEvent[];
 }
+
+/** payment-recorded's refusal for a payment id the totals already count (a retried apply). */
+export const PAYMENT_ALREADY_COUNTED = "That payment is already counted in the project's totals.";
 
 /** Manufacturers want registering soon after install; terms vary, so this is a safe default. */
 export const WARRANTY_REGISTRATION_DAYS = 30;
@@ -841,7 +851,21 @@ export interface ReadinessContext {
   actor?: StaffMember; // the person doing the action (gates that need qualifications)
   surveyCompleteness?: { pct: number; missing: string[] };
   design?: { status: string; approvedBy?: string; compatibilityErrors: string[] };
-  proposalCheck?: { belowMinMargin: boolean; marginOverride: boolean; taxConfirmed: boolean; taxOverride: boolean; expired: boolean };
+  proposalCheck?: {
+    belowMinMargin: boolean;
+    marginOverride: boolean;
+    taxConfirmed: boolean;
+    taxOverride: boolean;
+    expired: boolean;
+    /** Cost lines with no price, across the options: the margin can't be checked (fails closed). */
+    unpricedCostLines?: number;
+  };
+  /**
+   * The payment schedule the customer agreed (the accepted proposal's frozen
+   * terms, or the contract document's), when there's a contract. The booking
+   * gate reads the deposit from it, never from a settings change made after.
+   */
+  agreedPayments?: Pick<PilotSettings["payments"], "depositPct" | "depositTiming" | "balanceDueDays">;
   compliance: { key: string; label: string; status: ComplianceStatus; statutory: boolean; gate: GateId }[];
   crew: StaffMember[]; // full records of booking.crew
   kit?: { requiredLines: number; deliveredLines: number; inspectedLines: number; damaged: number };
@@ -1019,6 +1043,15 @@ export function blockersFor(project: Project, ctx: ReadinessContext, gate: GateI
             "admin",
             "Adjust the price, or record an admin override with a reason",
           );
+        } else if ((pc.unpricedCostLines ?? 0) > 0 && !pc.marginOverride) {
+          // The margin on the priced lines alone overstates the real one: fail closed.
+          const n = pc.unpricedCostLines!;
+          block(
+            "costs-unpriced",
+            `${n} cost line${n === 1 ? " has" : "s have"} no price, so the ${s.pricing.minMarginPct}% minimum margin can't be checked.`,
+            "ops",
+            "Enter the missing costs in the proposal builder, or an admin records an override with a reason",
+          );
         }
         if (pc.expired) {
           block("validity-passed", "The proposal's valid-until date has already passed.", "ops", "Set a new valid-until date");
@@ -1082,7 +1115,9 @@ export function blockersFor(project: Project, ctx: ReadinessContext, gate: GateI
       if (!ctx.crew.some((m) => meetsRequirement(m, "tech-lead", today))) {
         warn("no-tech-lead", "Nobody on the crew can sign off commissioning.", "ops", "Assign a technical lead");
       }
-      const depositRequired = s.payments.depositPct > 0 && s.payments.depositTiming === "on-acceptance";
+      // The deposit the contract says, not today's settings.
+      const pay = ctx.agreedPayments ?? s.payments;
+      const depositRequired = pay.depositPct > 0 && pay.depositTiming === "on-acceptance";
       const depositPaid =
         p.booking.depositStatus === "paid" ||
         (ctx.money !== undefined && ctx.money.depositDuePence > 0 && ctx.money.depositPaidPence >= ctx.money.depositDuePence);
@@ -1707,7 +1742,11 @@ export type ProjectAction =
        * install. Left out means the customer's home.
        */
       deliveredTo?: "customer" | "elsewhere";
+      /** The day (yyyy-mm-dd, London) the last required line arrived (kitSummary): the period runs from it, not from this update. */
+      receivedOn?: string;
     }
+  /** Before the booking is confirmed: every required line is at the customer's home (kitSummary), so the period starts. */
+  | { type: "goods-received"; receivedOn?: string }
   // install
   | { type: "installer-on-my-way"; etaMinutes: number; by: string }
   | { type: "install-day-started"; n: number; by: string }
@@ -1723,7 +1762,12 @@ export type ProjectAction =
   | { type: "warranty-registered"; documentId?: string }
   // money
   | { type: "invoice-issued"; amountPence: number }
-  | { type: "payment-recorded"; amountPence: number }
+  | {
+      type: "payment-recorded";
+      amountPence: number;
+      /** The payment record's id: the reducer counts each one once, however often its apply is retried. */
+      paymentId?: string;
+    }
   | { type: "survey-fee-paid"; amountPence: number }
   // customer + aftercare
   | { type: "prep-toggled"; itemId: string; done: boolean }
@@ -1869,13 +1913,36 @@ export function applyProjectAction(project: Project, action: ProjectAction, now:
    * the customer-facing sentence about the new end date ("" when nothing
    * changed).
    */
-  const startGoodsPeriod = (): string => {
+  /**
+   * supply-and-install: start the cancellation period from the day the last
+   * of the goods came into the customer's possession (reg 30(3)–(5)): `on`,
+   * the delivery date purchasing recorded (never after today), else today.
+   * Set once; the period is held open again (heldOpenForGoods) while a
+   * replacement is on its way, so it then runs from that later arrival.
+   * Never ends before cancellationDays from acceptance.
+   */
+  const startGoodsPeriod = (on?: string): string => {
     if (p.proposal.status !== "accepted" || p.proposal.contractType !== "supply-and-install" || p.proposal.goodsReceivedOn) return "";
+    const day = on && /^\d{4}-\d{2}-\d{2}/.test(on) && dateOf(on) <= today ? dateOf(on) : today;
     const days = settings.scheduling.cancellationDays;
     const acceptedOn = dateOf(p.proposal.acceptedAt ?? today);
-    p.proposal.goodsReceivedOn = today;
-    p.proposal.cancellationEndsOn = laterOf(addDays(today, days), addDays(acceptedOn, days));
+    p.proposal.goodsReceivedOn = day;
+    p.proposal.cancellationEndsOn = laterOf(addDays(day, days), addDays(acceptedOn, days));
     return ` Your cancellation period now runs until the end of ${fmtDate(p.proposal.cancellationEndsOn)}.`;
+  };
+  /**
+   * More of the goods are still to come after the period had started (a
+   * replacement for damaged kit, or kit added later): the last of the goods
+   * isn't with the customer yet, so the period is open again and runs from
+   * when it arrives. Only while the period is still running and before the
+   * install has started: an ended period stays ended.
+   */
+  const heldOpenForGoods = (): string => {
+    if (p.proposal.contractType !== "supply-and-install" || !p.proposal.goodsReceivedOn || p.install.status !== "not-started") return "";
+    if (cancellationStatus(p, today, settings).ended) return "";
+    delete p.proposal.goodsReceivedOn;
+    delete p.proposal.cancellationEndsOn;
+    return " Your cancellation period now runs from when the last of it arrives.";
   };
 
   /** The signed-in staff member, qualified for a step that legally needs one. */
@@ -2258,6 +2325,18 @@ export function applyProjectAction(project: Project, action: ProjectAction, now:
       if (!earlyStartRequestedOf(p) && coolingOff && start <= coolingOff) {
         return err(`Your cancellation period runs until ${fmtDate(coolingOff)}. Pick a start after that, or ask us about starting sooner.`);
       }
+      // Supply-and-install with the kit still to come: the period runs from
+      // its delivery, which can't be before tomorrow, so a start any sooner
+      // than that plus the period could never go ahead. (The server checks
+      // the orders' real delivery dates on top: earliestStartForKit.)
+      if (!coolingOff && periodWaitsOnDelivery(p)) {
+        const floor = earliestStartForKit(p, today, settings);
+        if (start < floor) {
+          return err(
+            `Your cancellation period runs for ${settings.scheduling.cancellationDays} days from when your equipment is delivered, so the earliest we can start is ${fmtDate(floor)}. Pick a later start, or ask us about starting sooner.`,
+          );
+        }
+      }
       if (p.booking.dates.join() === dates.join()) return err("Those are already your install dates.");
       const moving = p.booking.status === "booked" && Boolean(p.booking.startDate);
       const fee = moving && !staff ? rescheduleFeeGbp("installation", daysBetween(now, p.booking.startDate!)) : 0;
@@ -2321,6 +2400,20 @@ export function applyProjectAction(project: Project, action: ProjectAction, now:
 
     /* ---------------- kit ---------------- */
 
+    // The goods reached the customer's home before the booking was confirmed:
+    // their cancellation period starts from that day all the same (kit
+    // updates themselves wait for the booking, kit-updated).
+    case "goods-received": {
+      if (p.proposal.status !== "accepted") return err("There's no accepted contract yet.");
+      if (p.proposal.contractType !== "supply-and-install") return err("Only a supply-and-install contract's period runs from delivery.");
+      if (p.install.status !== "not-started") return err("The install has started.");
+      if (p.proposal.goodsReceivedOn) return err("The delivery is already recorded.");
+      const note = startGoodsPeriod(action.receivedOn);
+      if (!note) return err("The delivery couldn't be recorded.");
+      log("goods-received", `Your equipment has been delivered to your home.${note}`, "ops");
+      return ok();
+    }
+
     case "kit-updated": {
       if (p.booking.status !== "booked") return err("Confirm the booking before tracking kit.");
       if (!KIT_STATUSES.includes(action.status)) return err("Unknown kit status.");
@@ -2343,8 +2436,10 @@ export function applyProjectAction(project: Project, action: ProjectAction, now:
       // the crew: the clock starts on install day 1 instead. Never earlier
       // than 14 days from acceptance. Legal review required (see
       // cancellationStatus).
+      const knownBefore = Boolean(p.proposal.goodsReceivedOn);
       let periodNote = "";
-      if (arrived && action.shortages === 0 && withCustomer) periodNote = startGoodsPeriod();
+      if (arrived && action.shortages === 0 && withCustomer) periodNote = startGoodsPeriod(action.receivedOn);
+      else if (arrived && action.shortages > 0) periodNote = heldOpenForGoods();
       const toCome = action.shortages
         ? ` ${action.shortages} item${action.shortages === 1 ? " is" : "s are"} still to come; we're on it.`
         : "";
@@ -2369,7 +2464,9 @@ export function applyProjectAction(project: Project, action: ProjectAction, now:
           log("kit-updated", "Kit dispatched by the supplier.", "ops", { internal: true });
           break;
         case "delivered":
-          log("kit-updated", `Your kit has been delivered.${toCome}${periodNote}`, "ops");
+          // Already told (goods-received, before the booking): only the record here.
+          if (knownBefore && !toCome && !periodNote) log("kit-updated", "Kit delivered (recorded before the booking).", "ops", { internal: true });
+          else log("kit-updated", `Your kit has been delivered.${toCome}${periodNote}`, "ops");
           break;
         case "inspected":
           log("kit-updated", `Your kit has been checked by our team.${toCome}${periodNote}`, "field");
@@ -2574,6 +2671,10 @@ export function applyProjectAction(project: Project, action: ProjectAction, now:
     // person recording a bank transfer). A negative amount is a refund.
     case "payment-recorded": {
       if (!isWholePence(action.amountPence) || action.amountPence === 0) return err("A payment needs a whole-pence amount.");
+      if (action.paymentId) {
+        if (p.money.paymentIds?.includes(action.paymentId)) return err(PAYMENT_ALREADY_COUNTED);
+        p.money.paymentIds = [...(p.money.paymentIds ?? []), action.paymentId];
+      }
       p.money.paidPence += action.amountPence;
       log(
         "payment-recorded",
@@ -2780,6 +2881,52 @@ export function earliestInstallStart(project: Project, todayIso: string, setting
   const ends = cancellationStatus(project, todayIso, settings).endsOn;
   if (ends && !earlyStartRequestedOf(project)) earliest = laterOf(earliest, addDays(ends, 1));
   return nextWorkingDay(earliest, settings.scheduling.workingDays);
+}
+
+/**
+ * Does this project's cancellation period still wait on the kit reaching the
+ * customer's home? supply-and-install, no early-start request, and no
+ * delivery recorded yet: then day 1 must come after delivery plus the
+ * cancellation days (the period includes its last day).
+ */
+function periodWaitsOnDelivery(project: Project): boolean {
+  const pr = project.proposal;
+  return pr.contractType !== "install-only" && !earlyStartRequestedOf(project) && !pr.goodsReceivedOn;
+}
+
+/**
+ * The last day the kit can reach the customer's home for an install that
+ * starts `start` to clear ready-to-install without an early-start request:
+ * `start` less the cancellation days less one. Undefined when the period
+ * doesn't wait on delivery (install-only, an early-start request, or the
+ * delivery already recorded). Kit dates (purchasing's poSchedule) and the
+ * booking warning use it.
+ */
+export function goodsDeliverBy(project: Project, start: string, settings: PilotSettings = DEFAULT_SETTINGS): string | undefined {
+  if (!periodWaitsOnDelivery(project) || !/^\d{4}-\d{2}-\d{2}/.test(start)) return undefined;
+  return addDays(dateOf(start), -(settings.scheduling.cancellationDays + 1));
+}
+
+/**
+ * The first install start that can actually clear the cancellation period:
+ * earliestInstallStart, and, while the period waits on delivery, the
+ * cancellation days after the earliest the kit can reach the customer's home
+ * (`kitArrivesOn`: from the orders, see purchasing's earliestKitArrival;
+ * never before tomorrow, the default). The portal offers nothing earlier,
+ * and neither the reducer nor the ops booking page accepts it.
+ */
+export function earliestStartForKit(
+  project: Project,
+  todayIso: string,
+  settings: PilotSettings = DEFAULT_SETTINGS,
+  kitArrivesOn?: string,
+): string {
+  const base = earliestInstallStart(project, todayIso, settings);
+  if (!periodWaitsOnDelivery(project)) return base;
+  const tomorrow = addDays(dateOf(todayIso), 1);
+  const arrival = kitArrivesOn && /^\d{4}-\d{2}-\d{2}/.test(kitArrivesOn) ? laterOf(dateOf(kitArrivesOn), tomorrow) : tomorrow;
+  const floor = nextWorkingDay(addDays(arrival, settings.scheduling.cancellationDays + 1), settings.scheduling.workingDays);
+  return laterOf(base, floor);
 }
 
 /* ------------------------------------------------------------------ */

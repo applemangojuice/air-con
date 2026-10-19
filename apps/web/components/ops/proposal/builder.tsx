@@ -48,7 +48,7 @@ export interface BuilderProps {
 type SaveState = { kind: "saved"; at?: string } | { kind: "dirty" } | { kind: "saving" } | { kind: "error"; message: string; conflict: boolean };
 
 /** The gate blockers the builder re-checks live from the draft itself. */
-const LIVE_CODES = new Set(["margin-below-minimum", "validity-passed", "proposal-not-drafted"]);
+const LIVE_CODES = new Set(["margin-below-minimum", "costs-unpriced", "validity-passed", "proposal-not-drafted"]);
 
 export function ProposalBuilder(props: BuilderProps) {
   const { projectId, proposal, canSeeMargins, canIssue, isAdmin } = props;
@@ -84,7 +84,10 @@ export function ProposalBuilder(props: BuilderProps) {
   const projectBlockers = props.blockers.filter((b) => !LIVE_CODES.has(b.code));
   const blocking = projectBlockers.filter((b) => b.severity === "block");
   const anyAboveInstant = props.instantPricePence > 0 && previews.some((p) => p.preview.option.pricing.totalPence > props.instantPricePence);
-  const belowMin = previews.some((p) => p.preview.option.pricing.belowMinMargin && p.preview.option.pricing.netPence > 0);
+  // Below the minimum, or with costs missing so the minimum can't be checked: both need an admin override to issue.
+  const belowMin = previews.some(
+    (p) => p.preview.option.pricing.netPence > 0 && (p.preview.option.pricing.belowMinMargin || p.preview.option.pricing.unpricedCostLines > 0),
+  );
 
   /* ---------------- saving ---------------- */
 
@@ -615,7 +618,7 @@ function Overrides({
       <h3 className="text-sm font-semibold text-ink-900">Admin overrides</h3>
       <p className="mt-1 text-xs text-ink-500">On the record with your name. For this version only.</p>
       <div className="mt-3 space-y-5">
-        {showMargin && block("margin", "Below the minimum margin", margin, setMargin, proposal.marginOverride)}
+        {showMargin && block("margin", "Below the minimum margin, or costs not all priced", margin, setMargin, proposal.marginOverride)}
         {showTax && block("tax", "VAT treatment not confirmed / changed tax code", tax, setTax, proposal.taxOverride)}
       </div>
       <div aria-live="polite" role="status">

@@ -7,6 +7,7 @@ import {
   advanceOrder,
   generatePurchaseOrders,
   orderReplacement,
+  recordActualCosts,
   recordDelivery,
   recordInspection,
   updateOrder,
@@ -103,6 +104,34 @@ export async function updateAction(projectId: string, _prev: ActionState, form: 
     shippingPence,
   };
   return toState(await updateOrder(projectId, id.data, patch, staff), "Order details saved.");
+}
+
+/**
+ * What the supplier actually charged, per line (ex VAT, per unit). A blank
+ * box clears the line back to its expected cost; only lines whose box was
+ * on the form are touched.
+ */
+export async function actualCostsAction(projectId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
+  const staff = await guard(projectId);
+  if (!staff) return NOT_FOUND;
+  const id = poId(form);
+  if (!id.success) return invalid();
+  const lines: { lineId: string; actualUnitCostPence: number | null }[] = [];
+  for (const [key, value] of form.entries()) {
+    if (!key.startsWith("actual:")) continue;
+    const lineId = key.slice(7);
+    if (!lineId || lineId.length > 64) return invalid();
+    const raw = String(value).trim();
+    if (!raw) {
+      lines.push({ lineId, actualUnitCostPence: null });
+      continue;
+    }
+    const pence = poundsToPence(raw);
+    if (pence === null) return invalid("Actual costs are amounts in pounds, like 450 or 12.50.");
+    lines.push({ lineId, actualUnitCostPence: pence });
+  }
+  if (lines.length === 0 || lines.length > 100) return invalid("Nothing to save on this order.");
+  return toState(await recordActualCosts(projectId, id.data, lines, staff), "Actual costs saved.");
 }
 
 export async function deliveryAction(projectId: string, _prev: ActionState, form: FormData): Promise<ActionState> {

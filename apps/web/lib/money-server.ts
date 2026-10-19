@@ -32,6 +32,7 @@ import {
   type ProposalRecord,
   type StaffMember,
   type TaxCodeId,
+  PAYMENT_ALREADY_COUNTED,
   variationsBillableAlone,
 } from "@aircon/domain";
 import { audit, type AuditActorInput } from "./audit";
@@ -503,8 +504,8 @@ export function customerInvoice(inv: Invoice): Invoice {
 
 /** A payment as a receipt shows it: no internal bookkeeping. */
 export function customerPayment(pay: Payment): Payment {
-  const { pendingApply: _p, appliedAt: _a, recordedAt: _r, eventId: _e, ...rest } = pay;
-  void [_p, _a, _r, _e];
+  const { pendingApply: _p, appliedAt: _a, recordedAt: _r, eventId: _e, recordedOnProjectAt: _o, ...rest } = pay;
+  void [_p, _a, _r, _e, _o];
   return rest;
 }
 
@@ -601,23 +602,46 @@ async function applyNow(paymentId: string, actor: ActorInput): Promise<{ warning
   }
 
   const counted = payment.status === "succeeded" || payment.status === "refunded";
+  let recordedOnProjectAt = payment.recordedOnProjectAt;
   if (counted) {
-    const r = await dispatch(payment.projectId, { type: "payment-recorded", amountPence: payment.amountPence }, actor);
-    if ("error" in r) {
-      // Leave appliedAt unset: a retry finishes the job.
-      return { warning: `Recorded, but the project's totals didn't update (${r.error}). Try again in a minute: it finishes where it stopped.` };
+    // Add it to the project's totals exactly once. A retry of a payment that
+    // stopped part-way skips this step when it already happened (recorded
+    // here, or refused by the reducer for a payment id it already counts).
+    let project: Project | null;
+    if (recordedOnProjectAt) {
+      project = await loadProject(payment.projectId);
+    } else {
+      const r = await dispatch(payment.projectId, { type: "payment-recorded", amountPence: payment.amountPence, paymentId: payment.id }, actor);
+      if ("error" in r) {
+        const current = r.error === PAYMENT_ALREADY_COUNTED ? await loadProject(payment.projectId) : null;
+        if (!current?.money.paymentIds?.includes(payment.id)) {
+          // Leave appliedAt unset: a retry finishes the job.
+          return { warning: `Recorded, but the project's totals didn't update (${r.error}). Try again in a minute: it finishes where it stopped.` };
+        }
+        project = current;
+      } else {
+        project = r.project;
+      }
+      recordedOnProjectAt = new Date().toISOString();
+      try {
+        // (payments has no updated_at, so a plain update of the fresh row, not mutateRow.)
+        const fresh = (await paymentsRepo.get(payment.id)) ?? payment;
+        await paymentsRepo.update({ ...fresh, recordedOnProjectAt });
+      } catch (err) {
+        console.error(`[money] marking payment ${payment.id} counted failed (the reducer still refuses a second count):`, err);
+      }
     }
     // Paid: by this payment, or with account credit covering the rest (invoiceOutstanding).
     const cleared =
       invoice !== null &&
       payment.amountPence > 0 &&
       (invoice.status === "paid" || (live(invoice) && invoiceOutstanding(invoice, await invoicesRepo.listForProject(payment.projectId)) === 0));
-    if (invoice && cleared) {
-      if (invoice.kind === "deposit" && r.project.booking.depositStatus !== "paid") {
+    if (invoice && cleared && project) {
+      if (invoice.kind === "deposit" && project.booking.depositStatus !== "paid") {
         const d = await dispatch(payment.projectId, { type: "deposit-paid", amountPence: invoice.totalPence }, actor);
         if ("error" in d) warnings.push(`the deposit wasn't marked paid (${d.error})`);
       }
-      if (invoice.kind === "survey-fee" && r.project.survey.paymentStatus === "unpaid") {
+      if (invoice.kind === "survey-fee" && project.survey.paymentStatus === "unpaid") {
         const d = await dispatch(payment.projectId, { type: "survey-fee-paid", amountPence: invoice.totalPence }, actor);
         if ("error" in d) warnings.push(`the survey fee wasn't marked paid (${d.error})`);
       }
@@ -625,9 +649,9 @@ async function applyNow(paymentId: string, actor: ActorInput): Promise<{ warning
   }
 
   try {
-    const { pendingApply: _pending, ...applied } = payment;
+    const { pendingApply: _pending, ...applied } = (await paymentsRepo.get(payment.id)) ?? payment;
     void _pending;
-    await paymentsRepo.update({ ...applied, appliedAt: new Date().toISOString() });
+    await paymentsRepo.update({ ...applied, ...(recordedOnProjectAt ? { recordedOnProjectAt } : {}), appliedAt: new Date().toISOString() });
   } catch (err) {
     console.error(`[money] marking payment ${payment.id} applied failed:`, err);
   }

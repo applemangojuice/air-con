@@ -432,7 +432,8 @@ export interface ReadinessContext {
   actor?: StaffMember;                                  // the signed-in person doing the action (qualified steps)
   surveyCompleteness?: { pct: number; missing: string[] };
   design?: { status: string; approvedBy?: string; compatibilityErrors: string[] };
-  proposalCheck?: { belowMinMargin: boolean; marginOverride: boolean; taxConfirmed: boolean; taxOverride: boolean; expired: boolean };
+  proposalCheck?: { belowMinMargin: boolean; marginOverride: boolean; taxConfirmed: boolean; taxOverride: boolean; expired: boolean; unpricedCostLines?: number }; // proposalCheckFor (§K31)
+  agreedPayments?: { depositPct: number; depositTiming: "on-acceptance" | "before-kit-order"; balanceDueDays: number }; // agreedPaymentsFor: the contract's, for the booking gate (§K31)
   compliance: { key: string; label: string; status: ComplianceStatus; statutory: boolean; gate: GateId }[];
   crew: StaffMember[];                                  // full records of booking.crew
   kit?: { requiredLines: number; deliveredLines: number; inspectedLines: number; damaged: number };
@@ -562,7 +563,8 @@ signatures record the verified `ctx.actor.name`, never a typed `by`.
 | `crew-assigned` | `{ crew: CrewMember[] }` | names and roles |
 | `booking-confirmed` | `{}` | booking gate |
 | `deposit-requested` / `deposit-paid` | `{ amountPence }` | status only (money moves via `payment-recorded`) |
-| `kit-updated` | `{ status, expectedDate?, summary?, shortages }` | booking confirmed. Conservative customer wording. Delivered/inspected with 0 shortages on supply-and-install sets `goodsReceivedOn` and `cancellationEndsOn` (once) |
+| `kit-updated` | `{ status, expectedDate?, summary?, shortages, deliveredTo?, receivedOn? }` | booking confirmed. Conservative customer wording. Delivered/inspected with 0 shortages at the customer's home on supply-and-install sets `goodsReceivedOn` (= `receivedOn`, the day the last line arrived, never after today) and `cancellationEndsOn`; more to come while the period runs holds it open again (§K31) |
+| `goods-received` | `{ receivedOn? }` | accepted supply-and-install, before the booking is confirmed: kit at the customer's home starts the period on the day it arrived (§K31) |
 | `installer-on-my-way` | `{ etaMinutes, by }` | booking confirmed |
 | `install-day-started` | `{ n, by }` | n=1: ready-to-install gate (`ctx`); n>1: day n−1 started; overrun days allowed |
 | `install-day-ended` | `{ n, summary, customerUpdate? }` | day n in progress |
@@ -573,7 +575,7 @@ signatures record the verified `ctx.actor.name`, never a typed `by`.
 | `electrical-cert-updated` | `{ status }` | – |
 | `warranty-registered` | `{}` | once |
 | `invoice-issued` | `{ amountPence }` | non-zero whole pence; negative = credit note; updates `money.invoicedPence` |
-| `payment-recorded` | `{ amountPence }` | only after a verified payment record; negative = refund; updates `money.paidPence` |
+| `payment-recorded` | `{ amountPence, paymentId? }` | only after a verified payment record; negative = refund; updates `money.paidPence`; a `paymentId` already in `money.paymentIds` is refused (§K31) |
 | `survey-fee-paid` | `{ amountPence }` | status only (like `deposit-paid`); a fee is due and unpaid |
 | `prep-toggled` | `{ itemId, done }` | confirmable items |
 | `aftercare-checkin-sent` / `feedback-requested` / `review-requested` / `seasonal-check-sent` | `{}` | once each |
@@ -1579,3 +1581,65 @@ changelog and the reasons, so nobody "fixes" a deliberate choice back.
       the label, other columns as labelled lines); the accept button, tapped
       with something missing, scrolls to and focuses the first thing to fix
       and says what's missing beside the button.
+
+31. **Hardening review, batch 3 (before the first real customers).**
+    - *Margins fail closed*: a proposal with unpriced cost lines can't
+      issue (`proposalIssueErrors`, and the proposal-issue gate's
+      `costs-unpriced` blocker from `proposalCheckFor`) until the costs are
+      typed into the build-up, priced in the catalogue, or an admin records
+      the margin override with a reason; `belowMinMargin` still judges only
+      the known costs. Cost-plus refuses to price while an equipment line is
+      unpriced. The DEMO catalogue has a delivery price, so DEMO build-ups
+      are complete.
+    - *The contract's payment schedule rules*: the booking gate reads
+      `ctx.agreedPayments` (the accepted proposal's frozen terms) and the
+      booking page plans and describes the deposit with `agreedTerms`, like
+      the money page, so a settings change after acceptance moves nothing.
+      Both readiness builders share `proposalCheckFor` / `agreedPaymentsFor`.
+    - *Kit dates know the cancellation period*: for supply-and-install with
+      no early-start request, the kit must reach the customer's home the
+      cancellation days plus one before day 1 (`goodsDeliverBy`), which brings
+      "needed at the home" and the order-by date forward (`poSchedule`'s
+      `deliverBy`). Start dates have a floor of the kit's earliest arrival
+      (`earliestKitArrival`: delivered days, ETAs, order date plus lead time,
+      or today plus the lead time) plus the period (`earliestStartForKit`):
+      the portal offers nothing earlier, the ops booking page refuses it
+      (with how to change it), and the reducer refuses anything before a
+      delivery tomorrow plus the period.
+    - *The period runs from the real delivery*: `kitSummary().receivedOn` is
+      the London day the last required line arrived, and `kit-updated`
+      starts the period from it (backdated, never forward). Kit at the home
+      before the booking is confirmed starts it then (`goods-received`, sent
+      by `syncKitStatus`; same "delivered" email). A replacement or extra kit
+      still to come while the period is running holds it open, then it runs
+      from that arrival; an ended period stays ended (legal review required).
+    - *Pilot costs are never invented*: the kit page takes actual unit costs
+      per line once an order is placed (`recordPoActualCosts`). A required
+      order line with no cost at all makes `costBasis` "incomplete" (counted
+      in `unknownCostLines`, in the CSV); with that, or nothing ordered,
+      gross profit and margin are unknown, not computed on £0. The labour
+      estimate is person-days like the costing (crew × installer days).
+    - *Owed to us nets credits*: the console and the digest use
+      `owedInvoices` (invoiceOutstanding per project), so a credited invoice
+      drops out.
+    - *A payment counts once*: `payment-recorded` carries the payment id and
+      the reducer refuses one already in `money.paymentIds`; the payment row
+      records `recordedOnProjectAt` straight after, so a retried part-applied
+      payment never doubles the project's totals.
+    - *Schema checks are GETs*: a HEAD request turned PostgREST's "no such
+      table" 404 into a 204 with no error. `lib/schema-check.ts` probes every
+      0010 table and the columns 0010 adds (projects, media) by GET, and
+      /api/health, /ops/status, /ops/launch, the boot log and /login all use
+      it. /api/health answers 503 for demo mode in production (unless it's a
+      deliberate demo deployment) and the health workflow fails on it.
+    - *Locked out by a missing migration*: `/login` says the database needs
+      its migrations; break-glass for an `ADMIN_EMAILS` address falls back to
+      the synthetic admin while the staff table is missing, so /ops/status can
+      open; the boot log names what's missing.
+    - *Template values aren't settings*: `.env.example` ships every value
+      blank, and `isPlaceholderValue` (lib/env-placeholders.ts) makes the old
+      template strings count as unset for the session secret, break-glass,
+      providers, the crons, the data backend, /ops/status and /ops/launch,
+      with a boot warning naming them. `docs/going-live.md` is the pilot's
+      setup: every migration to 0010, the required variables, the Stripe
+      webhook.

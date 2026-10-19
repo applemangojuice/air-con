@@ -19,6 +19,8 @@ import {
   pricingInputsOf,
   proposalDocumentContent,
   proposalIssueErrors,
+  proposalCheckFor,
+  agreedPaymentsFor,
   recomputeOption,
   reviseProposal,
   unitHighlights,
@@ -27,6 +29,7 @@ import {
   withoutDiscountLine,
   type AcceptanceRecord,
   type OptionContext,
+  type ProposalOption,
   type ProposalRecord,
 } from "./proposal.ts";
 import { DEFAULT_SETTINGS, mergeSettings, type PilotSettings } from "./settings.ts";
@@ -120,10 +123,18 @@ const draft = (over: Partial<ProposalRecord> = {}, ctx: OptionContext = CTX): Pr
   ...over,
 });
 
-/** A draft whose prices clear the minimum margin (cost-plus to 40%). */
+/** Costs typed in for every line the catalogue can't price (ex VAT), as the builder does. */
+function priceGaps(o: ProposalOption, unitCostPence = 2_500): Record<string, { unitCostPence: number }> {
+  return Object.fromEntries(o.costLines.filter((l) => l.totalPence === null).map((l) => [l.id, { unitCostPence }]));
+}
+
+/** A draft whose prices clear the minimum margin (cost-plus to 40%), every cost line priced. */
 function healthy(): ProposalRecord {
   const p = draft();
-  p.options = p.options.map((o) => recomputeOption(CTX, { ...o, pricingInputs: { basis: "cost-plus", targetMarginPct: 40 } }));
+  p.options = p.options.map((o) => {
+    const gaps = priceGaps(recomputeOption(CTX, { ...o, pricingInputs: { basis: "cost-plus", targetMarginPct: 40 } }));
+    return recomputeOption(CTX, { ...o, pricingInputs: { basis: "cost-plus", targetMarginPct: 40, costOverrides: gaps } });
+  });
   return p;
 }
 
@@ -317,11 +328,54 @@ test("proposalIssueErrors: below the minimum margin needs an admin override", ()
   assert.deepEqual(proposalIssueErrors(overridden, READY, TODAY), []);
 });
 
+test("proposalIssueErrors: unpriced cost lines fail closed until they're priced or an admin overrides", () => {
+  // Priced with the catalogue's gaps left open: the margin on the priced lines alone looks fine.
+  const generous = { basis: "manual" as const, manualNetPence: 900_000, manualReason: "DEMO survey price" };
+  const gappy = draft();
+  gappy.options = gappy.options.map((o) => recomputeOption(CTX, { ...o, pricingInputs: generous }));
+  assert.ok(gappy.options.every((o) => o.pricing.unpricedCostLines > 0 && !o.pricing.belowMinMargin));
+  const errors = proposalIssueErrors(gappy, READY, TODAY).join(" ");
+  assert.match(errors, /Standard: 2 cost lines have no price, so the 25% minimum margin can't be checked/);
+  // Typing the costs in clears it (and the margin is then judged on the full cost).
+  const priced = { ...gappy, options: gappy.options.map((o) => recomputeOption(CTX, { ...o, pricingInputs: { ...generous, costOverrides: priceGaps(o) } })) };
+  assert.ok(priced.options.every((o) => o.pricing.unpricedCostLines === 0));
+  assert.doesNotMatch(proposalIssueErrors(priced, READY, TODAY).join(" "), /no price/);
+  // So does an admin override with a reason; a blank reason doesn't.
+  assert.doesNotMatch(proposalIssueErrors({ ...gappy, marginOverride: { reason: "Supplier quote on file", by: "DEMO Ada", at: NOW } }, READY, TODAY).join(" "), /no price/);
+  assert.match(proposalIssueErrors({ ...gappy, marginOverride: { reason: " ", by: "DEMO Ada", at: NOW } }, READY, TODAY).join(" "), /no price/);
+  // The project gate says the same (proposalCheckFor feeds it).
+  assert.equal(proposalCheckFor(gappy, READY, TODAY).unpricedCostLines, 4);
+  assert.equal(proposalCheckFor(priced, READY, TODAY).unpricedCostLines, 0);
+});
+
+test("cost-plus refuses to price while equipment is unpriced; other gaps price on what's known", () => {
+  const o = draft().options[0]!;
+  const blankKit = CTX.catalogue.map((i) => (i.kind === "indoor" || i.kind === "outdoor" ? { ...i, costPence: null } : i));
+  assert.throws(() => recomputeOption({ ...CTX, catalogue: blankKit }, { ...o, pricingInputs: { basis: "cost-plus" } }), /needs the equipment priced: \d equipment line/);
+  // Typing the unit costs in lets it price.
+  const kitGaps = recomputeOption({ ...CTX, catalogue: blankKit }, { ...o, pricingInputs: { basis: "engine" } });
+  const ok = recomputeOption({ ...CTX, catalogue: blankKit }, { ...o, pricingInputs: { basis: "cost-plus", costOverrides: priceGaps(kitGaps, 50_000) } });
+  assert.ok(ok.pricing.listNetPence > 0);
+  assert.equal(ok.pricing.unpricedCostLines, 0);
+});
+
+test("agreedPaymentsFor: the accepted proposal's frozen schedule, not today's settings", () => {
+  const terms = { depositPct: 20, depositTiming: "on-acceptance" as const, balanceDueDays: 14, methods: ["bank-transfer" as const], cancellationDays: 14 };
+  const accepted = { ...issued({ terms }), status: "accepted" as const };
+  const live = mergeSettings({ ...READY, payments: { ...READY.payments, depositPct: 0, balanceDueDays: 3 } });
+  assert.deepEqual(agreedPaymentsFor(accepted, live), { depositPct: 20, depositTiming: "on-acceptance", balanceDueDays: 14 });
+  assert.equal(agreedPaymentsFor(issued({ terms }), live), undefined, "no contract yet: settings rule");
+  assert.equal(agreedPaymentsFor(null, live), undefined);
+});
+
 test("proposalIssueErrors: VAT treatment and tax overrides", () => {
   const registered = mergeSettings({ ...READY, tax: { vatRegistered: true, defaultTaxCode: "zero-esm", accountantConfirmed: false, rationale: "DEMO" } });
   const ctx = { ...CTX, settings: registered };
   const p = draft({}, ctx);
-  p.options = p.options.map((o) => recomputeOption(ctx, { ...o, pricingInputs: { basis: "cost-plus", targetMarginPct: 40 } }));
+  p.options = p.options.map((o) => {
+    const gaps = priceGaps(recomputeOption(ctx, { ...o, pricingInputs: { basis: "cost-plus", targetMarginPct: 40 } }));
+    return recomputeOption(ctx, { ...o, pricingInputs: { basis: "cost-plus", targetMarginPct: 40, costOverrides: gaps } });
+  });
   assert.match(proposalIssueErrors(p, registered, TODAY).join(" "), /isn't confirmed by the accountant/);
   const withOverride = { ...p, taxOverride: { reason: "Accountant confirmed by phone", by: "DEMO Ada", at: NOW } };
   assert.deepEqual(proposalIssueErrors(withOverride, registered, TODAY), []);
@@ -469,7 +523,10 @@ test("withoutDiscountLine: an older record's discount line is folded in, so the 
 
 test("pricingInputsOf: stored inputs win; older records read back to the same basis and discount", () => {
   const p = healthy();
-  assert.deepEqual(pricingInputsOf(p.options[0]!), { basis: "cost-plus", targetMarginPct: 40 });
+  const stored = pricingInputsOf(p.options[0]!);
+  assert.equal(stored.basis, "cost-plus");
+  assert.equal(stored.targetMarginPct, 40);
+  assert.deepEqual(stored.costOverrides, p.options[0]!.pricingInputs?.costOverrides);
   const old = recomputeOption(CTX, { ...p.options[0]!, pricingInputs: { basis: "cost-plus", targetMarginPct: 30, discountCode: "PILOT15" } });
   const { pricingInputs: _gone, ...legacy } = old;
   const derived = pricingInputsOf(legacy);

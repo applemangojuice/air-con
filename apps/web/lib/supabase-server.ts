@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { sessionSecretUsable } from "./auth/session.ts";
 import { createLocalClient, defaultDataDir, type LocalBackendKind } from "./db/local-client.ts";
+import { realEnv } from "./env-placeholders.ts";
 
 export const PHOTO_BUCKET = "survey-photos";
 export const VIDEO_BUCKET = "survey-videos";
@@ -18,7 +19,8 @@ export type DataBackend = "supabase" | "file" | "memory" | "none";
  * DATA_BACKEND=none forces demo mode in dev, to check the public demo pages.
  */
 export function dataBackend(): DataBackend {
-  if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) return "supabase";
+  // The .env.example placeholders (YOUR-PROJECT.supabase.co, your-service-role-key) aren't a database.
+  if (realEnv(process.env, "SUPABASE_URL") && realEnv(process.env, "SUPABASE_SERVICE_ROLE_KEY")) return "supabase";
   const choice = process.env.DATA_BACKEND;
   if (choice === "file" || choice === "memory") return choice;
   if (choice === "none") return "none";

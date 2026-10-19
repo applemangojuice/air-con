@@ -305,7 +305,7 @@ function MarginPanel({ preview, minMarginPct }: { preview: OptionPreview; minMar
       </div>
       {incomplete && (
         <p className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          <span className="font-semibold">Margin incomplete:</span> {pr.unpricedCostLines} cost line{pr.unpricedCostLines === 1 ? " has" : "s have"} no price yet, so the real margin is lower than shown. Enter the costs below.
+          <span className="font-semibold">Margin incomplete:</span> {pr.unpricedCostLines} cost line{pr.unpricedCostLines === 1 ? " has" : "s have"} no price yet, so the real margin is lower than shown. Enter the costs below: it can&apos;t be issued until they&apos;re priced, or an admin records an override.
         </p>
       )}
       {priced && pr.belowMinMargin && (

@@ -446,6 +446,51 @@ const DETAIL_LABEL: Partial<Record<keyof PurchaseOrder, string>> = {
   leadDays: "lead time",
 };
 
+const pounds = (pence: number) => `£${(pence / 100).toFixed(2)}`;
+
+/** The most a line's actual unit cost can be (a typo guard): £50,000. */
+export const MAX_ACTUAL_UNIT_COST_PENCE = 5_000_000;
+
+/**
+ * Record what the supplier actually charged for each line, per unit and ex
+ * VAT, from their invoice or confirmation: the pilot's real cost and margin
+ * come from these (pilotMetrics), the catalogue's figure is only expected.
+ * Only once the order is placed (before that there's nothing charged). A
+ * null clears a line back to its expected cost. Named, and in the history.
+ */
+export function recordPoActualCosts(
+  po: PurchaseOrder,
+  input: { by: string; lines: { lineId: string; actualUnitCostPence: number | null }[] },
+  now: string,
+): PoResult {
+  const fail = (error: string): PoResult => ({ ok: false, error });
+  const who = input.by.trim();
+  if (!who) return fail("Who's recording this?");
+  if (po.status === "cancelled") return fail("This order is cancelled.");
+  if (statusIndex(po.status) < statusIndex("ordered")) return fail("Record actual costs once the order is placed: until then the expected cost stands.");
+  const next = clone(po);
+  const changed: string[] = [];
+  for (const entry of input.lines) {
+    const line = next.lines.find((l) => l.id === entry.lineId);
+    if (!line) return fail("That line isn't on this order.");
+    const value = entry.actualUnitCostPence;
+    if (value !== null && (!Number.isInteger(value) || value < 0 || value > MAX_ACTUAL_UNIT_COST_PENCE)) {
+      return fail(`${line.label}: the actual unit cost must be an amount from £0 to ${pounds(MAX_ACTUAL_UNIT_COST_PENCE)}.`);
+    }
+    if ((line.actualUnitCostPence ?? null) === value) continue;
+    if (value === null) {
+      delete line.actualUnitCostPence;
+      changed.push(`${line.label} cleared`);
+    } else {
+      line.actualUnitCostPence = value;
+      changed.push(`${line.label} ${pounds(value)} each`);
+    }
+  }
+  if (changed.length === 0) return fail("Nothing changed.");
+  next.history.push({ at: now, by: who, note: `Actual costs (ex VAT): ${changed.join("; ")}.` });
+  return { ok: true, po: next };
+}
+
 /**
  * Record what arrived (all or part of the order), by a named person at a
  * time that has happened. When every required line is in, the order becomes
@@ -662,7 +707,8 @@ const KIT_ORDER: Project["kit"]["status"][] = ["not-ordered", "ordered", "confir
  * "customer" only when every required line is on an order going to the
  * customer's home: kit sent to our storage, the installer or a
  * subcontractor reaches the customer with the crew, which is when a
- * supply-and-install cancellation period starts (reg 30(3)).
+ * supply-and-install cancellation period starts (reg 30(3)). `receivedOn` is
+ * the London day the last required line arrived, once they all have.
  */
 export function kitSummary(pos: PurchaseOrder[]): {
   requiredLines: number;
@@ -673,6 +719,7 @@ export function kitSummary(pos: PurchaseOrder[]): {
   expectedDate?: string;
   shortages: number;
   deliveredTo: "customer" | "elsewhere";
+  receivedOn?: string;
 } {
   const live = pos.filter((p) => p.status !== "cancelled");
   const required = live.flatMap((po) =>
@@ -695,6 +742,16 @@ export function kitSummary(pos: PurchaseOrder[]): {
     );
   }
 
+  // The day the last of the goods arrived: the latest delivery among the
+  // orders holding required lines, once every line is in (each order records
+  // when it was fully delivered). Unknown when one doesn't say.
+  let receivedOn: string | undefined;
+  if (required.length > 0 && delivered.length === required.length) {
+    const holding = [...new Set(required.map(({ po }) => po))];
+    const dates = holding.map((po) => (po.deliveredAt && Number.isFinite(Date.parse(po.deliveredAt)) ? londonDate(po.deliveredAt) : null));
+    if (dates.every((d): d is string => d !== null)) receivedOn = dates.sort().at(-1);
+  }
+
   const etas = owing.map((po) => po.eta);
   const expectedDate =
     owing.length > 0 && etas.every((e): e is string => isDate(e))
@@ -710,7 +767,15 @@ export function kitSummary(pos: PurchaseOrder[]): {
     ...(expectedDate ? { expectedDate } : {}),
     shortages: anyArrived ? required.length - delivered.length : 0,
     deliveredTo: required.some(({ po }) => po.destination !== "customer") ? "elsewhere" : "customer",
+    ...(receivedOn ? { receivedOn } : {}),
   };
+}
+
+/** The London calendar date (yyyy-mm-dd) of an instant: deliveries are dated as the customer's day. */
+function londonDate(iso: string): string {
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/London", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date(iso));
+  const get = (t: string) => parts.find((x) => x.type === t)?.value ?? "";
+  return `${get("year")}-${get("month")}-${get("day")}`;
 }
 
 /* ------------------------------------------------------------------ */
@@ -762,13 +827,48 @@ export const PO_FLAG_TEXT: Record<PoFlag, string> = {
   "delivery-late": "Not here, and it's needed on site already",
 };
 
-/** Late or at-risk flags for one order against the install date. No install date: only the ETA checks. */
+/**
+ * The earliest the kit can all be at the customer's home, from the orders
+ * holding required lines: an order already delivered counts its delivery
+ * day; one placed with an ETA, the ETA; one placed without, its order date
+ * plus the lead time; one not placed yet, today plus the lead time. Never
+ * before tomorrow for anything still to come. No orders yet: today plus the
+ * default lead time. (For the cancellation period's floor on install dates:
+ * project.ts earliestStartForKit.)
+ */
+export function earliestKitArrival(pos: PurchaseOrder[], todayIso: string, workingDays: number[] = MON_FRI): string {
+  const today = dateOf(todayIso);
+  const tomorrow = addDays(today, 1);
+  const later = (a: string, b: string) => (a >= b ? a : b);
+  const holding = pos.filter((po) => po.status !== "cancelled" && po.lines.some((l) => l.required && poLineEffectiveQty(l) > 0));
+  if (holding.length === 0) return shiftWorkingDays(today, DEFAULT_SUPPLIER_LEAD_DAYS, workingDays);
+  let latest = tomorrow;
+  for (const po of holding) {
+    const lead = po.leadDays ?? DEFAULT_SUPPLIER_LEAD_DAYS;
+    let on: string;
+    if ((po.status === "delivered" || po.status === "inspected") && po.deliveredAt && isDate(po.deliveredAt)) on = dateOf(po.deliveredAt);
+    else if (statusIndex(po.status) >= statusIndex("ordered") && po.eta && isDate(po.eta)) on = later(dateOf(po.eta), tomorrow);
+    else if (statusIndex(po.status) >= statusIndex("ordered") && po.orderedOn && isDate(po.orderedOn)) on = later(shiftWorkingDays(po.orderedOn, lead, workingDays), tomorrow);
+    else on = later(shiftWorkingDays(today, lead, workingDays), tomorrow);
+    latest = later(latest, on);
+  }
+  return latest;
+}
+
+/**
+ * Late or at-risk flags for one order against the install date. No install
+ * date: only the ETA checks. `deliverBy` (project.ts goodsDeliverBy: a
+ * supply-and-install customer's cancellation period still waiting on the
+ * kit) brings "needed on site" forward for an order going to their home, so
+ * that the period has run by day 1; `needFor` then says so.
+ */
 export function poSchedule(
   po: PurchaseOrder,
   installStart: string | undefined,
   todayIso: string,
   workingDays: number[] = MON_FRI,
-): { needOnSiteBy?: string; orderBy?: string; flags: PoFlag[] } {
+  opts: { deliverBy?: string } = {},
+): { needOnSiteBy?: string; orderBy?: string; needFor?: "install" | "cancellation-period"; flags: PoFlag[] } {
   const today = dateOf(todayIso);
   const flags: PoFlag[] = [];
   // Nothing on it holds the install (van stock only): no deadlines to chase.
@@ -780,7 +880,9 @@ export function poSchedule(
   if (placed && eta && eta < today) flags.push("eta-passed");
   if (!installStart || !isDate(installStart)) return { flags };
 
-  const need = needOnSiteBy(installStart, workingDays);
+  const onSite = needOnSiteBy(installStart, workingDays);
+  const forPeriod = po.destination === "customer" && opts.deliverBy && isDate(opts.deliverBy) && dateOf(opts.deliverBy) < onSite ? dateOf(opts.deliverBy) : undefined;
+  const need = forPeriod ?? onSite;
   const orderBy = orderByDate(need, po.leadDays ?? DEFAULT_SUPPLIER_LEAD_DAYS, workingDays);
   if (!done) {
     if (po.status === "required" || po.status === "approved") {
@@ -790,7 +892,7 @@ export function poSchedule(
     if (placed && eta && eta > need) flags.push("eta-after-need");
     if (today > need) flags.push("delivery-late");
   }
-  return { needOnSiteBy: need, orderBy, flags };
+  return { needOnSiteBy: need, orderBy, needFor: forPeriod ? "cancellation-period" : "install", flags };
 }
 
 /**

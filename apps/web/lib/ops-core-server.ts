@@ -3,11 +3,15 @@ import {
   ISSUE_KIND_LABEL,
   defaultsForKind,
   depositPence,
+  settingsForProposal,
+  proposalCheckFor,
+  agreedPaymentsFor,
   diffSelfSurvey,
   isOpen,
   kitSummary,
   migrateProject,
   outstandingPence,
+  owedInvoices,
   stillToBillPence,
   acceptedVariationsPence,
   projectFees,
@@ -48,6 +52,8 @@ import { dispatchDue, notify } from "./comms/outbox";
 import { emailConfigured } from "./email";
 import { isDemoSeedId } from "./demo-seed/ids";
 import { healthReport } from "./health";
+import { isPlaceholderValue, placeholderKeys, realEnv } from "./env-placeholders";
+import { PILOT_MIGRATION, checkPilotSchema } from "./schema-check";
 import { MEDIA_CONTENT_TYPES, MEDIA_MAX_BYTES, safeMediaName, signedMediaUrls } from "./media-server";
 import { DAILY_JOB_IDS, DONE_STATUSES, dailyJobsFor, emptySummary, type DailyJob, type DailyOpsSummary } from "./ops-core-schedule";
 import { dispatch, londonToday } from "./project-service";
@@ -244,13 +250,10 @@ export function contextFromRecords(
   }
   const proposal = rec.proposals.get(id);
   if (proposal) {
-    ctx.proposalCheck = {
-      belowMinMargin: (proposal.options ?? []).some((o) => o.pricing?.belowMinMargin === true),
-      marginOverride: Boolean(proposal.marginOverride),
-      taxConfirmed: !settings.tax.vatRegistered || settings.tax.accountantConfirmed,
-      taxOverride: Boolean(proposal.taxOverride),
-      expired: Boolean(proposal.validUntil) && proposal.validUntil.slice(0, 10) < today,
-    };
+    ctx.proposalCheck = proposalCheckFor(proposal, settings, today);
+    // The deposit the booking gate asks for is the contract's, not today's settings.
+    const agreed = agreedPaymentsFor(proposal, settings);
+    if (agreed) ctx.agreedPayments = agreed;
   }
   const pos = rec.purchaseOrders.get(id) ?? [];
   if (pos.length > 0) {
@@ -278,7 +281,8 @@ export function contextFromRecords(
       .filter((p) => p.status === "succeeded" && p.invoiceId && depositInvoices.has(p.invoiceId))
       .reduce((sum, p) => sum + p.amountPence, 0);
     return {
-      depositDuePence: contract > 0 ? depositPence(contract, settings) : 0,
+      // The deposit the customer agreed (the accepted proposal's frozen terms), not today's settings.
+      depositDuePence: contract > 0 ? depositPence(contract, settingsForProposal(settings, proposal?.status === "accepted" ? proposal : null)) : 0,
       depositPaidPence,
       outstandingPence: outstandingPence(invoices),
       // What's agreed but on no invoice yet: the closed gate holds until it's billed.
@@ -365,12 +369,11 @@ export async function loadPulse(board?: BoardData): Promise<Pulse> {
   const data = board ?? (await loadBoard());
   const { cards, today } = data;
   const live = cards.filter((c) => c.column !== "closed");
-  const [openIssues, invoices] = await Promise.all([issuesRepo.listOpen(), invoicesRepo.list({ statuses: ["issued", "part-paid"] })]);
+  // Every live invoice and credit note: what's owed nets off credits and overpayments (owedInvoices).
+  const [openIssues, invoices] = await Promise.all([issuesRepo.listOpen(), invoicesRepo.list({ statuses: ["issued", "part-paid", "paid"] })]);
   const byId = new Map(cards.map((c) => [c.id, c]));
-  const owed = invoices
-    .map((i) => ({ i, due: Math.max(0, i.totalPence - i.paidPence) }))
-    .filter((x) => x.due > 0)
-    .map(({ i, due }) => ({
+  const owed = owedInvoices(invoices)
+    .map(({ invoice: i, duePence: due }) => ({
       projectId: i.projectId,
       customer: byId.get(i.projectId)?.customer ?? "Unknown project",
       number: i.number,
@@ -658,44 +661,6 @@ export interface GoLiveCheck {
   href?: string;
 }
 
-/** The pilot platform's tables (migration 0010). Anything missing means the migration hasn't run. */
-const PILOT_TABLES = [
-  "staff",
-  "login_tokens",
-  "customers",
-  "media",
-  "surveys",
-  "designs",
-  "proposals",
-  "catalogue_items",
-  "catalogue_compatibility",
-  "purchase_orders",
-  "compliance_items",
-  "install_jobs",
-  "install_evidence",
-  "issues",
-  "time_entries",
-  "invoices",
-  "payments",
-  "messages",
-  "documents",
-  "learnings",
-  "settings",
-  "audit_log",
-];
-
-async function missingTables(): Promise<string[]> {
-  const client = getServiceClient();
-  if (!client) return PILOT_TABLES;
-  const results = await Promise.all(
-    PILOT_TABLES.map(async (t) => {
-      const { error } = await client.from(t).select("*", { count: "exact", head: true });
-      return error ? t : null;
-    }),
-  );
-  return results.filter((t): t is string => Boolean(t));
-}
-
 const looksDemo = (v: string | undefined | null) => Boolean(v && /\bDEMO\b/.test(v));
 
 /**
@@ -707,12 +672,15 @@ export async function goLiveChecks(): Promise<GoLiveCheck[]> {
   const checks: GoLiveCheck[] = [];
   const backend = dataBackend();
   const demoMode = demoLoginAllowed(env);
-  const has = (k: string) => Boolean(env[k]?.trim());
+  // Really set: an .env.example placeholder counts as missing.
+  const has = (k: string) => Boolean(realEnv(env, k));
 
   // Database.
-  const [report, missing] = await Promise.all([healthReport(), missingTables()]);
+  // The same GET probes as /ops/status and /api/health (schema-check), so a missing table can't pass here.
+  const [report, schema] = await Promise.all([healthReport(), checkPilotSchema()]);
   if (backend === "supabase") {
-    const allOk = report.reachable && missing.length === 0 && report.tables.every((t) => t.ok);
+    const missing = [...schema.missingTables, ...schema.missingColumns];
+    const allOk = report.reachable && missing.length === 0 && schema.errors.length === 0 && report.tables.every((t) => t.ok);
     checks.push({
       id: "database",
       label: "Supabase connected, pilot migrations applied",
@@ -720,9 +688,11 @@ export async function goLiveChecks(): Promise<GoLiveCheck[]> {
       detail: !report.reachable
         ? `Supabase isn't answering: ${report.connectionError ?? "unreachable"}.`
         : missing.length
-          ? `Missing tables: ${missing.join(", ")}.`
-          : "Every pilot table is there.",
-      fix: "Run supabase/migrations 0010 onwards in the Supabase SQL editor, in order, then reload this page.",
+          ? `Missing from the database: ${missing.join(", ")}.`
+          : !allOk
+            ? `Some checks failed: ${[...schema.errors, ...report.tables.filter((t) => !t.ok).map((t) => `${t.table}: ${t.error ?? "error"}`)].slice(0, 4).join("; ")}.`
+            : "Every pilot table and column is there.",
+      fix: `Run every file in supabase/migrations in order (0001 to 0010, both 0006 files) in the Supabase SQL editor; ${PILOT_MIGRATION} is the pilot platform. Then reload this page.`,
       href: "/ops/status",
     });
   } else {
@@ -734,7 +704,7 @@ export async function goLiveChecks(): Promise<GoLiveCheck[]> {
         backend === "none"
           ? "No database: nothing saves."
           : `Using the local ${backend} backend. Fine for trying things out; real customers need Supabase (local files don't survive a Vercel deploy).`,
-      fix: "Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in Vercel, run migrations 0010 onwards, redeploy.",
+      fix: "Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in Vercel, run every migration 0001 to 0010 in order, redeploy.",
     });
   }
   const buckets = report.buckets.filter((b) => !b.ok);
@@ -755,11 +725,23 @@ export async function goLiveChecks(): Promise<GoLiveCheck[]> {
     level: sessionSecretUsable(env) ? "green" : "red",
     detail: sessionSecretUsable(env)
       ? "Sessions and upload links are signed."
-      : has("SESSION_SECRET")
-        ? "Set, but too short: production ignores it, so nobody can sign in."
-        : "Not set: production signs nobody in.",
+      : isPlaceholderValue(env.SESSION_SECRET)
+        ? "Still the .env.example placeholder, which anyone can read in the repo: it's ignored, so nobody can sign in."
+        : has("SESSION_SECRET")
+          ? "Set, but too short: production ignores it, so nobody can sign in."
+          : "Not set: production signs nobody in.",
     fix: "Generate one with `openssl rand -hex 32`, add SESSION_SECRET in Vercel, redeploy.",
   });
+  const templates = placeholderKeys(env);
+  if (templates.length) {
+    checks.push({
+      id: "placeholders",
+      label: "No .env.example placeholder values",
+      level: "red",
+      detail: `${templates.join(", ")} still ${templates.length === 1 ? "holds" : "hold"} the template's value, so ${templates.length === 1 ? "it counts" : "they count"} as not set.`,
+      fix: "Replace each with a real value in Vercel (secrets: `openssl rand -hex 32`), or delete it, then redeploy.",
+    });
+  }
   checks.push({
     id: "admin-emails",
     label: "ADMIN_EMAILS set",

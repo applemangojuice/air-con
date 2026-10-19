@@ -249,6 +249,12 @@ test("priceOption, cost-plus: cost / (1 − target), rounded up to £10", () => 
   assert.equal(price({ basis: "cost-plus" }).listNetPence, 424_000, "defaults to the minimum margin");
   assert.throws(() => price({ basis: "cost-plus", targetMarginPct: 100 }), PricingError);
   assert.throws(() => price({ basis: "cost-plus", costLines: [] }), /priced cost line/);
+  // An unpriced unit would make the target margin a fiction: refused until it has a cost.
+  const blankKit = COSTS.map((l) => (l.category === "equipment" ? { ...l, unitCostPence: null, totalPence: null } : l));
+  assert.throws(() => price({ basis: "cost-plus", costLines: blankKit }), /needs the equipment priced: \d+ equipment lines? (has|have) no cost yet/);
+  // belowMinMargin still only judges the known costs; the issue guards treat unpriced lines as failing (proposal.ts).
+  assert.equal(price({ costLines: blankKit }).belowMinMargin, false);
+  assert.ok(price({ costLines: blankKit }).unpricedCostLines > 3);
 });
 
 test("priceOption, manual: needs an amount and a reason", () => {

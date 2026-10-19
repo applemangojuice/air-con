@@ -1,4 +1,5 @@
 import type { Invoice } from "@aircon/domain";
+import { isPlaceholderValue } from "../env-placeholders.ts";
 
 /**
  * Stripe Checkout over the REST API (plain fetch, no SDK), contract §F.
@@ -23,18 +24,19 @@ export const STRIPE_MIN_CHARGE_PENCE = 30;
 export type StripeMode = "live" | "test" | "demo";
 
 export function stripeConfigured(): boolean {
-  return Boolean(process.env.STRIPE_SECRET_KEY);
+  return stripeMode() !== "demo";
 }
 
-/** From the key prefix. An unrecognised key is never reported as live. */
+/** From the key prefix. An unrecognised key is never reported as live; a template one (sk_test_xxx) is demo. */
 export function stripeMode(key: string | undefined = process.env.STRIPE_SECRET_KEY): StripeMode {
-  if (!key) return "demo";
+  if (!key || isPlaceholderValue(key)) return "demo";
   if (/^(sk|rk)_live_/.test(key)) return "live";
   return "test";
 }
 
 export function stripeWebhookSecret(): string | null {
-  return process.env.STRIPE_WEBHOOK_SECRET || null;
+  const secret = process.env.STRIPE_WEBHOOK_SECRET;
+  return secret && !isPlaceholderValue(secret) ? secret : null;
 }
 
 /* ------------------------------------------------------------------ */

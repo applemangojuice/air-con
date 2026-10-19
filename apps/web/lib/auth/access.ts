@@ -1,5 +1,6 @@
 import { can, type Permission, type StaffMember } from "@aircon/domain";
 import { MIN_SESSION_SECRET_LENGTH, sessionSecretUsable, type CustomerSession, type Session } from "./session.ts";
+import { isPlaceholderValue, placeholderKeys, realEnv } from "../env-placeholders.ts";
 
 /**
  * Access decisions, as pure functions (contract §C). lib/auth/server.ts
@@ -238,6 +239,8 @@ export const MIN_BREAK_GLASS_PASSWORD = 20;
 
 /** Is break-glass sign-in on? Only with an OPS_PASSWORD long enough to resist guessing. */
 export function breakGlassEnabled(env: Record<string, string | undefined>): boolean {
+  // The .env.example placeholder is published in the repo: never a password.
+  if (isPlaceholderValue(env.OPS_PASSWORD)) return false;
   return (env.OPS_PASSWORD ?? "").length >= MIN_BREAK_GLASS_PASSWORD;
 }
 
@@ -257,13 +260,24 @@ export function securityWarnings(env: Record<string, string | undefined>): strin
   }
   if (!sessionSecretUsable(env)) {
     out.push(
-      env.SESSION_SECRET
-        ? `SESSION_SECRET is shorter than ${MIN_SESSION_SECRET_LENGTH} characters, so it's ignored and nobody can sign in. Use: openssl rand -hex 32`
-        : "SESSION_SECRET is not set, so nobody can sign in. Use: openssl rand -hex 32",
+      isPlaceholderValue(env.SESSION_SECRET)
+        ? "SESSION_SECRET is still the .env.example placeholder (a value anyone can read in the repo), so it's ignored and nobody can sign in. Use: openssl rand -hex 32"
+        : env.SESSION_SECRET
+          ? `SESSION_SECRET is shorter than ${MIN_SESSION_SECRET_LENGTH} characters, so it's ignored and nobody can sign in. Use: openssl rand -hex 32`
+          : "SESSION_SECRET is not set, so nobody can sign in. Use: openssl rand -hex 32",
     );
   }
-  if (env.OPS_PASSWORD && !breakGlassEnabled(env)) {
+  if (isPlaceholderValue(env.OPS_PASSWORD)) {
+    out.push("OPS_PASSWORD is still the .env.example placeholder, so break-glass sign-in is off. Use: openssl rand -base64 24, or unset it.");
+  } else if (env.OPS_PASSWORD && !breakGlassEnabled(env)) {
     out.push(`OPS_PASSWORD is shorter than ${MIN_BREAK_GLASS_PASSWORD} characters, so break-glass sign-in is off.`);
+  }
+  const others = placeholderKeys(env).filter((k) => k !== "SESSION_SECRET" && k !== "OPS_PASSWORD");
+  if (others.length) {
+    out.push(`${others.join(", ")} still hold .env.example placeholder values, so they count as not set (the matching features stay off or in demo mode). Set real values or remove them.`);
+  }
+  if (!realEnv(env, "CRON_SECRET")) {
+    out.push("CRON_SECRET is not set: the daily jobs (survey and day-before reminders, proposal expiry, outbox retries, aftercare) and the morning digest all refuse to run.");
   }
   return out;
 }

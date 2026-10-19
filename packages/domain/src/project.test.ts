@@ -15,6 +15,8 @@ import {
   customerNextAction,
   daysBetween,
   earliestInstallStart,
+  earliestStartForKit,
+  goodsDeliverBy,
   earlyStartWording,
   isLegacySnapshot,
   isGatePassed,
@@ -506,6 +508,13 @@ test("proposal-issue gate: design sign-off, compatibility, tax, margin; terms on
   assert.equal(severityOf(blockersFor(p, c({ proposalCheck: low }), "proposal-issue"), "margin-below-minimum"), "block");
   assert.equal(severityOf(blockersFor(p, c({ proposalCheck: { ...low, marginOverride: true } }), "proposal-issue"), "margin-below-minimum"), undefined);
   assert.equal(severityOf(blockersFor(p, c({ proposalCheck: undefined }), "proposal-issue"), "proposal-not-drafted"), "block");
+  // Unpriced cost lines: the margin can't be checked, so it fails closed; the admin override clears it.
+  const gaps = { ...noTax, taxConfirmed: true, unpricedCostLines: 3 };
+  const unpriced = blockersFor(p, c({ proposalCheck: gaps }), "proposal-issue").find((b) => b.code === "costs-unpriced");
+  assert.equal(unpriced?.severity, "block");
+  assert.match(unpriced!.message, /3 cost lines have no price, so the 25% minimum margin can't be checked/);
+  assert.equal(severityOf(blockersFor(p, c({ proposalCheck: { ...gaps, marginOverride: true } }), "proposal-issue"), "costs-unpriced"), undefined);
+  assert.equal(severityOf(blockersFor(p, c({ proposalCheck: { ...gaps, unpricedCostLines: 0 } }), "proposal-issue"), "costs-unpriced"), undefined);
 
   const reviewed = ready({ legal: { termsReviewed: true, cancellationReviewed: true } });
   assert.deepEqual(blockersFor(walk("documents-consent-recorded"), c({ settings: reviewed }), "proposal-issue"), []);
@@ -762,10 +771,19 @@ test("install-dates-set: accepted, working days, right length, lead time, after 
   refuses(early, set(["2026-10-30", "2026-11-02", "2026-11-03"]), T.dates, {}, /5 days' notice/);
 
   // Supply-and-install with no early start: the end isn't known until the kit
-  // arrives, so dates aren't refused here (ready-to-install holds the start).
+  // arrives, but delivery can't be before tomorrow (Thu 29 Oct), so nothing
+  // before 14 days after that could ever start: refused, with the date.
   const goods = walk("proposal-accepted", { early: false });
-  assert.ok(apply(goods, set(["2026-11-03", "2026-11-04", "2026-11-05"]), T.dates).ok);
-  assert.equal(earliestInstallStart(goods, T.dates), "2026-11-02"); // lead time only
+  refuses(goods, set(["2026-11-03", "2026-11-04", "2026-11-05"]), T.dates, {}, /from when your equipment is delivered, so the earliest we can start is Fri 13 Nov/);
+  assert.ok(apply(goods, set(["2026-11-13", "2026-11-16", "2026-11-17"]), T.dates).ok);
+  assert.equal(earliestInstallStart(goods, T.dates), "2026-11-02"); // lead time only: the period's end isn't known
+  assert.equal(earliestStartForKit(goods, T.dates), "2026-11-13"); // delivered tomorrow at the earliest, then 14 days
+  // With the orders saying the kit can't arrive before Mon 2 Nov: Tue 17 Nov.
+  assert.equal(earliestStartForKit(goods, T.dates, DEFAULT_SETTINGS, "2026-11-02"), "2026-11-17");
+  assert.equal(goodsDeliverBy(goods, "2026-11-17"), "2026-11-02");
+  // An early-start request, or install-only, doesn't wait on delivery.
+  assert.equal(goodsDeliverBy(walk("proposal-accepted"), "2026-11-17"), undefined);
+  assert.equal(earliestStartForKit(walk("proposal-accepted"), T.dates), "2026-11-02");
   const delivered = { ...goods, proposal: { ...goods.proposal, goodsReceivedOn: "2026-11-02", cancellationEndsOn: "2026-11-16" } };
   refuses(delivered, set(["2026-11-16", "2026-11-17", "2026-11-18"]), T.dates, {}, /runs until Mon 16 Nov/);
   assert.equal(earliestInstallStart(delivered, T.dates), "2026-11-17");
@@ -814,6 +832,11 @@ test("booking gate: F-gas, a Part P electrician, deposit, dates", () => {
   assert.equal(severityOf(blockersFor(p, paidBySum, "booking"), "deposit-unpaid"), undefined);
   const beforeKit = mergeSettings({ payments: { depositPct: 20, depositTiming: "before-kit-order" } });
   assert.equal(severityOf(blockersFor(p, c({ settings: beforeKit }), "booking"), "deposit-unpaid"), undefined);
+  // The contract's schedule wins over a settings change made after acceptance, either way.
+  const agreedNone = { depositPct: 0, depositTiming: "on-acceptance" as const, balanceDueDays: 7 };
+  assert.equal(severityOf(blockersFor(p, c({ settings: deposit, agreedPayments: agreedNone }), "booking"), "deposit-unpaid"), undefined, "contracted at 0%: no deposit now asked");
+  const agreed20 = { depositPct: 20, depositTiming: "on-acceptance" as const, balanceDueDays: 7 };
+  assert.equal(severityOf(blockersFor(p, c({ agreedPayments: agreed20 }), "booking"), "deposit-unpaid"), "block", "contracted at 20%, settings since set to 0%");
 
   // No early start on supply-and-install: the kit has to land 15+ days before day 1.
   const noEarly = walk("crew-assigned", { early: false });
@@ -890,6 +913,55 @@ test("kit-updated needs a confirmed booking and keeps customer wording conservat
   assert.equal(service.proposal.goodsReceivedOn, undefined);
   assert.equal(service.proposal.cancellationEndsOn, "2026-11-10");
   refuses(walk("booking-confirmed"), { type: "kit-updated", status: "ordered", shortages: -1 }, T.dates, {}, /whole number/);
+});
+
+test("the cancellation period runs from the day the last of the kit arrived, even when that's recorded later", () => {
+  // Synced three days after it arrived (the booking was confirmed on the 16th): the delivery day counts.
+  const late = step(walk("kit-confirmed"), { type: "kit-updated", status: "delivered", shortages: 0, receivedOn: "2026-11-13" }, "2026-11-16T10:00:00.000Z", { actor: ADMIN });
+  assert.equal(late.proposal.goodsReceivedOn, "2026-11-13");
+  assert.equal(late.proposal.cancellationEndsOn, "2026-11-27");
+  // Never a future date, whatever an order claims.
+  const future = step(walk("kit-confirmed"), { type: "kit-updated", status: "delivered", shortages: 0, receivedOn: "2026-12-01" }, T.kit, { actor: ADMIN });
+  assert.equal(future.proposal.goodsReceivedOn, "2026-11-13");
+
+  // A damaged unit replaced while the period is running: it's open again, then runs from the replacement.
+  const delivered = walk("kit-delivered");
+  assert.equal(delivered.proposal.cancellationEndsOn, "2026-11-27");
+  const replacing = step(delivered, { type: "kit-updated", status: "delivered", shortages: 1 }, "2026-11-16T10:00:00.000Z", { actor: ADMIN });
+  assert.equal(replacing.proposal.goodsReceivedOn, undefined);
+  assert.equal(cancellationStatus(replacing, "2026-11-30").ended, false, "held open, not ended, while the replacement is on its way");
+  assert.match(replacing.events.at(-1)!.label, /1 item is still to come; we're on it\. Your cancellation period now runs from when the last of it arrives\./);
+  const replaced = step(replacing, { type: "kit-updated", status: "delivered", shortages: 0, receivedOn: "2026-11-20" }, "2026-11-20T15:00:00.000Z", { actor: ADMIN });
+  assert.deepEqual([replaced.proposal.goodsReceivedOn, replaced.proposal.cancellationEndsOn], ["2026-11-20", "2026-12-04"]);
+  // Once the period has ended it stays ended: a later replacement doesn't reopen it.
+  const after = step(delivered, { type: "kit-updated", status: "delivered", shortages: 1 }, "2026-11-30T10:00:00.000Z", { actor: ADMIN });
+  assert.equal(after.proposal.cancellationEndsOn, "2026-11-27");
+});
+
+test("goods-received: kit at the customer's home before the booking is confirmed starts the period that day", () => {
+  const accepted = walk("install-dates-set", { early: false });
+  const got = step(accepted, { type: "goods-received", receivedOn: "2026-10-30" }, "2026-11-02T10:00:00.000Z", { actor: ADMIN });
+  assert.deepEqual([got.proposal.goodsReceivedOn, got.proposal.cancellationEndsOn], ["2026-10-30", "2026-11-13"]);
+  assert.match(got.events.at(-1)!.label, /^Your equipment has been delivered to your home\. Your cancellation period now runs until the end of Fri 13 Nov\.$/);
+  refuses(got, { type: "goods-received" }, "2026-11-02T10:00:00.000Z", { actor: ADMIN }, /already recorded/);
+  refuses(walk("proposal-viewed"), { type: "goods-received" }, T.dates, { actor: ADMIN }, /no accepted contract/);
+  refuses(walk("install-dates-set", INSTALL_ONLY), { type: "goods-received" }, T.dates, { actor: ADMIN }, /supply-and-install/);
+  // Once known, dates inside it are refused, and the later kit update doesn't repeat itself to the customer.
+  refuses(got, { type: "install-dates-set", startDate: "2026-11-13", dates: ["2026-11-13", "2026-11-16", "2026-11-17"] }, "2026-11-02T10:00:00.000Z", {}, /runs until Fri 13 Nov/);
+  const booked = step({ ...got, booking: { ...got.booking, status: "booked" } }, { type: "kit-updated", status: "delivered", shortages: 0, receivedOn: "2026-10-30" }, "2026-11-03T10:00:00.000Z", { actor: ADMIN });
+  assert.equal(booked.events.at(-1)!.internal, true);
+  assert.equal(booked.proposal.cancellationEndsOn, "2026-11-13");
+});
+
+test("payment-recorded counts each payment once, however often its apply is retried", () => {
+  const p = walk("invoice-issued");
+  const once = step(p, { type: "payment-recorded", amountPence: 50_000, paymentId: "pay-1" }, T.after);
+  assert.equal(once.money.paidPence, p.money.paidPence + 50_000);
+  assert.deepEqual(once.money.paymentIds, ["pay-1"]);
+  refuses(once, { type: "payment-recorded", amountPence: 50_000, paymentId: "pay-1" }, T.after, {}, /already counted/);
+  const two = step(once, { type: "payment-recorded", amountPence: 20_000, paymentId: "pay-2" }, T.after);
+  assert.equal(two.money.paidPence, p.money.paidPence + 70_000);
+  assert.equal(two.events.filter((e) => e.type === "payment-recorded").length - p.events.filter((e) => e.type === "payment-recorded").length, 2);
 });
 
 test("kit held by us, the installer or a subcontractor starts no cancellation clock until it reaches the customer on day 1", () => {
@@ -1755,7 +1827,8 @@ test("migrateProject is idempotent on v2 and tolerant of missing fields", () => 
 
 test("a migrated project keeps moving through the v2 reducer", () => {
   const p = migrateProject(v1(V1_VISITED));
-  const r = applyProjectAction(p, { type: "install-dates-set", startDate: "2026-07-21", dates: ["2026-07-21", "2026-07-22", "2026-07-23"].slice(0, p.booking.installDays) }, "2026-07-15T10:00:00.000Z", ctx("2026-07-15"));
+  // Supply-and-install with no early start: 14 days after a delivery tomorrow at the earliest.
+  const r = applyProjectAction(p, { type: "install-dates-set", startDate: "2026-07-31", dates: ["2026-07-31", "2026-08-03", "2026-08-04"].slice(0, p.booking.installDays) }, "2026-07-15T10:00:00.000Z", ctx("2026-07-15"));
   assert.ok(r.ok, r.ok ? "" : r.error);
 });
 

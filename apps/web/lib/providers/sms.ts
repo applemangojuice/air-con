@@ -11,10 +11,14 @@
  * import nothing, so `node --test` can load this file directly.
  */
 
+import { realEnv } from "../env-placeholders.ts";
+
 const TWILIO_API = "https://api.twilio.com/2010-04-01";
 
 export function smsConfigured(): boolean {
-  return Boolean(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_FROM);
+  // Template values (ACxxxx…, your-twilio-auth-token) aren't a provider: stay honestly in demo mode.
+  const env = process.env;
+  return Boolean(realEnv(env, "TWILIO_ACCOUNT_SID") && realEnv(env, "TWILIO_AUTH_TOKEN") && env.TWILIO_FROM);
 }
 
 /* ------------------------------------------------------------------ */

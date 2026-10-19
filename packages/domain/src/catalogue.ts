@@ -880,6 +880,8 @@ export const DEMO_CATALOGUE: CatalogueItem[] = [
   demo({ id: "demo-mat-pump", kind: "material", label: "Mini condensate pump (DEMO)", unit: "each", category: "drainage", costPence: 8_500, supplier: DEMO_TRADE }),
   demo({ id: "demo-mat-r32", kind: "material", label: "R32 refrigerant (DEMO)", unit: "kg", category: "refrigerant", costPence: 3_000, supplier: DEMO_TRADE }),
   demo({ id: "demo-mat-fixings", kind: "material", label: "Fixings pack (DEMO)", unit: "pack", category: "consumable", costPence: 1_000, supplier: DEMO_TRADE }),
+  // The proposal's delivery line (buildCostLines), so a DEMO build-up is complete and can issue.
+  demo({ id: "demo-svc-delivery", kind: "service", label: "Kit delivery to the home (DEMO)", unit: "drop", category: "delivery", costPence: 4_500, supplier: DEMO_TRADE }),
 ];
 
 export const DEMO_COMPATIBILITY: CompatibilityRule[] = [

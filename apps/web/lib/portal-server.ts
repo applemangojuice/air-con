@@ -5,6 +5,7 @@ import {
   defaultsForKind,
   documentCompany,
   documentCustomer,
+  earliestKitArrival,
   isFullName,
   isOpen,
   variationAgreeWording,
@@ -17,6 +18,7 @@ import {
   type HandoverPackSnapshot,
   type Issue,
   type MediaItem,
+  type PilotSettings,
   type Project,
   type ProjectAction,
   type ProjectStageId,
@@ -40,6 +42,7 @@ import * as installJobsRepo from "./repo/installJobs";
 import * as invoicesRepo from "./repo/invoices";
 import * as issuesRepo from "./repo/issues";
 import * as mediaRepo from "./repo/media";
+import * as purchaseOrdersRepo from "./repo/purchaseOrders";
 import * as staffRepo from "./repo/staff";
 import { enforceRateLimit } from "./rate-limit";
 import { getSettings } from "./settings-server";
@@ -168,6 +171,11 @@ const toPhoto = (m: MediaItem, url: string | null): HubPhoto => ({
   ...(m.height ? { height: m.height } : {}),
 });
 
+/** The earliest the kit can all be at the customer's home, from the orders (purchasing's earliestKitArrival). */
+async function kitArrival(projectId: string, today: string, settings: PilotSettings): Promise<string> {
+  return earliestKitArrival(await purchaseOrdersRepo.listForProject(projectId), today, settings.scheduling.workingDays);
+}
+
 /**
  * Everything the hub shows, customer-safe. `access` decides the viewer
  * strip; the content is the customer's view either way (staff see what the
@@ -184,7 +192,7 @@ export async function loadHub(projectId: string, access: ProjectAccess): Promise
   const wantsSlots = project.survey.status === "not-booked" || project.survey.status === "booked";
   const wantsBlocks = project.proposal.status === "accepted" && project.install.status === "not-started";
 
-  const [documents, issues, invoices, crewStaff, surveyorStaff, job, taken, booked] = await Promise.all([
+  const [documents, issues, invoices, crewStaff, surveyorStaff, job, taken, booked, kitArrivesOn] = await Promise.all([
     safe("documents", () => listDocuments(projectId, { customerVisibleOnly: true }), [] as DocumentRecord[]),
     safe("issues", async () => (await issuesRepo.listForProject(projectId)).filter((i) => i.customerVisible), [] as Issue[]),
     safe("invoices", () => invoicesRepo.listForProject(projectId), []),
@@ -197,6 +205,7 @@ export async function loadHub(projectId: string, access: ProjectAccess): Promise
     safe("install job", () => installJobsRepo.getForProject(projectId), null),
     wantsSlots ? safe("survey slots", () => takenSurveySlots(projectId, today), [] as string[]) : Promise.resolve([] as string[]),
     wantsBlocks ? safe("install dates", () => bookedInstallDates(projectId, today), [] as string[]) : Promise.resolve([] as string[]),
+    wantsBlocks ? safe("kit arrival", () => kitArrival(projectId, today, settings), undefined as string | undefined) : Promise.resolve(undefined),
   ]);
 
   // Photos: staff faces, the end-of-day updates, and pictures on customer-visible issues.
@@ -287,8 +296,8 @@ export async function loadHub(projectId: string, access: ProjectAccess): Promise
     surveyor,
     crew,
     surveySlots: wantsSlots ? surveySlotDays({ settings, nowWall: londonWallClock(), taken }) : [],
-    installBlocks: wantsBlocks ? installBlockOptions({ project: raw, settings, today, booked }) : [],
-    earliestStart: earliestOfferedStart(raw, today, settings),
+    installBlocks: wantsBlocks ? installBlockOptions({ project: raw, settings, today, booked, ...(kitArrivesOn ? { kitArrivesOn } : {}) }) : [],
+    earliestStart: earliestOfferedStart(raw, today, settings, kitArrivesOn),
     documents: documents.map(toHubDocument),
     issues: issues.map((i) => toHubIssue(i, photoById)),
     invoices: liveInvoices,
@@ -553,8 +562,8 @@ export async function customerAct(projectId: string, actor: CustomerActor, req: 
 
     case "install-dates": {
       const dates = req.dates.map((d) => d.slice(0, 10));
-      const booked = await bookedInstallDates(projectId, today);
-      const problem = blockProblem({ project, settings, today, booked, dates });
+      const [booked, kitArrivesOn] = await Promise.all([bookedInstallDates(projectId, today), kitArrival(projectId, today, settings)]);
+      const problem = blockProblem({ project, settings, today, booked, dates, ...(kitArrivesOn ? { kitArrivesOn } : {}) });
       if (problem) return { ok: false, error: problem, status: 409 };
       const moving = project.booking.dates.length > 0;
       const result = await act(projectId, actor, name, { type: "install-dates-set", startDate: dates[0]!, dates });

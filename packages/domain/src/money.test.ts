@@ -14,6 +14,7 @@ import {
   invoiceLineFromTotal,
   invoiceNumber,
   invoiceOutstanding,
+  owedInvoices,
   invoiceTotals,
   isInvoiceOverdue,
   moneySummary,
@@ -286,4 +287,28 @@ test("account credit is used oldest invoice first, and per-invoice figures add u
   // An overpayment on one invoice counts towards the next.
   const over = { ...a, paidPence: 12_000, status: "paid" as const };
   assert.equal(invoiceOutstanding(b, [over, b]), 38_000);
+});
+
+test("owedInvoices: what's still due across projects, net of credit notes and account credit", () => {
+  const all = [
+    // Project 1: a balance fully credited ("cancel what's unpaid") owes nothing.
+    invoice({ id: "a", projectId: "p-1", number: "DIH-0001", totalPence: 631_320 }),
+    invoice({ id: "a-cn", projectId: "p-1", number: "DIH-0002", kind: "credit-note", totalPence: -631_320, creditsInvoiceId: "a" }),
+    // Project 2: part-paid, and a goodwill credit on the account comes off it.
+    invoice({ id: "b", projectId: "p-2", number: "DIH-0003", totalPence: 100_000, paidPence: 40_000, status: "part-paid", dueOn: "2026-11-01" }),
+    invoice({ id: "b-cn", projectId: "p-2", number: "DIH-0004", kind: "credit-note", totalPence: -10_000 }),
+    // Project 3: a credit on another project never nets off this one.
+    invoice({ id: "c", projectId: "p-3", number: "DIH-0005", totalPence: 25_000 }),
+    invoice({ id: "d", projectId: "p-3", number: "DIH-0006", totalPence: 9_000, status: "void" }),
+  ];
+  const owed = owedInvoices(all);
+  assert.deepEqual(
+    owed.map((o) => [o.invoice.id, o.duePence]),
+    [
+      ["b", 50_000],
+      ["c", 25_000],
+    ],
+  );
+  // Matches what each project's money page says (outstandingPence, never below zero).
+  assert.equal(owed.filter((o) => o.invoice.projectId === "p-2").reduce((n, o) => n + o.duePence, 0), outstandingPence(all.filter((i) => i.projectId === "p-2")));
 });

@@ -463,7 +463,10 @@ export function buildCostLines(input: {
  * line including the overhead allocation, before and after the discount;
  * contribution = net − the direct costs (everything but the overhead per
  * job). A margin built on unpriced lines is incomplete: `unpricedCostLines`
- * says how many, and the UI says so.
+ * says how many, the UI says so, and the proposal can't issue until they're
+ * priced or an admin overrides (proposalIssueErrors and the proposal-issue
+ * gate fail closed: `belowMinMargin` only judges the costs that are known).
+ * Cost-plus refuses to price while any equipment line is unpriced.
  *
  * Throws PricingError for an input it can't honestly price.
  */
@@ -505,6 +508,14 @@ export function priceOption(input: {
       const target = input.targetMarginPct ?? settings.pricing.minMarginPct;
       if (!(target >= 0 && target < 100)) throw new PricingError("The target margin must be between 0% and 99%.");
       if (costPence <= 0) throw new PricingError("Cost-plus needs at least one priced cost line.");
+      // A price built on unpriced equipment would sit far below the target
+      // margin it claims: the units are most of the cost.
+      const kitUnpriced = input.costLines.filter((l) => l.category === "equipment" && l.totalPence === null).length;
+      if (kitUnpriced > 0) {
+        throw new PricingError(
+          `Cost-plus needs the equipment priced: ${kitUnpriced} equipment line${kitUnpriced === 1 ? " has" : "s have"} no cost yet. Type the cost in the build-up, or price it in the catalogue.`,
+        );
+      }
       listNetPence = Math.ceil(costPence / (1 - target / 100) / 1000) * 1000;
       break;
     }

@@ -20,7 +20,7 @@ const REQS: StepRequirement[] = ["fgas", "electrical", "tech-lead"];
 
 /**
  * Booking (schedule.edit): set the install block on the customer's behalf,
- * put a qualified crew together, take the deposit if settings ask for one,
+ * put a qualified crew together, take the deposit if the contract asks for one,
  * record the early-start evidence, and confirm. The booking gate decides;
  * this page shows exactly what it's waiting for.
  */
@@ -33,12 +33,12 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
   const view = await loadBooking(id, staff);
   if (!view) notFound();
 
-  const { project: p, settings } = view;
+  const { project: p, settings, payments } = view;
   const accepted = p.proposal.status === "accepted";
   const started = p.install.status !== "not-started";
   const booked = p.booking.status === "booked";
   const blocking = view.blockers.filter((b) => b.severity === "block");
-  const depositRequired = settings.payments.depositPct > 0;
+  const depositRequired = payments.depositPct > 0;
   const depositInvoice = view.deposit.invoice;
 
   return (
@@ -62,7 +62,7 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
           label="Deposit"
           value={p.booking.depositStatus === "paid" ? "Paid" : p.booking.depositStatus === "requested" ? "Requested" : depositRequired ? "Not requested" : "None needed"}
           tone={p.booking.depositStatus === "paid" ? "success" : depositRequired ? "warn" : "neutral"}
-          hint={depositInvoice ? `Invoice ${depositInvoice.number}` : depositRequired ? `${settings.payments.depositPct}% of the contract` : "Settings ask for no deposit"}
+          hint={depositInvoice ? `Invoice ${depositInvoice.number}` : depositRequired ? `${payments.depositPct}% of the contract` : view.paymentsAgreed ? "The contract has no deposit" : "Settings ask for no deposit"}
         />
       </div>
 
@@ -219,8 +219,8 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
           title="Deposit"
           description={
             !depositRequired
-              ? "Settings don't ask for a deposit now; this one was raised earlier."
-              : settings.payments.depositTiming === "on-acceptance"
+              ? "The agreed payment terms have no deposit; this one was raised earlier."
+              : payments.depositTiming === "on-acceptance"
                 ? "Needed before the booking is confirmed."
                 : "Needed before the kit is ordered."
           }
@@ -253,7 +253,7 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
               >
                 <input type="hidden" name="expectedTotal" value={(view.deposit.plan.totalPence / 100).toFixed(2)} />
                 <p className="text-sm text-ink-700">
-                  {settings.payments.depositPct}% of {money(p.money.contractTotalPence ?? 0)}: {money(view.deposit.plan.totalPence)}. The customer pays from their
+                  {payments.depositPct}% of {money(p.money.contractTotalPence ?? 0)}: {money(view.deposit.plan.totalPence)}. The customer pays from their
                   payment page; nothing is marked paid until the money has actually arrived.
                 </p>
               </ActionForm>

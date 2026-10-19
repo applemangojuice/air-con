@@ -6,6 +6,7 @@ import { breakGlassEnabled, safeNextPath, staffLanding } from "@/lib/auth/access
 import { DEMO_ROLE_KEYS, DEMO_ROLE_LABEL } from "@/lib/auth/demo-staff";
 import { currentStaff } from "@/lib/auth/server";
 import { appMode, isDemoLoginAllowed } from "@/lib/env-mode";
+import { PILOT_MIGRATION, pilotSchemaStatus } from "@/lib/schema-check";
 import { demoSignIn } from "./actions";
 import { DemoSeedButton } from "./demo-seed";
 import { BreakGlassForm, MagicLinkForm } from "./forms";
@@ -47,6 +48,10 @@ export default async function LoginPage({ searchParams }: { searchParams: Search
   const demoAllowed = isDemoLoginAllowed();
   const breakGlass = breakGlassEnabled(process.env);
   const mode = appMode();
+  // Supabase connected but the pilot migration never ran: say so here, where
+  // everyone lands (every diagnostic page is behind this sign-in).
+  const schema = mode.data === "supabase" ? await pilotSchemaStatus().catch(() => null) : null;
+  const notMigrated = Boolean(schema && (schema.missingTables.length > 0 || schema.missingColumns.length > 0));
   // "Load demo pilots": anyone in development; on a demo deployment, admins only
   // (the route checks the same thing). Needs somewhere to put them.
   const canSeed =
@@ -66,6 +71,17 @@ export default async function LoginPage({ searchParams }: { searchParams: Search
           For the Dang, It&apos;s Hot team and our installers. We email you a link, no passwords.
         </p>
 
+        {notMigrated && (
+          <div className="mt-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-900" role="alert">
+            <p className="font-semibold">The database isn&apos;t set up for sign-in yet.</p>
+            <p className="mt-1">
+              Supabase is connected, but the pilot platform&apos;s migration hasn&apos;t been run. In the Supabase SQL editor, run every file in{" "}
+              <code className="font-mono text-xs">supabase/migrations</code> in order, ending with{" "}
+              <code className="font-mono text-xs">{PILOT_MIGRATION.split("/").pop()}</code>, then reload this page.
+              {breakGlass ? " Until then, an admin email with the break-glass password opens /ops/status to check." : ""}
+            </p>
+          </div>
+        )}
         {error && (
           <p className="mt-6 rounded-2xl border border-accent-100 bg-accent-50 p-4 text-sm text-ink-900" role="alert">
             {error}

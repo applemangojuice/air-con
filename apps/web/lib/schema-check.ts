@@ -1,0 +1,144 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { dataBackend, getServiceClient } from "./supabase-server";
+
+/**
+ * Is the database's schema what the app writes to? One implementation for
+ * /api/health and /ops/status (lib/health.ts), /ops/launch (goLiveChecks),
+ * the boot log (instrumentation.ts), the /login banner and the break-glass
+ * fallback, so they can never disagree.
+ *
+ * Every probe is a GET (`select(cols).limit(0)`), never a HEAD: PostgREST
+ * answers a missing table with a 404 (PGRST205), and on a HEAD request the
+ * body is empty, which postgrest-js turns into a 204 with no error, so a
+ * missing table would look present and empty.
+ */
+
+/** Every table the pilot platform writes (migration 0010_pilot_platform.sql). */
+export const PILOT_TABLES = [
+  "staff",
+  "login_tokens",
+  "customers",
+  "media",
+  "surveys",
+  "designs",
+  "proposals",
+  "catalogue_items",
+  "catalogue_compatibility",
+  "purchase_orders",
+  "compliance_items",
+  "install_jobs",
+  "install_evidence",
+  "issues",
+  "time_entries",
+  "invoices",
+  "payments",
+  "messages",
+  "documents",
+  "learnings",
+  "settings",
+  "audit_log",
+] as const;
+
+/** Columns 0010 adds to tables earlier migrations made: the table is there, the pilot can't use it without them. */
+export const PILOT_COLUMNS: { table: string; columns: string[] }[] = [
+  { table: "projects", columns: ["schema_version", "customer_id", "pilot_number", "owner_staff_id", "next_action", "next_action_at", "value_pence", "blocked"] },
+  { table: "media", columns: ["annotations_version", "locked"] },
+];
+
+/** The migration that creates them, for every message that says how to fix it. */
+export const PILOT_MIGRATION = "supabase/migrations/0010_pilot_platform.sql";
+
+type ErrorLike = { code?: string | null; message?: string | null } | null | undefined;
+
+/**
+ * PostgREST or Postgres saying a table or column isn't there: PGRST205 (not
+ * in the schema cache), PGRST204 (no such column), 42P01 (undefined table),
+ * 42703 (undefined column). Network or permission errors are not this.
+ */
+export function isMissingSchemaError(error: ErrorLike): boolean {
+  if (!error) return false;
+  if (["PGRST205", "PGRST204", "42P01", "42703"].includes(String(error.code ?? ""))) return true;
+  return /could not find the (table|'[^']+' column)|relation .* does not exist|column .* does not exist/i.test(String(error.message ?? ""));
+}
+
+export interface TableProbe {
+  ok: boolean;
+  /** Rows in the table (when the probe asked and it answered). */
+  count: number | null;
+  error: string | null;
+  /** The table (or a probed column) definitely isn't there, as opposed to an unreachable database. */
+  missing: boolean;
+}
+
+/** One table, by GET. With `columns`, checks those columns exist too. */
+export async function probeTable(client: SupabaseClient, table: string, opts: { columns?: string[]; count?: boolean } = {}): Promise<TableProbe> {
+  try {
+    const columns = opts.columns?.length ? opts.columns.join(",") : "*";
+    const query = opts.count ? client.from(table).select(columns, { count: "exact" }) : client.from(table).select(columns);
+    const { error, count, status, data } = await query.limit(0);
+    if (error) return { ok: false, count: null, error: error.message, missing: isMissingSchemaError(error) };
+    // A real table answers a GET with an array (empty here). No body at all
+    // (postgrest-js turns an empty 404 into "204, no error") is no answer:
+    // unknown, never "present".
+    if (!Array.isArray(data)) return { ok: false, count: null, error: `No answer for "${table}" (HTTP ${status})`, missing: false };
+    return { ok: true, count: opts.count ? (count ?? 0) : null, error: null, missing: false };
+  } catch (err) {
+    return { ok: false, count: null, error: err instanceof Error ? err.message : String(err), missing: false };
+  }
+}
+
+export interface SchemaStatus {
+  /** False when there's no Supabase database to check (demo mode or the local backend). */
+  checked: boolean;
+  missingTables: string[];
+  /** "projects.schema_version" and the like. */
+  missingColumns: string[];
+  /** Probes that failed for another reason (unreachable, a bad key): unknown, never "missing". */
+  errors: string[];
+}
+
+/** Every pilot table and column, now. */
+export async function checkPilotSchema(client: SupabaseClient | null = getServiceClient()): Promise<SchemaStatus> {
+  if (!client || dataBackend() !== "supabase") return { checked: false, missingTables: [], missingColumns: [], errors: [] };
+  const [tables, columns] = await Promise.all([
+    Promise.all(PILOT_TABLES.map(async (t) => ({ t, r: await probeTable(client, t) }))),
+    Promise.all(PILOT_COLUMNS.map(async (c) => ({ c, r: await probeTable(client, c.table, { columns: c.columns }) }))),
+  ]);
+  const missingTables: string[] = tables.filter((x) => x.r.missing).map((x) => x.t);
+  const missingColumns: string[] = [];
+  for (const { c, r } of columns) {
+    if (!r.missing || missingTables.includes(c.table)) continue;
+    // Name the columns that are missing (one probe each only when the group failed).
+    const each = await Promise.all(c.columns.map(async (col) => ({ col, r: await probeTable(client, c.table, { columns: [col] }) })));
+    const gone = each.filter((x) => x.r.missing).map((x) => `${c.table}.${x.col}`);
+    missingColumns.push(...(gone.length ? gone : [`${c.table} (${c.columns.join(", ")})`]));
+  }
+  const errors = [...tables, ...columns].filter((x) => !x.r.ok && !x.r.missing).map((x) => x.r.error ?? "unreachable");
+  return { checked: true, missingTables, missingColumns, errors };
+}
+
+const CACHE_MS = 60_000;
+let cached: { at: number; status: SchemaStatus } | null = null;
+
+/**
+ * checkPilotSchema, remembered for a minute: for pages that ask on every
+ * request (/login) and the break-glass fallback. A fixed schema shows up
+ * within a minute; a failure to check is never cached.
+ */
+export async function pilotSchemaStatus(): Promise<SchemaStatus> {
+  if (cached && Date.now() - cached.at < CACHE_MS) return cached.status;
+  const status = await checkPilotSchema();
+  if (status.checked && status.errors.length === 0) cached = { at: Date.now(), status };
+  return status;
+}
+
+/** True only when the database definitely lacks the pilot's staff table (sign-in can't work at all). */
+export async function staffTableMissing(): Promise<boolean> {
+  const s = await pilotSchemaStatus();
+  return s.checked && s.missingTables.includes("staff");
+}
+
+/** For tests: forget the remembered status. */
+export function resetSchemaStatusCache(): void {
+  cached = null;
+}

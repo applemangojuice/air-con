@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cronSecret } from "@/lib/env-placeholders";
 import { constantTimeEqual } from "@/lib/auth/session";
 import { appUrl } from "@/lib/brand";
 import { escapeHtml, sendTeamEmail } from "@/lib/email";
@@ -19,7 +20,7 @@ import { getServiceClient } from "@/lib/supabase-server";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  const secret = process.env.CRON_SECRET;
+  const secret = cronSecret(); // a template value (.env.example) is no secret
   if (!secret || !constantTimeEqual(request.headers.get("authorization") ?? "", `Bearer ${secret}`)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

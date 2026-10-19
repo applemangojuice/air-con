@@ -1,7 +1,9 @@
 # Daily probe of the live site's /api/health. The endpoint returns:
-#   200 "ok"       — database connected, every table + bucket present
-#   200 "demo"     — no database configured (fine for previews, not for prod)
+#   200 "ok"       — database connected, every table, column and bucket present
 #   503 "degraded" — connected but missing schema: data is being LOST
+#   503 "demo"     — production with no database: every lead is dropped
+#   200 "demo"     — no database on a preview or a deliberate demo deployment
+# The live business must answer "ok": anything else fails the run.
 #
 # A failing run (red ✗ on the Actions tab + GitHub's failure email to the
 # repo watchers) is the alarm. Set the SITE_URL repository variable
@@ -23,14 +25,20 @@ jobs:
         run: |
           URL="${{ vars.SITE_URL || 'https://dang.ac' }}"
           echo "Probing $URL/api/health"
+          # No -f: a 503 still carries the JSON body that says why.
           BODY=$(curl -sS --max-time 30 "$URL/api/health") || { echo "::error::Site unreachable"; exit 1; }
           echo "$BODY"
-          STATUS=$(echo "$BODY" | python3 -c "import json,sys; print(json.load(sys.stdin).get('status',''))")
+          STATUS=$(echo "$BODY" | python3 -c "import json,sys; print(json.load(sys.stdin).get('status',''))" 2>/dev/null || echo "")
           if [ "$STATUS" = "degraded" ]; then
-            echo "::error::Database is connected but unhealthy (missing tables/buckets). Data may be being lost. Open /ops/status."
+            echo "::error::Database is connected but unhealthy (missing tables, columns or buckets). Data may be being lost. Open /ops/status."
             exit 1
           fi
           if [ "$STATUS" = "demo" ]; then
-            echo "::warning::Site is running in demo mode — nothing is being persisted."
+            echo "::error::The live site is running in demo mode: no database is connected, so nothing (not even a lead) is saved. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in Vercel."
+            exit 1
+          fi
+          if [ "$STATUS" != "ok" ]; then
+            echo "::error::Unexpected health answer: '$STATUS'."
+            exit 1
           fi
           echo "Status: $STATUS"

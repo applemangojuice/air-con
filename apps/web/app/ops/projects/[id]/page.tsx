@@ -965,7 +965,7 @@ function BlockerLinks({ blockers, projectId }: { blockers: string[]; projectId: 
     const c = code.split(":")[0]!;
     if (c.startsWith("survey")) areas.set("survey", { href: `/field/survey/${projectId}`, label: "Survey" });
     else if (c.startsWith("design")) areas.set("design", { href: `/ops/projects/${projectId}/design`, label: "Design" });
-    else if (["proposal-not-drafted", "margin-below-minimum", "validity-passed", "proposal-not-issued", "proposal-expired", "tax-unconfirmed"].includes(c))
+    else if (["proposal-not-drafted", "margin-below-minimum", "costs-unpriced", "validity-passed", "proposal-not-issued", "proposal-expired", "tax-unconfirmed"].includes(c))
       areas.set("proposal", { href: `/ops/projects/${projectId}/proposal`, label: "Proposal" });
     else if (["schedule2-incomplete", "terms-unreviewed"].includes(c)) areas.set("settings", { href: "/ops/settings#company", label: "Settings" });
     else if (c === "compliance" || c === "compliance-missing") areas.set("compliance", { href: `/ops/projects/${projectId}/compliance`, label: "Compliance" });

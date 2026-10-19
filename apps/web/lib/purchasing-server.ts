@@ -1,16 +1,19 @@
 import {
   advancePo,
+  goodsDeliverBy,
   kitCustomerSummary,
   kitSummary,
   poSchedule,
   posFromDesign,
   raiseReplacement,
+  recordPoActualCosts,
   recordPoDelivery,
   recordPoInspection,
   updatePoDetails,
   type Blocker,
   type DesignRecord,
   type Issue,
+  type PilotSettings,
   type PoStatus,
   type Project,
   type ProposalRecord,
@@ -137,6 +140,18 @@ export interface KitView {
   kitIssues: Issue[];
 }
 
+/**
+ * One order's dates against the install: on site two working days before
+ * day 1, or, for a supply-and-install customer whose cancellation period
+ * still waits on the kit, at their home early enough for the period to have
+ * run by then (goodsDeliverBy).
+ */
+function scheduleFor(po: PurchaseOrder, project: Project, settings: PilotSettings, today: string): ReturnType<typeof poSchedule> {
+  const start = project.booking.startDate;
+  const deliverBy = start ? goodsDeliverBy(project, start, settings) : undefined;
+  return poSchedule(po, start, today, settings.scheduling.workingDays, deliverBy ? { deliverBy } : {});
+}
+
 export async function loadKit(projectId: string): Promise<KitView | null> {
   const project = await loadProject(projectId);
   if (!project) return null;
@@ -149,7 +164,7 @@ export async function loadKit(projectId: string): Promise<KitView | null> {
   const today = londonToday();
   return {
     project,
-    orders: pos.map((po) => ({ ...po, schedule: poSchedule(po, project.booking.startDate, today, settings.scheduling.workingDays) })),
+    orders: pos.map((po) => ({ ...po, schedule: scheduleFor(po, project, settings, today) })),
     summary: kitSummary(pos),
     source: src.ok ? { ok: true, optionLabel: src.source.optionLabel, designVersion: src.source.design.version } : { ok: false, reason: src.reason },
     today,
@@ -223,6 +238,16 @@ export function advanceOrder(
 
 export function updateOrder(projectId: string, poId: string, patch: Partial<PurchaseOrder>, staff: StaffMember): Promise<Outcome<PurchaseOrder>> {
   return changePo(projectId, poId, staff, "update", (po) => updatePoDetails(po, patch, staff.name, new Date().toISOString()));
+}
+
+/** What the supplier actually charged, line by line (ex VAT): the pilot's real cost and margin come from these. */
+export function recordActualCosts(
+  projectId: string,
+  poId: string,
+  lines: { lineId: string; actualUnitCostPence: number | null }[],
+  staff: StaffMember,
+): Promise<Outcome<PurchaseOrder>> {
+  return changePo(projectId, poId, staff, "actual-costs", (po) => recordPoActualCosts(po, { by: staff.name, lines }, new Date().toISOString()));
 }
 
 export async function recordDelivery(
@@ -329,13 +354,30 @@ export async function orderReplacement(projectId: string, poId: string, lineId: 
  * actually changed, and only once the booking is confirmed (the reducer's
  * rule; booking confirmation runs this again). The wording the customer sees
  * is the reducer's, which only ever says what someone recorded.
+ *
+ * One thing can't wait for the booking: kit that has all reached the
+ * customer's home starts a supply-and-install cancellation period on the day
+ * the last of it arrived (goods-received), so the dates offered and checked
+ * from then on count from the real delivery, not from the confirmation.
  */
 export async function syncKitStatus(projectId: string, staff: StaffMember | null): Promise<{ changed: boolean; warning?: string }> {
   try {
     const [project, pos] = await Promise.all([loadProject(projectId), purchaseOrdersRepo.listForProject(projectId)]);
     if (!project) return { changed: false };
-    if (project.booking.status !== "booked") return { changed: false };
     const s = kitSummary(pos);
+    if (project.booking.status !== "booked") {
+      const pr = project.proposal;
+      const home = (s.status === "delivered" || s.status === "inspected") && s.shortages === 0 && s.deliveredTo === "customer";
+      if (!home || pr.status !== "accepted" || pr.contractType !== "supply-and-install" || pr.goodsReceivedOn || project.install.status !== "not-started") {
+        return { changed: false };
+      }
+      const r = await dispatch(projectId, { type: "goods-received", ...(s.receivedOn ? { receivedOn: s.receivedOn } : {}) }, staff ?? { kind: "system", name: "purchasing" });
+      if ("error" in r) {
+        console.error(`[purchasing] goods-received on ${projectId} refused:`, r.error);
+        return { changed: false, warning: `Saved, but the delivery date didn't reach the project: ${r.error}` };
+      }
+      return { changed: true };
+    }
     const k = project.kit;
     let status = s.status;
     let summary = kitCustomerSummary(s);
@@ -366,6 +408,8 @@ export async function syncKitStatus(projectId: string, staff: StaffMember | null
         summary,
         shortages: s.shortages,
         ...(arrived ? { deliveredTo: s.deliveredTo } : {}),
+        // The period runs from the day the last of it arrived, not this update.
+        ...(arrived && s.receivedOn ? { receivedOn: s.receivedOn } : {}),
       },
       staff ?? { kind: "system", name: "purchasing" },
     );
@@ -409,7 +453,7 @@ export async function listPurchasing(projects: { id: string; project: Project }[
           bookingConfirmed: p.booking.status === "booked",
           ...(p.pilot ? { pilot: `Pilot ${p.pilot.number}` } : {}),
         },
-        schedule: poSchedule(po, p.booking.startDate, today, settings.scheduling.workingDays),
+        schedule: scheduleFor(po, p, settings, today),
       };
     });
 }

@@ -139,10 +139,15 @@ test("secrets: production treats a short SESSION_SECRET as unset", async () => {
   assert.equal(MIN_SESSION_SECRET_LENGTH, 32);
   const prod = (secret: string) => ({ SESSION_SECRET: secret, NODE_ENV: "production" });
   assert.equal(sessionSecret(prod("configured")), null);
-  assert.equal(sessionSecret(prod("x".repeat(31))), null);
-  assert.equal(sessionSecret(prod("x".repeat(32))), "x".repeat(32));
+  const k = (n: number) => "k7".repeat(32).slice(0, n);
+  assert.equal(sessionSecret(prod(k(31))), null);
+  assert.equal(sessionSecret(prod(k(32))), k(32));
   assert.equal(sessionSecretUsable(prod("short")), false);
-  assert.equal(sessionSecretUsable(prod("x".repeat(32))), true);
+  assert.equal(sessionSecretUsable(prod(k(32))), true);
+  // The .env.example placeholder is 33 characters and public: never a secret, anywhere.
+  assert.equal(sessionSecretUsable(prod("generate-with-openssl-rand-hex-32")), false);
+  assert.equal(sessionSecret(prod("generate-with-openssl-rand-hex-32")), null);
+  assert.equal(sessionSecretUsable(prod("x".repeat(40))), false, "all x's is a template, not a secret");
   assert.equal(sessionSecretUsable({ NODE_ENV: "production" }), false);
   // Outside production any secret works (tests and dev use short ones).
   assert.equal(sessionSecret({ SESSION_SECRET: "configured", NODE_ENV: "development" }), "configured");

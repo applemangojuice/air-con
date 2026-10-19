@@ -5,6 +5,7 @@ import type { Permission, StaffMember } from "@aircon/domain";
 import { audit } from "@/lib/audit";
 import type { CustomerRecord } from "@/lib/repo/customers";
 import * as staffRepo from "@/lib/repo/staff";
+import { PILOT_MIGRATION, staffTableMissing } from "@/lib/schema-check";
 import { getServiceClient } from "@/lib/supabase-server";
 import {
   breakGlassEnabled,
@@ -133,7 +134,9 @@ function breakGlassAdmin(email: string): StaffMember {
 async function staffForSession(session: StaffSession): Promise<StaffMember | null> {
   const env = process.env;
   if (session.staffId === BREAK_GLASS_STAFF_ID) {
-    const ok = !getServiceClient() && breakGlassEnabled(env) && isAdminEmail(session.email);
+    // Only while there's nowhere to keep a real admin row: no database, or
+    // one without the pilot migration (so the admin can reach /ops/status).
+    const ok = breakGlassEnabled(env) && isAdminEmail(session.email) && (!getServiceClient() || (await staffTableMissing()));
     return ok ? breakGlassAdmin(session.email) : null;
   }
   if (!getServiceClient()) {
@@ -309,6 +312,10 @@ async function passwordMatches(given: string, expected: string): Promise<boolean
  */
 async function breakGlassCandidate(email: string): Promise<StaffMember | "bootstrap" | "synthetic" | null> {
   if (!getServiceClient()) return isAdminEmail(email) ? "synthetic" : null;
+  // Supabase is connected but 0010 never ran: there's no staff table to look
+  // in or bootstrap into, so an ADMIN_EMAILS address gets the synthetic admin
+  // (as with no database), and /ops/status and /ops/launch can say what's wrong.
+  if (await staffTableMissing()) return isAdminEmail(email) ? "synthetic" : null;
   const existing = await staffRepo.getByEmail(email);
   if (existing) return existing.active && existing.roles.includes("admin") ? existing : null;
   return isAdminEmail(email) ? "bootstrap" : null;
@@ -336,7 +343,10 @@ export async function breakGlassSession(email: string, password: string): Promis
     }),
   ]);
   if (!passwordOk || !password || !candidate) return null;
-  if (candidate === "synthetic") return staffSession(breakGlassAdmin(clean), BREAK_GLASS_TTL_SECONDS);
+  if (candidate === "synthetic") {
+    if (getServiceClient()) console.error(`[auth] break-glass: ${clean} signed in as the synthetic admin because the staff table is missing (run ${PILOT_MIGRATION}).`);
+    return staffSession(breakGlassAdmin(clean), BREAK_GLASS_TTL_SECONDS);
+  }
   const staff = candidate === "bootstrap" ? await bootstrapAdmin(clean, "break-glass") : candidate;
   if (!staff) return null;
   await audit({ actor: staff, action: "auth.break-glass", entity: "staff", entityId: staff.id });

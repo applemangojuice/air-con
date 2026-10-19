@@ -1,5 +1,6 @@
 import { demoLoginAllowed } from "./auth/access";
 import { emailConfigured } from "./email";
+import { isPlaceholderValue, realEnv } from "./env-placeholders";
 import { dataBackend } from "./supabase-server";
 
 /**
@@ -24,11 +25,12 @@ export interface AppMode {
 
 export function appMode(env: Record<string, string | undefined> = process.env): AppMode {
   const backend = dataBackend();
-  const stripeKey = env.STRIPE_SECRET_KEY ?? "";
+  // A template key (sk_test_xxx) is no key: honestly demo.
+  const stripeKey = isPlaceholderValue(env.STRIPE_SECRET_KEY) ? "" : (env.STRIPE_SECRET_KEY ?? "");
   return {
     data: backend === "none" ? "demo" : backend,
     email: emailConfigured() ? "live" : "demo",
-    sms: env.TWILIO_ACCOUNT_SID && env.TWILIO_AUTH_TOKEN && env.TWILIO_FROM ? "live" : "demo",
+    sms: realEnv(env, "TWILIO_ACCOUNT_SID") && realEnv(env, "TWILIO_AUTH_TOKEN") && env.TWILIO_FROM ? "live" : "demo",
     payments: /^(sk|rk)_live_/.test(stripeKey) ? "live" : /^(sk|rk)_test_/.test(stripeKey) ? "test" : "demo",
   };
 }

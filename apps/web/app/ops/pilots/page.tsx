@@ -10,6 +10,7 @@ import {
   STAGE_INFO,
   TIME_KIND_LABEL,
   can,
+  metricComparable,
   rowExtremes,
   type IssueKind,
   type Learning,
@@ -162,6 +163,12 @@ export default async function PilotsPage({ searchParams }: { searchParams: Promi
                 per row, only among pilots far enough along for the number to be final (costs and hours once installed, defects once handed over). A dash means nothing was recorded.
               </li>
               {showMoney && <li>* Some costs are expected (from the purchase order or proposal), not yet actual. Labour is costed at the rates in Settings.</li>}
+              {showMoney && (
+                <li>
+                  † Incomplete: an order line has no cost yet, or nothing has been ordered, so the cost leaves it out and gross profit and margin show a dash
+                  until it&apos;s entered (actual costs go in on each project&apos;s Kit page).
+                </li>
+              )}
               <li>Messages sent counts only messages a provider accepted; demo-mode messages aren&apos;t counted.</li>
               {rows.some((r) => r.diffNote) && <li>Self-survey accuracy: {[...new Set(rows.map((r) => r.diffNote).filter(Boolean))].join(" ")}</li>}
             </ul>
@@ -230,10 +237,20 @@ function MetricLine({ row, pilots }: { row: MetricRow; pilots: PilotRow[] }) {
         const isBest = best.includes(i);
         const isWorst = worst.includes(i);
         const flagged = costRow && (p.metrics.costBasis === "expected" || p.metrics.costBasis === "mixed") && values[i] !== null;
+        // A cost missing where one should be: an order line with no cost, or nothing ordered by the time the kit is due.
+        const kitDue = metricComparable({ from: "kit" }, p.metrics);
+        const incomplete =
+          costRow &&
+          (p.metrics.costBasis === "incomplete" || (p.metrics.costBasis === "none" && kitDue)) &&
+          row.key !== "grossProfitPence" &&
+          row.key !== "grossMarginPct";
         return (
           <td key={p.metrics.projectId} className={`px-4 py-2 tabular-nums ${isBest ? "bg-emerald-50 font-semibold text-emerald-900" : isWorst ? "bg-amber-50 font-semibold text-amber-900" : "text-ink-900"}`}>
             {formatMetric(values[i], row.format)}
             {flagged && <span title="Includes expected costs">*</span>}
+            {incomplete && (
+              <span title={p.metrics.costBasis === "none" ? "Nothing ordered yet" : `${p.metrics.unknownCostLines} order line${p.metrics.unknownCostLines === 1 ? " has" : "s have"} no cost yet`}>†</span>
+            )}
             {row.key === "messagesSent" && p.demoMessages > 0 && <span className="ml-1 text-xs font-normal text-ink-500">(+{p.demoMessages} demo)</span>}
             {isBest && <span className="sr-only"> (best)</span>}
             {isWorst && <span className="sr-only"> (worst)</span>}

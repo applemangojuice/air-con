@@ -116,6 +116,12 @@ export interface Payment {
   /** When the payment was applied to its invoice and the project (a retry finishes what a failure left). */
   appliedAt?: string;
   /**
+   * When it was added to the project's totals (payment-recorded). Set straight
+   * after, so a retry of a part-applied payment never adds it twice; the
+   * reducer refuses a payment id it has already counted as well.
+   */
+  recordedOnProjectAt?: string;
+  /**
    * True while it still has to be applied (to its invoice, the project's
    * totals, the receipt). Absent on payments recorded any other way, which
    * are treated as applied.
@@ -364,6 +370,25 @@ export function invoiceOutstanding(invoice: Invoice, all: Invoice[]): number {
     credit -= used;
   }
   return own;
+}
+
+/**
+ * Every invoice that still asks for money, across projects, with what's due
+ * on it: invoiceOutstanding within its own project, so credit notes (against
+ * it or on the account) and overpayments come off. For the console's "owed
+ * to us" and the morning digest; a credited or cancelled invoice drops out.
+ */
+export function owedInvoices(invoices: Invoice[]): { invoice: Invoice; duePence: number }[] {
+  const byProject = new Map<string, Invoice[]>();
+  for (const i of invoices) byProject.set(i.projectId, [...(byProject.get(i.projectId) ?? []), i]);
+  const out: { invoice: Invoice; duePence: number }[] = [];
+  for (const list of byProject.values()) {
+    for (const invoice of list) {
+      const duePence = invoiceOutstanding(invoice, list);
+      if (duePence > 0) out.push({ invoice, duePence });
+    }
+  }
+  return out;
 }
 
 /** How much of the account's credit is being used against this invoice (0 when none). */

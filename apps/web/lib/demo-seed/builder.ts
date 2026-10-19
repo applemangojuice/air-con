@@ -3,6 +3,7 @@ import {
   DEFAULT_SETTINGS,
   GATE_IDS,
   NUMERIC_KINDS,
+  proposalTermsFrom,
   TAX_CODES,
   applyProjectAction,
   buildRunsheet,
@@ -1426,6 +1427,8 @@ function buildProject(sc: Scenario, today: string, settings: PilotSettings, invo
     warranty: settings.warranty.manufacturerSummary,
     validUntil,
     termsVersion: settings.legal.termsVersion,
+    // Frozen at issue, as the real issue does: the deposit and due days the contract carries.
+    terms: proposalTermsFrom(settings),
     instantPriceGbp: quote.totalGbp,
     ...(dearest > instantPence ? { increaseReason: "Your survey measured longer pipe runs and the new circuit's route; the online estimate assumed the simplest case." } : {}),
     issuedAt: at(cal.issued!, "11:00"),

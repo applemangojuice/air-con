@@ -130,9 +130,13 @@ export interface PilotMetrics {
   /**
    * Where the equipment and materials figures come from: every purchase
    * order line at its actual cost, some at the expected cost (mixed), all
-   * expected, or no purchase orders yet.
+   * expected, a required line with no cost at all (incomplete: the figures
+   * leave it out, so gross profit and margin are unknown), or no purchase
+   * orders yet (none: nothing bought is known, so neither are they).
    */
-  costBasis: "actual" | "mixed" | "expected" | "none";
+  costBasis: "actual" | "mixed" | "expected" | "incomplete" | "none";
+  /** Required order lines with neither an expected nor an actual cost: what makes the basis incomplete. */
+  unknownCostLines: number;
   /** Logged hours costed at the settings' labour rates; null when no rates were given. */
   labourCostPence: number | null;
   /** Hours the install estimate covers: install, commissioning, handover and rework. */
@@ -169,7 +173,7 @@ export function chosenOption(proposal: ProposalRecord | undefined, project: Proj
   return byLabel ?? proposal.options[0];
 }
 
-/** A PO line's cost: actual when someone recorded it, else expected (or unknown). */
+/** A PO line's cost: actual when someone recorded it, else expected, else unknown (never £0). */
 function lineCost(line: PoLine): { pence: number; actual: boolean; known: boolean } {
   if (typeof line.actualUnitCostPence === "number") return { pence: Math.round(line.actualUnitCostPence * line.qty), actual: true, known: true };
   if (typeof line.unitCostPence === "number") return { pence: Math.round(line.unitCostPence * line.qty), actual: false, known: true };
@@ -252,13 +256,16 @@ export function pilotMetrics(input: {
   let shipping = 0;
   let actualLines = 0;
   let expectedLines = 0;
+  let unknownLines = 0;
   for (const po of input.purchaseOrders ?? []) {
     if (po.status === "cancelled") continue;
     shipping += po.shippingPence || 0;
     for (const line of po.lines ?? []) {
       const c = lineCost(line);
       if (!c.known) {
-        expectedLines++;
+        // Never £0: a required line nobody priced makes the cost unknown.
+        // (Van stock with no price is left out: it's the van's, not the job's.)
+        if (line.required) unknownLines++;
         continue;
       }
       if (c.actual) actualLines++;
@@ -270,7 +277,15 @@ export function pilotMetrics(input: {
     }
   }
   const costBasis: PilotMetrics["costBasis"] =
-    actualLines + expectedLines === 0 ? "none" : expectedLines === 0 ? "actual" : actualLines === 0 ? "expected" : "mixed";
+    unknownLines > 0
+      ? "incomplete"
+      : actualLines + expectedLines === 0
+        ? "none"
+        : expectedLines === 0
+          ? "actual"
+          : actualLines === 0
+            ? "expected"
+            : "mixed";
 
   // Subcontract work isn't bought on a PO: the proposal's expected figure
   // stands in until one is raised.
@@ -304,12 +319,21 @@ export function pilotMetrics(input: {
 
   const actualCostPence = equipment + materials + subcontractCostPence + shipping + (labourCostPence ?? 0);
   const estimatedCostPence = pricing && Number.isFinite(pricing.costPence) ? pricing.costPence : null;
-  const grossProfitPence = contractPricePence !== null && revenuePence > 0 ? revenuePence - actualCostPence : null;
+  // Profit only on a cost we know: with a required line unpriced, or nothing
+  // ordered at all, the kit's cost is missing, not £0.
+  const costsKnown = costBasis !== "incomplete" && costBasis !== "none";
+  const grossProfitPence = contractPricePence !== null && revenuePence > 0 && costsKnown ? revenuePence - actualCostPence : null;
   const grossMarginPct = grossProfitPence !== null ? round1((grossProfitPence / revenuePence) * 100) : null;
 
+  // Person-days, as the costing prices them (buildCostLines): installer days
+  // are per installer, so the crew multiplies them; every crew member logs
+  // their own time.
   const labour = option?.labour;
   const estimatedLabourHours = labour
-    ? round1((labour.installerDays + labour.electricianDays + labour.techLeadDays) * HOURS_PER_DAY)
+    ? round1(
+        (Math.max(0, labour.crewSize) * Math.max(0, labour.installerDays) + Math.max(0, labour.electricianDays) + Math.max(0, labour.techLeadDays)) *
+          HOURS_PER_DAY,
+      )
     : null;
 
   // Install days: the days actually started, once the install has begun.
@@ -399,6 +423,7 @@ export function pilotMetrics(input: {
     defects30d: defectsWithin(30),
     selfSurveyAccuracyPct,
     costBasis,
+    unknownCostLines: unknownLines,
     labourCostPence,
     installLabourHours: hours(installMinutes),
   };
@@ -518,6 +543,7 @@ const CSV_COLUMNS: Column[] = [
   { header: "subcontract_cost_gbp", value: (m) => pounds(m.subcontractCostPence) },
   { header: "labour_cost_gbp", value: (m) => pounds(m.labourCostPence) },
   { header: "cost_basis", value: (m) => m.costBasis },
+  { header: "order_lines_without_cost", value: (m) => m.unknownCostLines },
   { header: "estimated_cost_gbp", value: (m) => pounds(m.estimatedCostPence) },
   { header: "actual_cost_gbp", value: (m) => pounds(m.actualCostPence) },
   { header: "gross_profit_gbp", value: (m) => pounds(m.grossProfitPence) },

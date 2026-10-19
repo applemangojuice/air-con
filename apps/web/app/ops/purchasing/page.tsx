@@ -137,7 +137,7 @@ function Rows({ rows }: { rows: PurchasingRow[] }) {
                 )}
                 {schedule.needOnSiteBy && (
                   <div>
-                    <dt className="inline text-ink-500">On site by </dt>
+                    <dt className="inline text-ink-500">{schedule.needFor === "cancellation-period" ? "At the home by (cancellation period) " : "On site by "}</dt>
                     <dd className="inline font-semibold">{fmtDay(schedule.needOnSiteBy)}</dd>
                   </div>
                 )}

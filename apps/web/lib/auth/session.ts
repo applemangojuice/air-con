@@ -1,4 +1,5 @@
 import type { StaffRole } from "@aircon/domain";
+import { isPlaceholderValue } from "../env-placeholders.ts";
 
 /**
  * The signed session cookie (contract §C). Edge-safe: Web Crypto, TextEncoder
@@ -58,6 +59,8 @@ let warnedWeak = false;
 /** Is SESSION_SECRET set and strong enough for this environment? (The status page asks.) */
 export function sessionSecretUsable(env: Record<string, string | undefined> = process.env): boolean {
   const configured = env.SESSION_SECRET ?? "";
+  // The template's own value is public (it's in the repo): never a secret.
+  if (isPlaceholderValue(configured)) return false;
   return configured.length >= (env.NODE_ENV === "production" ? MIN_SESSION_SECRET_LENGTH : 1);
 }
 
@@ -73,7 +76,9 @@ export function sessionSecret(env: Record<string, string | undefined> = process.
     if (configured && !warnedWeak) {
       warnedWeak = true;
       console.error(
-        `[auth] SESSION_SECRET is shorter than ${MIN_SESSION_SECRET_LENGTH} characters, so it's ignored and nobody can sign in. Generate one with: openssl rand -hex 32`,
+        isPlaceholderValue(configured)
+          ? "[auth] SESSION_SECRET is still the .env.example placeholder, so it's ignored and nobody can sign in. Generate one with: openssl rand -hex 32"
+          : `[auth] SESSION_SECRET is shorter than ${MIN_SESSION_SECRET_LENGTH} characters, so it's ignored and nobody can sign in. Generate one with: openssl rand -hex 32`,
       );
     }
     return null;

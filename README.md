@@ -34,9 +34,13 @@ surfaces and a data model already shaped for it. See
   start-to-finish guide for getting data in** (demo mode, sample CSVs, or real
   open-data downloads); [docs/property-intelligence.md](./docs/property-intelligence.md)
   has the per-source detail.
-- **Ops review** (`/ops/quotes` + `/ops/projects`): incoming surveys and
-  in-flight installations (issue final quotes, record site-visit outcomes,
-  dispatch equipment, assign installers), behind basic auth (`OPS_PASSWORD`).
+- **Pilot operations** (`/ops`, `/field`): the board, each project's command
+  centre (survey, design, proposal, booking, kit, compliance, money), the
+  field app for surveyors and installers, and the customer portal. Staff sign
+  in at `/login` with an emailed magic link (`SESSION_SECRET` and
+  `ADMIN_EMAILS` required; an optional break-glass `OPS_PASSWORD` lets an
+  admin in when email is down). See
+  [docs/pilot-architecture.md](./docs/pilot-architecture.md).
 - **Scheduling & procurement** (`/ops/schedule` + `/ops/procurement`): live
   projects laid onto a six-week crew board (conflicts flagged, street
   batching surfaced) and turned into a weekly order book with per-install
@@ -87,10 +91,13 @@ cd apps/mobile
 EXPO_PUBLIC_API_URL=http://<your-ip>:3000 pnpm start
 ```
 
-Runs in demo mode with no configuration (including the full project
-timeline at `/p/demo`). To persist quotes and projects, copy
-`apps/web/.env.example` to `apps/web/.env.local` and fill in your Supabase
-project, then run the files in `supabase/migrations/` against it in order.
+Runs with no configuration: in development the local data backend keeps
+everything under `apps/web/.data`, and "Try as…" on `/login` signs you in as
+a DEMO team member ("Load demo pilots" fills it with five fictional homes).
+To use Supabase, copy `apps/web/.env.example` to `apps/web/.env.local`, fill
+in your own values (they ship blank), and run every file in
+`supabase/migrations/` against the project in order, `0001` to
+`0010_pilot_platform.sql` (both `0006` files).
 
 To load property data, follow [docs/loading-data.md](./docs/loading-data.md):
 demo mode (no setup), a one-click **GitHub Actions** workflow that imports and
@@ -99,5 +106,8 @@ open-data downloads.
 
 ## Deploy
 
-Vercel (root directory: `apps/web`, watching `main`) + Supabase. Checklist
-and smoke tests in [docs/going-live.md](./docs/going-live.md).
+Vercel (root directory: `apps/web`) + Supabase. The setup checklist (every
+migration to `0010`, the required variables, the Stripe webhook), the smoke
+tests and troubleshooting are in [docs/going-live.md](./docs/going-live.md);
+after the first admin signs in, `/ops/launch` checks the live site against
+it.

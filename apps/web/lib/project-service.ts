@@ -6,6 +6,8 @@ import {
   currentStage,
   depositPence,
   settingsForProposal,
+  proposalCheckFor,
+  agreedPaymentsFor,
   generateQuote,
   instantiateCompliance,
   isOpen,
@@ -416,13 +418,10 @@ export async function buildReadinessContext(project: Project, actor?: StaffMembe
   }
 
   if (proposal) {
-    ctx.proposalCheck = {
-      belowMinMargin: (proposal.options ?? []).some((o) => o.pricing?.belowMinMargin === true),
-      marginOverride: Boolean(proposal.marginOverride),
-      taxConfirmed: !settings.tax.vatRegistered || settings.tax.accountantConfirmed,
-      taxOverride: Boolean(proposal.taxOverride),
-      expired: Boolean(proposal.validUntil) && proposal.validUntil.slice(0, 10) < today,
-    };
+    ctx.proposalCheck = proposalCheckFor(proposal, settings, today);
+    // The deposit the booking gate asks for is the contract's, not today's settings.
+    const agreed = agreedPaymentsFor(proposal, settings);
+    if (agreed) ctx.agreedPayments = agreed;
   }
 
   if (pos.length > 0) {

@@ -1,131 +1,154 @@
 # Going live (and checking it worked)
 
-Everything ships on the `main` branch. Production is a Vercel project that
-watches `main`; every merge auto-deploys. This page is the checklist —
-and **`/ops/launch` is its live twin**: eight platform checks verified
-against the running site plus the launch-day walk, each with the exact fix
-when something's red. Start there.
+This is the checklist for putting the pilot platform in front of real
+customers and installers. **`/ops/launch` is its live twin**: once you can
+sign in, it checks every setting, secret and table against the running site,
+red, amber or green, each with the exact fix. Do the one-time setup below,
+sign in as the first admin, then work down `/ops/launch` until it's green.
+
+The pilot platform lives on the `claude/pilot-ops` branch until it's merged
+into `main`. Deploy whichever branch Vercel's production environment
+watches (Vercel → Project → Settings → Git → Production Branch).
 
 ## One-time setup
 
 1. **Vercel**: vercel.com → Add New Project → import this GitHub repo.
-   Set **Root Directory** to `apps/web`. Framework auto-detects (Next.js),
-   pnpm workspaces are handled natively. First deploy happens on import.
-2. **Supabase**: create a project, then run every file in
-   `supabase/migrations/` in order (SQL editor, or `supabase db push`).
-   As of now that's `0001` → `0009`. Note there are **two** `0006_*` files
-   (`0006_draft_quotes.sql` and `0006_property_intelligence.sql`) — run both;
-   they create independent tables. Re-running is safe — they use `if not
-   exists`. **If you skip this step the site looks connected but saves
-   nothing**, which is the single most common cause of "my data isn't there"
-   (see Troubleshooting). New migrations get run the same way when they land.
+   Set **Root Directory** to `apps/web`. Framework auto-detects (Next.js);
+   pnpm workspaces are handled natively.
+
+2. **Supabase**: create a project, then run **every** file in
+   `supabase/migrations/` **in order**, in the Supabase SQL editor (or
+   `supabase db push`):
+
+   `0001` → `0002` → `0003` → `0004` → `0005` → **both** `0006` files
+   (`0006_draft_quotes.sql` and `0006_property_intelligence.sql`) → `0007` →
+   `0008` → `0009` → **`0010_pilot_platform.sql`**.
+
+   `0010` is the pilot platform itself: the staff and sign-in tables, every
+   project record (surveys, designs, proposals, orders, invoices, payments,
+   documents…) and the `project-media` bucket. **Without it nobody can sign
+   in.** Re-running a file is safe (`if not exists`). If you skip one the
+   site looks connected but can't save; `/login` says so, and so do the
+   deploy logs (`[schema] The database is missing …`).
+
 3. **Environment variables** (Vercel → Project → Settings → Environment
-   Variables). From `apps/web/.env.example`:
-   - `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`: persistence on. Without
-     them the site runs in demo mode (works, saves nothing).
-   - `OPS_PASSWORD`: locks the admin console subpages. Browser prompts:
-     any username, this password.
-   - `GETADDRESS_API_KEY` (optional): address autofill for postcodes not
-     yet in the property database. Free tier at getaddress.io.
-   - `RESEND_API_KEY` + `EMAIL_FROM` + `NEXT_PUBLIC_APP_URL`: **required
-     before any real customer**. They carry the sign-in links, the proposal
-     email (the pre-contract information and cancellation form the law needs
-     on a durable medium) and the contract copy. Without them a live
-     deployment refuses to issue proposals, and a proposal can't be accepted
-     or an install booked until its email has really gone. Verify the
-     `EMAIL_FROM` domain in Resend first: a rejected send records nothing.
-4. **Data**: load the property book. The step-by-step is in
-   [loading-data.md](./loading-data.md) — start with the committed sample
-   CSVs to smoke-test the pipeline, then swap in the real EPC bulk downloads
-   (source detail in [property-intelligence.md](./property-intelligence.md)).
-   Hit **Recompute scores** on `/ops/intel` afterwards.
+   Variables, Production). `apps/web/.env.example` lists them all with their
+   values left **blank**: fill in your own, never paste the file as it is.
+
+   Required before the first real customer:
+
+   | Variable | What it's for | How to get it |
+   | --- | --- | --- |
+   | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | The database. Without them the site is in demo mode and saves nothing. | Supabase → Settings → API |
+   | `SESSION_SECRET` | Signs every sign-in. Missing, under 32 characters, or a template value: production signs **nobody** in. | `openssl rand -hex 32` |
+   | `ADMIN_EMAILS` | The first sign-in from one of these (comma separated) creates its admin account. The only way to get the first admin. | Your own addresses |
+   | `RESEND_API_KEY`, `EMAIL_FROM` | Sign-in links, the proposal email (pre-contract information and the cancellation form, which must reach the customer on a durable medium), the contract copy, every update. Without email a live deployment refuses to issue proposals. | Resend; verify the `EMAIL_FROM` domain there first |
+   | `NEXT_PUBLIC_APP_URL` | The live domain (`https://…`): every link in every email. | Your domain |
+   | `CRON_SECRET` | The scheduled jobs in `apps/web/vercel.json`: daily ops (survey and day-before reminders, proposal expiry, outbox retries, aftercare), the morning digest and the abandoned-quote follow-up. Without it they all answer 401. | `openssl rand -hex 32` |
+
+   Optional:
+
+   - **Card payments**: `STRIPE_SECRET_KEY` (`sk_test_…` first, then
+     `sk_live_…`) and `STRIPE_WEBHOOK_SECRET`. In Stripe → Developers →
+     Webhooks add the endpoint `https://<your-domain>/api/stripe/webhook`
+     for `checkout.session.completed`,
+     `checkout.session.async_payment_succeeded` and
+     `checkout.session.async_payment_failed`; its signing secret is
+     `STRIPE_WEBHOOK_SECRET`. Money is only ever recorded from that verified
+     webhook. Without Stripe, bank transfers are recorded by hand.
+   - **SMS**: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM`.
+     Without them texts are stored as "demo, not sent" in `/ops/messages`;
+     customers still get every email.
+   - **Break-glass**: `OPS_PASSWORD`, at least 20 characters
+     (`openssl rand -base64 24`). `/login` then also accepts an
+     `ADMIN_EMAILS` address plus this password, for a 12-hour admin session
+     (logged and rate limited), for when email is down. It is not a password
+     wall in front of the console: everyone else signs in by magic link.
+     Leave it unset if you don't want it.
+   - `LEADS_NOTIFY_EMAIL` (where lead alerts go), `GETADDRESS_API_KEY`
+     (address autofill), `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` (video
+     walkthroughs).
+
+   Never set `ALLOW_DEMO_LOGIN`, `DEMO_DEPLOYMENT` or `DATA_BACKEND` on the
+   live business: they're for demo deployments and local development.
+
+   Redeploy after changing any of them (Vercel → Deployments → Redeploy).
+
+4. **First sign-in**: open `/login`, enter one of the `ADMIN_EMAILS`
+   addresses, and click the emailed link. That creates your admin account.
+   Add the rest of the team on `/ops/staff`.
+
+5. **Work down `/ops/launch`** until every row is green: the database and
+   buckets, the secrets, email and its domain, the Schedule 2 company
+   details in Settings (proposals can't be issued without them), payment
+   details, the catalogue's prices (a proposal with unpriced cost lines
+   needs the costs typed in or an admin's override before it can issue),
+   and the team's F-gas and Part P qualifications.
+
+6. **Data** (optional): load the property book. The step-by-step is in
+   [loading-data.md](./loading-data.md); hit **Recompute scores** on
+   `/ops/intel` afterwards.
 
 ## How to check a deploy worked
 
-1. Vercel dashboard → Deployments: the top entry should be `main`, status
-   **Ready**, with the commit message you expect.
-2. On the live site, walk the smoke list:
-   - `/` loads with the Dang, It's Hot brand.
-   - `/quote` gives a price in a couple of minutes.
-   - `/p/demo` plays the whole install timeline.
-   - `/a/demo` shows a per-address mailing page.
-   - `/ops` shows the console; `/ops/intel`, `/ops/projects`,
-     `/ops/quotes`, `/ops/templates` ask for the ops password, then load.
-3. Data check (with Supabase connected): submit a test quote at `/quote`,
-   then find it at `/ops/quotes`. Start its project from the saved quote
-   page and find it at `/ops/projects`.
-4. Automated version of step 2's funnel walk:
+1. Vercel → Deployments: the top production entry is **Ready**, on the
+   commit you expect.
+2. `/api/health` answers `{"status":"ok", …}` with HTTP 200. `degraded`
+   (503) means a table, column or bucket is missing; `demo` (503 in
+   production) means no database is connected and nothing is being saved.
+3. Sign in at `/login` and open `/ops/status`: every table, bucket and
+   variable, with what each one is for.
+4. Walk the smoke list:
+   - `/` loads with the Dang, It's Hot brand; `/quote` gives a price.
+   - `/ops` shows the console (signed in); `/ops/launch` is all green.
+   - Submit a test quote at `/quote`, find it at `/ops/quotes`, start its
+     project, and find it on the board at `/ops/projects`.
+5. Automated version of the funnel walk:
    `BASE_URL=https://your-domain pnpm --filter @aircon/web test:e2e`
-   drives the whole funnel in a headless browser (needs a local
-   Chromium; see the header of `apps/web/scripts/e2e-funnel.mjs`).
+   (needs a local Chromium; see the header of `apps/web/scripts/e2e-funnel.mjs`).
 
-If a deploy is missing, the usual suspects: the Vercel project is watching
-a different branch (should be `main`), or the build failed (open the
-deployment's logs; `pnpm build` locally reproduces it).
-
-## Troubleshooting: "it's not saving anything"
-
-**Start at `/ops/status`.** It runs a live check of every table, storage
-bucket and env var and tells you, in plain English, exactly what's missing
-and how to fix it. Almost every "my data isn't there" report is one of these:
+## Troubleshooting
 
 | Symptom | Cause | Fix |
 | --- | --- | --- |
-| Quotes don't save; funnel errors at the end | `quote_requests` table missing, or Supabase keys point at the wrong project | Run migrations `0001`–`0007`; verify `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` |
-| `/q/<id>` "failing to load quote" | The quote never saved (see above), so there's no row | Fix saving first; old lost leads can't be recovered unless you had email alerts on |
-| "Invalid path specified in URL" when uploading photos | The `survey-photos` storage bucket doesn't exist | Run migration `0001` (it creates the bucket) |
-| **Property intelligence shows 0** | `properties` table is empty — the importer/seed never ran. The SW16/SW17 "dummy" homes only show in demo mode (no database) | On `/ops/intel`, click **Seed sample book**, or run the EPC importer (`docs/property-intelligence.md`) |
-| Usage analytics page says "table missing" | Migration `0007` not run | Run `supabase/migrations/0007_analytics.sql` |
+| `/login` says "The database isn't set up for sign-in yet" | Supabase is connected but `0010_pilot_platform.sql` (or an earlier file) hasn't been run | Run the missing migrations in order (step 2), reload |
+| "We couldn't send a link just now" | Email isn't configured or the `EMAIL_FROM` domain isn't verified; the server log says which | Check `RESEND_API_KEY` / `EMAIL_FROM` and the domain in Resend |
+| Nobody can sign in, even with the right link | `SESSION_SECRET` missing, too short, or still a template value | Set it with `openssl rand -hex 32`, redeploy |
+| No admin account and no way to make one | `ADMIN_EMAILS` empty | Set it, redeploy, sign in with one of those addresses |
+| Quotes don't save; the funnel errors at the end | Supabase keys wrong, or migrations not run | Check `/api/health`, then `/ops/status` |
+| "Invalid path specified in URL" uploading photos | A storage bucket is missing | Migration `0001` creates survey photos, `0004` videos, `0010` project media |
+| Reminders, expiries and the digest never happen | `CRON_SECRET` missing (the crons answer 401) | Set it, redeploy |
+| Property intelligence shows 0 | The property book hasn't been loaded | `/ops/intel` → **Seed sample book**, or the importer ([property-intelligence.md](./property-intelligence.md)) |
 
-**The key idea:** the site only falls back to safe "demo mode" (works, saves
-nothing) when Supabase is *unconfigured*. Once the keys are set but the schema
-isn't migrated, reads return empty and writes fail — and *that* looks like
-data loss. `/ops/status` exists so you never have to guess which it is.
+**The key idea:** the site only falls back to demo mode (works, saves
+nothing) when Supabase is *unconfigured*. Once the keys are set but the
+schema isn't migrated, writes fail, which looks like data loss. `/login`,
+`/api/health`, `/ops/status`, `/ops/launch` and the deploy log all check
+the schema the same way, so they say so plainly instead.
 
-**Don't lose leads while you fix it.** With Resend configured
-(`RESEND_API_KEY` + `EMAIL_FROM`, optional `LEADS_NOTIFY_EMAIL`), every
-submission emails the team, and any submission that *fails* to save emails a
-"recover this by hand" alert with the customer's details. Turn this on before
-sharing the site widely.
+If you're locked out with the schema missing, an `ADMIN_EMAILS` address
+plus the break-glass password (if `OPS_PASSWORD` is set) still opens the
+console as a temporary admin, so `/ops/status` can show what's missing.
 
-## Booking confirmations & the daily digest
+## Daily digest and automations
 
-With Resend configured, every **booking** emails the customer a written
-confirmation (what happens next, price locked) and the team a 🎉 alert with
-the ops link. A second cron (`/api/cron/digest`, 06:00 UTC) emails the team
-one morning summary: yesterday's quotes, bookings, unfinished drafts and
-traffic, plus the standing pipeline — quiet days included, so silence is
-never ambiguous.
-
-## Automated follow-up (abandoned quotes)
-
-People who give their address and email but never finish are warm leads. With
-`CRON_SECRET` set (any long random string) and Resend configured, a Vercel
-cron (`apps/web/vercel.json`) runs daily at 10:00 UTC and sends **one**
-friendly nudge to drafts that are 24 hours – 7 days old, then never emails
-them again (`follow_up_sent_at`, migration `0008`). The Unfinished tab on
-`/ops/quotes` shows the same list for manual follow-up.
+With Resend and `CRON_SECRET` set, the Vercel crons in `apps/web/vercel.json`
+run: **daily ops** (16:00 UTC: survey and day-before reminders, proposal
+expiry, outbox retries, aftercare check-ins), the **morning digest** (06:00
+UTC: what needs doing today, who owes us what), and the **abandoned-quote
+follow-up** (10:00 UTC: one nudge to drafts 24 hours to 7 days old, then
+never again). Each can also be run by hand from `/ops/messages`.
 
 ## Uptime alarm
 
 `.github/workflows/health-check.yml` probes `/api/health` daily and fails
-the run (GitHub emails the watchers) if the database is degraded — i.e. the
-site is up but data is being lost. Set the `SITE_URL` repository variable to
-your live domain, and use **Run workflow** to test it any time.
+the run (GitHub emails the watchers) unless the live site answers `ok`:
+a degraded schema or a site in demo mode both fail it. Set the `SITE_URL`
+repository variable to your live domain, and use **Run workflow** to test it.
 
 ## Usage analytics
 
-`/ops/analytics` shows visitors, sessions, traffic sources, campaigns
-(via `utm_*` tags on your links), geography and the quote funnel from landing
-to saved. It's first-party and cookieless — a random id in the browser plus
-Vercel's edge geo (country/region/city, never the raw IP), no third-party
-trackers, nothing to consent to. Tag your mailing and ad links with
-`?utm_source=…&utm_campaign=…` and they flow straight into the dashboard, and
-every quote request stores the source it came from.
-
-## The admin console
-
-`/ops` is mission control: live modules (property intelligence, projects,
-quote requests, template library, schedule, procurement, business case & P&L), the customer-side
-pages for reference, and the not-built-yet roadmap. Also reachable from the "Prototype" strip at
-the bottom of every page and the Platform column in the footer.
+`/ops/analytics` shows visitors, sessions, traffic sources, campaigns (via
+`utm_*` tags on your links), geography and the quote funnel from landing to
+saved. It's first-party and cookieless: a random id in the browser plus
+Vercel's edge geo (never the raw IP), nothing to consent to.

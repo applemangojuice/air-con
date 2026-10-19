@@ -109,9 +109,19 @@ test("londonWallClock encodes London time the house way", () => {
 
 test("earliest offered start: supply-and-install with no early start waits for a possible delivery plus the period", () => {
   const p = accepted("2026-10-19T10:00:00.000Z");
-  const e = schedule.earliestOfferedStart(p, "2026-10-19", DEFAULT_SETTINGS);
-  // Delivered 20 Oct at the earliest → period to 3 Nov → start 4 Nov (a Wednesday).
-  assert.deepEqual(e, { date: "2026-11-04", reason: "awaiting-delivery" });
+  // Nothing ordered yet: the supplier's usual 5 working days → delivered Mon 26 Oct → period to 9 Nov → start Tue 10 Nov.
+  assert.deepEqual(schedule.earliestOfferedStart(p, "2026-10-19", DEFAULT_SETTINGS), { date: "2026-11-10", reason: "awaiting-delivery" });
+  // The orders say Thu 22 Oct (a confirmed ETA): period to 5 Nov → start Fri 6 Nov.
+  assert.deepEqual(schedule.earliestOfferedStart(p, "2026-10-19", DEFAULT_SETTINGS, "2026-10-22"), { date: "2026-11-06", reason: "awaiting-delivery" });
+  // Never sooner than a delivery tomorrow: 20 Oct → period to 3 Nov → start Wed 4 Nov.
+  assert.deepEqual(schedule.earliestOfferedStart(p, "2026-10-19", DEFAULT_SETTINGS, "2026-10-01"), { date: "2026-11-04", reason: "awaiting-delivery" });
+  // The cards and the server's check use the same floor.
+  const blocks = schedule.installBlockOptions({ project: p, settings: DEFAULT_SETTINGS, today: "2026-10-19", booked: [], kitArrivesOn: "2026-10-22" });
+  assert.ok(blocks.every((b) => b.startDate >= "2026-11-06"));
+  assert.match(
+    schedule.blockProblem({ project: p, settings: DEFAULT_SETTINGS, today: "2026-10-19", booked: [], dates: ["2026-11-05", "2026-11-06", "2026-11-09"], kitArrivesOn: "2026-10-22" }) ?? "",
+    /earliest we can start is Fri 6 Nov/,
+  );
 });
 
 test("earliest offered start: an early-start request or a known end date use the reducer's floor", () => {

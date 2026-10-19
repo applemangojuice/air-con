@@ -75,12 +75,12 @@ async function liveChecks(): Promise<{ checks: Check[]; score: number; total: nu
   });
 
   checks.push({
-    label: "Automations (follow-up nudge + daily digest)",
+    label: "Scheduled jobs (daily ops, morning digest, follow-up nudge)",
     ok: env("CRON_SECRET"),
     detail: env("CRON_SECRET")
-      ? "CRON_SECRET set — Vercel crons will authenticate."
-      : "Not set: abandoned-quote follow-ups and the daily digest won't run.",
-    fix: "Set CRON_SECRET (any long random string) in Vercel.",
+      ? "CRON_SECRET set: Vercel's scheduled jobs will authenticate."
+      : "Not set: no survey or day-before reminders, no proposal expiry, no outbox retries, no aftercare, no digest, no follow-up nudge.",
+    fix: "Set CRON_SECRET (`openssl rand -hex 32`) in Vercel and redeploy.",
   });
 
   checks.push({
@@ -95,7 +95,8 @@ async function liveChecks(): Promise<{ checks: Check[]; score: number; total: nu
   if (supabase) {
     const { count: propertyCount } = await supabase
       .from("properties")
-      .select("*", { count: "exact", head: true });
+      .select("*", { count: "exact" })
+      .limit(0);
     checks.push({
       label: "Property intelligence has data",
       ok: (propertyCount ?? 0) > 0,
@@ -109,8 +110,9 @@ async function liveChecks(): Promise<{ checks: Check[]; score: number; total: nu
     const dayAgo = new Date(Date.now() - 24 * 3600_000).toISOString();
     const { count: eventCount } = await supabase
       .from("analytics_events")
-      .select("*", { count: "exact", head: true })
-      .gte("created_at", dayAgo);
+      .select("*", { count: "exact" })
+      .gte("created_at", dayAgo)
+      .limit(0);
     checks.push({
       label: "Analytics receiving events",
       ok: (eventCount ?? 0) > 0,

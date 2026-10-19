@@ -1,4 +1,5 @@
 import { BRAND } from "./brand";
+import { realEnv } from "./env-placeholders";
 
 /**
  * The one place email leaves the platform from. Resend under the hood,
@@ -8,7 +9,8 @@ import { BRAND } from "./brand";
  */
 
 export function emailConfigured(): boolean {
-  return Boolean(process.env.RESEND_API_KEY && process.env.EMAIL_FROM);
+  // A template key (re_xxx) isn't a provider: stay honestly in demo mode.
+  return Boolean(realEnv(process.env, "RESEND_API_KEY") && process.env.EMAIL_FROM);
 }
 
 /** Where team-facing alerts go: LEADS_NOTIFY_EMAIL, else the from-address. */

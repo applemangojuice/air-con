@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { OptionPricing } from "./costing.ts";
+import { buildCostLines, type OptionPricing } from "./costing.ts";
 import type { Issue } from "./issues.ts";
 import {
   HOURS_PER_DAY,
@@ -333,7 +333,8 @@ test("a finished pilot: hours, days, durations and quality", () => {
       { room: "Electrics", field: "board", customerSaid: "unsure", measured: "modern-rcbo", match: null },
     ],
   });
-  assert.equal(m.estimatedLabourHours, (3 + 1 + 2) * HOURS_PER_DAY);
+  // Person-days, as the costing prices them: 2 installers × 3 days, the electrician's day, the tech lead's 2.
+  assert.equal(m.estimatedLabourHours, (2 * 3 + 1 + 2) * HOURS_PER_DAY);
   assert.equal(m.actualLabourHours, Math.round(((95 + 45 + 510 + 480 + 90 + 180 + 240) / 60) * 10) / 10);
   assert.equal(m.installLabourHours, Math.round(((510 + 480 + 90 + 180 + 240) / 60) * 10) / 10);
   assert.deepEqual(m.labourHoursByPerson, { "DEMO Sam": 1.6, "DEMO Ivo": 10.8, "DEMO Tess": 11, "DEMO Eli": 4 });
@@ -403,6 +404,57 @@ test("expected-only and actual-only purchase orders are flagged; cancelled ones 
   assert.equal(m.costBasis, "none");
   assert.equal(m.equipmentCostPence, 0);
   assert.equal(m.unplannedMaterials, 0);
+});
+
+test("an order line nobody priced makes the cost incomplete: no invented £0, no margin", () => {
+  const p = finishedProject();
+  const unpriced: PurchaseOrder = {
+    ...PO,
+    lines: PO.lines.map((l) => (l.id === "l2" ? { ...l, unitCostPence: null, actualUnitCostPence: undefined } : l)),
+  };
+  const m = pilotMetrics({ project: p, proposal: proposal(), purchaseOrders: [unpriced], time: [], issues: [], messagesSent: 0 });
+  assert.equal(m.costBasis, "incomplete");
+  assert.equal(m.unknownCostLines, 1);
+  assert.equal(m.equipmentCostPence, 2 * 28_500, "the known lines still add up");
+  assert.equal(m.grossProfitPence, null);
+  assert.equal(m.grossMarginPct, null);
+  // Entering what the supplier charged completes it.
+  const entered: PurchaseOrder = { ...unpriced, lines: unpriced.lines.map((l) => (l.id === "l2" ? { ...l, actualUnitCostPence: 92_000 } : l)) };
+  const done = pilotMetrics({ project: p, proposal: proposal(), purchaseOrders: [entered], time: [], issues: [], messagesSent: 0 });
+  assert.equal(done.costBasis, "mixed");
+  assert.equal(done.unknownCostLines, 0);
+  assert.notEqual(done.grossMarginPct, null);
+  // Van stock with no price is the van's, not the job's: it doesn't hold the margin back.
+  const vanStock: PurchaseOrder = { ...PO, lines: PO.lines.map((l) => (l.id === "l5" ? { ...l, unitCostPence: null } : l)) };
+  assert.equal(pilotMetrics({ project: p, proposal: proposal(), purchaseOrders: [vanStock], time: [], issues: [], messagesSent: 0 }).costBasis, "mixed");
+  // Nothing ordered at all: the kit's cost is unknown, not nothing.
+  const none = pilotMetrics({ project: p, proposal: proposal(), purchaseOrders: [], time: [], issues: [], messagesSent: 0 });
+  assert.equal(none.costBasis, "none");
+  assert.equal(none.grossMarginPct, null);
+  // The CSV says how many lines are missing, and leaves the margin empty.
+  const csv = pilotsCsv([m]).split("\r\n");
+  const header = csv[0]!.split(",");
+  const row = csv[1]!.split(",");
+  assert.equal(row[header.indexOf("order_lines_without_cost")], "1");
+  assert.equal(row[header.indexOf("gross_margin_pct")], "");
+});
+
+test("the labour estimate counts installer days per installer, as the costing does", () => {
+  const p = finishedProject();
+  const solo = proposal({ options: [option({ labour: { crewSize: 1, installerDays: 3, electricianDays: 0.5, techLeadDays: 1 } })] });
+  const pair = proposal({ options: [option({ labour: { crewSize: 2, installerDays: 3, electricianDays: 0.5, techLeadDays: 1 } })] });
+  const hours = (pr: ProposalRecord) => pilotMetrics({ project: p, proposal: pr, purchaseOrders: [], time: [], issues: [], messagesSent: 0 }).estimatedLabourHours;
+  assert.equal(hours(solo), (3 + 0.5 + 1) * HOURS_PER_DAY);
+  assert.equal(hours(pair), (2 * 3 + 0.5 + 1) * HOURS_PER_DAY, "60 hours: what buildCostLines prices (7.5 person-days)");
+  // The same person-days buildCostLines costs.
+  const lines = buildCostLines({
+    variant: { id: "v", label: "Standard", tier: "standard", systems: [], bom: [], installDays: 3 } as never,
+    catalogue: [],
+    labour: pair.options[0]!.labour,
+    settings: DEFAULT_SETTINGS,
+  });
+  const personDays = lines.filter((l) => l.category === "labour" || l.category === "subcontract").reduce((n, l) => n + l.qty, 0);
+  assert.equal(hours(pair), personDays * HOURS_PER_DAY);
 });
 
 test("chosenOption: the accepted one, then the named one, then the first", () => {

@@ -237,6 +237,11 @@ export function commsForAction(project: Project, action: ProjectAction, actor?: 
       ];
     }
 
+    // Delivered before the booking was confirmed: the same "delivered" email
+    // (one discriminator, so the later kit-updated never sends it twice).
+    case "goods-received":
+      return [notice("kit-update", { status: "delivered", shortages: 0 }, "delivered:0")];
+
     case "kit-updated": {
       if (action.status !== "confirmed" && action.status !== "delivered" && action.status !== "inspected") return [];
       const discriminator =

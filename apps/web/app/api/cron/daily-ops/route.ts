@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cronSecret } from "@/lib/env-placeholders";
 import { constantTimeEqual } from "@/lib/auth/session";
 import { runDailyOps } from "@/lib/ops-core-server";
 
@@ -19,7 +20,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 async function authorised(request: Request): Promise<boolean> {
-  const secret = process.env.CRON_SECRET;
+  const secret = cronSecret(); // a template value (.env.example) is no secret
   if (!secret) return false;
   return constantTimeEqual(request.headers.get("authorization") ?? "", `Bearer ${secret}`);
 }
