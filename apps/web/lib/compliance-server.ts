@@ -3,6 +3,8 @@ import {
   addComplianceEvidence,
   asbestosSuspectedAtSurvey,
   companyFgasCertProblem,
+  higherRiskBuilding,
+  isFlat,
   complianceTemplateFor,
   createIssue,
   instantiateCompliance,
@@ -10,6 +12,8 @@ import {
   reviewCompliance,
   syncCompliance,
   transitionIssue,
+  type BlockContext,
+  type BuildingRegsRoute,
   type ComplianceItem,
   type ComplianceStatus,
   type Issue,
@@ -38,7 +42,7 @@ export async function listingFacts(projectId: string): Promise<ListingFacts> {
 }
 
 /** What the survey says that a review needs: the listing facts, the tenure and whether asbestos is suspected. */
-async function surveyFacts(projectId: string): Promise<{ listing: ListingFacts; tenure?: MeasuredSurvey["site"]["tenure"]; asbestosSuspected: boolean }> {
+async function surveyFacts(projectId: string): Promise<{ listing: ListingFacts; tenure?: MeasuredSurvey["site"]["tenure"]; asbestosSuspected: boolean; block?: BlockContext }> {
   const [survey, design] = await Promise.all([
     surveysRepo.currentForProject(projectId).catch(() => null),
     designsRepo.latestForProject(projectId).catch(() => null),
@@ -50,6 +54,8 @@ async function surveyFacts(projectId: string): Promise<{ listing: ListingFacts; 
     },
     ...(survey?.data?.site?.tenure ? { tenure: survey.data.site.tenure } : {}),
     asbestosSuspected: asbestosSuspectedAtSurvey(survey?.data),
+    // A flat in a block (and a higher-risk one): which Building Regulations routes fit.
+    ...(survey?.data ? { block: { flat: isFlat(survey.data), higherRisk: higherRiskBuilding(survey.data) } } : {}),
   };
 }
 
@@ -66,6 +72,7 @@ async function reviewContext(project: Project) {
     listed: listedOnRecord(items, facts.listing),
     ...(facts.tenure ? { tenure: facts.tenure } : {}),
     asbestosSuspected: facts.asbestosSuspected,
+    ...(facts.block ? { block: facts.block } : {}),
   };
 }
 
@@ -146,7 +153,7 @@ export async function loadChecklist(project: Project): Promise<ComplianceItem[]>
 export async function reviewItem(
   projectId: string,
   itemId: string,
-  input: { to: ComplianceStatus; note?: string; overrideReason?: string; planningOutcome?: PlanningOutcome; listedBuilding?: "yes" | "no" },
+  input: { to: ComplianceStatus; note?: string; overrideReason?: string; planningOutcome?: PlanningOutcome; listedBuilding?: "yes" | "no"; buildingRegsRoute?: BuildingRegsRoute },
   staff: StaffMember,
 ): Promise<Outcome<ComplianceItem>> {
   const project = await loadProject(projectId);
@@ -154,6 +161,7 @@ export async function reviewItem(
     ...(project ? await reviewContext(project) : {}),
     ...(input.planningOutcome ? { planningOutcome: input.planningOutcome } : {}),
     ...(input.listedBuilding ? { listedBuilding: input.listedBuilding } : {}),
+    ...(input.buildingRegsRoute ? { buildingRegsRoute: input.buildingRegsRoute } : {}),
   };
   const res = await mutateRow<ComplianceItem>("compliance_items", itemId, complianceRepo, (current) => {
     if (current.projectId !== projectId) return { ok: false, error: "That item isn't on this project's checklist." };

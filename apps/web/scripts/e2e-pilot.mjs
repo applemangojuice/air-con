@@ -504,6 +504,9 @@ async function reviewCompliance(page, skip = /$^/) {
       if (await outcome.count()) await outcome.check();
       const notListed = det.getByLabel("No: not listed", { exact: true });
       if (await notListed.count()) await notListed.check();
+      // The heat pump's Building Regulations route: our competent person scheme (a DEMO house, so every route is open).
+      const scheme = det.getByLabel("Competent person scheme (we self-certify)", { exact: true });
+      if (await scheme.count()) await scheme.check();
       await det.locator("textarea").fill(`DEMO: checked against the survey record, photos and design (${label}).`);
       await det.getByRole("button", { name: "Save the review" }).click();
       await page.waitForTimeout(1500);

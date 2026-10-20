@@ -174,15 +174,27 @@ says what to do instead. Approvals that need a professional are in
    weight raises no lift flag. A survey started before this change is judged at 2.5 m. *Instead:* the
    technical lead plans the rest on the **Working at height plan** item,
    and the office books two people when the job card says so.
-9g. **Flats in blocks get no block questions.** The survey doesn't ask the
-   block's height or storeys, its common parts or whether a pipe crosses a
-   compartment wall or floor, and there's no fire-stopping photo for such a
-   crossing. *Instead:* for any flat, the admin confirms the route with
-   building control on **Building Regulations route for the heat pump** (a
-   full plans application rather than a building notice in most blocks; the
-   Building Safety Regulator's approval in a higher-risk building outside a
-   competent person scheme), and the crew photographs the sleeve and its
-   fire-stopping in the core-drilling step.
+9g. **Flats in blocks: the survey asks, the checklist routes, the crew
+   fire-stops** (§K49; was "get no block questions"). For a flat the survey
+   asks the block's storeys (or height), whether a pipe or cable crosses a
+   compartment wall or floor or a common part, and the freeholder or
+   managing agent; 7 storeys or 18 m and above is flagged as a higher-risk
+   building; the Building Regulations route item asks the route and refuses
+   a building notice for a flat, and both council routes in a higher-risk
+   building (our scheme or the Building Safety Regulator); and a crossing
+   (or "not sure") adds a critical fire-stopping step with a photo and the
+   product on day 1. But: *the rules were read through council checklists
+   and law-firm summaries, not legislation.gov.uk* (unreachable from here):
+   the higher-risk building test (Building Safety Act 2022 s.65 and the 2023
+   descriptions regulations: also at least two homes, with exclusions), the
+   building notice exclusion (Building Regulations 2010 reg 12, where the
+   Fire Safety Order applies), whether our competent person scheme covers
+   work in a higher-risk building, and Approved Document B's fire-stopping
+   are all to verify. The app doesn't judge the fire-stopping product, check
+   the freeholder's consent covers the common parts, or count the homes in
+   the block; the height is the surveyor's estimate. *Instead:* confirm the
+   route with building control (or the Regulator) for any flat before
+   booking, and keep the fire-stopping product's data sheet with the job.
 
 ## The field app
 

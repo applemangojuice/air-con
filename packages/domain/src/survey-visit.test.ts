@@ -5,6 +5,8 @@ import { DEFAULT_SETTINGS } from "./settings.ts";
 import {
   ACCESS_EQUIPMENT_HEIGHT_M,
   HEIGHT_ACCESS,
+  crossesCompartment,
+  higherRiskBuilding,
   LADDER_MAX_BRACKET_M,
   PD_CHECKS,
   ladderLimitM,
@@ -618,4 +620,25 @@ test("diffAccuracyPct: only real comparisons count", () => {
     ]),
     67,
   );
+});
+
+test("a flat: the block's storeys or height, whether the route crosses a compartment, and the freeholder; 7 storeys or 18 m is a higher-risk building", () => {
+  const m = complete();
+  const flat = (block?: MeasuredSurvey["house"]["block"]): MeasuredSurvey => ({ ...m, house: { ...m.house, type: "flat", ...(block ? { block } : {}) } });
+  assert.deepEqual(missingItems(flat()), [
+    "The block: how many storeys (or its height)",
+    "The block: does a pipe or cable cross a compartment wall or floor, or a common part?",
+    "The block: the freeholder or managing agent",
+  ]);
+  assert.equal(surveyCompleteness(flat({ heightM: 12, crossing: "no", freeholder: "DEMO Estates, 020 7946 0000" })).pct, 100);
+  assert.equal(surveyCompleteness(m).pct, 100, "a house isn't asked");
+  assert.equal(higherRiskBuilding(flat({ storeys: 6 })), false);
+  assert.equal(higherRiskBuilding(flat({ storeys: 7 })), true);
+  assert.equal(higherRiskBuilding(flat({ heightM: 17.9 })), false);
+  assert.equal(higherRiskBuilding(flat({ storeys: 4, heightM: 18 })), true);
+  assert.equal(higherRiskBuilding({ ...m, house: { ...m.house, block: { storeys: 9 } } }), false, "only a flat");
+  assert.equal(crossesCompartment(flat({ crossing: "no" })), false);
+  assert.equal(crossesCompartment(flat({ crossing: "unsure" })), true, "not sure counts as yes");
+  assert.equal(crossesCompartment(flat()), true);
+  assert.equal(crossesCompartment(m), false);
 });

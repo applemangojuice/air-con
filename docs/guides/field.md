@@ -130,7 +130,14 @@ loft hatch, and a torch for the fuse board.
       to go ahead) confirmed, own or rent.
    2. **Wishes**: heating as well as cooling, or cooling only; what matters
       (quiet, discreet, app control, budget); timing.
-   3. **House**: construction, era, loft access. Older homes get the
+   3. **House**: construction, era, loft access. **A flat** gets three
+      questions about **The block**: how many storeys (or its height), whether
+      a pipe or cable crosses a compartment wall or floor (into another flat,
+      a corridor, a riser) or runs through a common part (**Not sure** counts
+      as yes), and the freeholder or managing agent with a contact. 7 storeys
+      or 18 m and above is a **higher-risk building**: the office sorts the
+      Building Regulations route with the Building Safety Regulator before
+      anything is booked. Older homes get the
       asbestos questions: suspected asbestos means stop and raise it.
       Possible or suspected asbestos (or a flash guard that may be) raises
       the stop-work issue by itself when you submit, so day 1 waits for a
@@ -214,7 +221,7 @@ The three days, roughly:
 
 | Day | What |
 | --- | --- |
-| 1 · Prep and building work | Arrival, protection, condition photos, RAMS, kit and serial check, marking out (scan the wall first), core drilling, wall plates, outdoor base or bracket |
+| 1 · Prep and building work | Arrival, protection, condition photos, RAMS, kit and serial check, marking out (scan the wall first), core drilling, any fire-stopping at a compartment crossing in a block of flats (photo and the product, critical), wall plates, outdoor base or bracket |
 | 2 · Mechanical and electrical | Indoor units, outdoor unit, pipework, any brazed joint in a long run (F-gas, hot work), flares and torque (F-gas), condensate, the electrical circuit and the interconnects (electrician) |
 | 3 · Test, commission, hand over | Pressure test, vacuum, release and leak check with an electronic R32 detector (F-gas), commissioning in heating and cooling, electrical tests, walkthrough, paperwork, finished photos, clean up |
 

@@ -136,6 +136,42 @@ export type ReflectingSurfaces = "one" | "two" | "three";
 /** MCS 020(a) directivity from the reflecting surfaces counted at the survey. */
 export const DIRECTIVITY_Q: Record<ReflectingSurfaces, 2 | 4 | 8> = { one: 2, two: 4, three: 8 };
 
+/** A flat's block: how tall, whether our route crosses its fire compartments, and who manages it. */
+export interface BlockFacts {
+  /** Storeys in the block, the ground floor counting as one (basements and roof plant left out). */
+  storeys?: number;
+  /** Or its height, ground to the top floor's surface, m, where that's known instead. */
+  heightM?: number;
+  /** Does the pipe or cable route cross a compartment wall or floor (to another flat, a corridor, a riser), or run through a common part? */
+  crossing?: "yes" | "no" | "unsure";
+  /** The freeholder or managing agent: name and how to reach them. */
+  freeholder?: string;
+}
+
+/**
+ * A higher-risk building (Building Safety Act 2022 s.65 with the 2023
+ * descriptions regulations, read through extracts: to verify): at least
+ * 18 m or at least 7 storeys, with at least two homes (any block of flats).
+ */
+export const HRB_MIN_STOREYS = 7;
+export const HRB_MIN_HEIGHT_M = 18;
+
+export function isFlat(m: { house?: { type?: string } } | null | undefined): boolean {
+  return m?.house?.type === "flat";
+}
+
+/** Is this flat in a higher-risk building (7 storeys or 18 m and above)? */
+export function higherRiskBuilding(m: { house?: { type?: string; block?: BlockFacts } } | null | undefined): boolean {
+  if (!isFlat(m)) return false;
+  const b = m!.house!.block ?? {};
+  return (typeof b.storeys === "number" && b.storeys >= HRB_MIN_STOREYS) || (typeof b.heightM === "number" && b.heightM >= HRB_MIN_HEIGHT_M);
+}
+
+/** Does the route cross a compartment wall or floor, or a common part? "Not sure", or not asked, counts as yes on a flat. */
+export function crossesCompartment(m: { house?: { type?: string; block?: BlockFacts } } | null | undefined): boolean {
+  return isFlat(m) && m!.house!.block?.crossing !== "no";
+}
+
 export type AccessEquipmentKind = "none" | "ladder" | "podium" | "tower" | "scaffold" | "mewp";
 
 /** Access that isn't a ladder: what a bracket above the ladder limit needs (each a priced hire line on the proposal). */
@@ -209,6 +245,8 @@ export interface MeasuredSurvey {
     asbestosRisk: "none-suspected" | "possible" | "suspected" | "not-assessed";
     asbestosNote?: string;
     notes?: string;
+    /** A flat: the block it's in (asked only for a flat). */
+    block?: BlockFacts;
   };
   rooms: MeasuredRoom[];
   outdoor: { positions: OutdoorPosition[] };
@@ -691,6 +729,12 @@ export function surveyChecks(m: MeasuredSurvey): SurveyCheck[] {
   }
   if (house.asbestosRisk === "possible" || house.asbestosRisk === "suspected") {
     add("house", "Asbestos: what you saw and where", filled(house.asbestosNote), { field: "asbestosNote" });
+  }
+  if (house.type === "flat") {
+    const b: BlockFacts = house.block ?? {};
+    add("house", "The block: how many storeys (or its height)", positive(b.storeys) || positive(b.heightM), { field: "blockStoreys" });
+    add("house", "The block: does a pipe or cable cross a compartment wall or floor, or a common part?", b.crossing === "yes" || b.crossing === "no" || b.crossing === "unsure", { field: "blockCrossing" });
+    add("house", "The block: the freeholder or managing agent", filled(b.freeholder), { field: "blockFreeholder" });
   }
 
   const rooms = list(m?.rooms).filter((r) => r && r.include !== false);

@@ -762,6 +762,7 @@ function toolsFor(job: InstallJobV2 | null, measured: MeasuredSurvey | null | un
     out.push({ label: "Fire extinguisher and fire blanket", why: "Hot work: a brazed joint" });
   }
   if (steps.some((s) => s.title === "Condensate" && /pump/.test(s.item ?? ""))) out.push({ label: "Condensate pump and its alarm wiring", why: "A room on this job can't drain by gravity" });
+  if (steps.some((s) => s.id === "d1-firestop")) out.push({ label: "Fire-stopping product tested for that wall or floor and the service (collar, wrap or sealant)", why: "The route crosses a compartment wall or floor, or a common part, in the block" });
   const chosen = measured?.outdoor.positions.filter((p) => p.chosen) ?? [];
   const HIRE: Partial<Record<OutdoorPosition["accessEquipment"], string>> = { tower: "Mobile tower (PASMA), booked", podium: "Podium steps", scaffold: "Scaffold, booked", mewp: "MEWP, booked, with a trained operator (IPAF)" };
   for (const kind of new Set(chosen.map((p) => p.accessEquipment))) {

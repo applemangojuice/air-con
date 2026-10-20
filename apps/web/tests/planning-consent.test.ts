@@ -93,3 +93,22 @@ test("a checklist from before the consent item: the day-1 gate still holds on th
   assert.equal(items.find((i) => i.key === "planning-consent")?.status, "not-started", "added by itself before day 1");
   assert.equal(items.find((i) => i.key === "planning-pd")?.status, "under-review", "the old free-text approval is asked again");
 });
+
+test("a flat in a block: the Building Regulations route refuses a building notice, from the survey's own answer", async () => {
+  const { emptyMeasuredSurvey } = await import("@aircon/domain");
+  const surveysRepo = await import("../lib/repo/surveys.ts");
+  const id = await newProject();
+  const data = emptyMeasuredSurvey();
+  data.house.type = "flat";
+  data.house.block = { storeys: 8, crossing: "yes", freeholder: "DEMO Estates" };
+  await surveysRepo.insert({ id: crypto.randomUUID(), projectId: id, version: 1, status: "submitted", data });
+  const regs = (await complianceRepo.getByKey(id, "heat-pump-building-regs"))!;
+  const note = "DEMO: application reference BSR-0001 (DEMO).";
+  const notice = await reviewItem(id, regs.id, { to: "approved", note, buildingRegsRoute: "building-notice" }, TECH);
+  assert.ok(!notice.ok && /higher-risk building/.test(notice.error), JSON.stringify(notice));
+  const plans = await reviewItem(id, regs.id, { to: "approved", note, buildingRegsRoute: "full-plans" }, TECH);
+  assert.ok(!plans.ok && /Building Safety Regulator's approval/.test(plans.error));
+  const bsr = await reviewItem(id, regs.id, { to: "approved", note, buildingRegsRoute: "bsr" }, TECH);
+  assert.ok(bsr.ok, JSON.stringify(bsr));
+  assert.equal((await complianceRepo.getByKey(id, "heat-pump-building-regs"))?.buildingRegsRoute, "bsr");
+});

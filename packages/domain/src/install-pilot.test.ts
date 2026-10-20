@@ -481,6 +481,26 @@ test("access at height and a heavy outdoor unit reach the RAMS, the bracket step
   assert.doesNotMatch(light.find((s) => s.id === "d1-rams")!.guidance ?? "", /two-person lift/);
 });
 
+test("a flat in a block: a crossing adds the fire-stopping step (photo and product) on day 1; the RAMS names the block", () => {
+  const flat = (block: MeasuredSurvey["house"]["block"]) => ({ ...measured({ type: "flat", block }) });
+  const crossing = runsheetFromDesign(design(1, "single"), "v-std", CATALOGUE, flat({ storeys: 8, crossing: "yes", freeholder: "DEMO Estates" }));
+  const fire = crossing.find((s) => s.id === "d1-firestop")!;
+  assert.ok(fire, "the fire-stopping step");
+  assert.deepEqual([fire.phase, fire.day, fire.critical, fire.allowNa], [3, 1, true, true]);
+  assert.ok(fire.evidence.some((e) => e.kind === "photo"));
+  assert.ok(fire.evidence.some((e) => e.kind === "reference" && /fire rating/.test(e.label)));
+  const rams = crossing.find((s) => s.id === "d1-rams")!.guidance ?? "";
+  assert.match(rams, /a flat in a block: .*DEMO Estates/);
+  assert.match(rams, /a higher-risk building/);
+  assert.match(rams, /fire-stop every crossing/);
+  const none = runsheetFromDesign(design(1, "single"), "v-std", CATALOGUE, flat({ storeys: 3, crossing: "no", freeholder: "DEMO Estates" }));
+  assert.equal(none.some((s) => s.id === "d1-firestop"), false);
+  assert.doesNotMatch(none.find((s) => s.id === "d1-rams")!.guidance ?? "", /higher-risk/);
+  assert.equal(runsheetFromDesign(design(1, "single"), "v-std", CATALOGUE, measured()).some((s) => s.id === "d1-firestop"), false, "a house");
+  // The customer's words mention it once.
+  assert.ok(customerWorkNext(crossing).length > 0);
+});
+
 test("unknown variant or empty design is refused loudly", () => {
   assert.throws(() => runsheetFromDesign(design(1, "single"), "nope", CATALOGUE), /no variant/);
   const empty = design(1, "single");

@@ -142,6 +142,14 @@ export default async function FieldHelpPage() {
           </p>
         </Fold>
 
+        <Fold id="firestop" title="Flats: fire-stopping">
+          <p>
+            In a block of flats, where the route crosses a compartment wall or floor (into another flat, a corridor, a riser) or a common part, day 1 has a critical step,{" "}
+            <B>Fire-stopping at the compartment crossing</B>: seal it with a product tested for that wall or floor and that service, photograph it before it&apos;s boxed in,
+            and type the product and its fire rating. Not crossing one after all: the tech lead marks it N/A.
+          </p>
+        </Fold>
+
         <Fold id="lift" title="Height and heavy lifts">
           <p>
             The job card and the RAMS name any access at height and the bracket&apos;s height: no work off a ladder there. Check the tower, podium, scaffold or MEWP
@@ -284,6 +292,10 @@ export default async function FieldHelpPage() {
             </li>
             <li>Every room needs its measurements and a tagged photo, with the unit drawn where it would go.</li>
             <li>Older homes: answer the asbestos questions. Suspected asbestos means stop and raise it.</li>
+            <li>
+              A flat: <B>The block</B> asks its storeys (or height), whether a pipe or cable crosses a compartment wall or floor or a common part (not sure counts as yes), and
+              the freeholder or managing agent. 7 storeys or 18 m and above is a higher-risk building: the office sorts the route first.
+            </li>
             <li>
               Outdoor: the height to the bracket. Above 2.5 m (the company&apos;s limit) a ladder won&apos;t do for installing it: pick <B>Tower</B>, <B>Podium steps</B>,{" "}
               <B>Scaffold</B> or <B>MEWP</B>. Its hire goes on the proposal and into the RAMS.

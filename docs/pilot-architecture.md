@@ -2877,4 +2877,26 @@ changelog and the reasons, so nobody "fixes" a deliberate choice back.
       tools list use. Limits are the company's; HSE INDG455 and INDG143
       and the Work at Height Regulations were read through reproductions
       (legislation.gov.uk and hse.gov.uk failed DNS): to verify.
+    - *Flats in blocks* (was known limitation 9g): `MeasuredSurvey.house.
+      block` (`BlockFacts`: `storeys`, `heightM`, `crossing` yes/no/unsure,
+      `freeholder`), asked only for a flat (`surveyChecks`: three house
+      items; the survey zod and the House section's **The block** card).
+      `higherRiskBuilding` (a flat at `HRB_MIN_STOREYS` 7 or
+      `HRB_MIN_HEIGHT_M` 18 and above) and `crossesCompartment` (a flat
+      unless "no"). Compliance: `ComplianceItem.buildingRegsRoute`
+      (`BuildingRegsRoute`: competent-person, full-plans, building-notice,
+      bsr; `BUILDING_REGS_ROUTE_TEXT`), asked to approve
+      `heat-pump-building-regs` (`ComplianceReviewContext.buildingRegsRoute`
+      and `block`, `BlockContext` from the survey in compliance-server's
+      `surveyFacts`); `buildingRegsRouteProblem` refuses no route, a
+      building notice on a flat, either council route in a higher-risk
+      building, and the Regulator outside one. `syncCompliance` reopens an
+      approval with no route, or one that no longer fits, before day 1. The
+      page shows the block facts, greys out routes that don't fit and ticks
+      the scheme by default. The runsheet: a crossing adds `d1-firestop`
+      (phase 3, day 1, critical, N/A by the tech lead: photo and product
+      reference); the RAMS names the block, the agent, a higher-risk
+      building and the crossing; the tools list adds the fire-stopping
+      product. The demo seed's approved route is the scheme. Sources read
+      through extracts (s.65, reg 12, ADB): to verify.
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { PD_CHECKS, RISK_QUESTIONS, SURVEY_LABELS, type MeasuredSurvey, type RiskQuestionId } from "@aircon/domain";
+import { HRB_MIN_HEIGHT_M, HRB_MIN_STOREYS, PD_CHECKS, RISK_QUESTIONS, SURVEY_LABELS, higherRiskBuilding, type BlockFacts, type MeasuredSurvey, type RiskQuestionId } from "@aircon/domain";
 import { Callout, ChoiceGroup, FieldCard, MultiChoice, NumberField, TextArea, TextField, Tick, SelectField, choices, type Choice } from "./controls";
 import { setOpt, useSurvey } from "./context";
 import { SCREEN_LABEL, nextScreen, type ScreenId } from "./nav";
@@ -263,6 +263,8 @@ export function HouseSection() {
         />
       </FieldCard>
 
+      {h.type === "flat" && <BlockCard />}
+
       <FieldCard title="Asbestos" tone={concern ? "danger" : older ? "warn" : "plain"}>
         {older ? (
           <Callout tone="warn" title="Built before 2000: check before anyone drills">
@@ -309,6 +311,59 @@ export function HouseSection() {
         <TextArea field="houseNotes" label="Notes about the house" value={h.notes} onChange={(v) => update((m) => ({ ...m, house: setOpt(m.house, "notes", v) }))} maxLength={2000} />
       </FieldCard>
     </Screen>
+  );
+}
+
+/** A flat: the block's height, whether our route crosses its fire compartments, and who manages it. */
+function BlockCard() {
+  const { data, update, isMissing } = useSurvey();
+  const b: BlockFacts = data.house.block ?? {};
+  const setBlock = (fn: (x: BlockFacts) => BlockFacts) => update((m) => ({ ...m, house: { ...m.house, block: fn(m.house.block ?? {}) } }));
+  const hrb = higherRiskBuilding(data);
+  return (
+    <FieldCard title="The block" tone={hrb ? "warn" : "plain"}>
+      <NumberField
+        field="blockStoreys"
+        label="Storeys in the block"
+        hint="Count the ground floor as one; leave out basements and roof plant. Or give its height below if that's known instead."
+        value={b.storeys}
+        onChange={(v) => setBlock((x) => setOpt(x, "storeys", v === undefined ? undefined : Math.max(1, Math.round(v))))}
+        integer
+        min={1}
+        max={200}
+        suggestions={[3, 4, 6, 8]}
+        missing={isMissing("house", "blockStoreys")}
+      />
+      <NumberField field="blockHeightM" label="Or its height, ground to the top floor" unit="m" value={b.heightM} onChange={(v) => setBlock((x) => setOpt(x, "heightM", v))} min={0} max={400} />
+      {hrb && (
+        <Callout tone="warn" title={`A higher-risk building (${HRB_MIN_STOREYS} storeys or ${HRB_MIN_HEIGHT_M} m and above)`}>
+          Building control is the Building Safety Regulator here, not the council: the office sorts the route before anything is booked.
+        </Callout>
+      )}
+      <ChoiceGroup
+        field="blockCrossing"
+        legend="Does a pipe or cable cross a compartment wall or floor (into another flat, a corridor, a riser), or run through a common part?"
+        hint="Not sure counts as yes: the crew fire-stops and photographs every crossing."
+        value={b.crossing}
+        options={[
+          { value: "no", label: "No" },
+          { value: "yes", label: "Yes" },
+          { value: "unsure", label: "Not sure" },
+        ]}
+        onChange={(crossing) => setBlock((x) => ({ ...x, crossing }))}
+        columns={3}
+        missing={isMissing("house", "blockCrossing")}
+      />
+      <TextField
+        field="blockFreeholder"
+        label="Freeholder or managing agent"
+        hint="Name and a phone or email: the consent and any access to common parts go through them."
+        value={b.freeholder}
+        onChange={(v) => setBlock((x) => setOpt(x, "freeholder", v.slice(0, 300)))}
+        maxLength={300}
+        missing={isMissing("house", "blockFreeholder")}
+      />
+    </FieldCard>
   );
 }
 

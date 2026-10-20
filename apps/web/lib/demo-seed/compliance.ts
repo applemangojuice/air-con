@@ -66,7 +66,9 @@ export function demoChecklist(
         ? { planningOutcome: "pd" as const }
         : s?.status === "approved" && row.key === "designations"
           ? { listedBuilding: "no" as const }
-          : {};
+          : s?.status === "approved" && row.key === "heat-pump-building-regs"
+            ? { buildingRegsRoute: "competent-person" as const }
+            : {};
     return {
       ...answers,
       id: makeId(row.key),

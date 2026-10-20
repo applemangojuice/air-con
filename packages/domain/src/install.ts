@@ -15,7 +15,7 @@ import {
 import { R32_GWP, fgasRecord, type FgasRecord, type InstalledEquipmentRow } from "./documents.ts";
 import type { PhotoTag } from "./media.ts";
 import { can, meetsRequirement, qualificationStatus, type StaffMember, type StepRequirement } from "./staff.ts";
-import { ACCESS_PHRASE, HEIGHT_ACCESS, SURVEY_LABELS, TWO_PERSON_LIFT_KG, type AccessEquipmentKind, type MeasuredSurvey } from "./survey-visit.ts";
+import { ACCESS_PHRASE, HEIGHT_ACCESS, SURVEY_LABELS, TWO_PERSON_LIFT_KG, crossesCompartment, higherRiskBuilding, isFlat, type AccessEquipmentKind, type MeasuredSurvey } from "./survey-visit.ts";
 
 /**
  * The Installation Operating System.
@@ -1386,6 +1386,13 @@ export function runsheetFromDesign(
   }
   if (!heightAccess.length && measured?.risks.workingAtHeight) risks.push("working at height (flagged at the survey)");
   for (const s of heavy) risks.push(`two-person lift: ${modelOf(s.outdoor)} weighs ${weightOf(s.outdoor)} kg (two people, or a lifting aid, for every lift)`);
+  const crossing = crossesCompartment(measured);
+  if (isFlat(measured)) {
+    const agent = measured?.house.block?.freeholder?.trim();
+    risks.push(`a flat in a block: common parts kept clear and protected, fire doors never wedged open${agent ? ` (freeholder or managing agent: ${agent})` : ""}`);
+    if (higherRiskBuilding(measured)) risks.push("a higher-risk building (7 storeys or 18 m and above): only the Building Regulations route on the checklist, nothing beyond it");
+    if (crossing) risks.push("the route crosses a compartment wall or floor, or a common part: fire-stop every crossing as you go, and photograph it");
+  }
   if (needsAsbestosCheck) risks.push(house ? `possible asbestos (house era ${house.era}, survey says ${house.asbestosRisk})` : "asbestos not assessed in the survey");
   if (measured?.site.petsKids) risks.push(`pets or children: ${measured.site.petsKids}`);
   if (measured?.risks.concealedServicesConcern) risks.push("concealed services flagged at survey");
@@ -1530,6 +1537,23 @@ export function runsheetFromDesign(
       slots: [
         { key: "sleeve", kind: "photo", label: "Hole drilled with a fall, sleeve fitted", tag: "progress" },
         { key: "seal", kind: "photo", label: "Outside face sealed and weatherproof", tag: "external-wall" },
+      ],
+    });
+  }
+  if (crossing) {
+    add({
+      key: "d1-firestop",
+      phase: 3,
+      day: 1,
+      title: "Fire-stopping at the compartment crossing",
+      item: "Where the route crosses a compartment wall or floor, or a common part",
+      critical: true,
+      allowNa: true,
+      guidance:
+        "A flat in a block: where a pipe or cable passes through a compartment wall or floor (to another flat, a corridor, a riser) or through a common part, seal the hole with a fire-stopping product tested for that wall or floor and that service (a collar or wrap on plastic, sealant or batt as its instructions say), so the wall or floor keeps its fire resistance. Photograph it finished, before it's boxed in. Not crossing one after all: the tech lead marks it N/A with a reason.",
+      slots: [
+        { key: "photo", kind: "photo", label: "The crossing fire-stopped, sleeve and seal visible, before boxing in", tag: "progress" },
+        { key: "product", kind: "reference", label: "Fire-stopping product used (make, product and its fire rating)" },
       ],
     });
   }
@@ -2025,6 +2049,7 @@ const CUSTOMER_WORK: Record<string, WorkWords | null> = {
   "Asbestos check before drilling": null,
   "Marking out": { group: "mark", one: "the unit position marked out", many: "unit positions marked out", per: "room" },
   "Core drilling": { group: "core", one: "the hole drilled and sealed", many: "holes drilled and sealed", per: "room" },
+  "Fire-stopping at the compartment crossing": { group: "firestop", one: "the fire-stopping sealed where the pipework passes through the block's walls or floors", many: "the fire-stopping sealed where the pipework passes through the block's walls or floors", per: "job" },
   "Wall plate": { group: "plate", one: "the wall plate up", many: "wall plates up", per: "room" },
   "Outdoor base or bracket": { group: "base", one: "the outdoor base in", many: "the outdoor bases in", per: "system" },
   "Indoor unit": { group: "indoor", one: "the indoor unit hung", many: "indoor units hung", per: "room" },
@@ -2050,6 +2075,7 @@ const CUSTOMER_WORK: Record<string, WorkWords | null> = {
 const CUSTOMER_NEXT: Record<string, string | null> = {
   "Marking out": "marking out",
   "Core drilling": "drilling the holes",
+  "Fire-stopping at the compartment crossing": null,
   "Wall plate": "the wall plates",
   "Outdoor base or bracket": "the outdoor base",
   "Indoor unit": "the indoor and outdoor units",

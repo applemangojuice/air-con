@@ -159,6 +159,14 @@ export const measuredSurveySchema = z.object({
     asbestosRisk: z.enum(["none-suspected", "possible", "suspected", "not-assessed"]),
     asbestosNote: optText(1000),
     notes: optText(2000),
+    block: z
+      .object({
+        storeys: z.number().int().min(1).max(200).optional(),
+        heightM: measure(0, 400),
+        crossing: z.enum(["yes", "no", "unsure"]).optional(),
+        freeholder: optText(300),
+      })
+      .optional(),
   }),
   rooms: z.array(roomSchema).max(MAX_ROOMS),
   outdoor: z.object({ positions: z.array(positionSchema).max(MAX_POSITIONS) }),

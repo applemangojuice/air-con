@@ -1,7 +1,7 @@
 "use server";
 
 import { z } from "zod";
-import { COMPLIANCE_STATUSES, PLANNING_OUTCOMES, can, type ComplianceStatus, type PlanningOutcome, type StaffMember } from "@aircon/domain";
+import { BUILDING_REGS_ROUTES, COMPLIANCE_STATUSES, PLANNING_OUTCOMES, can, type BuildingRegsRoute, type ComplianceStatus, type PlanningOutcome, type StaffMember } from "@aircon/domain";
 import { requireProjectAccess, requireStaff } from "@/lib/auth/server";
 import { addEvidence, ensureChecklist, reviewItem } from "@/lib/compliance-server";
 import { isUuid } from "@/lib/repo/base";
@@ -54,6 +54,7 @@ export async function reviewAction(projectId: string, _prev: ActionState, form: 
   // The questions an approval asks (planning-pd's outcome, designations' "listed?"); the domain says when one is missing.
   const outcome = z.enum(PLANNING_OUTCOMES as [PlanningOutcome, ...PlanningOutcome[]]).safeParse(form.get("planningOutcome"));
   const listed = z.enum(["yes", "no"]).safeParse(form.get("listedBuilding"));
+  const route = z.enum(BUILDING_REGS_ROUTES as [BuildingRegsRoute, ...BuildingRegsRoute[]]).safeParse(form.get("buildingRegsRoute"));
   const done: Record<ComplianceStatus, string> = {
     approved: "Approved.",
     "not-applicable": "Marked not applicable.",
@@ -72,6 +73,7 @@ export async function reviewAction(projectId: string, _prev: ActionState, form: 
         ...(override ? { overrideReason: override } : {}),
         ...(outcome.success ? { planningOutcome: outcome.data } : {}),
         ...(listed.success ? { listedBuilding: listed.data } : {}),
+        ...(route.success ? { buildingRegsRoute: route.data } : {}),
       },
       staff,
     ),

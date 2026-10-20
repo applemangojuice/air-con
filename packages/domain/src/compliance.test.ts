@@ -5,6 +5,7 @@ import {
   COMPLIANCE_TEMPLATE,
   addComplianceEvidence,
   asbestosSuspectedAtSurvey,
+  buildingRegsRouteProblem,
   companyFgasCertProblem,
   complianceProgress,
   complianceTemplateFor,
@@ -569,4 +570,38 @@ test("round 9: supply capacity and the DNO is on the checklist before booking, a
   assert.equal(reviewCompliance(i, "approved", TECH, undefined, undefined, NOW).ok, false, "a photo alone isn't the outcome");
   assert.equal(reviewCompliance(i, "not-applicable", TECH, "Small unit", undefined, NOW).ok, false);
   assert.ok(reviewCompliance(i, "approved", TECH, "60 A cut-out, not looped, max demand 38 A after diversity; connect and notify, UKPN ref DEMO-1 (DEMO)", undefined, NOW).ok);
+});
+
+test("flats in blocks: the Building Regulations route is a choice; a flat can't use a building notice, a higher-risk building can't use the council", () => {
+  const regs = item("heat-pump-building-regs", { status: "under-review" });
+  const note = "DEMO: scheme DEMO-CPS, registration 12345.";
+  // A route must be chosen.
+  const none = reviewCompliance(regs, "approved", TECH, note, undefined, NOW, {});
+  assert.equal(none.ok, false);
+  if (!none.ok) assert.match(none.error, /Choose how the heat pump's Building Regulations are covered/);
+  // A house: a building notice is fine, and it's kept on the item while approved.
+  const house = reviewCompliance(regs, "approved", TECH, note, undefined, NOW, { buildingRegsRoute: "building-notice", block: { flat: false, higherRisk: false } });
+  assert.equal(house.ok, true);
+  if (house.ok) assert.equal(house.item.buildingRegsRoute, "building-notice");
+  // A flat in a block: no building notice.
+  const flat = reviewCompliance(regs, "approved", TECH, note, undefined, NOW, { buildingRegsRoute: "building-notice", block: { flat: true, higherRisk: false } });
+  assert.equal(flat.ok, false);
+  if (!flat.ok) assert.match(flat.error, /a building notice isn't accepted/);
+  assert.equal(reviewCompliance(regs, "approved", TECH, note, undefined, NOW, { buildingRegsRoute: "full-plans", block: { flat: true, higherRisk: false } }).ok, true);
+  // A higher-risk building: neither council route; the Regulator, or the scheme.
+  for (const r of ["building-notice", "full-plans"] as const) assert.match(buildingRegsRouteProblem(r, { flat: true, higherRisk: true }) ?? "", /Building Safety Regulator's approval/);
+  assert.equal(buildingRegsRouteProblem("bsr", { flat: true, higherRisk: true }), null);
+  assert.equal(buildingRegsRouteProblem("competent-person", { flat: true, higherRisk: true }), null);
+  assert.match(buildingRegsRouteProblem("bsr", { flat: true, higherRisk: false }) ?? "", /higher-risk buildings only/);
+  // Approved before the route was a choice, or with a route that no longer fits the home: reopened before day 1.
+  const old = item("heat-pump-building-regs", { status: "approved", reviewedBy: "DEMO Tess", reviewedAt: NOW, note });
+  assert.equal(syncCompliance([old], project(), NOW, undefined, {}).find((c) => c.key === "heat-pump-building-regs")?.status, "under-review");
+  const notice = { ...old, buildingRegsRoute: "building-notice" as const };
+  assert.equal(syncCompliance([notice], project(), NOW, undefined, { block: { flat: false, higherRisk: false } }).length, 0, "a house's building notice stands");
+  const reopened = syncCompliance([notice], project(), NOW, undefined, { block: { flat: true, higherRisk: false } })[0];
+  assert.equal(reopened?.status, "under-review");
+  assert.match(reopened?.history?.at(-1)?.note ?? "", /a building notice isn't accepted/);
+  assert.equal(reopened?.buildingRegsRoute, undefined, "the answer goes with the approval");
+  // Once the install has started, nothing is reopened by itself.
+  assert.equal(syncCompliance([notice], project((p) => { p.install.status = "in-progress"; }), NOW, undefined, { block: { flat: true, higherRisk: false } }).length, 0);
 });

@@ -132,7 +132,7 @@ const ROUTINES: Routine[] = [
       </>,
       <>On the first morning the installer checks every box against the design. Damage or a shortage comes back to you as an issue.</>,
       <>
-        <B>Open the checklist</B> (Compliance): everything approved, or marked not applicable, before install day.
+        <B>Open the checklist</B> (Compliance): everything approved, or marked not applicable, before install day. The Building Regulations route is a choice: a flat can&apos;t use a building notice, and a higher-risk building (7 storeys or 18 m and above) goes through our scheme or the Building Safety Regulator.
       </>,
     ],
   },

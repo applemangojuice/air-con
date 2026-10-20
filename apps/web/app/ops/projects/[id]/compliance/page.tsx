@@ -5,9 +5,16 @@ import {
   COMPLIANCE_GATE_GROUPS,
   COMPLIANCE_STATUS_TEXT,
   COMPLIANCE_TEMPLATE,
+  BUILDING_REGS_ROUTES,
+  BUILDING_REGS_ROUTE_TEXT,
+  HRB_MIN_HEIGHT_M,
+  HRB_MIN_STOREYS,
   PD_CHECKS,
   PLANNING_OUTCOMES,
   PLANNING_OUTCOME_TEXT,
+  buildingRegsRouteProblem,
+  higherRiskBuilding,
+  isFlat,
   ROLE_LABEL,
   can,
   cancellationStatus,
@@ -137,6 +144,7 @@ export default async function CompliancePage({ params }: { params: Promise<{ id:
                         contributor={contributor}
                         media={item.mediaIds.map((m) => mediaById.get(m)).filter((m) => m !== undefined)}
                         context={context(item)}
+                        {...(survey?.data ? { measured: survey.data } : {})}
                       />
                     ))}
                   </ul>
@@ -211,6 +219,25 @@ function contextFor(
         { label: "Tenure (survey)", value: site.tenure, tone: consent || site.tenure === "unknown" ? "warn" : "success", ...(consent ? { detail: "The written consent must be attached to approve this, and install day 1 waits for it." } : {}) },
         { label: "Decision maker", value: site.decisionMaker?.trim() || "Not recorded", tone: site.decisionMaker?.trim() ? undefined : "warn" },
         { label: "Authority to go ahead (survey tick)", value: site.ownerConfirmed ? "Confirmed" : "Not confirmed", tone: site.ownerConfirmed ? "success" : "warn" },
+      ];
+    }
+    case "heat-pump-building-regs": {
+      const m = facts.measured;
+      if (!m) return [{ label: "Survey", value: "Not recorded yet", tone: "warn" }];
+      if (!isFlat(m)) return [{ label: "Home (survey)", value: m.house.type, tone: "success", detail: "A house: any route can work (our competent person scheme, full plans, or a building notice)." }];
+      const b = m.house.block ?? {};
+      const hrb = higherRiskBuilding(m);
+      return [
+        {
+          label: "The block (survey)",
+          value: [b.storeys ? `${b.storeys} storeys` : "", b.heightM ? `${b.heightM} m` : ""].filter(Boolean).join(", ") || "Not recorded",
+          tone: hrb ? "danger" : b.storeys || b.heightM ? "success" : "warn",
+          detail: hrb
+            ? `A higher-risk building (${HRB_MIN_STOREYS} storeys or ${HRB_MIN_HEIGHT_M} m and above, with two or more homes): the Building Safety Regulator is the building control authority. Outside our competent person scheme (check it covers work in a higher-risk building), the Regulator's approval comes before any work: apply on GOV.UK and allow its decision period. No building notice, no full plans to the council.`
+            : "A flat in a block: no building notice (the Fire Safety Order covers the block's common parts). Our competent person scheme, or a full plans application.",
+        },
+        { label: "Crosses a compartment wall or floor, or a common part", value: b.crossing ?? "Not answered", tone: b.crossing === "no" ? "success" : "warn", ...(b.crossing !== "no" ? { detail: "The crew photographs the fire-stopping on day 1 (Fire-stopping at the compartment crossing)." } : {}) },
+        { label: "Freeholder or managing agent", value: b.freeholder?.trim() || "Not recorded", tone: b.freeholder?.trim() ? undefined : "warn" },
       ];
     }
     case "asbestos": {
@@ -312,6 +339,7 @@ function ItemCard({
   contributor,
   media,
   context,
+  measured,
 }: {
   item: ComplianceItem;
   projectId: string;
@@ -320,6 +348,8 @@ function ItemCard({
   contributor: boolean;
   media: { id: string; contentType: string; url: string | null; caption?: string; takenAt: string }[];
   context: ContextRow[];
+  /** The survey: which Building Regulations routes fit this home. */
+  measured?: MeasuredSurvey;
 }) {
   const t = complianceTemplateFor(item.key);
   const settled = item.status === "approved" || item.status === "not-applicable";
@@ -351,6 +381,7 @@ function ItemCard({
         {(item.reviewedBy || item.note) && (
           <div className="mt-3 text-sm">
             {item.status === "approved" && item.planningOutcome && <p className="font-semibold text-ink-900">Outcome: {PLANNING_OUTCOME_TEXT[item.planningOutcome]}</p>}
+            {item.status === "approved" && item.buildingRegsRoute && <p className="font-semibold text-ink-900">Route: {BUILDING_REGS_ROUTE_TEXT[item.buildingRegsRoute]}</p>}
             {item.status === "approved" && item.listedBuilding && (
               <p className="font-semibold text-ink-900">Listed building, or in the curtilage of one: {item.listedBuilding === "yes" ? "Yes" : "No"}</p>
             )}
@@ -466,6 +497,25 @@ function ItemCard({
                       ))}
                     </div>
                     <p className="mt-1 text-xs text-ink-500">&quot;Needed&quot; holds install day 1 until the council&apos;s decision notice is on &quot;Planning permission or listed building consent granted&quot;.</p>
+                  </fieldset>
+                )}
+                {item.key === "heat-pump-building-regs" && choices.some((c) => c.to === "approved") && (
+                  <fieldset className="mt-3">
+                    <legend className="mb-1.5 text-sm font-semibold text-ink-900">How is it covered? (to approve)</legend>
+                    <div className="flex flex-col gap-y-1">
+                      {BUILDING_REGS_ROUTES.map((r) => {
+                        const block = measured ? { flat: isFlat(measured), higherRisk: higherRiskBuilding(measured) } : undefined;
+                        const problem = buildingRegsRouteProblem(r, block);
+                        return (
+                          <label key={r} className={`flex min-h-11 items-center gap-2 text-sm ${problem ? "text-ink-500" : "text-ink-900"}`}>
+                            <input type="radio" name="buildingRegsRoute" value={r} disabled={Boolean(problem)} defaultChecked={r === "competent-person" && !problem} className="h-4 w-4 accent-accent-600" />
+                            {BUILDING_REGS_ROUTE_TEXT[r]}
+                            {problem ? <span className="text-xs">(not for this home)</span> : null}
+                          </label>
+                        );
+                      })}
+                    </div>
+                    <p className="mt-1 text-xs text-ink-500">Write the scheme and registration number, or the application reference and date, in the note.</p>
                   </fieldset>
                 )}
                 {item.key === "designations" && choices.some((c) => c.to === "approved") && (

@@ -302,6 +302,17 @@ start. A few ask for more than a note:
   test result (or the avoiding route) attached.
 - **Supply capacity and the network operator (DNO)**: the electrician's
   written outcome, before booking.
+- **Building Regulations route for the heat pump**: choose how it's covered
+  (**Competent person scheme** is ticked to start with), and write the
+  scheme and registration number, or the application's reference and date.
+  The survey's block answers decide what fits: a flat can't use a
+  **building notice**; a **higher-risk building** (7 storeys or 18 m and
+  above) can't use the council at all: our scheme (check it covers work in
+  a higher-risk building) or the **Building Safety Regulator's approval**,
+  applied for on GOV.UK before any work. Routes that don't fit are greyed
+  out, and one approved before (or one that no longer fits) is reopened
+  before day 1. The item shows the block, the crossing and the freeholder
+  or managing agent from the survey.
 
 A checklist made before an item existed shows **Add the missing items**
 with their names; the planning consent item adds itself before day 1.

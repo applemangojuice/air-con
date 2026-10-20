@@ -27,6 +27,37 @@ import { can, type StaffMember, type StaffRole } from "./staff.ts";
  * until the council's decision notice is attached.
  */
 
+/** How the heat pump's Building Regulations are covered, chosen to approve `heat-pump-building-regs`. */
+export type BuildingRegsRoute = "competent-person" | "building-notice" | "full-plans" | "bsr";
+
+export const BUILDING_REGS_ROUTES: readonly BuildingRegsRoute[] = ["competent-person", "full-plans", "building-notice", "bsr"];
+
+export const BUILDING_REGS_ROUTE_TEXT: Record<BuildingRegsRoute, string> = {
+  "competent-person": "Competent person scheme (we self-certify)",
+  "full-plans": "Full plans application to the council",
+  "building-notice": "Building notice to the council (a house only)",
+  bsr: "Building Safety Regulator's approval (a higher-risk building)",
+};
+
+/** The block a flat is in, as the survey records it: building notice and higher-risk building rules. */
+export interface BlockContext {
+  flat: boolean;
+  higherRisk: boolean;
+}
+
+/** Why this route can't be used for this home, or null. */
+export function buildingRegsRouteProblem(route: BuildingRegsRoute | undefined, block: BlockContext | undefined): string | null {
+  if (!route || !BUILDING_REGS_ROUTES.includes(route)) return "Choose how the heat pump's Building Regulations are covered: our competent person scheme, a full plans application, a building notice, or the Building Safety Regulator.";
+  if (block?.higherRisk && (route === "building-notice" || route === "full-plans")) {
+    return "A higher-risk building (7 storeys or 18 m and above, per the survey): the council isn't the building control authority there. Work outside our competent person scheme needs the Building Safety Regulator's approval before it starts (apply through GOV.UK); check the scheme covers work in a higher-risk building.";
+  }
+  if (block?.flat && route === "building-notice") {
+    return "A flat in a block: a building notice isn't accepted where the Fire Safety Order covers the building (a block's common parts). Use our competent person scheme, or a full plans application.";
+  }
+  if (route === "bsr" && block && !block.higherRisk) return "The Building Safety Regulator approves work in higher-risk buildings only (7 storeys or 18 m and above): the survey doesn't record one here.";
+  return null;
+}
+
 /** The technical lead's planning outcome on `planning-pd`. */
 export type PlanningOutcome = "pd" | "consent-needed";
 
@@ -263,7 +294,7 @@ export const COMPLIANCE_TEMPLATE: ComplianceTemplateItem[] = [
     basis: "Building Regulations 2010 Part L, Sch 3 (competent person schemes), reg 12; Building Safety Act 2022 for higher-risk buildings. Building control to confirm",
     guidance:
       "Installing a split heat pump or air conditioner is very likely building work under Part L, separate from the electrical circuit. Before the booking, record how this job is covered: the competent person scheme our installer is registered with for this work (scheme and registration number), who then self-certifies it; or, without one, the council's approval before work starts: a building notice for a house, but a full plans application for a flat in a block the Fire Safety Order covers (most blocks: a building notice isn't allowed there). In a higher-risk building (18 m or more, or 7 storeys or more, with two or more homes), work outside a competent person scheme needs the Building Safety Regulator's approval first. Once work has started, a missed notice can only be put right by regularisation. Mark it not applicable only on building control's written word that this install isn't building work.",
-    evidenceHint: "The scheme name and registration number, or the building notice or full plans reference and the date it went in (or the Building Safety Regulator's approval, or building control's written confirmation that none is needed).",
+    evidenceHint: "Choose the route, then: the scheme name and registration number, or the building notice or full plans reference and the date it went in, or the Building Safety Regulator's approval. A flat can't use a building notice, and a higher-risk building (the survey's block answers) can't use the council at all.",
   },
   {
     key: "fgas-company",
@@ -529,6 +560,8 @@ export interface ComplianceItem {
   planningOutcome?: PlanningOutcome;
   /** designations, while approved: is it a listed building, or in the curtilage of one? */
   listedBuilding?: "yes" | "no";
+  /** heat-pump-building-regs, while approved: how the work is covered. */
+  buildingRegsRoute?: BuildingRegsRoute;
 }
 
 /** The survey's and the property record's word on listing, before anyone checks the heritage list. */
@@ -660,6 +693,10 @@ export interface ComplianceReviewContext {
   tenure?: "owner" | "leaseholder" | "tenant" | "unknown";
   /** The survey says asbestos is possible or suspected, or a flash guard may be: approving the asbestos check needs the result. */
   asbestosSuspected?: boolean;
+  /** The reviewer's answer to approve heat-pump-building-regs. */
+  buildingRegsRoute?: BuildingRegsRoute;
+  /** A flat in a block, and whether it's a higher-risk building (the survey's block answers). */
+  block?: BlockContext;
 }
 
 /** Tenures whose authority to contract rests on someone else's written consent. */
@@ -719,6 +756,10 @@ export function reviewCompliance(
         }
         if (item.key === "designations" && context.listedBuilding !== "yes" && context.listedBuilding !== "no") {
           return fail("Answer the question: is it a listed building, or in the curtilage of one?");
+        }
+        if (item.key === "heat-pump-building-regs") {
+          const problem = buildingRegsRouteProblem(context.buildingRegsRoute, context.block);
+          if (problem) return fail(problem);
         }
         if ((t?.approvalNeeds ?? "evidence-or-note") === "note" && !text) {
           return fail("Write what you checked in the note: the outcome alone can't approve this.");
@@ -803,6 +844,8 @@ export function reviewCompliance(
   else delete next.planningOutcome;
   if (to === "approved" && item.key === "designations") next.listedBuilding = context.listedBuilding;
   else delete next.listedBuilding;
+  if (to === "approved" && item.key === "heat-pump-building-regs") next.buildingRegsRoute = context.buildingRegsRoute;
+  else delete next.buildingRegsRoute;
   return { ok: true, item: clean(next) };
 }
 
@@ -910,6 +953,7 @@ export function syncCompliance(
       delete next.reviewedByStaffId;
       delete next.planningOutcome;
       delete next.listedBuilding;
+      delete next.buildingRegsRoute;
     }
     // A status the system decided says why, where the item shows its note.
     if (to === "not-applicable" || (item.key === "planning-consent" && to === "evidence-required")) next.note = note;
@@ -977,6 +1021,25 @@ export function syncCompliance(
     // Approved on the strength of the company certificate in settings, which no longer covers the job: back to review.
     if (item.status === "approved" && restsOnSettingsCert(item) && context.companyFgasProblem) {
       set(item, "under-review", "System", now, `Reopened automatically: ${context.companyFgasProblem}`);
+      continue;
+    }
+    // The route recorded no longer fits the home (the survey now says a flat, or a higher-risk building), or was
+    // never a choice: asked again before day 1, so a building notice in a block can't stand.
+    if (
+      beforeDay1 &&
+      item.key === "heat-pump-building-regs" &&
+      item.status === "approved" &&
+      (!item.buildingRegsRoute || (context.block && buildingRegsRouteProblem(item.buildingRegsRoute, context.block)))
+    ) {
+      set(
+        item,
+        "under-review",
+        "System",
+        now,
+        item.buildingRegsRoute
+          ? `Reopened automatically: ${buildingRegsRouteProblem(item.buildingRegsRoute, context.block)}`
+          : "Reopened automatically: choose the route (our competent person scheme, full plans, a building notice, or the Building Safety Regulator), so the checklist can tell whether it fits this home.",
+      );
       continue;
     }
     // Approved before the outcome (or the listing answer) was a recorded choice: the free-text note
