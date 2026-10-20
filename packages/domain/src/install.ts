@@ -1,6 +1,7 @@
 import type { CatalogueItem } from "./catalogue.ts";
 import { A2L_ROOM_CHECK_ABOVE_KG, a2lMaxChargeKg, releaseHeightOf, type DesignRecord, type DesignVariant, type SystemSelection } from "./design-record.ts";
 import {
+  VACUUM_STANDARD_MICRON,
   judgePressureDecay,
   judgeVacuumDecay,
   type DecayJudgement,
@@ -2434,6 +2435,9 @@ export function targetError(key: TargetKey, min: number | undefined, max: number
     return key === "pressure.test" ? "Set the manual's test pressure and the nameplate PS." : `Set ${def.label.toLowerCase()} from the manual: it can't be record only.`;
   }
   if ((key === "pressure.hold" || key === "vacuum.hold") && min !== undefined && min <= 0) return "A hold time is more than 0 minutes.";
+  if (key === "vacuum.target" && max !== undefined && max > VACUUM_STANDARD_MICRON) {
+    return `500 micron always applies: a figure above it would change nothing. Use 500 micron, or the manual's if it's stricter.`;
+  }
   return null;
 }
 

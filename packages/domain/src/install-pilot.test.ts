@@ -576,6 +576,8 @@ test("targets: the job's targets, set by the tech lead, re-judge readings; commi
   for (const k of ["pressure.test", "pressure.hold", "vacuum.hold", "vacuum.rise"] as const) assert.ok(targetError(k, undefined, undefined), `${k} needs a number from the manual`);
   assert.equal(targetError("pressure.test", undefined, 41.5), "Set the minimum too: the manual's test pressure.");
   assert.match(targetError("pressure.hold", 0, undefined) ?? "", /more than 0/);
+  assert.match(targetError("vacuum.target", undefined, 1000) ?? "", /500 micron always applies/, "a looser vacuum target would change nothing, so it isn't taken");
+  assert.equal(targetError("vacuum.target", undefined, 250), null);
   assert.throws(() => setJobTarget(steps, { key: "pressure.test", min: -1, max: 40 }, TECH.name, AT), /positive/);
 
   let sheet = setJobTarget(steps, { key: "pressure.test", min: 30, max: 41.5, note: "DEMO manual p.12" }, TECH.name, AT);
