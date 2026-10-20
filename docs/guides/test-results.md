@@ -1,6 +1,63 @@
 # Test results
 
-The latest real results of every automatic check, run on the evening of
+The latest real results of every automatic check, run late on
+**20 October 2026** on branch `claude/pilot-ops` at commit `f27e113`: the
+six items round 9 left half-done (architecture §K49: the charge against the
+as-built length, access at height, flats in blocks, the yearly service and
+the heat pump's certificate alert, CDM 2015 roles and the health and safety
+file, multi-split reducers), each committed on its own with its unit tests,
+on top of round 9 (`32e378b`, [below](#the-run-for-round-9)). Every check
+ran once, start to finish, and passed, on both databases. Every person,
+home and price the browser walks use is fictional and labelled DEMO.
+
+**Summary: everything passed, on both databases.** 1,079 unit tests (535
+domain, 544 web: 20 new), the type check (the iOS scaffold included), the
+production build (Next.js 15.5.28), every database migration check and the
+upgrade file check (no migration: the new fields live in JSON columns and
+the settings document); then the browser walks on **both** backends: on the
+local file database, 230 end-to-end pilot checks and 24 quote-form checks;
+on the Supabase-shaped stack (Postgres 16, PostgREST 12.2.3 and the Storage
+API), the same 230 and 24, the property book importers over 3,000 homes,
+and 444 checks across the screens (one more than round 9: the new `/stop`
+page) with no statement refused by the database.
+
+| Check | Command | Result | Run (UTC, 20 Oct) |
+| --- | --- | --- | --- |
+| Type check (domain, web, mobile) | `pnpm -r typecheck` | **Pass** (3 of 3 projects) | 21:37 |
+| Domain unit tests | `pnpm test` | **535 of 535 pass**, 0 fail (31 test files) | 21:37 to 21:38 |
+| Web unit tests | `pnpm test` | **544 of 544 pass**, 0 fail (59 test files) | 21:37 to 21:38 |
+| Production build | `pnpm --filter @aircon/web build` | **Pass**: Next.js 15.5.28, compiled, 35 of 35 static pages generated | 21:17 to 21:19 |
+| Database migrations | `bash supabase/tests/run-migrations.sh` | **Pass**: 15 migrations and the pilot upgrade bundle (none new); the local backend's schema matches | 21:19 |
+| Upgrade file is current | `bash supabase/build-pilot-upgrade.sh --check` | **Pass**: `pilot-upgrade.sql` is current (0010 to 0014) | 21:19 |
+| Pilot walk, **local file database** | `node scripts/e2e-pilot.mjs` (port 3901) | **230 of 230 pass** | 21:20 to 21:25 |
+| Quote form walk, **local file database** | `node scripts/e2e-funnel.mjs` (port 3902) | **24 of 24 pass** | 21:26 |
+| Pilot walk, **Supabase-shaped** | `bash supabase/tests/compat/run-compat-e2e.sh` (Postgres 55901, PostgREST 3904, gateway 3905, app 3906) | **230 of 230 pass** | 21:26 to 21:36 |
+| Quote form walk, **Supabase-shaped** | (same run) | **24 of 24 pass** | (same run) |
+| Property book import, **Supabase-shaped** | (same run) | **Pass**: 3,000 homes, 900 in a conservation area, 3,000 classified | (same run) |
+| Every screen, **Supabase-shaped** | (same run) | **444 of 444 pass** (286 pages, 214 routes, 141 requests with ids that aren't there, the exports, the crons) | (same run) |
+| Database and app logs, **Supabase-shaped** | (same run) | **Clean**: no statement refused by Postgres, no PostgREST or Storage error in the app's log | (same run) |
+
+What the walks met of §K49: the runsheet is `pilot-runsheet-5`; the pilot
+walk now types the charge the as-built length needs (the step shows it next
+to the weighed slot), so the weighed figure is inside the job's tolerance,
+and picks **Competent person scheme** on the Building Regulations route (the
+DEMO home is a house; the radio is ticked by default anyway). The RAMS
+approval carries the CDM roles prefilled with the company's legal name. The
+walk's DEMO crew is all in-house, its home isn't a flat, its outdoor unit is
+on the ground and its catalogue has no port sizes, so the access hire, the
+fire-stopping step, the health and safety file and the reducers stay out of
+it: their unit tests cover them (the survey checks, the costing, the design's
+bill of materials, the runsheet, the compliance rules, the pack's file, the
+schedule's yearly reminder and the heat pump certificate alert, the footer's
+stop link through the outbox and the `/stop` action on the memory backend).
+The local walks ran against `next start` started directly on a fresh, empty
+data folder (demo sign-in on, a `SESSION_SECRET` over 40 characters,
+headless Chromium 1194), each stopped by its PID; the Supabase-shaped run
+reused the same build (`SKIP_BUILD=1`). Nothing flaked.
+
+## The run for round 9
+
+The results of every automatic check for round 9, run on the evening of
 **20 October 2026** on branch `claude/pilot-ops` at commit `32e378b`: round 9
 of the pre-launch review ([below](#what-round-9-found): the planning consent
 gate and the round's medium list), on top of the two engineering gaps round
