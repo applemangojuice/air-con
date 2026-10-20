@@ -191,7 +191,8 @@ pack and certificates in **Your documents**.
 
 ### 8. Aftercare
 
-**They see:** first service due (12 months after handover), the warranty
+**They see:** the next service due (12 months after handover, then a year
+from each service the office records, every year), the warranty
 status, their feedback, **Report a problem** (goes straight to the team,
 with photos if they add them; anything urgent or unsafe they say at the top,
 and we call them first), and **Stop follow-up emails**.
@@ -202,10 +203,13 @@ and we call them first), and **Stop follow-up emails**.
 | **One month on: how did we do?** | Email | 30 days after handover (up to day 60): a 0 to 10 score and three questions, for us only. Sent to everyone, whatever they'd say |
 | **Would you review Dang, It's Hot?** | Email | 37 days after handover, a week after the feedback request, and only once the electrical certificate and warranty registration are done and a **Review page link** is set in Settings. Same words for everyone, no incentive, never depends on their score |
 | **Colder days ahead: using your system to heat** (or **Warmer days ahead…: to cool**) | Email | Once, at the first change of season: from 1 October after a spring or summer handover, from 1 June after an autumn or winter one, never within 28 days of handover |
-| **Your system's yearly service is due \<day\>** | Email | Once, about 30 days before the service date (12 months after handover): the date and the warranty condition. The offer to book it only if they agreed to marketing |
+| **Your system's yearly service is due \<day\>** | Email | Every year, about 30 days before the service date (12 months after handover, then a year from the last service the office recorded): the date and the warranty condition. The offer to book it only if they agreed to marketing |
 
-These five are the follow-up emails. Each has an opt-out line, and none goes
-to a family who pressed **Stop follow-up emails** or who cancelled.
+These five are the follow-up emails. Each ends with **Stop them**: a link
+that opens a page with one button (no sign-in), the same as **Stop follow-up
+emails** on their page; they can turn them back on there. None goes to a
+family who stopped them, who cancelled, or whose aftercare the office closed
+(moved house, serviced elsewhere).
 
 ## Any time
 

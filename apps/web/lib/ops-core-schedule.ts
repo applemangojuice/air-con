@@ -3,6 +3,8 @@ import {
   daysBetween,
   handoverDeadlines,
   documentsConsentCovers,
+  nextServiceDueOn,
+  serviceRemindersOn,
   proposalOverdue,
   proposalPromisedBy,
   reviewRequestDue,
@@ -137,8 +139,14 @@ export function addDays(iso: string, n: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+/** What the checklist knows that the project doesn't: is the heat pump's own Building Regulations certificate in? */
+export interface DailyFacts {
+  /** heat-pump-compliance-certificate approved (or not applicable): false while it's still to come; absent when there's no checklist. */
+  heatPumpCertSettled?: boolean;
+}
+
 /** Today's jobs for one project, in the order they should run. */
-export function dailyJobsFor(project: Project, todayIso: string, settings: PilotSettings): DailyJob[] {
+export function dailyJobsFor(project: Project, todayIso: string, settings: PilotSettings, facts: DailyFacts = {}): DailyJob[] {
   const p = project;
   const today = dateOf(todayIso);
   const jobs: DailyJob[] = [];
@@ -274,6 +282,29 @@ export function dailyJobsFor(project: Project, todayIso: string, settings: Pilot
       });
     }
   }
+  // The heat pump's own Building Regulations certificate (from the competent person scheme, or the council's
+  // completion certificate): the same 30 days and the same weekly alert, from its checklist item.
+  if (p.install.status === "complete" && p.install.completedAt && facts.heatPumpCertSettled === false) {
+    const due = handoverDeadlines(dateOf(p.install.completedAt)).electricalCertDueBy;
+    const late = daysBetween(due, today);
+    if (late > 0 && (late - 1) % PAPERWORK_ALERT_EVERY_DAYS === 0) {
+      jobs.push({
+        kind: "notify",
+        job: "paperwork-overdue",
+        projectId: p.id,
+        event: "team-alert",
+        data: {
+          title: `Overdue: the heat pump's Building Regulations certificate for ${p.customer.name || "a customer"}`,
+          lines: [
+            `It was due to reach the customer by ${due} (30 days after completion), and its checklist item isn't approved yet.`,
+            "Chase the competent person scheme (or building control for a council application), email the certificate to the family, and attach it to \"Building Regulations certificate for the heat pump, to the customer\" on the compliance checklist.",
+          ],
+          urgent: true,
+        },
+        discriminator: `paperwork-overdue:heat-pump:${due}:${late}`,
+      });
+    }
+  }
   // The manufacturer warranty registration: the date is ours to keep (an extended warranty can be lost
   // after it), so the team hears 14 and 7 days ahead, on the day, then weekly while it's late.
   if (p.handover.status !== "pending" && !p.handover.warrantyRegistered && p.handover.warrantyDueOn) {
@@ -325,9 +356,11 @@ export function dailyJobsFor(project: Project, todayIso: string, settings: Pilot
       });
     }
   }
-  if (p.aftercare.serviceDueOn) {
-    const due = dateOf(p.aftercare.serviceDueOn);
-    if (today >= addDays(due, -SERVICE_REMINDER_DAYS_BEFORE) && today <= due) {
+  // The yearly service, every year: the due date rolls on from handover (or the latest service recorded) until
+  // the family opts out or the office closes aftercare. One reminder per due date.
+  if (serviceRemindersOn(p)) {
+    const due = nextServiceDueOn(p, today);
+    if (due && today >= addDays(due, -SERVICE_REMINDER_DAYS_BEFORE) && today <= due) {
       notify("service-reminder", { dueOn: due }, due);
     }
   }

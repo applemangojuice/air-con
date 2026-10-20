@@ -386,6 +386,23 @@ export async function closeProjectAction(projectId: string, fd: FormData): Promi
   );
 }
 
+/** A yearly service done: the day, who did it, any notes. The next reminder counts from it. */
+export async function serviceVisitAction(projectId: string, fd: FormData): Promise<ActionResult> {
+  const parsed = z
+    .object({ on: isoDate, engineer: text(120).min(2, "Who did the service?"), notes: text(1000).optional() })
+    .safeParse({ on: field(fd, "on"), engineer: field(fd, "engineer"), notes: field(fd, "notes") || undefined });
+  if (!parsed.success) return refused(firstIssue(parsed.error));
+  return run(projectId, { type: "service-visit-recorded", on: parsed.data.on, engineer: parsed.data.engineer, ...(parsed.data.notes ? { notes: parsed.data.notes } : {}) }, "Service recorded: the next reminder counts from it.");
+}
+
+/** Close aftercare (moved house, serviced elsewhere): no more follow-ups or service reminders. Or open it again. */
+export async function aftercareClosedAction(projectId: string, fd: FormData): Promise<ActionResult> {
+  const closed = field(fd, "closed") !== "false";
+  const reason = field(fd, "reason").trim().slice(0, 300);
+  if (closed && reason.length < 3) return refused("Say why aftercare is closing (they've moved, it's serviced elsewhere…).");
+  return run(projectId, { type: "aftercare-closed", closed, ...(closed ? { reason } : {}) }, closed ? "Aftercare closed: no more follow-ups or service reminders." : "Aftercare open again.");
+}
+
 /** The customer cancelled their contract: when and how it reached us, then everything that follows (cancellation-server). */
 export async function cancellationAction(projectId: string, fd: FormData): Promise<ActionResult> {
   const staff = await guard(projectId);

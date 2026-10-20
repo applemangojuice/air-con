@@ -821,7 +821,7 @@ export function HandoverPackDoc({ snap, ctx }: { snap: HandoverPackSnapshot; ctx
       )}
 
       <DocSection title="Service, problems and contacts">
-        <p>{ctx.live?.serviceDueOn ? `Your first service is due around ${fmtDate(ctx.live.serviceDueOn)}. We'll remind you.` : "We'll remind you when your first service is due, about a year after installation."}</p>
+        <p>{ctx.live?.serviceDueOn ? `Your first service is due around ${fmtDate(ctx.live.serviceDueOn)}. We'll remind you a few weeks before, and every year after.` : "We'll remind you when your first service is due, about a year after installation, and every year after."}</p>
         <p>
           Something not right? Report it from your project page
           {ctx.live?.projectHref ? (

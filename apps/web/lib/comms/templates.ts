@@ -4,6 +4,7 @@ import {
   EARLY_START_WORDING_VERSION,
   FOLLOW_UP_EVENTS,
   INSTALL_LEAD_DAYS,
+  STOP_PLACEHOLDER,
   RESCHEDULE_FEES,
   ROLE_LABEL,
   TAX_CODES,
@@ -504,7 +505,7 @@ const INVOICE_KIND: Record<InvoiceKind, string> = {
 /* Blocks: one tree renders to both HTML and plain text                */
 /* ------------------------------------------------------------------ */
 
-type Inline = string | { strong: string };
+type Inline = string | { strong: string } | { link: string; href: string };
 type Para = Inline | Inline[];
 type Block =
   | { p: Para }
@@ -516,11 +517,13 @@ type Block =
   | { box: string[] };
 
 const inlines = (p: Para): Inline[] => (Array.isArray(p) ? p : [p]);
-const paraText = (p: Para) => inlines(p).map((i) => (typeof i === "string" ? i : i.strong)).join("");
+const paraText = (p: Para) => inlines(p).map((i) => (typeof i === "string" ? i : "link" in i ? `${i.link} (${i.href})` : i.strong)).join("");
 const multiline = (s: string) => escapeHtml(s).replace(/\r?\n/g, "<br>");
 const paraHtml = (p: Para) =>
   inlines(p)
-    .map((i) => (typeof i === "string" ? multiline(i) : `<strong>${multiline(i.strong)}</strong>`))
+    .map((i) =>
+      typeof i === "string" ? multiline(i) : "link" in i ? `<a href="${escapeHtml(i.href)}" style="color:#5d6371">${multiline(i.link)}</a>` : `<strong>${multiline(i.strong)}</strong>`,
+    )
     .join("");
 
 function blockHtml(b: Block): string {
@@ -650,11 +653,19 @@ function reach(settings: PilotSettings, opts: { capital?: boolean; us?: boolean 
   return opts.us ? `${head} us ${phone ? "on" : "at"} ${target}` : `${head} ${target}`;
 }
 
-/** Every follow-up ends with this (FOLLOW_UP_EVENTS). The outbox honours it: see aftercare-opt-out. */
-function optOutLine(ctx: TemplateContext): string {
+/**
+ * Every follow-up ends with this (FOLLOW_UP_EVENTS). The outbox honours it: see aftercare-opt-out.
+ * With a project, a one-click link (STOP_PLACEHOLDER, signed for the project as it's sent) opens a
+ * page with one button; their project page has the same button.
+ */
+function optOutLine(ctx: TemplateContext): Para {
   const { email } = ctx.settings.company;
   const phone = phoneOf(ctx.settings);
-  return `Don't want follow-up emails like this one? Email ${email}${phone ? ` or call ${phone}` : ""} and we'll stop them. We'll still contact you about any open work, problem or payment.`;
+  const still = "We'll still contact you about any open work, problem or payment.";
+  if (ctx.projectId) {
+    return ["Don't want follow-up emails like this one (check-ins, the season's tips, the yearly service reminder)? ", { link: "Stop them", href: STOP_PLACEHOLDER }, `, or email ${email}${phone ? ` or call ${phone}` : ""}. ${still}`];
+  }
+  return `Don't want follow-up emails like this one? Email ${email}${phone ? ` or call ${phone}` : ""} and we'll stop them. ${still}`;
 }
 
 /* ------------------------------------------------------------------ */

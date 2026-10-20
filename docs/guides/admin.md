@@ -360,7 +360,9 @@ with their names; the planning consent item adds itself before day 1.
 - **The heat pump's own Building Regulations certificate** (from the scheme
   that covers the installation, or the council) is separate from the
   circuit's: attach it to its checklist item and email it to the family.
-  Their page shows it as to come until the item is approved.
+  Their page shows it as to come until the item is approved. Like the
+  electrical certificate, the team gets a weekly alert once it's past 30
+  days from completion, until that item is approved.
 - **Warranty registered**: register with the manufacturer (the box shows
   the date to register by: the one in the family's handover pack,
   completion plus 90 days for Daikin and 30 for the rest; the team is
@@ -373,6 +375,18 @@ with their names; the planning consent item adds itself before day 1.
 registered, the electrical certificate is in, and no serious defect is open.
 The page warns you about anything still open. Closing can't be undone on
 screen. Aftercare messages carry on by themselves after closing.
+
+**Aftercare** (the command centre's Aftercare box, after handover):
+
+- **The yearly service reminder** goes every year, about 30 days before the
+  next service is due: 12 months after handover, then a year from the last
+  service recorded. **Record a service visit** (the day, the engineer, any
+  notes): the next reminder counts from it, and the family's page shows the
+  new date. A service nobody recorded doesn't stop next year's reminder.
+- **Close aftercare** (with the reason: they've moved, someone else services
+  it) stops every follow-up and service reminder; **Open aftercare again**
+  undoes it. The family can stop them too, from their page or the **Stop
+  them** link at the foot of every follow-up email.
 
 ## 4. Money
 

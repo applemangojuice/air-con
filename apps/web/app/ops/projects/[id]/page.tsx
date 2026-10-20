@@ -22,7 +22,9 @@ import {
   earlyStartWording,
   isOpen,
   nextGate,
+  nextServiceDueOn,
   runsheetProgress,
+  serviceRemindersOn,
   schedule2Missing,
   stageState,
   surveyCompleteness,
@@ -35,6 +37,7 @@ import { Money } from "@/components/kit/money";
 import { fmtInstant, hoursLabel, mapsUrl, telHref, timeTotals, upcomingWorkingDays } from "@/components/ops/command/model";
 import { Facts, MessageBody, Note, Quiet, SectionCard } from "@/components/ops/command/sections";
 import {
+  AftercareCloseForm,
   AssignSurveyorForm,
   BookSurveyForm,
   CancellationForm,
@@ -51,6 +54,7 @@ import {
   PilotForm,
   RaiseIssueForm,
   ResendForm,
+  ServiceVisitForm,
 } from "@/components/ops/command/forms";
 import { requireStaff } from "@/lib/auth/server";
 import { ElectricalCertificateForms, WarrantyRegistrationForm } from "./certificate-forms";
@@ -63,6 +67,7 @@ import { buildReadinessContext, loadProject, londonToday } from "@/lib/project-s
 import { listForProject as messagesForProject } from "@/lib/repo/messages";
 import { getSettings } from "@/lib/settings-server";
 import {
+  aftercareClosedAction,
   addLearningAction,
   addNoteAction,
   assignSurveyorAction,
@@ -80,6 +85,7 @@ import {
   setNextActionAction,
   setOwnerAction,
   setPilotAction,
+  serviceVisitAction,
   warrantyRegisteredAction,
 } from "./actions";
 
@@ -653,11 +659,22 @@ export default async function CommandCentrePage({
                     ["30-day feedback", p.aftercare.feedback ? `${p.aftercare.feedback.score}/10` : p.aftercare.feedbackRequestedAt ? "Asked, no answer yet" : null],
                     ["Review request", p.aftercare.reviewRequestedAt ? fmtInstant(p.aftercare.reviewRequestedAt) : settings.company.reviewUrl ? null : "Off (no review link in settings)"],
                     ["Season check", p.aftercare.seasonalCheckSentAt ? fmtInstant(p.aftercare.seasonalCheckSentAt) : null],
-                    ["Service due", p.aftercare.serviceDueOn ? fmtDate(p.aftercare.serviceDueOn) : null],
-                    ["Follow-ups", p.aftercare.followUpsOptedOutAt ? "Opted out" : "On"],
+                    ["Next service due", nextServiceDueOn(p, today) ? `${fmtDate(nextServiceDueOn(p, today)!)}${serviceRemindersOn(p) ? " (reminder 30 days before)" : " (no reminder)"}` : null],
+                    ["Services recorded", p.aftercare.serviceVisits?.length ? p.aftercare.serviceVisits.map((v) => `${fmtDate(v.on)}, ${v.engineer}${v.notes ? `: ${v.notes}` : ""}`).join("; ") : "None yet"],
+                    ["Follow-ups", p.aftercare.closedAt ? `Aftercare closed: ${p.aftercare.closedReason ?? ""}` : p.aftercare.followUpsOptedOutAt ? "Opted out" : "On"],
                   ]}
                 />
                 {p.aftercare.feedback?.comments && <Quiet>“{p.aftercare.feedback.comments}”</Quiet>}
+                {canEdit && (
+                  <>
+                    <Disclosure summary="Record a service visit" className="mt-3">
+                      <ServiceVisitForm action={bind(serviceVisitAction)} today={today} />
+                    </Disclosure>
+                    <Disclosure summary={p.aftercare.closedAt ? "Open aftercare again" : "Close aftercare"} className="mt-2">
+                      <AftercareCloseForm action={bind(aftercareClosedAction)} closed={Boolean(p.aftercare.closedAt)} />
+                    </Disclosure>
+                  </>
+                )}
               </SectionCard>
             )}
           </div>

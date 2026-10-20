@@ -342,11 +342,11 @@ says what to do instead. Approvals that need a professional are in
 23a. **Paperwork after handover is partly by hand.**
     - *The heat pump's own Building Regulations certificate* is tracked on
       its checklist item (the file and number go there as evidence) and
-      shown on the family's page and in the pack; it isn't a customer
-      document of its own, and the weekly overdue alert covers only the
-      electrical certificate. *Instead:* email it to the family when it
-      comes, attach it to the checklist item, and check that item 30 days
-      after completion.
+      shown on the family's page and in the pack, and the team's weekly
+      overdue alert (§K49) covers it as well as the electrical certificate
+      once it's 30 days past completion. It isn't a customer document of its
+      own. *Instead:* email it to the family when it comes, and attach it to
+      the checklist item.
     - *Warranty terms per brand aren't stored.* The registration date the
       app keeps is the pack's (completion plus 90 days for Daikin, 30 for
       the rest), counted from completion, not commissioning, and the
@@ -354,11 +354,16 @@ says what to do instead. Approvals that need a professional are in
       item 20). The team is alerted 14 and 7 days ahead, on the day, and
       weekly while it's late. *Instead:* put each brand's real deadline and
       conditions in **Settings → Warranty** before quoting.
-    - *The yearly service reminder goes once* (about 30 days before the
-      first service), and services aren't recorded. A warranty that needs
-      a yearly service can lapse from year 2. *Instead:* put the service
-      condition in the warranty wording in Settings, so it's in the
-      contract and the pack, and diary each household's later services.
+    - *The yearly service reminder repeats every year* (§K49; was "goes
+      once"): 30 days before each due date, a year from handover and then a
+      year from the last service the office records, until the family stops
+      follow-ups (their page, or the one-click **Stop them** link in every
+      follow-up's footer) or the office closes aftercare. But: a service
+      done by someone else is only counted once the office records it, a
+      warranty's own service condition still isn't stored per brand, and the
+      reminder is a calendar date, not the unit's running hours. *Instead:*
+      put the service condition in the warranty wording in Settings, so it's
+      in the contract and the pack.
 
 ## Customers and messages
 

@@ -546,7 +546,13 @@ export interface Project {
     seasonalCheckSentAt?: string;
     /** The customer asked for no more follow-ups (check-ins, feedback, review, seasonal, service reminders). */
     followUpsOptedOutAt?: string;
+    /** The next yearly service: a year from handover, then a year from each service visit recorded (nextServiceDueOn rolls it on). */
     serviceDueOn?: string;
+    /** Service visits the office recorded, oldest first. */
+    serviceVisits?: ServiceVisit[];
+    /** The office closed aftercare (moved house, serviced elsewhere): no more follow-ups or service reminders. */
+    closedAt?: string;
+    closedReason?: string;
   };
   money: {
     contractTotalPence?: number;
@@ -565,6 +571,17 @@ export const PAYMENT_ALREADY_COUNTED = "That payment is already counted in the p
 /** Manufacturers want registering soon after install; terms vary, so this is a safe default. */
 export const WARRANTY_REGISTRATION_DAYS = 30;
 export const SERVICE_INTERVAL_MONTHS = 12;
+
+/** A yearly service, as the office records it. */
+export interface ServiceVisit {
+  /** The day it was done (London date). */
+  on: string;
+  engineer: string;
+  notes?: string;
+  /** When it was recorded, and by whom. */
+  at: string;
+  by?: string;
+}
 
 /* ------------------------------------------------------------------ */
 /* Date + money formatting (hand-rolled, runtime-stable)              */
@@ -2010,6 +2027,10 @@ export type ProjectAction =
   | { type: "seasonal-check-sent" }
   /** The customer asked for no more follow-ups (or, with false, for them again). */
   | { type: "aftercare-opt-out"; optedOut: boolean }
+  /** Ops: a yearly service was done; the next reminder counts from it. */
+  | { type: "service-visit-recorded"; on: string; engineer: string; notes?: string }
+  /** Ops: aftercare ends (or, with false, starts again): no follow-ups or service reminders while closed. */
+  | { type: "aftercare-closed"; closed: boolean; reason?: string }
   // admin
   | { type: "set-next-action"; text: string; dueOn?: string; ownerRole?: StaffRole | "customer" }
   | { type: "set-pilot"; number: number; label: string }
@@ -2065,6 +2086,8 @@ const AFTER_CLOSE: ReadonlySet<ProjectAction["type"]> = new Set<ProjectAction["t
   "review-requested",
   "seasonal-check-sent",
   "aftercare-opt-out",
+  "service-visit-recorded",
+  "aftercare-closed",
   "contract-confirmation-sent",
   "pre-contract-info-sent",
   "cancellation-charge-recorded",
@@ -3065,6 +3088,42 @@ export function applyProjectAction(project: Project, action: ProjectAction, now:
       return ok();
     }
 
+    case "service-visit-recorded": {
+      if (p.handover.status !== "handed-over") return err("A service is recorded once the system has been handed over.");
+      const on = (action.on ?? "").trim();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(on) || Number.isNaN(Date.parse(`${on}T12:00:00Z`))) return err("Give the day the service was done.");
+      if (on > today) return err("A service is recorded once it's done: that day hasn't come yet.");
+      const handed = p.handover.handedOverAt ? dateOf(p.handover.handedOverAt) : undefined;
+      if (handed && on < handed) return err("That's before the system was handed over.");
+      const engineer = action.engineer.trim();
+      if (engineer.length < 2) return err("Who did the service?");
+      if (engineer.length > 120) return err("The engineer's name is too long.");
+      const notes = action.notes?.trim();
+      if (notes && notes.length > 1000) return err("Keep the notes under 1,000 characters.");
+      const visit: ServiceVisit = { on, engineer, ...(notes ? { notes } : {}), at: now, ...(staff?.name ? { by: staff.name } : {}) };
+      p.aftercare.serviceVisits = [...(p.aftercare.serviceVisits ?? []), visit].sort((a, b) => (a.on < b.on ? -1 : a.on > b.on ? 1 : 0));
+      // The next one is a year from the latest service on record.
+      const latest = p.aftercare.serviceVisits.at(-1)!.on;
+      p.aftercare.serviceDueOn = addMonths(latest, SERVICE_INTERVAL_MONTHS);
+      log("service-visit-recorded", `Yearly service done on ${fmtDate(on)} by ${engineer}. The next one is due around ${fmtDate(p.aftercare.serviceDueOn)}.`, "ops");
+      return ok();
+    }
+
+    case "aftercare-closed": {
+      if (action.closed === Boolean(p.aftercare.closedAt)) return err(action.closed ? "Aftercare is already closed." : "Aftercare is already open.");
+      const reason = action.reason?.trim();
+      if (action.closed) {
+        if (!reason || reason.length < 3) return err("Say why aftercare is closing (they've moved, it's serviced elsewhere…).");
+        p.aftercare.closedAt = now;
+        p.aftercare.closedReason = reason.slice(0, 300);
+      } else {
+        delete p.aftercare.closedAt;
+        delete p.aftercare.closedReason;
+      }
+      log("aftercare-closed", action.closed ? `Aftercare closed: ${reason}. No more follow-ups or service reminders.` : "Aftercare reopened: follow-ups and service reminders are back on.", "ops", { internal: true });
+      return ok();
+    }
+
     case "feedback-submitted": {
       if (!Number.isInteger(action.score) || action.score < 0 || action.score > 10) return err("Pick a score from 0 to 10.");
       const comments = action.comments?.trim();
@@ -3661,7 +3720,29 @@ export const REVIEW_REQUEST_DAYS = 37;
 export const SEASONAL_CHECK_MIN_DAYS = 28;
 
 const handoverDay = (p: Project) => (p.handover.handedOverAt ? dateOf(p.handover.handedOverAt) : null);
-const followUpsAllowed = (p: Project) => p.closure.reason !== "cancelled" && !p.aftercare.followUpsOptedOutAt;
+const followUpsAllowed = (p: Project) => p.closure.reason !== "cancelled" && !p.aftercare.followUpsOptedOutAt && !p.aftercare.closedAt;
+
+/** Do yearly service reminders go to this family? Not after a cancellation, an opt-out, or the office closing aftercare. */
+export function serviceRemindersOn(p: Pick<Project, "closure" | "aftercare" | "handover">): boolean {
+  return p.closure.reason !== "cancelled" && !p.aftercare.followUpsOptedOutAt && !p.aftercare.closedAt && Boolean(p.aftercare.serviceDueOn);
+}
+
+/**
+ * The next yearly service due, on or after today: the due date on record
+ * (a year from handover, or from the latest service visit), rolled on a
+ * year at a time while it has passed (a service nobody recorded doesn't
+ * stop next year's reminder). Null with no due date on record.
+ */
+export function nextServiceDueOn(p: Pick<Project, "aftercare">, todayIso: string): string | null {
+  const first = p.aftercare.serviceDueOn ? dateOf(p.aftercare.serviceDueOn) : null;
+  if (!first) return null;
+  const today = dateOf(todayIso);
+  for (let years = 0; years < 60; years++) {
+    const due = addMonths(first, SERVICE_INTERVAL_MONTHS * years);
+    if (due >= today) return due;
+  }
+  return null;
+}
 
 /**
  * Is the review request due? The same rule for everyone (DMCC Act 2024

@@ -371,6 +371,8 @@ export function readdressedKey(key: string, to: string): string {
  * message or a database backup can't sign anyone in.
  */
 export const LINK_PLACEHOLDER = "[[link added when sent]]";
+/** Where a follow-up's one-click "stop these emails" link goes: the outbox signs one for the project as it sends. */
+export const STOP_PLACEHOLDER = "[[stop link added when sent]]";
 
 /**
  * Stands in for a sign-in email's one-time code in its stored body, on the

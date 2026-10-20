@@ -161,6 +161,10 @@ const ROUTINES: Routine[] = [
       <>The customer signs All good, or There&apos;s a snag. Each snag is an issue with an owner and a date: get it fixed, then close it.</>,
       <>The electrical certificate, in the project&apos;s Handover box: upload it, or mark it pending from the scheme with a date to chase.</>,
       <>Warranty registration, in the same box, has a date to register by: register with the manufacturer, then record it there.</>,
+      <>The heat pump&apos;s own Building Regulations certificate goes on its checklist item: the team is alerted weekly once it&apos;s 30 days late, like the electrical one.</>,
+      <>
+        Each year: the family gets the service reminder 30 days before it&apos;s due. When a service is done, <B>Record a service visit</B> in the Aftercare box: the next reminder counts from it. Moved house? <B>Close aftercare</B>.
+      </>,
     ],
   },
   {

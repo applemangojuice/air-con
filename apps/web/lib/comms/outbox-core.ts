@@ -3,6 +3,7 @@ import {
   COMMS_EVENTS,
   FOLLOW_UP_EVENTS,
   LINK_PLACEHOLDER,
+  STOP_PLACEHOLDER,
   idempotencyKey,
   readdressedKey,
   type CommsEventId,
@@ -150,6 +151,8 @@ export interface OutboxDeps {
    * `recipient` is that customer's own address, else the plain page URL.
    */
   customerLink(projectId: string, path: string, recipient: string): Promise<string>;
+  /** A follow-up's one-click stop link for this project (lib/follow-up-stop), or null without a secret. */
+  stopLink?(projectId: string): Promise<string | null>;
   appUrl(): string;
   teamInbox(): string | null;
   /**
@@ -173,7 +176,7 @@ const NO_REVIEW_LINK = "No review link in settings (company.reviewUrl)";
 
 /** Pure: has this customer refused this kind of message? Only follow-ups can be refused. */
 export function optedOut(event: CommsEventId, project: Pick<Project, "aftercare"> | null | undefined): boolean {
-  return FOLLOW_UP_EVENTS.has(event) && Boolean(project?.aftercare?.followUpsOptedOutAt);
+  return FOLLOW_UP_EVENTS.has(event) && Boolean(project?.aftercare?.followUpsOptedOutAt || project?.aftercare?.closedAt);
 }
 
 /**
@@ -293,7 +296,19 @@ export function createOutbox(deps: OutboxDeps) {
     const has = (placeholder: string) => [content.subject, content.text, content.html ?? ""].some((x) => x.includes(placeholder));
     const needsLink = has(LINK_PLACEHOLDER);
     const needsCode = has(CODE_PLACEHOLDER);
-    if (!needsLink && !needsCode) return content;
+    const needsStop = has(STOP_PLACEHOLDER);
+    if (!needsLink && !needsCode && !needsStop) return content;
+    // The footer's stop link, signed now; without a secret (or a project), their project page, which has the same button.
+    let stop: string | undefined;
+    if (needsStop) {
+      const page = m.projectId ? `${deps.appUrl()}/p/${m.projectId}#aftercare` : deps.appUrl();
+      try {
+        stop = (m.projectId && (await deps.stopLink?.(m.projectId))) || page;
+      } catch (err) {
+        log(`stop link for ${m.event} failed; linking their project page`, err);
+        stop = page;
+      }
+    }
     // A code is never kept, so a stored one can't be sent again.
     if (needsCode && !live?.code) return null;
     let link = live?.link;
@@ -303,6 +318,7 @@ export function createOutbox(deps: OutboxDeps) {
     }
     const fill = (x: string, html: boolean) => {
       let out = link === undefined ? x : x.split(LINK_PLACEHOLDER).join(html ? escapeHtml(link) : link);
+      if (stop !== undefined) out = out.split(STOP_PLACEHOLDER).join(html ? escapeHtml(stop) : stop);
       if (live?.code) out = out.split(CODE_PLACEHOLDER).join(html ? escapeHtml(live.code) : live.code);
       return out;
     };

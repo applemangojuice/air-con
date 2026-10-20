@@ -9,6 +9,7 @@ import {
   FOLLOW_UP_EVENTS,
   CODE_PLACEHOLDER,
   LINK_PLACEHOLDER,
+  STOP_PLACEHOLDER,
   applyProjectAction,
   createProject,
   earlyStartWording,
@@ -276,8 +277,10 @@ test("follow-ups carry an opt-out line; nothing else does", () => {
   for (const event of ALL_EVENTS) {
     if (COMMS_EVENTS[event].audience !== "customer") continue;
     const m = render(event, FULL[event] as never);
-    const has = /Don't want follow-up emails like this one\? Email hello@dang\.ac or call 020 7946 0123 and we'll stop them\./.test(m.text);
+    // With a project: the one-click stop link (signed as it's sent), and the email and phone too.
+    const has = /Don't want follow-up emails like this one \(check-ins, the season's tips, the yearly service reminder\)\? Stop them \(\[\[stop link added when sent\]\]\), or email hello@dang\.ac or call 020 7946 0123\./.test(m.text);
     assert.equal(has, FOLLOW_UP_EVENTS.has(event), `${event}: opt-out line`);
+    if (FOLLOW_UP_EVENTS.has(event)) assert.ok(m.html.includes(`href="${STOP_PLACEHOLDER}"`), `${event}: the stop link in the HTML`);
   }
 });
 
@@ -1734,4 +1737,37 @@ test("team emails about a customer say a reply reaches our own inbox, with the c
   // Not about a customer (an unmatched Stripe refund, a system alert): no such line.
   const bare = render("team-alert", { title: "A Stripe refund we couldn't match" }, { ...ctxFor(), customerName: "", addressLine: "", postcode: "", customerPhone: undefined, customerEmail: undefined, projectId: undefined } as never);
   assert.doesNotMatch(bare.text, /reaches our own inbox/);
+});
+
+test("follow-ups carry a one-click stop link, signed for the project as they're sent; without a signer, their project page", async () => {
+  const { stopLink, stopLinkValid } = await import("../lib/follow-up-stop.ts");
+  const secret = "demo-secret-demo-secret-demo-secret-0001";
+  const link = await stopLink("https://dang.example", PROJECT_ID, secret);
+  assert.ok(link?.startsWith(`https://dang.example/stop?p=${PROJECT_ID}&s=`));
+  const sig = new URL(link!).searchParams.get("s")!;
+  assert.equal(await stopLinkValid(PROJECT_ID, sig, secret), true);
+  assert.equal(await stopLinkValid(PROJECT_ID, sig, "another-secret-another-secret-0002"), false, "another deployment's secret");
+  assert.equal(await stopLinkValid("33333333-de5e-4000-8000-000000000003", sig, secret), false, "another project");
+  assert.equal(await stopLinkValid(PROJECT_ID, undefined, secret), false);
+  assert.equal(await stopLink("https://dang.example", "not-a-uuid", secret), null);
+
+  const h = await harness({ email: true });
+  h.deps.stopLink = async (id) => stopLink("https://dang.example", id, secret);
+  const outbox = createOutbox(h.deps);
+  const r = await outbox.notify("service-reminder", { projectId: PROJECT_ID, data: { dueOn: "2027-12-03" }, discriminator: "stop-1" });
+  assert.equal(r.status, "sent");
+  const body = h.sent.at(-1)!.body;
+  assert.match(body, /<a href="https:\/\/dang\.example\/stop\?p=[0-9a-f-]+&amp;s=[0-9a-f]{40}"[^>]*>Stop them<\/a>/);
+  assert.ok(!body.includes(STOP_PLACEHOLDER));
+  // The stored copy keeps the placeholder (the link is minted per send).
+  const { listForProject } = await import("../lib/repo/messages.ts");
+  const stored = (await listForProject(PROJECT_ID, 200, h.db)).find((m) => m.event === "service-reminder");
+  assert.ok(stored?.bodyText.includes(STOP_PLACEHOLDER));
+  // No signer: their project page, which has the same button.
+  const plain = await harness({ email: true });
+  await plain.outbox.notify("check-in-7d", { projectId: PROJECT_ID, data: {}, discriminator: "stop-2" });
+  assert.match(plain.sent.at(-1)!.body, new RegExp(`href="https://dang\\.example/p/${PROJECT_ID}#aftercare"`));
+  // Operational mail has no stop link.
+  await plain.outbox.notify("issue-update", { projectId: PROJECT_ID, data: { title: "Drip", update: "Fixed" }, discriminator: "stop-3" });
+  assert.doesNotMatch(plain.sent.at(-1)!.body, /Stop them/);
 });

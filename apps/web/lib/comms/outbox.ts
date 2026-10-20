@@ -9,6 +9,7 @@ import * as customersRepo from "@/lib/repo/customers";
 import { messageStore } from "@/lib/repo/messages";
 import { getSettings } from "@/lib/settings-server";
 import { getServiceClient } from "@/lib/supabase-server";
+import { stopLink } from "@/lib/follow-up-stop";
 import { followUpForDelivered } from "./action-map";
 import {
   createOutbox,
@@ -45,6 +46,7 @@ function realOutbox(): Outbox | null {
     customerLink,
     appUrl,
     teamInbox,
+    stopLink: (projectId) => stopLink(appUrl(), projectId),
     // The customer record's own answer: marketing is only ever a consent when it was ticked.
     marketingConsent: async (project) => {
       const id = project?.customer.customerId;

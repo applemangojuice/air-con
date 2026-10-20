@@ -112,3 +112,17 @@ test("a flat in a block: the Building Regulations route refuses a building notic
   assert.ok(bsr.ok, JSON.stringify(bsr));
   assert.equal((await complianceRepo.getByKey(id, "heat-pump-building-regs"))?.buildingRegsRoute, "bsr");
 });
+
+test("the follow-up footer's stop link turns follow-ups off for that project, with one button and no sign-in", async () => {
+  const { stopLink } = await import("../lib/follow-up-stop.ts");
+  const { stopFollowUpsAction } = await import("../app/stop/actions.ts");
+  const id = await newProject();
+  const link = await stopLink("https://dang.example", id);
+  assert.ok(link, "the dev secret signs it outside production");
+  const sig = new URL(link!).searchParams.get("s")!;
+  assert.match((await stopFollowUpsAction(id, "0".repeat(40), {}, new FormData())).error ?? "", /doesn't work/);
+  assert.equal((await loadProject(id))!.aftercare.followUpsOptedOutAt, undefined);
+  assert.deepEqual(await stopFollowUpsAction(id, sig, {}, new FormData()), { done: true });
+  assert.ok((await loadProject(id))!.aftercare.followUpsOptedOutAt);
+  assert.deepEqual(await stopFollowUpsAction(id, sig, {}, new FormData()), { done: true }, "a second tap reads the same");
+});

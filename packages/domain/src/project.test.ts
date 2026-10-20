@@ -42,6 +42,8 @@ import {
   reviewRequestDue,
   seasonalCheck,
   seasonalCheckDue,
+  nextServiceDueOn,
+  serviceRemindersOn,
   stageInfo,
   stageState,
   wrapUpDayOf,
@@ -1580,6 +1582,33 @@ test("aftercare-opt-out: the customer can stop follow-ups (and start them again)
   assert.equal(on.aftercare.followUpsOptedOutAt, undefined);
   assert.equal(on.events.at(-1)!.actor, "ops");
   refuses(on, { type: "aftercare-opt-out", optedOut: false }, T.close, {}, /already on/);
+});
+
+test("yearly service: a visit sets the next due a year from it; the due date rolls on every year; closing aftercare stops reminders", () => {
+  const p = walk(); // handed over 19 Nov 2026, closed
+  assert.equal(p.aftercare.serviceDueOn, "2027-11-19");
+  assert.equal(nextServiceDueOn(p, "2027-01-01"), "2027-11-19");
+  assert.equal(nextServiceDueOn(p, "2027-11-20"), "2028-11-19", "missed: next year's, never a reminder for a date gone");
+  assert.equal(serviceRemindersOn(p), true);
+  // Recorded by the office (even after the project closed): the next reminder counts from the visit.
+  refuses(p, { type: "service-visit-recorded", on: "2027-12-02", engineer: "DEMO Sam" }, "2027-12-01T10:00:00.000Z", { actor: ADMIN }, /hasn't come yet/);
+  refuses(p, { type: "service-visit-recorded", on: "2026-11-01", engineer: "DEMO Sam" }, "2027-12-03T10:00:00.000Z", { actor: ADMIN }, /before the system was handed over/);
+  refuses(p, { type: "service-visit-recorded", on: "2027-12-02", engineer: " " }, "2027-12-03T10:00:00.000Z", { actor: ADMIN }, /Who did the service/);
+  const serviced = step(p, { type: "service-visit-recorded", on: "2027-12-02", engineer: "DEMO Sam", notes: "Filters cleaned (DEMO)" }, "2027-12-03T10:00:00.000Z", { actor: ADMIN });
+  assert.equal(serviced.aftercare.serviceDueOn, "2028-12-02");
+  assert.deepEqual(serviced.aftercare.serviceVisits?.map((v) => [v.on, v.engineer, v.notes, v.by]), [["2027-12-02", "DEMO Sam", "Filters cleaned (DEMO)", ADMIN.name]]);
+  assert.match(serviced.events.at(-1)!.label, /Yearly service done on .* by DEMO Sam\. The next one is due around/);
+  // Not before the handover.
+  refuses(walk("handover-pack-published"), { type: "service-visit-recorded", on: "2026-11-19", engineer: "DEMO Sam" }, T.after, { actor: ADMIN }, /handed over/);
+  // Closing aftercare needs a reason, stops the reminders (and the other follow-ups), and can be undone.
+  refuses(serviced, { type: "aftercare-closed", closed: true, reason: " " }, "2027-12-04T10:00:00.000Z", { actor: ADMIN }, /Say why/);
+  const closed = step(serviced, { type: "aftercare-closed", closed: true, reason: "Moved house (DEMO)" }, "2027-12-04T10:00:00.000Z", { actor: ADMIN });
+  assert.deepEqual([closed.aftercare.closedAt, closed.aftercare.closedReason, serviceRemindersOn(closed)], ["2027-12-04T10:00:00.000Z", "Moved house (DEMO)", false]);
+  assert.equal(closed.events.at(-1)!.internal, true);
+  assert.equal(seasonalCheckDue({ ...closed, aftercare: { ...closed.aftercare, seasonalCheckSentAt: undefined } }, "2027-06-01"), false);
+  const reopened = step(closed, { type: "aftercare-closed", closed: false }, "2027-12-05T10:00:00.000Z", { actor: ADMIN });
+  assert.equal(serviceRemindersOn(reopened), true);
+  assert.equal(serviceRemindersOn(step(p, { type: "aftercare-opt-out", optedOut: true }, T.close)), false);
 });
 
 test("next action, pilot tag, contact details and notes are internal records", () => {

@@ -162,6 +162,7 @@ try {
     "/faq",
     "/how-it-works",
     "/privacy",
+    "/stop",
     "/terms",
     "/quote",
   ];

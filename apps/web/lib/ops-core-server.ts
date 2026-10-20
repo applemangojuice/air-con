@@ -664,7 +664,13 @@ export async function runDailyOps(now: Date = new Date()): Promise<DailyOpsSumma
   for (const { project } of projects) {
     let jobs: DailyJob[];
     try {
-      jobs = dailyJobsFor(project, today, settings);
+      // The heat pump's own certificate lives on the checklist: read it only for a finished install still inside its alerts.
+      let heatPumpCertSettled: boolean | undefined;
+      if (project.install.status === "complete" && project.install.completedAt) {
+        const cert = await complianceRepo.getByKey(project.id, "heat-pump-compliance-certificate").catch(() => null);
+        if (cert) heatPumpCertSettled = cert.status === "approved" || cert.status === "not-applicable";
+      }
+      jobs = dailyJobsFor(project, today, settings, heatPumpCertSettled === undefined ? {} : { heatPumpCertSettled });
     } catch (err) {
       summary.errors.push(`planning ${project.id}: ${err instanceof Error ? err.message : String(err)}`);
       continue;

@@ -428,6 +428,59 @@ export function CloseForm({ action, contracted = false }: { action: Action; cont
   );
 }
 
+/** A yearly service done: the day (today to start with), who, notes. */
+export function ServiceVisitForm({ action, today }: { action: Action; today: string }) {
+  const id = useId();
+  return (
+    <ActionForm action={action} resetOnSuccess>
+      <div className="grid gap-2 sm:grid-cols-[10rem_1fr]">
+        <div>
+          <L htmlFor={`${id}-on`}>Day it was done</L>
+          <input id={`${id}-on`} name="on" type="date" required defaultValue={today} max={today} className={compactInput} />
+        </div>
+        <div>
+          <L htmlFor={`${id}-e`}>Engineer</L>
+          <input id={`${id}-e`} name="engineer" required minLength={2} maxLength={120} className={compactInput} />
+        </div>
+      </div>
+      <div className="mt-2">
+        <L htmlFor={`${id}-n`} hint="(optional)">
+          Notes
+        </L>
+        <input id={`${id}-n`} name="notes" maxLength={1000} placeholder="Filters cleaned, coils checked, no leaks" className={compactInput} />
+      </div>
+      <div className="mt-2">
+        <SubmitButton variant="secondary">Record the service</SubmitButton>
+      </div>
+    </ActionForm>
+  );
+}
+
+/** Close aftercare with a reason, or open it again. */
+export function AftercareCloseForm({ action, closed }: { action: Action; closed: boolean }) {
+  const id = useId();
+  if (closed) {
+    return (
+      <ActionForm action={action}>
+        <input type="hidden" name="closed" value="false" />
+        <SubmitButton variant="secondary">Open aftercare again</SubmitButton>
+      </ActionForm>
+    );
+  }
+  return (
+    <ActionForm action={action} confirm="Close aftercare? No more follow-ups or yearly service reminders go to this family.">
+      <input type="hidden" name="closed" value="true" />
+      <div className="grid gap-2 sm:grid-cols-[1fr_auto] sm:items-end">
+        <div>
+          <L htmlFor={`${id}-r`}>Why</L>
+          <input id={`${id}-r`} name="reason" required minLength={3} maxLength={300} placeholder="Moved house; serviced by someone else" className={compactInput} />
+        </div>
+        <SubmitButton variant="secondary">Close aftercare</SubmitButton>
+      </div>
+    </ActionForm>
+  );
+}
+
 export function NoteForm({ action }: { action: Action }) {
   const id = useId();
   return (

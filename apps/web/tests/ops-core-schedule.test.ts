@@ -168,9 +168,47 @@ test("service reminder in the 30 days before it's due", () => {
   assert.deepEqual(jobsOf(p, "2026-10-11"), ["service-reminder"], "30 days before");
   assert.deepEqual(jobsOf(p, "2026-10-10"), []);
   assert.deepEqual(jobsOf(p, "2026-11-10"), ["service-reminder"]);
-  assert.deepEqual(jobsOf(p, "2026-11-11"), [], "overdue: a person follows up, not the cron");
+  assert.deepEqual(jobsOf(p, "2026-11-11"), [], "past it: next year's comes 30 days before that one");
   const [job] = dailyJobsFor(p, "2026-10-20", DEFAULT_SETTINGS);
   assert.equal(job?.kind === "notify" && job.discriminator, "2026-11-10");
+});
+
+test("the service reminder repeats every year until the family opts out or the office closes aftercare", () => {
+  const p = project((x) => {
+    x.aftercare.serviceDueOn = "2026-11-10";
+  });
+  // A year on, with no service recorded: the next reminder, keyed on the next due date.
+  const [y2] = dailyJobsFor(p, "2027-10-20", DEFAULT_SETTINGS);
+  assert.equal(y2?.job, "service-reminder");
+  assert.deepEqual([y2?.kind === "notify" && y2.discriminator, y2?.kind === "notify" && y2.data], ["2027-11-10", { dueOn: "2027-11-10" }]);
+  assert.equal((dailyJobsFor(p, "2030-10-20", DEFAULT_SETTINGS)[0] as { discriminator?: string } | undefined)?.discriminator, "2030-11-10");
+  // A service recorded on 2 Dec 2027 sets the next one a year from it (the reducer moves serviceDueOn).
+  const serviced = project((x) => {
+    x.aftercare.serviceDueOn = "2028-12-02";
+  });
+  assert.deepEqual(jobsOf(serviced, "2028-10-20"), []);
+  assert.deepEqual(jobsOf(serviced, "2028-11-02"), ["service-reminder"]);
+  // Opted out, or aftercare closed: none.
+  assert.deepEqual(jobsOf(project((x) => { x.aftercare.serviceDueOn = "2026-11-10"; x.aftercare.followUpsOptedOutAt = "2026-09-01T10:00:00Z"; }), "2026-10-20"), []);
+  assert.deepEqual(jobsOf(project((x) => { x.aftercare.serviceDueOn = "2026-11-10"; x.aftercare.closedAt = "2026-09-01T10:00:00Z"; x.aftercare.closedReason = "Moved (DEMO)"; }), "2026-10-20"), []);
+});
+
+test("the heat pump's own Building Regulations certificate alerts the team weekly past its 30 days, like the electrical one", () => {
+  const done = (completed: string) =>
+    project((p) => {
+      p.install = { ...p.install, status: "complete", completedAt: `${completed}T15:00:00.000Z` };
+      p.handover = { ...p.handover, electricalCert: "received" };
+    });
+  const completed = addDays(TODAY, -31);
+  const hp = (facts: { heatPumpCertSettled?: boolean }, on = completed) => dailyJobsFor(done(on), TODAY, DEFAULT_SETTINGS, facts).filter((j) => j.job === "paperwork-overdue");
+  const [alert] = hp({ heatPumpCertSettled: false });
+  assert.ok(alert && alert.kind === "notify");
+  assert.match((alert.data as { title: string }).title, /Overdue: the heat pump's Building Regulations certificate/);
+  assert.match(alert.discriminator, /^paperwork-overdue:heat-pump:/);
+  assert.equal(hp({ heatPumpCertSettled: true }).length, 0, "in: no alert");
+  assert.equal(hp({}).length, 0, "no checklist: nothing to go on");
+  assert.equal(hp({ heatPumpCertSettled: false }, addDays(TODAY, -33)).length, 0, "between weekly alerts");
+  assert.equal(hp({ heatPumpCertSettled: false }, addDays(TODAY, -38)).length, 1);
 });
 
 test("cancelled projects get nothing; closed ones keep aftercare but no delivery messages", () => {

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useId, useRef, useState } from "react";
-import { VARIATIONS_ANSWER_LABEL, VARIATION_ANSWER_LABEL, handoverDeadlines, isFullName, variationAgreeWording, variationHasOwnRight, variationsAwaitingCustomer } from "@aircon/domain";
+import { VARIATIONS_ANSWER_LABEL, VARIATION_ANSWER_LABEL, handoverDeadlines, isFullName, nextServiceDueOn, variationAgreeWording, variationHasOwnRight, variationsAwaitingCustomer } from "@aircon/domain";
 import { Input, Textarea } from "@/components/kit/form";
 import { fmtDate, fmtDay, fmtInstantDay, fmtInstantDayTime, money } from "@/lib/format";
 import {
@@ -695,7 +695,7 @@ function FollowUps({ data }: { data: PanelProps["data"] }) {
       <p className="text-[15px] leading-relaxed text-ink-700">
         {off
           ? "You've turned them off. We'll still contact you about any open work, problems or payments."
-          : "We check in after a week, ask how it's going after a month, check again when the season turns, and remind you when a service is due."}
+          : "We check in after a week, ask how it's going after a month, check again when the season turns, and remind you every year when a service is due."}
       </p>
       <ActionFeedback error={error} />
       <Secondary onClick={() => void run({ kind: "follow-ups", optedOut: !off })} disabled={busy || readOnly}>
@@ -724,10 +724,12 @@ export function AftercarePanel({ data, state }: PanelProps) {
       {handed && (
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="rounded-2xl border border-line bg-white p-4">
-            <p className="text-sm text-ink-500">First service due</p>
-            <p className="mt-0.5 font-semibold text-ink-900">{p.aftercare.serviceDueOn ? `Around ${fmtDate(p.aftercare.serviceDueOn)}` : "We'll let you know"}</p>
+            <p className="text-sm text-ink-500">{p.aftercare.serviceVisits?.length ? "Next service due" : "First service due"}</p>
+            <p className="mt-0.5 font-semibold text-ink-900">{nextServiceDueOn(p, data.today) ? `Around ${fmtDate(nextServiceDueOn(p, data.today)!)}` : "We'll let you know"}</p>
             <p className="mt-1 text-sm text-ink-500">
-              {p.aftercare.followUpsOptedOutAt ? "You've turned our follow-ups off, so we won't remind you: book it yourself around that date." : "We'll remind you a few weeks before."}
+              {p.aftercare.followUpsOptedOutAt || p.aftercare.closedAt
+                ? "You've turned our follow-ups off, so we won't remind you: book it yourself around that date, every year."
+                : "We'll remind you a few weeks before, every year."}
             </p>
           </div>
           <div className="rounded-2xl border border-line bg-white p-4">

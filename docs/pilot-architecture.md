@@ -2899,4 +2899,30 @@ changelog and the reasons, so nobody "fixes" a deliberate choice back.
       building and the crossing; the tools list adds the fire-stopping
       product. The demo seed's approved route is the scheme. Sources read
       through extracts (s.65, reg 12, ADB): to verify.
+    - *Yearly service and certificates* (was known limitation 23a): `Project.
+      aftercare` gains `serviceVisits` (`ServiceVisit`: on, engineer, notes,
+      at, by) and `closedAt`/`closedReason`. Actions `service-visit-recorded`
+      (ops, after handover, not in the future or before handover; sets
+      `serviceDueOn` a year from the latest visit) and `aftercare-closed`
+      (with a reason; false reopens), both allowed after close.
+      `nextServiceDueOn` rolls the due date on a year at a time
+      (`SERVICE_INTERVAL_MONTHS`, `addMonths` from the first so 29 Feb
+      doesn't drift); `serviceRemindersOn` (not cancelled, opted out or
+      closed); `followUpsAllowed` and the outbox's `optedOut` honour a closed
+      aftercare. The daily `service-reminder` notifies 30 days before
+      `nextServiceDueOn`, keyed on that date, every year.
+      `dailyJobsFor(…, facts)` takes `DailyFacts.heatPumpCertSettled`
+      (runDailyOps reads `heat-pump-compliance-certificate` for a finished
+      install) and alerts `paperwork-overdue:heat-pump:` on the electrical
+      certificate's 30-day weekly cadence. The follow-up footer
+      (`optOutLine`) carries `STOP_PLACEHOLDER` as an inline `link`; the
+      outbox swaps it per send for `stopLink` (lib/follow-up-stop: the
+      project id and an HMAC of it under SESSION_SECRET, `/stop?p=&s=`), or
+      their project page without a signer. `/stop` (not indexed) checks the
+      signature and offers one button (`stopFollowUpsAction`:
+      aftercare-opt-out as the customer, idempotent); a page, not a GET that
+      acts, because mail scanners open links. The command centre's
+      Aftercare box shows the next due, the visits and the forms; the
+      family's page and the pack say "every year". The route walk opens
+      `/stop`.
 
