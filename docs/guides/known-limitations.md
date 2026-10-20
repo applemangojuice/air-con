@@ -201,7 +201,12 @@ says what to do instead. Approvals that need a professional are in
     the job. Use **Customer view** from the office to see what the family
     sees.
 38. **The phone video-walkthrough app** (`apps/mobile`) isn't part of the
-    pilots and its endpoints are off on the live site.
+    pilots and its endpoints are off on the live site. It's a scaffold that
+    has never been released: it now sends the quote consents (in the web
+    funnel's words and shape) and each photo's type, as the API requires,
+    and it type-checks, but nobody has run it against the API. *Before any
+    release:* test it end to end against a deployment (a quote saved with
+    its consents, photos uploaded, the video endpoints switched on).
 39. **Admin break-glass relies on its password.** Attempts are slowed per
     network (5 a quarter hour) and every failure is logged, but there's no
     site-wide cap any more: one would let a stranger lock you out on launch

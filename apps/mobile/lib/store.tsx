@@ -24,6 +24,8 @@ export interface Contact {
 export interface QuoteDraft {
   survey: Survey;
   contact: Contact;
+  /** The quote consents (lib/consent.ts): operational is needed to save; marketing is never assumed. */
+  consents: { operational: boolean; marketing: boolean };
 }
 
 export function newDraft(): QuoteDraft {
@@ -37,6 +39,7 @@ export function newDraft(): QuoteDraft {
       electrics: { condition: "unsure", photos: [] },
     },
     contact: { name: "", email: "", phone: "", timeframe: "1-3-months" },
+    consents: { operational: false, marketing: false },
   };
 }
 
@@ -73,6 +76,7 @@ interface DraftContextValue {
   hydrated: boolean;
   setSurvey: (update: Partial<Survey>) => void;
   setContact: (update: Partial<Contact>) => void;
+  setConsents: (update: Partial<QuoteDraft["consents"]>) => void;
   updateRoom: (id: string, update: Partial<SurveyRoom>) => void;
   reset: () => void;
 }
@@ -89,7 +93,10 @@ export function DraftProvider({ children }: { children: ReactNode }) {
     loaded.current = true;
     AsyncStorage.getItem(STORAGE_KEY)
       .then((raw) => {
-        if (raw) setDraft(JSON.parse(raw) as QuoteDraft);
+        if (!raw) return;
+        const saved = JSON.parse(raw) as Partial<QuoteDraft>;
+        // A draft saved before consents existed asks for them again (never assumed).
+        setDraft((d) => ({ ...d, ...saved, consents: saved.consents ?? d.consents }));
       })
       .catch(() => undefined)
       .finally(() => setHydrated(true));
@@ -108,6 +115,10 @@ export function DraftProvider({ children }: { children: ReactNode }) {
     setDraft((d) => ({ ...d, contact: { ...d.contact, ...update } }));
   }, []);
 
+  const setConsents = useCallback((update: Partial<QuoteDraft["consents"]>) => {
+    setDraft((d) => ({ ...d, consents: { ...d.consents, ...update } }));
+  }, []);
+
   const updateRoom = useCallback((id: string, update: Partial<SurveyRoom>) => {
     setDraft((d) => ({
       ...d,
@@ -124,7 +135,7 @@ export function DraftProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <DraftContext.Provider value={{ draft, hydrated, setSurvey, setContact, updateRoom, reset }}>
+    <DraftContext.Provider value={{ draft, hydrated, setSurvey, setContact, setConsents, updateRoom, reset }}>
       {children}
     </DraftContext.Provider>
   );
