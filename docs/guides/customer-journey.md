@@ -38,7 +38,10 @@ Every family sees the same layout, on a phone or a computer:
    "Ref AB84A440"). Quote that reference, not their name, when you talk to
    anyone outside the business.
 2. **Your next step**: always exactly one thing to do, or "Nothing for you
-   to do right now".
+   to do right now". Between acceptance and day 1, a tenant's or
+   leaseholder's missing written consent is their step (**Send us your
+   landlord's written consent**), and planning permission still awaited
+   reads **Waiting for planning permission**, never "You're all set".
 3. **Your project, stage by stage**: eight stages (Price, Survey, Proposal,
    Booking, Kit, Install, Handover, Aftercare), done ones dated, future ones
    with an estimated date.
@@ -144,16 +147,17 @@ delivery date.
 
 | Message | Channel | When |
 | --- | --- | --- |
-| **Your equipment is confirmed by the supplier** | Email | When the supplier confirms a date |
-| **Your equipment has been delivered** | Email | When the delivery to their home is recorded. Their cancellation period now has an end date |
+| **Your equipment is confirmed by the supplier** | Email | When the supplier confirms a date. Coming to their home: asks for someone to be in to take it, and to keep the boxes unopened and dry until day 1 |
+| **Your equipment has been delivered** | Email | When the delivery to their home is recorded. Their cancellation period now has an end date. Asks them to keep the boxes unopened, dry and out of the way until day 1 |
 | **Your equipment has arrived with our team** | Email | When the kit reaches our store, the installer or a subcontractor instead (never "delivered"). It says their cancellation period starts on the day the kit is brought to their home |
-| **Your equipment has been checked** | Email | When the kit is checked against the design (by the office or the installer) |
+| **Your equipment has been checked** | Email | When someone who saw the boxes records the check against the design on the Kit page (the office or the technical lead) |
 | **Your cancellation period: you can cancel until \<date\>** | Email only, never a text | Supply and install, on the day the period starts: the kit is delivered to their home, or (kit we held) install day 1. The exact last day they can cancel without a reason, how to cancel, and (if they asked us to start early) that work done may be charged for. Sent once; not after that last day, nor on a closed or cancelled project |
 
 ### 6. Install
 
 **They see:** **Get your home ready** (the prep list to tick: clear space
-under each unit, parking for a van, someone 18+ at home), the plan day by
+under each unit, taking in the equipment delivery if it comes to their
+home, parking for a van, someone 18+ at home), the plan day by
 day, the power-off warning (up to 30 minutes on day 2), **Your install
 team** with names, photos and the certificates they actually hold, and the
 end-of-day updates as they arrive. When the office sends a change for

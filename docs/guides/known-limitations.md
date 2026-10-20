@@ -1,8 +1,8 @@
 # Known limitations
 
 An honest list of what the pilot platform doesn't do, or does only
-partly, as of 20 October 2026 (round 9 of the pre-launch review, §K48, and
-the six items it left half-done, §K49). None of these stops the four pilots; each
+partly, as of 20 October 2026 (round 9 of the pre-launch review, §K48, the
+six items it left half-done, §K49, and round 10, §K50). None of these stops the four pilots; each
 says what to do instead. Approvals that need a professional are in
 [approvals-required.md](approvals-required.md).
 

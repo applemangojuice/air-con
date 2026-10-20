@@ -574,7 +574,8 @@ every email carries a fresh link.
 | Survey time or surveyor | The project → Survey box → **Move the survey** / **Change surveyor** |
 | Install dates or crew | The project → **Booking** → move the dates or change the crew (the family is told) |
 | A proposal before it's accepted | The project → **Proposal** → **Revise: start version 2**, fix it, issue it. It replaces the old one for the family |
-| A proposal after it's accepted | It can't be edited (it's the contract). Use a variation: the family approves the change and its price |
+| A proposal after it's accepted | It can't be edited (it's the contract). Use a variation: the family approves the change and its price. A unit added, swapped or moved to another room or outdoor position isn't a variation (the design is locked): quote it as a new job |
+| A change the family cancels after agreeing it | The project's **Issues** → the change → **They cancelled this change**; credit any invoice raised for it and refund what they paid on it |
 | A payment recorded wrongly | The project → **Money** → **Record a refund** or a credit note. Payments are never deleted, so the history stays true |
 | A card payment refund | In Stripe's dashboard. The app records it by itself; don't record it by hand as well |
 | Company details, prices, rates | **Settings** → change → **Save settings**. Proposals already sent keep the terms they went out on |

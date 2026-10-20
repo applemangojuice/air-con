@@ -2956,3 +2956,77 @@ changelog and the reasons, so nobody "fixes" a deliberate choice back.
       recordOnly false) and names the port in its guidance; unknown keeps
       the old guidance. The tools list names the reducers.
 
+
+50. **Pre-launch review, round 10 (one high finding and the round's medium
+    list, before the first real customers).**
+    - *A variation never changes the design* (was: after acceptance every
+      change was a variation, so a unit added or moved on install day met no
+      design gate, kit, runsheet step or certificate line). `issues.ts`:
+      `DESIGN_CHANGE_QUESTION`, `DESIGN_CHANGE_REFUSAL`,
+      `DESIGN_CHANGE_CONFIRMATION`; `createIssue` refuses a variation with
+      `unitsUnchanged: false` and keeps `unitsUnchangedOnSite`;
+      `sendVariationToCustomer` requires `unitsUnchanged: true` (the office's
+      tick, recorded as `unitsUnchangedConfirmed`). The field sheet asks the
+      question first (Yes: the reason, and the request goes to the office as
+      a `clarification` "Design change asked for: …", never priced); the sync
+      route refuses a variation answered Yes (permanent); an older phone's
+      variation carries no answer and the office's tick holds it. There is
+      still no design-change route after acceptance: known limitation 9h
+      (quote the change as a new job).
+    - *Checklist timing and evidence*: `AFTER_INSTALL_KEYS`
+      (electrical certificate, commissioning notice, heat pump certificate)
+      and `approvalTooEarly`: `reviewCompliance` refuses approving them
+      before `ComplianceReviewContext.installComplete` (compliance-server
+      passes it), and the page shows "Opens once the install is complete"
+      with no Review form. `heat-pump-compliance-certificate` has
+      `approvalNeeds: "evidence-and-note"` (its own refusal text); the
+      family's page says "Sent to you" only for an approved item with a
+      file. `asbestosNaRefusal`: not applicable only when the survey's era
+      is "2000+" (`builtFrom2000`) and nothing is suspected; the radio is
+      hidden otherwise. `supply-and-dno` blocks ready-to-install (an
+      internal item, owner electrician) and its guidance names the route to
+      write and the unverified ENA criteria.
+    - *Planning before acceptance*: the proposal-issue gate blocks
+      `compliance:planning-pd` while Permitted development checks is open
+      (when the checklist has it), as the terms promise;
+      `planningConsentNoteErrors` (proposal.ts) asks for the customer note
+      when the outcome is "consent-needed". The demo seed approves planning
+      for its issued proposals; the pilot walk records the outcome after the
+      design is signed.
+    - *The survey's noise check*: `PD_CHECKS` entries gain `byDesign`
+      (noise-ok): `surveyChecks` doesn't ask it, the design's planning rule
+      counts only the survey's checks, the survey report prints "Worked out
+      in your design" and the planning card lists the survey's answers
+      without it.
+    - *Commissioning targets*: the step card's `DecayPanel` takes
+      `holdMin` (the hold the crew must keep, or "Hold time not set yet");
+      `decayNewlyFailed` and `TARGET_FAILS_PREFIX`: `setTarget` refuses a
+      change that newly fails a passed test unless `confirmFails` (the
+      Commission tab's tick-box, audited); `MAX_HOLD_MINUTES` (24 h) bounds a
+      hold. The guides set targets before day 1.
+    - *Variations the family cancels*: `VariationStatus` "cancelled",
+      `VariationCancellation`, `recordVariationCancellation` (accepted only,
+      once; `withinPeriod` against its own 14 days); the issue closes,
+      `variationStart` says don't do it, every money total leaves it out
+      (they read "accepted" only). `recordVariationCancellationRequest`
+      (variation-server) names an invoice already raised for it, for the
+      office to credit and refund. The Issues page records it ("They
+      cancelled this change"); the family's page says "You cancelled it".
+    - *The family's page*: `customerHolds` (a tenant's or leaseholder's open
+      written consent, planning consent awaiting its decision notice) feeds
+      `customerNextAction` ("Send us your landlord's / the freeholder's
+      written consent") and `waitingCopy` ("Waiting for planning
+      permission"), computed in portal-server between acceptance and day 1;
+      the booking panel says what day 1 waits for.
+    - *Kit*: the check's Good quantities start blank (refused blank); the
+      `kit-not-inspected` warning's owner is "ops"; the kit-update email for
+      kit at or coming to the home (the confirmed email now carries
+      `deliveredTo`) asks for someone in and the boxes kept unopened and dry;
+      `DEFAULT_PREP_ITEMS` gains "delivery".
+    - *Smaller*: the subcontracted technical lead's refusal text and the
+      launch row (only a non-external technical lead counts);
+      `paymentCopy`'s balance basis matches the proposal and contract ("of
+      our invoice", the terms text changes without a new version label: no
+      real proposal has been issued). Sources (legislation.gov.uk, HSE, ENA,
+      the manufacturers) were unreachable from here: limits are worded as to
+      be verified.
