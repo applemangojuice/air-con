@@ -56,7 +56,7 @@ export type PdCheckId =
  * system never concludes "no planning needed" by itself, and any "no" or
  * "unsure" sends the job down the planning application route.
  */
-export const PD_CHECKS: { id: PdCheckId; label: string; help: string }[] = [
+export const PD_CHECKS: { id: PdCheckId; label: string; help: string; byDesign?: true }[] = [
   {
     id: "heating-use",
     label: "It will be used for heating, not just cooling",
@@ -85,7 +85,9 @@ export const PD_CHECKS: { id: PdCheckId; label: string; help: string }[] = [
   {
     id: "noise-ok",
     label: "Noise at the neighbour's window passes the MCS 020(a) check",
-    help: "Calculated, not measured: the heat pump's own level 1 m out from the nearest habitable-room window next door must be 37.0 dB(A) or less (the 42 dB(A) limit includes an assumed 40 dB(A) background). The design works it out; answer from that.",
+    help: "Calculated, not measured: the heat pump's own level 1 m out from the nearest habitable-room window next door must be 37.0 dB(A) or less (the 42 dB(A) limit includes an assumed 40 dB(A) background). There's no design at the survey, so the surveyor doesn't answer it: the design works it out from the distance and surfaces recorded here, and the technical lead runs the full calculation.",
+    // Round 10: never guessed at the survey (it reached the family's survey report as a "Yes").
+    byDesign: true,
   },
   {
     id: "siting-minimises-impact",
@@ -806,7 +808,8 @@ export function surveyChecks(m: MeasuredSurvey): SurveyCheck[] {
   }
 
   const pd = m?.permissions?.pd ?? {};
-  for (const check of PD_CHECKS) {
+  // What the design works out (noise) isn't asked at the survey.
+  for (const check of PD_CHECKS.filter((c) => !c.byDesign)) {
     const answer = pd[check.id];
     add("permissions", check.label, answer === "yes" || answer === "no" || answer === "unsure", { field: `pd-${check.id}` });
   }

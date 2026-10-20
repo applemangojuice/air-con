@@ -163,7 +163,9 @@ loft hatch, and a torch for the fuse board.
    6. **Electrics**: fuse board photo, spare ways, earthing, cable route and
       length, and the old-board asbestos check.
    7. **Permissions**: the permitted-development questions for the outdoor
-      unit (size, position, listed or conservation area).
+      unit (size, position, listed or conservation area). The noise check
+      (MCS 020(a)) isn't yours to answer: the design works it out from the
+      distance and surfaces you recorded on the outdoor position.
    8. **Risks**: working at height, hidden services, pets, anything else.
    9. **Assumptions & unknowns**: anything you couldn't check.
    10. **Documents by email**: ask "Are you happy to receive your proposal

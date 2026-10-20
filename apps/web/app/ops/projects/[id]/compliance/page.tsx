@@ -185,7 +185,8 @@ function contextFor(
     case "planning-pd": {
       const answers: ContextRow[] = !facts.survey
         ? [{ label: "Survey checklist", value: "Not recorded yet", tone: "warn" }]
-        : PD_CHECKS.map((c) => {
+        : PD_CHECKS.filter((c) => !c.byDesign).map((c) => {
+            // Noise is the design's own check (listed below), never the survey's answer.
             const a = facts.survey?.[c.id];
             return { label: c.label, value: a === "yes" ? "Yes" : a === "no" ? "No" : a === "unsure" ? "Unsure" : "Not answered", tone: a === "yes" ? "success" : a === "no" ? "danger" : "warn" };
           });

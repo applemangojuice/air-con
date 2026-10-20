@@ -500,6 +500,15 @@ export function PermissionsSection() {
       <ol className="space-y-3">
         {PD_CHECKS.map((c, i) => (
           <li key={c.id}>
+            {c.byDesign ? (
+              <FieldCard>
+                <p className="text-base font-semibold text-ink-900">
+                  <span className="mr-1 text-ink-500">{i + 1}.</span>
+                  {c.label}
+                </p>
+                <p className="mt-1 text-sm text-ink-700">Worked out by the design: nothing to answer here. Record the distance and the surfaces on the outdoor position.</p>
+              </FieldCard>
+            ) : (
             <FieldCard>
               <ChoiceGroup
                 field={`pd-${c.id}`}
@@ -521,6 +530,7 @@ export function PermissionsSection() {
                 missing={isMissing("permissions", `pd-${c.id}`)}
               />
             </FieldCard>
+            )}
           </li>
         ))}
       </ol>

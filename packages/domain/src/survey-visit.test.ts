@@ -288,7 +288,7 @@ test("a fresh prefilled survey lists exactly what the visit has to find out", ()
   assert.ok(!items.includes("Site & people: Tenure"), "tenure carried over from the customer counts");
   assert.ok(!items.includes("Rooms: Main bedroom: which way the windows face"), "the customer's orientation stands until corrected");
   assert.ok(!items.includes("Electrics: Fuse board type"), "the customer's board guess stands until corrected");
-  for (const check of PD_CHECKS) assert.ok(items.includes(`Permissions: ${check.label}`));
+  for (const check of PD_CHECKS.filter((c) => !c.byDesign)) assert.ok(items.includes(`Permissions: ${check.label}`));
   assert.ok(c.pct > 0 && c.pct < 50, `a fresh survey is mostly to do (${c.pct}%)`);
   // Jump-link ids ride along.
   const bedPhoto = c.missing.find((m) => m.item === "Main bedroom: photo of the unit wall")!;
@@ -400,8 +400,13 @@ test("house: pre-2000 homes can't skip the asbestos question; a concern needs a 
 test("permissions: every PD check answered; unsure is an answer (it goes to the planning route)", () => {
   const m = complete();
   const pd = { ...m.permissions.pd };
-  delete pd["noise-ok"];
-  assert.deepEqual(missingItems({ ...m, permissions: { pd } }), [PD_CHECKS.find((c) => c.id === "noise-ok")!.label]);
+  delete pd["article4-checked"];
+  assert.deepEqual(missingItems({ ...m, permissions: { pd } }), [PD_CHECKS.find((c) => c.id === "article4-checked")!.label]);
+  // Round 10: noise is the design's own check, never asked at the survey (it can't be known there).
+  const noNoise = { ...m.permissions.pd };
+  delete noNoise["noise-ok"];
+  assert.deepEqual(missingItems({ ...m, permissions: { pd: noNoise } }), []);
+  assert.deepEqual(PD_CHECKS.filter((c) => c.byDesign).map((c) => c.id), ["noise-ok"]);
   const unsure = { ...m, permissions: { pd: { ...m.permissions.pd, "article4-checked": "unsure" as const } } };
   assert.equal(surveyCompleteness(unsure).pct, 100);
 });
@@ -444,7 +449,7 @@ test("sectionProgress counts per section and adds up to the checks", () => {
   assert.deepEqual(Object.keys(progress), SURVEY_SECTIONS.map((s) => s.id));
   const total = Object.values(progress).reduce((n, p) => n + p.total, 0);
   assert.equal(total, surveyChecks(m).length);
-  assert.equal(progress.permissions.total, PD_CHECKS.length);
+  assert.equal(progress.permissions.total, PD_CHECKS.filter((c) => !c.byDesign).length);
   assert.equal(progress.permissions.done, 0);
   const full = sectionProgress(complete());
   for (const p of Object.values(full)) assert.equal(p.done, p.total);

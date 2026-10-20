@@ -1721,7 +1721,8 @@ function designRules(x: RuleInput): RuleResult[] {
         statuses.push("review");
         notes.push("No property record held, so listing, conservation area and Article 4 haven't been checked against the council's maps.");
       }
-      const answers = Object.values(p.pd);
+      // The surveyor's checks only: noise is the design's own check (its rule below), never the survey's.
+      const unanswered = PD_CHECKS.filter((c) => !c.byDesign && !p.pd[c.id]).length;
       const pdLabel = (k: string) => `“${PD_CHECKS.find((c) => c.id === k)?.label ?? k}”`;
       const no = Object.entries(p.pd).filter(([, v]) => v === "no").map(([k]) => pdLabel(k));
       const unsure = Object.entries(p.pd).filter(([, v]) => v === "unsure").map(([k]) => pdLabel(k));
@@ -1729,15 +1730,15 @@ function designRules(x: RuleInput): RuleResult[] {
         statuses.push("review");
         notes.push(`Permitted development answered no: ${no.join("; ")}. This goes down the planning application route.`);
       }
-      if (unsure.length || answers.length < 8) {
+      if (unsure.length || unanswered > 0) {
         statuses.push("review");
-        notes.push(`${unsure.length ? `Unsure: ${unsure.join("; ")}. ` : ""}${answers.length < 8 ? `${8 - answers.length} permitted-development checks unanswered.` : ""}`.trim());
+        notes.push(`${unsure.length ? `Unsure: ${unsure.join("; ")}. ` : ""}${unanswered > 0 ? `${unanswered} permitted-development checks unanswered.` : ""}`.trim());
       }
       if (site?.heatingUse === "cooling-only-intent") {
         statuses.push("review");
         notes.push("They mean to use it only for cooling: permitted development covers heat pumps used for heating.");
       }
-      if (statuses.length === 0) notes.push("No listing, conservation area or Article 4 on the property record, and every permitted-development check answered yes.");
+      if (statuses.length === 0) notes.push("No listing, conservation area or Article 4 on the property record, and every permitted-development check the survey asks answered yes (noise is the design's own check).");
     }
     notes.push("The technical lead confirms the assessment; this isn't a planning decision.");
     add("planning", "Planning constraints", worst(statuses), notes.join(" "));

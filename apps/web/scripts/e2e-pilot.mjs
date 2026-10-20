@@ -811,7 +811,7 @@ try {
     await next("Permissions");
     const yes = m.locator('input[type="radio"][value="yes"]');
     for (let i = 0; i < (await yes.count()); i++) await choose(yes.nth(i));
-    check("all eight PD checks answered", await waitFor(surveyor, /Nothing left to do here/));
+    check("every PD check the surveyor can answer is answered (noise is the design's)", (await yes.count()) === 7 && (await has(surveyor, /Worked out by the design: nothing to answer here/)) && (await waitFor(surveyor, /Nothing left to do here/)));
     await next("Risks");
     await choose(m.locator('input[type="radio"][value="yes"]').nth(0));
     await choose(m.locator('input[type="radio"][value="no"]').nth(1));

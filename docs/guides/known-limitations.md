@@ -468,6 +468,16 @@ says what to do instead. Approvals that need a professional are in
       decision period, conditions to discharge). *Instead:* note the
       application on the planning consent item, and check its conditions
       against the install before approving it.
+    - *The survey's permitted-development answers* (round 10): the noise
+      check is no longer asked at the survey (there's no design yet, and a
+      guessed "Yes" reached the family's survey report); the design's own
+      MCS 020(a) estimate and the technical lead's calculation decide it, and
+      the report says "Worked out in your design". But: *heating use is
+      still asked twice* (Wishes and Permissions; the screen warns when they
+      differ), and the outdoor unit's volume and the number of outdoor units
+      are still the surveyor's answers, checked again by the design. The
+      technical lead's card shows both. *Instead:* answer "Not sure" where
+      the survey can't tell; it only asks the technical lead to look.
     - *Leasehold and rented homes*: the day-1 gate rests on the survey's
       tenure. The quote form only asks "own or rent", so a leaseholder
       learns about the freeholder's consent at the survey, not from the

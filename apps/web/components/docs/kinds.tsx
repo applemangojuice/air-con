@@ -1005,7 +1005,7 @@ export function SurveyReportDoc({ snap, ctx }: { snap: SurveyReportSnapshot; ctx
         />
       </DocSection>
       <DocSection title="Planning checks (permitted development)">
-        <Table head={["Check", "Answer"]} rows={PD_CHECKS.map((c) => [c.label, answer(m.permissions.pd[c.id])])} />
+        <Table head={["Check", "Answer"]} rows={PD_CHECKS.map((c) => [c.label, c.byDesign ? "Worked out in your design" : answer(m.permissions.pd[c.id])])} />
         <p className="text-xs text-ink-500">These are checks, not a planning decision. Where anything is unclear we say so in your proposal.</p>
       </DocSection>
       {(m.assumptions.length > 0 || m.unknowns.length > 0) && (
