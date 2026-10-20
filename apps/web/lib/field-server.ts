@@ -724,7 +724,8 @@ const STANDARD_TOOLS = [
   "Oxygen-free nitrogen, regulator with relief valve",
   "Vacuum pump and digital micron gauge",
   "Manifold gauges and refrigerant scale",
-  "Leak detection spray",
+  "Electronic leak detector rated for R32 (A2L), sensitive to 5 g a year or better",
+  "Leak detection spray (for the nitrogen test)",
   "Thermometer probe for the air temperature split",
   "Multifunction tester (electrician)",
   "Lock-off kit",
@@ -734,8 +735,19 @@ function toolsFor(job: InstallJobV2 | null, measured: MeasuredSurvey | null | un
   const out: { label: string; why?: string }[] = STANDARD_TOOLS.map((label) => ({ label }));
   const steps = job?.runsheet ?? [];
   const sizes = new Set<string>();
-  for (const s of steps) for (const e of s.evidence) if (e.targetKey?.startsWith("torque.")) sizes.add(e.targetKey.slice(7));
+  let unsized = false;
+  for (const s of steps) {
+    for (const e of s.evidence) {
+      if (e.targetKey === "torque.unsized") unsized = true;
+      else if (e.targetKey?.startsWith("torque.")) sizes.add(e.targetKey.slice(7));
+    }
+  }
   if (sizes.size) out.push({ label: `Flare heads: ${[...sizes].sort((a, b) => Number(a) - Number(b)).map((s) => `${s} mm`).join(", ")}`, why: "Pipe sizes on this design" });
+  if (unsized) out.push({ label: "Flare heads for the indoor unit whose pipe sizes aren't in the catalogue", why: "Check its manual for the sizes" });
+  if (steps.some((s) => s.title === "Brazed joint in the pipe run")) {
+    out.push({ label: "Brazing kit, nitrogen purge regulator and brazing rods", why: "A run on this job is longer than one coil" });
+    out.push({ label: "Fire extinguisher and fire blanket", why: "Hot work: a brazed joint" });
+  }
   if (steps.some((s) => s.title === "Condensate" && /pump/.test(s.item ?? ""))) out.push({ label: "Condensate pump and its alarm wiring", why: "A room on this job can't drain by gravity" });
   const access = measured?.outdoor.positions.find((p) => p.chosen && p.accessEquipment !== "none")?.accessEquipment;
   if (access === "tower" || access === "scaffold") out.push({ label: access === "tower" ? "Mobile tower (PASMA)" : "Scaffold, booked", why: "The outdoor position is at height" });
@@ -848,6 +860,8 @@ export async function loadJobPack(projectId: string, staff: StaffMember): Promis
   if (m?.site.decisionMaker) instructions.push(`Decision maker: ${m.site.decisionMaker}`);
   if (m?.site.siteContactPhone) instructions.push(`Site contact: ${m.site.siteContactPhone}`);
   for (const r of m?.rooms ?? []) if (r.routeNote) instructions.push(`${r.name}: ${r.routeNote}`);
+  // The bill of materials' notes the crew must see whatever was ordered (the purchase orders don't carry them).
+  for (const l of variant?.bom ?? []) if (/needs a brazed joint/.test(l.note ?? "")) instructions.push(`${l.note} (${l.label}).`);
   for (const i of await issuesRepo.listForProject(projectId)) {
     if (i.kind === "customer-instruction" && isOpen(i)) instructions.push(`${i.title}${i.detail ? `: ${i.detail}` : ""}`);
   }

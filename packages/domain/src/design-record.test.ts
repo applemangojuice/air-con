@@ -162,6 +162,9 @@ test("one room: a single split on its listed pair, Standard and Quiet", () => {
   assert.equal(d.rooms[0]!.suggestedKw, 2.5);
   assert.deepEqual(d.rooms[0]!.layoutMediaIds, ["photo-r1"]);
   assert.deepEqual(designApprovalErrors(d), []);
+  // Round 9: an outdoor unit whose charge rate the catalogue doesn't have can't be approved (the install day would read "0 g").
+  const unknownCharge = { ...d, variants: d.variants.map((v) => ({ ...v, systems: v.systems.map((x) => ({ ...x, refrigerant: { ...x.refrigerant, chargeKnown: false } })) })) };
+  assert.ok(designApprovalErrors(unknownCharge).some((e) => /no pre-charged pipe length or extra charge per metre/.test(e)));
 });
 
 test("two rooms: one verified multi-split; no acknowledgement needed", () => {

@@ -721,7 +721,7 @@ export interface InstallJobV2 extends InstallJob {
 }
 
 /** Bumped when the template changes; a job keeps the version it was built with. */
-export const INSTALL_TEMPLATE_VERSION: string = "pilot-runsheet-3";
+export const INSTALL_TEMPLATE_VERSION: string = "pilot-runsheet-4";
 
 /** R32 GWP for the F-gas label (tCO2e = kg × 675 / 1000). */
 export const RUNSHEET_GWP = R32_GWP;
@@ -791,6 +791,7 @@ export type TargetKey =
   | "torque.9.52"
   | "torque.12.7"
   | "torque.15.88"
+  | "torque.unsized"
   | "condensate.fall";
 
 export interface TargetDef {
@@ -891,6 +892,14 @@ export const JOB_TARGETS: Record<TargetKey, TargetDef> = {
     unit: "N·m",
     bounds: "min-max",
     hint: "Recalled tables (unverified): Daikin 62-75, Mitsubishi 73.5-78.4, Panasonic 65.",
+  },
+  "torque.unsized": {
+    key: "torque.unsized",
+    label: "Flare torque, pipe size not in the catalogue",
+    unit: "N·m",
+    bounds: "min-max",
+    hint: "An indoor unit on this job has no pipe sizes in the catalogue, so its flares have no torque window. Set it from the manual's torque table for the flare size actually fitted (every unsized flare on this job uses it: if they differ, add the sizes to the catalogue item instead), and add the sizes to the catalogue.",
+    recordOnly: false,
   },
   "condensate.fall": {
     key: "condensate.fall",
@@ -1040,6 +1049,29 @@ function specFromSlot(stepKey: string, s: SlotDef): EvidenceSpec {
   if (s.window) spec.window = s.window;
   return spec;
 }
+
+/**
+ * The leak check of the field joints once the refrigerant is released. R32
+ * manufacturers' manuals (Daikin, Hitachi and others, read through search
+ * extracts only, to be confirmed in each model's manual) ask for field-made
+ * joints indoors to be tightness tested by a method sensitive to 5 g a year
+ * or better, at a pressure of at least 0.25 x PS: in practice an electronic
+ * detector rated for A2L refrigerants. Spray finds bigger leaks only.
+ */
+export const LEAK_CHECK_GUIDANCE =
+  "Check every field joint, indoor and outdoor, with an electronic leak detector rated for R32 (A2L) and sensitive to 5 g a year or better, with the joints at a quarter of the nameplate PS or more (on a cold day, run it in heating). Spray alone isn't enough indoors. A leak: don't top up. Pump the charge down into the outdoor unit (or recover it), re-make the joint, then strength-test, evacuate and decay-test again; mark Fail and the tech lead reviews it.";
+
+/**
+ * A joint in a run longer than one coil (the bill of materials says so).
+ * Daikin's R32 manuals (search extracts, to confirm in each model's manual):
+ * inside an occupied space only permanent joints, except the field joints
+ * at the indoor unit; braze with nitrogen flowing (about 0.02 MPa through a
+ * reducing valve) so no oxide scale forms. Hot-work precautions and the
+ * fire watch's length come from the RAMS and the insurer (secondary sources
+ * give 30 to 60 minutes; HSE's own guidance wasn't reachable).
+ */
+export const BRAZED_JOINT_GUIDANCE =
+  "A run longer than one coil needs a joint. Inside the home only a permanent brazed joint (no flare or reusable mechanical joint in the run: those only at the indoor unit, or a mechanical joint the manual allows). Braze with oxygen-free nitrogen flowing through the pipe at low pressure through a regulator (Daikin's manuals say about 0.02 MPa), so no oxide scale forms inside. It's hot work: clear or shield anything that burns, have an extinguisher and fire blanket at hand, mind smoke alarms, and keep a fire watch after the last flame for as long as the RAMS and the insurer say. Photograph each joint before it's insulated or boxed in.";
 
 const PRESSURE_GUIDANCE =
   "Oxygen-free nitrogen through a regulator with a relief valve, at the manual's test pressure and never above the outdoor unit's nameplate PS. Note the ambient temperature as you apply it, hold for the manual's time, then read the gauge and the temperature again, and bubble-test every joint. The app corrects the end reading to the start temperature (absolute pressure × kelvin ratio) and fails the test if it fell by more than the allowance: no more than the gauge's resolution unless the tech lead set the manual's figure. A failed test is found, fixed and tested again: every reading again.";
@@ -1277,12 +1309,28 @@ export function runsheetFromDesign(
     house.asbestosRisk !== "none-suspected" ||
     measured?.electrics.asbestosFlashGuard === "possible" ||
     measured?.electrics.asbestosFlashGuard === "yes";
+  const surveySuspects =
+    house?.asbestosRisk === "possible" ||
+    house?.asbestosRisk === "suspected" ||
+    measured?.electrics.asbestosFlashGuard === "possible" ||
+    measured?.electrics.asbestosFlashGuard === "yes";
+  const surveyAsbestosWords = [
+    house && (house.asbestosRisk === "possible" || house.asbestosRisk === "suspected") ? `asbestos ${house.asbestosRisk}${house.asbestosNote ? ` (${house.asbestosNote})` : ""}` : "",
+    measured?.electrics.asbestosFlashGuard === "possible" || measured?.electrics.asbestosFlashGuard === "yes" ? `a flash guard in the fuse board that may be asbestos (${measured.electrics.asbestosFlashGuard})` : "",
+  ]
+    .filter(Boolean)
+    .join("; ");
+  // Rooms whose run is longer than one coil: the bill of materials says a brazed joint is needed (hot work).
+  const brazedRooms = new Set(
+    (variant.bom ?? []).filter((l) => /needs a brazed joint/.test(l.note ?? "")).map((l) => (l.note ?? "").split(":")[0]!.trim()),
+  );
   const atHeight = systems.some((s) => s.accessEquipment === "tower" || s.accessEquipment === "scaffold") || Boolean(measured?.risks.workingAtHeight);
   const risks: string[] = [];
   if (atHeight) risks.push("working at height (access equipment on the job)");
   if (needsAsbestosCheck) risks.push(house ? `possible asbestos (house era ${house.era}, survey says ${house.asbestosRisk})` : "asbestos not assessed in the survey");
   if (measured?.site.petsKids) risks.push(`pets or children: ${measured.site.petsKids}`);
   if (measured?.risks.concealedServicesConcern) risks.push("concealed services flagged at survey");
+  if (brazedRooms.size) risks.push(`hot work: a brazed joint in the pipe run to ${[...brazedRooms].join(", ")} (clear what burns, extinguisher and fire blanket, fire watch)`);
 
   const defs: StepDef[] = [];
   const add = (d: StepDef) => defs.push(d);
@@ -1381,9 +1429,13 @@ export function runsheetFromDesign(
       title: "Asbestos check before drilling",
       critical: true,
       allowNa: true,
-      guidance:
-        "Look at every drilling and fixing zone and the fuse board before any hole: textured coatings, old boards, flash guards behind old fuses. Anything suspicious: stop, mark Blocked, and the office arranges a test. Never drill it.",
-      slots: [{ key: "clear", kind: "check", label: "Nothing suspected in any drilling or fixing zone" }],
+      guidance: `Look at every drilling and fixing zone and the fuse board before any hole: textured coatings, old boards, flash guards behind old fuses. Anything suspicious: stop, mark Blocked, and the office arranges a test. Never drill it.${
+        surveySuspects ? ` The survey found: ${surveyAsbestosWords}. Drill only once a test result clears it, or the route avoids it.` : ""
+      }`,
+      slots: [
+        { key: "clear", kind: "check", label: surveySuspects ? "Nothing suspected left in any drilling or fixing zone: what the survey found is cleared or avoided" : "Nothing suspected in any drilling or fixing zone" },
+        ...(surveySuspects ? [{ key: "cleared", kind: "reference" as const, label: "What cleared it: the test result's reference, or \"avoided: route changed\" and how" }] : []),
+      ],
     });
   }
   for (const r of rooms) {
@@ -1505,6 +1557,28 @@ export function runsheetFromDesign(
     });
   }
   for (const r of rooms) {
+    if (!brazedRooms.has(r.name)) continue;
+    add({
+      key: `d2-joint-${r.key}`,
+      phase: 6,
+      day: 2,
+      title: "Brazed joint in the pipe run",
+      item: r.name,
+      roomId: r.id,
+      systemId: r.systemId,
+      requires: "fgas",
+      critical: true,
+      guidance: BRAZED_JOINT_GUIDANCE,
+      slots: [
+        { key: "hotwork", kind: "check", label: "Hot work: anything that burns cleared or shielded, extinguisher and fire blanket at hand" },
+        { key: "nitrogen", kind: "check", label: "Oxygen-free nitrogen flowing through the pipe while brazing, at low pressure through a regulator" },
+        { key: "permanent", kind: "check", label: "Permanent brazed joint: no flare or reusable mechanical joint in the run inside the home" },
+        { key: "joint", kind: "photo", label: "Each joint, and where it is, before it's insulated or boxed in", tag: "pipe-route" },
+        { key: "watch", kind: "check", label: "Fire watch kept after the last flame, for as long as the RAMS says: nothing smouldering" },
+      ],
+    });
+  }
+  for (const r of rooms) {
     const liquid = flareSize(r.indoor?.specs?.liquidPipeMm);
     const gas = flareSize(r.indoor?.specs?.gasPipeMm);
     const flareSlot = (key: string, line: "Liquid" | "Gas", size: FlareSizeMm | null, role: EvidenceRole): SlotDef => {
@@ -1515,14 +1589,15 @@ export function runsheetFromDesign(
         label: `${line} line flares${size ? ` (${size} mm)` : ""}, both ends`,
         unit: "N·m",
         role,
-        ...(size ? { targetKey: torqueTargetKey(size) } : {}),
+        // An unknown size still has a target the tech lead must set, so sign-off waits for it (never a silent pass).
+        targetKey: size ? torqueTargetKey(size) : "torque.unsized",
         ...(cand
           ? { min: cand.min, max: cand.max, window: { basis: "candidate" as const, note: cand.note } }
           : {
               window: RECORD_ONLY(
                 size
                   ? "No verified torque for this make: record the wrench setting. The tech lead sets the window from the manual."
-                  : "Pipe size isn't in the catalogue: check the manual and record the wrench setting.",
+                  : "Pipe size isn't in the catalogue: check the manual and record the wrench setting. The tech lead sets the window from the manual before sign-off.",
               ),
             }),
       };
@@ -1536,7 +1611,11 @@ export function runsheetFromDesign(
       roomId: r.id,
       systemId: r.systemId,
       requires: "fgas",
-      guidance: "Calibrated torque wrench on every flare, indoor and outdoor ends. Record the setting you used for each line.",
+      guidance: `Calibrated torque wrench on every flare, indoor and outdoor ends. Record the setting you used for each line.${
+        (systems.find((x) => x.sel.id === r.systemId)?.rooms.length ?? 1) > 1
+          ? " Multi-split: where the outdoor unit's port is a different size from this pipe, fit the reducer the manual names and tighten its nuts as the manual says (often less than the normal torque), not to this line's window, which is for the field flares."
+          : ""
+      }`,
       slots: [flareSlot("liquid", "Liquid", liquid, "flare-liquid"), flareSlot("gas", "Gas", gas, "flare-gas")],
     });
   }
@@ -1578,12 +1657,14 @@ export function runsheetFromDesign(
       systemId: s.sel.id,
       requires: "electrical",
       critical: true,
-      guidance: `New circuit, notifiable under Part P: done and tested by the registered electrician.${e.routeNote ? ` Route: ${e.routeNote}` : ""} Tell the customer before the power goes off (up to 30 minutes).`,
+      guidance: `New circuit, notifiable under Part P: designed, done and tested by the registered electrician, who confirms the supply (main fuse, existing load, earthing) can take it, and sizes the protective device, its RCD type and the cable for this route (how it's run, insulation, the outside section, length). The design's figures are a starting point: ${e.breaker || "a protective device"}, ${e.cableMm2 || "?"} mm² cable.${e.routeNote ? ` Route: ${e.routeNote}` : ""} The indoor-outdoor interconnect is mains voltage: the cable the manual specifies, terminated as the manual shows, earth first. Tell the customer before the power goes off (up to 30 minutes).`,
       slots: [
         { key: "lockoff", kind: "photo", label: "Supply isolated and locked off before work", tag: "electrical-supply" },
-        { key: "spec", kind: "check", label: `${e.breaker || "Protective device"} fitted, ${e.cableMm2 || "?"} mm² cable as designed` },
+        { key: "spec", kind: "check", label: "Protective device (with the RCD type the manual asks for) and cable fitted as the electrician sized them for this route" },
         { key: "board", kind: "photo", label: "New device in the board, labelled", tag: "fuse-board" },
         { key: "isolator", kind: "photo", label: `${e.isolator || "Isolator"} fitted by the outdoor unit`, tag: "electrical-supply" },
+        { key: "interconnect", kind: "check", label: "Interconnect between the units: the cable the manual specifies, terminals tight, strain relief on, earth connected" },
+        { key: "terminals", kind: "photo", label: "Terminal blocks at the outdoor unit and each indoor unit, before the covers go on", tag: "electrical-supply" },
       ],
     });
   }
@@ -1629,9 +1710,18 @@ export function runsheetFromDesign(
       systemId: s.sel.id,
       requires: "fgas",
       critical: true,
+      guidance: LEAK_CHECK_GUIDANCE,
       slots: [
         { key: "valves", kind: "check", label: "Service valves fully open, caps back on and tight" },
-        { key: "leaks", kind: "check", label: "Every flare leak-checked: no leaks found" },
+        { key: "leaks", kind: "check", label: "Every field joint leak-checked with an electronic R32 (A2L) detector, sensitive to 5 g a year or better: no leaks found" },
+        { key: "detector", kind: "reference", label: "Leak detector used (make and model)" },
+        {
+          key: "pressure",
+          kind: "measurement",
+          label: "Pressure at the joints while leak-checking",
+          unit: "bar g",
+          window: RECORD_ONLY("At least a quarter of the outdoor unit's nameplate PS (the manuals' wording, read through search extracts: confirm in this model's manual). A cold day's standing pressure can be lower: run it in heating and check the high side."),
+        },
       ],
     });
   }
@@ -1681,7 +1771,8 @@ export function runsheetFromDesign(
         {
           key: "added",
           kind: "measurement",
-          label: `Refrigerant added, weighed (design: ${expected} g)`,
+          // With no charge rate in the catalogue, "design: 0 g" would be a figure nobody worked out: say so instead.
+          label: typeof gpm === "number" && typeof pre === "number" ? `Refrigerant added, weighed (design: ${expected} g)` : "Refrigerant added, weighed (no charge rate in the catalogue: work it out from the manual)",
           unit: "g",
           role: "additional-charge",
           ...(maxAddedG !== undefined ? { max: maxAddedG } : {}),
@@ -1756,6 +1847,7 @@ export function runsheetFromDesign(
     slots: [
       { key: "eic", kind: "reference", label: "EIC number", role: "eic-ref" },
       { key: "scheme", kind: "reference", label: "Scheme notification reference, or \"pending from scheme\"", role: "scheme-ref" },
+      { key: "scope", kind: "check", label: "The certificate covers the new circuit, the isolator and the indoor-outdoor interconnects" },
     ],
   });
   add({

@@ -989,3 +989,68 @@ test("photoGroups: finished work first, then the latest work, grouped by step; a
   );
   assert.equal(groups[3]!.photos[0]!.label, "Extra DEMO photo");
 });
+
+/* ---------------- round 9: the runsheet's refrigeration and electrical checks ---------------- */
+
+test("round 9: a flare whose pipe size isn't in the catalogue still has a target the tech lead must set before sign-off", () => {
+  const cat = [...CATALOGUE, item({ id: "in-nosize", kind: "indoor", manufacturer: "Daikin", model: "DEMO-FTX50-NOSIZE", label: "DEMO unit with no pipe sizes", specs: {} })];
+  const steps = runsheetFromDesign(design(1, "single", { indoor: "in-nosize" }), "v-std", cat);
+  const flares = steps.find((s) => s.title === "Flares and torque")!.evidence;
+  assert.ok(flares.every((e) => e.targetKey === "torque.unsized" && e.min === undefined && e.max === undefined));
+  assert.ok(unconfirmedTargets(steps).includes("torque.unsized"), "the review's gap: it never reached the tech lead");
+  const t = jobTargets(steps).find((x) => x.key === "torque.unsized")!;
+  assert.equal(t.def.recordOnly, false, "a number from the manual, never record only");
+});
+
+test("round 9: the leak check names the method and records the detector and the pressure; a leak means pump down, re-make, retest", () => {
+  const steps = runsheetFromDesign(design(1, "single"), "v-std", CATALOGUE);
+  const release = steps.find((s) => s.title === "Release and leak check")!;
+  assert.match(release.evidence.find((e) => e.label.startsWith("Every field joint"))!.label, /electronic R32 \(A2L\) detector, sensitive to 5 g a year/);
+  assert.ok(release.evidence.some((e) => e.kind === "reference" && /Leak detector used/.test(e.label)));
+  const p = release.evidence.find((e) => /Pressure at the joints/.test(e.label))!;
+  assert.equal(p.unit, "bar g");
+  assert.match(p.window?.note ?? "", /quarter of the outdoor unit's nameplate PS/);
+  assert.match(release.guidance ?? "", /don't top up\. Pump the charge down/);
+});
+
+test("round 9: a run longer than one coil gets an F-gas brazed joint step with the hot-work checks, and the RAMS names the hot work", () => {
+  const d = design(2, "single");
+  d.variants[0]!.bom = [{ sku: "pipe-14-12-15m", label: "Pipe pair 1/4 + 1/2, 15 m coil", qty: 2, category: "materials", note: "Living room: 22 m run: longer than one coil, needs a brazed joint" }];
+  const steps = runsheetFromDesign(d, "v-std", CATALOGUE);
+  const joints = steps.filter((s) => s.title === "Brazed joint in the pipe run");
+  assert.deepEqual(joints.map((s) => s.item), ["Living room"]);
+  assert.equal(joints[0]!.requires, "fgas");
+  assert.equal(joints[0]!.critical, true);
+  assert.ok(["Hot work", "Oxygen-free nitrogen", "Permanent brazed joint", "Fire watch"].every((w) => joints[0]!.evidence.some((e) => e.label.startsWith(w))));
+  assert.ok(joints[0]!.evidence.some((e) => e.kind === "photo"));
+  assert.match(steps.find((s) => s.id === "d1-rams")!.guidance ?? "", /hot work: a brazed joint in the pipe run to Living room/);
+  assert.equal(runsheetFromDesign(design(2, "single"), "v-std", CATALOGUE).some((s) => s.title === "Brazed joint in the pipe run"), false, "no joint, no step");
+});
+
+test("round 9: the circuit step asks the electrician to size it for the route and checks the interconnect; the EIC's scope is confirmed", () => {
+  const steps = runsheetFromDesign(design(1, "single"), "v-std", CATALOGUE);
+  const el = steps.find((s) => s.title === "Electrical circuit")!;
+  assert.ok(!el.evidence.some((e) => /as designed/.test(e.label)), "the design's cable size is a starting point, not the spec");
+  assert.match(el.guidance ?? "", /supply \(main fuse, existing load, earthing\) can take it/);
+  assert.ok(el.evidence.some((e) => /RCD type the manual asks for/.test(e.label)));
+  assert.ok(el.evidence.some((e) => e.kind === "check" && /^Interconnect between the units/.test(e.label)));
+  assert.ok(el.evidence.some((e) => e.kind === "photo" && /Terminal blocks/.test(e.label)));
+  assert.ok(steps.find((s) => s.id === "d3-eic")!.evidence.some((e) => /covers the new circuit, the isolator and the indoor-outdoor interconnects/.test(e.label)));
+});
+
+test("round 9: suspected asbestos at the survey: the day-1 check says what was found and records what cleared it", () => {
+  const sus = runsheetFromDesign(design(1, "single"), "v-std", CATALOGUE, measured({ era: "pre-1930", asbestosRisk: "suspected", asbestosNote: "DEMO Artex ceiling on the pipe route" }));
+  const asb = sus.find((s) => s.id === "d1-asbestos")!;
+  assert.match(asb.guidance ?? "", /The survey found: asbestos suspected \(DEMO Artex ceiling on the pipe route\)/);
+  assert.ok(asb.evidence.some((e) => e.kind === "reference" && /What cleared it/.test(e.label)));
+  const older = runsheetFromDesign(design(1, "single"), "v-std", CATALOGUE, measured({ era: "1930-1950" }));
+  assert.equal(older.find((s) => s.id === "d1-asbestos")!.evidence.length, 1, "nothing suspected: the plain check");
+});
+
+test("round 9: no charge rate in the catalogue reads as unknown, never 'design: 0 g'", () => {
+  const cat = CATALOGUE.map((c) => (c.id === "out-1" ? { ...c, specs: {} } : c));
+  const steps = runsheetFromDesign(design(1, "single"), "v-std", cat);
+  const added = steps.find((s) => s.title === "F-gas label and charge record")!.evidence.find((e) => e.role === "additional-charge")!;
+  assert.match(added.label, /no charge rate in the catalogue: work it out from the manual/);
+  assert.doesNotMatch(added.label, /design: 0 g/);
+});

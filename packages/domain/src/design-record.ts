@@ -2141,6 +2141,11 @@ export function designApprovalErrors(design: DesignRecord): string[] {
       if (!v.systems.some((s) => s.roomIds.includes(r.roomId))) out.push(`${prefix}${r.roomName} isn't connected to an outdoor unit.`);
     }
     for (const s of v.systems) for (const e of s.compatibility.errors) out.push(`${prefix}${e}`);
+    // The refrigerant to add is worked out from the pre-charged length and the grams per metre: without them the
+    // install day would be told "design: 0 g". The technical lead adds them from the manual first.
+    if (v.systems.some((s) => s.refrigerant?.chargeKnown === false)) {
+      out.push(`${prefix}the catalogue has no pre-charged pipe length or extra charge per metre for an outdoor unit here: add them from the installation manual (Catalogue → the item) before approving.`);
+    }
   }
   for (const d of designDeviations(design)) {
     const o = design.overrides.find((x) => x.field === d.field && x.to === d.to);
