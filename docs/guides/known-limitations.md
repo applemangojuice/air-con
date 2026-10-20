@@ -60,6 +60,9 @@ says what to do instead. Approvals that need a professional are in
     - captures wait for the person who made them: one still waiting when its
       author signs out sends only when they sign in on that phone again,
       never under the next person's name;
+    - rarely, a screen doesn't show the result of what you just did (seen
+      once in testing, after publishing the handover pack): pull down to
+      refresh, or open the job again;
     - commissioning can't be signed while anything for that job is still on
       the signer's phone, or over a reading that reached the server after
       the screen loaded (reload and check, then sign);

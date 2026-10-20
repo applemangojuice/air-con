@@ -1,14 +1,17 @@
 # Test results
 
-The latest real results of every automatic check, run on **19 October
-2026** on branch `claude/pilot-ops` at commit `9ef0a25` (the go-live pack
-merged with the Supabase compatibility work, the six fixes from the final
-pre-launch review [below](#what-the-final-review-found), and the nine from
-round 3 of that review [below](#what-round-3-found)). Everything was run
-**twice, start to finish, and passed both times**. Every person, home and
-price the browser walks use is fictional and labelled DEMO.
+The latest real results of every automatic check, run on the night of
+**19 to 20 October 2026** on branch `claude/pilot-ops` at commit `4d9c16b`
+(the go-live pack merged with the Supabase compatibility work, the six
+fixes from the final pre-launch review [below](#what-the-final-review-found),
+the nine from round 3 [below](#what-round-3-found) and the nine from round 4
+[below](#what-round-4-found)). Everything was run **twice, start to finish,
+and passed both times** (in round 2 the Supabase-shaped run stopped once on
+a field-app screen this round didn't touch and passed when run again: see
+below). Every person, home and price the browser walks use is fictional
+and labelled DEMO.
 
-**Summary: everything passed, on both databases.** 895 unit tests, the type
+**Summary: everything passed, on both databases.** 909 unit tests, the type
 check, the production build (Next.js 15.5.28), every database migration
 check (110 assertions) and the upgrade file check; then the browser walks on
 **both** backends: on the local file database, 193 end-to-end pilot checks
@@ -18,26 +21,43 @@ database's default grants as a project created today has them), the same
 193 and 23, the property book importers over 3,000 homes, and 439 checks
 across 284 screens, with no statement refused by the database.
 
-| Check | Command | Result | Round 1 (UTC) | Round 2 (UTC) |
+| Check | Command | Result | Round 1 (UTC, 20 Oct) | Round 2 (UTC, 20 Oct) |
 | --- | --- | --- | --- | --- |
-| Type check (domain, web, mobile) | `pnpm -r typecheck` | **Pass** (3 of 3 projects) | 21:26 | 21:44 |
-| Domain unit tests | `pnpm test` | **457 of 457 pass**, 0 fail (29 test files) | 21:26 to 21:27 | 21:44 |
-| Web unit tests | `pnpm test` | **438 of 438 pass**, 0 fail (50 test files) | 21:26 to 21:27 | 21:44 |
-| Production build | `pnpm --filter @aircon/web build` | **Pass**: Next.js 15.5.28, compiled, 34 of 34 static pages generated | 21:27 to 21:28 | 21:44 to 21:46 |
-| Database migrations | `bash supabase/tests/run-migrations.sh` | **Pass**: 15 migrations and the pilot upgrade bundle; the local backend's schema matches; 110 sanity assertions | 21:28 | 21:46 |
-| Upgrade file is current | `bash supabase/build-pilot-upgrade.sh --check` | **Pass**: `pilot-upgrade.sql` is current (0010 to 0014) | 21:28 | 21:46 |
-| Pilot walk, **local file database** | `node scripts/e2e-pilot.mjs` | **193 of 193 pass** | 21:28 to 21:33 | 21:46 to 21:50 |
-| Quote form walk, **local file database** | `node scripts/e2e-funnel.mjs` | **23 of 23 pass** | 21:33 | 21:50 |
-| Pilot walk, **Supabase-shaped** | `bash supabase/tests/compat/run-compat-e2e.sh` | **193 of 193 pass** | 21:33 to 21:43 | 21:51 to 22:01 |
+| Type check (domain, web, mobile) | `pnpm -r typecheck` | **Pass** (3 of 3 projects) | 00:04 | 00:21 |
+| Domain unit tests | `pnpm test` | **460 of 460 pass**, 0 fail (29 test files) | 00:04 to 00:05 | 00:21 to 00:22 |
+| Web unit tests | `pnpm test` | **449 of 449 pass**, 0 fail (50 test files) | 00:04 to 00:05 | 00:21 to 00:22 |
+| Production build | `pnpm --filter @aircon/web build` | **Pass**: Next.js 15.5.28, compiled, 34 of 34 static pages generated | 00:05 to 00:06 | 00:22 to 00:23 |
+| Database migrations | `bash supabase/tests/run-migrations.sh` | **Pass**: 15 migrations and the pilot upgrade bundle; the local backend's schema matches; 110 sanity assertions | 00:06 | 00:23 |
+| Upgrade file is current | `bash supabase/build-pilot-upgrade.sh --check` | **Pass**: `pilot-upgrade.sql` is current (0010 to 0014) | 00:06 | 00:23 |
+| Pilot walk, **local file database** | `node scripts/e2e-pilot.mjs` | **193 of 193 pass** | 00:06 to 00:11 | 00:23 to 00:27 |
+| Quote form walk, **local file database** | `node scripts/e2e-funnel.mjs` | **23 of 23 pass** | 00:11 | 00:28 |
+| Pilot walk, **Supabase-shaped** | `bash supabase/tests/compat/run-compat-e2e.sh` | **193 of 193 pass** | 00:11 to 00:21 | 00:39 to 00:47 (see below) |
 | Quote form walk, **Supabase-shaped** | (same run) | **23 of 23 pass** | (same run) | (same run) |
 | Property book import, **Supabase-shaped** | (same run) | **Pass**: 3,000 homes, 900 in a conservation area, 3,000 classified (three times Max Rows) | (same run) | (same run) |
 | Every screen, **Supabase-shaped** | (same run) | **439 of 439 pass**: 284 pages over 212 routes, 141 requests with ids that aren't there, a NUL in the quote form, 4 CSV exports, 4 daily jobs | (same run) | (same run) |
 | Database and app logs, **Supabase-shaped** | (same run) | **Clean**: no statement refused by Postgres, no PostgREST or Storage error in the app's log | (same run) | (same run) |
 
-Both rounds ran on commit `9ef0a25` itself (only this document changed
-after it). Before that commit, the same walks also passed once on the
-working tree while the fixes were being made (193, 23, 3,000 / 900 / 3,000
-and 439 of 439).
+Both rounds ran on commit `4d9c16b` itself (only this document changed
+after it), each from a fresh build and a fresh, empty local data folder.
+
+**One stop in round 2, then a pass.** The first Supabase-shaped run of
+round 2 (00:28 to 00:38) stopped in the pilot walk at phase J, "handover
+pack published": the crew phone published the pack (the server answered
+200 and the screen said "Published"), but the page's refresh was cut off
+part-way (`net::ERR_ABORTED`), most likely by the screen's own
+refresh-after-sync landing at the same moment, so the screen kept its old
+header and the sign-off stayed greyed out. Everything else in that run
+passed (23 of 23, 3,000 / 900 / 3,000, 439 of 439, clean logs). The
+handover screen and its refresh weren't changed in this round, and the same
+step passed in every other walk of this round (four on this commit, two on
+the working tree). Run again on the same build (00:39 to 00:47), everything
+passed. On a real phone the fix is to pull down to refresh, or open the job
+again.
+
+Before that commit, the same walks also passed once on the working tree
+while the fixes were being made (193 and 23 on the local file database
+from 23:41 to 23:46 on 19 October; 193, 23, 3,000 / 900 / 3,000 and 439 of
+439 on the Supabase-shaped stack from 23:49 to 23:58).
 
 Set-up for the local walks: a production build (`next start`) on the local
 file database (which enforces the same schema Postgres does), a fresh
@@ -49,10 +69,90 @@ supabase-js with the service-role key, as a demo deployment
 **Admin break-glass**. Node 22.22.0, pnpm 10.12.1, PostgreSQL 16.15,
 PostgREST 12.2.3.
 
+## What round 4 found
+
+A fourth pass of the pre-launch review found nine more problems. All nine
+are fixed in `4d9c16b`, each with unit tests that fail without the fix
+(architecture §K40):
+
+- **Issuing a proposal could email an older price than the one on the
+  screen.** The builder works its prices out on today's catalogue and
+  settings, but **Issue** sent the draft as last saved: after a supplier
+  price or a labour rate changed, the family was emailed yesterday's
+  figure (on a cost-plus option, hundreds of pounds less) and the
+  minimum-margin check ran on yesterday's costs. Issuing now reprices
+  every option exactly as a save does, the builder sends the figures it
+  showed, and nothing is issued if they differ (it says what changed).
+  Opening the builder after such a change saves today's figures straight
+  away and says so. (New test: a £300 rise in a unit's cost after the
+  draft was saved; issuing on the old figures is refused, issuing on
+  today's sends today's price in the email and the frozen document, and a
+  fixed price whose margin falls below the minimum on today's costs is
+  refused. A browser check on the local build did the same through the
+  catalogue and the builder: £7,820 on screen, £7,820 in the email.)
+- **A typo in a family's name, address or postcode couldn't be put right**,
+  although both guides said **Edit contact and access** fixes the name.
+  It now has the name, the first line of the address and the postcode
+  (checked like **New pilot**, never blank); the change is logged, the
+  board and the Pilots page follow, and documents already issued keep the
+  details they were issued with (the guides say so). (New tests.)
+- **After a cancellation and its refund, the money page offered a new
+  deposit invoice**, and one click emailed the family who had cancelled a
+  fresh bill with bank details. Once a contract is cancelled nothing more
+  can be invoiced (only refunds and credit notes); a deposit that was paid
+  and then refunded never makes way for a fresh one; and the family's page
+  shows the refunded invoice as **refunded**, not "due" on its old date.
+  (New test on DEMO 3: cancel, refund the deposit, then every kind of
+  invoice is refused and nothing is emailed.)
+- **Correcting a wrong email after the proposal had gone let the family
+  accept a contract whose pre-contract information they never got.** A
+  new address on an issued proposal now clears the record that the
+  information was delivered (it went to someone else), and acceptance
+  also needs their agreement to documents at the new address. They can
+  accept once they've agreed and the proposal email has gone to the new
+  address (**Messages** → **Send again**); the guides say how. (New
+  tests.)
+- **A cancellation that arrived after the cancellation period still
+  emailed a written promise of a full refund and collection.** Recording
+  one now warns the office first; the family is told only that we've
+  received it and will be in touch in writing; their page promises no
+  refund; and a task to take advice replaces the refund and collection
+  tasks. (New tests, including the London day deciding the period across
+  the clocks going back on 25 October 2026: 23:30 BST on the last day is
+  inside, 00:30 BST the next morning, still the 24th in UTC, is outside.)
+- **After a cancellation, the family's page still showed the install as
+  happening** ("Install, now, Mon 26 Oct", the day-by-day plan, the
+  power-off warning) and aftercare as done. The page now says **Your
+  contract is cancelled**, with when it reached us, the refund and its
+  date and the collection (or, after the period, only that we'll be in
+  touch); the stages that won't happen show **cancelled** with no date,
+  their panels show the cancellation instead of plans, and the contract
+  total reads cancelled. (New tests, and a browser check on the local
+  build: no page errors.)
+- **Removing a project's email didn't sign out the person who owned it**:
+  a sign-in from before the change kept the household's page, photos and
+  actions for up to 30 days. Access now follows the project as it stands,
+  never the list saved in the sign-in. (New test, and a browser check: the
+  old sign-in gets the sign-in page and a 404 for the photos.)
+- **Anyone could use up the day's email quota in about a minute** by
+  posting quotes with made-up addresses and starting projects from them,
+  after which proposal, contract and sign-in emails failed until the next
+  day. The emails anyone can trigger from the website now come from a
+  shared daily budget, per London day and per hour, well under the email
+  plan's 100 a day (known limitation 26); the office's own emails are
+  never held back. (New tests, including the budget's day across the
+  25-hour day the clocks go back.)
+- **The website's analytics beacon stored anything it was sent**: one IP
+  could write gigabytes a minute and fill the database. A beacon is now at
+  most 4 KB of flat facts, the user agent is trimmed, at most 20,000
+  events are kept a day, and quote and draft bodies are capped too.
+  (New tests, and on the local build a 4 MB beacon is refused with 413
+  and stores nothing.)
+
 ## What round 3 found
 
 A third pass of the pre-launch review found nine more problems. All nine
-are fixed in `9ef0a25`, each with unit tests that fail without the fix
+are fixed in `9ef0a25` (and stayed fixed in `4d9c16b`), each with unit tests that fail without the fix
 (architecture §K39):
 
 - **Retrying a message after correcting a wrong email sent it to the old
@@ -317,7 +417,9 @@ pilot walks, two quote-form walks and one screen walk per round).
 - The real outside services: these walks use demo email and texts (recorded,
   not sent) and the DEMO card simulator, not Resend, Twilio or Stripe.
   After going live, send yourself a test email and walk the quote form once
-  on the live site (`/ops/launch` lists it).
+  on the live site (`/ops/launch` lists it). With no email provider the
+  public email budget is never spent, so the walks don't exercise it: unit
+  tests do, with a stand-in provider.
 - A real Supabase project: the Supabase-shaped run uses the same database,
   PostgREST version and Storage API calls, on this machine, but not
   Supabase's own servers, their network delays or their photo storage.
