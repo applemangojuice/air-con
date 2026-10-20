@@ -115,6 +115,24 @@ export default async function MoneyPage({ params }: { params: Promise<{ id: stri
         )}
       </Section>
 
+      {payments.some((x) => x.status === "failed" && x.amountPence < 0) && (
+        <div role="alert" className="mt-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
+          <p className="font-semibold">A card refund didn&apos;t go through</p>
+          <ul className="mt-1 list-disc space-y-1 pl-5">
+            {payments
+              .filter((x) => x.status === "failed" && x.amountPence < 0)
+              .map((x) => (
+                <li key={x.id}>
+                  <Money pence={-x.amountPence} /> on {fmtDate(x.receivedAt)} ({x.reference ?? x.providerRef}): {x.note ?? "it failed at Stripe."}
+                </li>
+              ))}
+          </ul>
+          <p className="mt-1">
+            It&apos;s kept here as failed and counts for nothing. {s.outstandingPence < 0 ? <>They&apos;re <Money pence={-s.outstandingPence} /> in credit: refund it again, in Stripe or by bank transfer (Record a refund on the invoice they paid).</> : "Check with the family, then refund again if it's still owed."}
+          </p>
+        </div>
+      )}
+
       {p.cancellation && <CancellationChargeSection project={p} invoices={invoices} />}
 
       {/* New invoice */}
@@ -170,7 +188,7 @@ export default async function MoneyPage({ params }: { params: Promise<{ id: stri
                   <li key={pay.id} className="flex flex-col gap-2 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
                     <div className="min-w-0">
                       <p className="font-semibold text-ink-900">
-                        <Money pence={pay.amountPence} /> {pay.amountPence < 0 ? "refunded" : "received"}
+                        <Money pence={pay.amountPence} /> {pay.status === "failed" ? (pay.amountPence < 0 ? "refund failed: not sent" : "failed") : pay.amountPence < 0 ? "refunded" : "received"}
                         {inv ? ` · ${inv.number}` : ""}
                       </p>
                       <p className="text-sm text-ink-500">

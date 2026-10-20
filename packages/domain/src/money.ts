@@ -124,7 +124,11 @@ export interface Payment {
   providerRef: string;
   /** Negative for a refund we made. */
   amountPence: number;
-  /** A refund we made is recorded as a negative amount with status "refunded". */
+  /**
+   * A refund we made is recorded as a negative amount with status "refunded";
+   * one that failed at the provider afterwards (or was never made) is
+   * "failed", and counts for nothing.
+   */
   status: "succeeded" | "pending" | "failed" | "refunded";
   receivedAt: string;
   recordedBy?: string;
@@ -150,6 +154,14 @@ export interface Payment {
    * are treated as applied.
    */
   pendingApply?: boolean;
+  /**
+   * A refund the card provider later reported as failed or cancelled (§K45):
+   * the row stays (status `failed`, never counted), with when and why, and
+   * when the project's totals took it back (`refund-failed`).
+   */
+  failedAt?: string;
+  failureReason?: string;
+  reversedOnProjectAt?: string;
 }
 
 /** "DIH", 1 → "DIH-0001". Pads to four digits and never truncates past them. */

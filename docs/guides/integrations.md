@@ -154,8 +154,12 @@ database holding a real customer, and `/ops/launch` turns red.
   endpoint** → `https://<your-domain>/api/stripe/webhook` with the events
   `checkout.session.completed`, `checkout.session.async_payment_succeeded`,
   `checkout.session.async_payment_failed`, `charge.refunded`,
-  `charge.refund.updated`, `charge.dispute.created`,
+  `charge.refund.updated`, `refund.created`, `refund.updated`,
+  `refund.failed`, `charge.dispute.created`,
   `charge.dispute.closed` → copy its **Signing secret** (`whsec_…`).
+  The `refund.*` events are how a refund that fails after it was sent
+  (an expired card, a closed account) comes back: the app marks it failed
+  and shows the money as owed back again.
 - **Test (sandbox):** an `sk_test_…` key. The strip says **TEST MODE**; use
   Stripe's test card numbers; no money moves.
 - **Live:** an `sk_live_…` key and a live-mode webhook.

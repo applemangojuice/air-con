@@ -332,6 +332,15 @@ The project → **Invoices and payments** (the Money page).
   refuses).
 - A wrong amount or a refund by bank transfer: **Record a refund**, or a
   credit note. Payments are never deleted, so the history stays honest.
+- **A card refund that failed at Stripe** (an expired card, a closed
+  account): you get an urgent email, and the money page shows a red box,
+  **A card refund didn't go through**. The refund is kept, marked failed;
+  their invoice reads as paid again and they're in credit by that amount
+  (what's owed back to them). Tell the family, then refund it again: in
+  Stripe if their card works now (it records itself), or by bank transfer
+  to an account they give you, recorded with **Record a refund** on the
+  invoice they paid (How: Bank transfer). The credit note that went with
+  the first refund stays.
 - Bank details: families only ever see them on their project page and the
   invoice. Never change them because an email asks; tell families you'll
   never ask them to pay a different account by email.

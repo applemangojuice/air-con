@@ -1279,9 +1279,22 @@ export interface StripeRefundInput {
   status: string;
   refundedAt: string;
   reason?: string;
+  /** Stripe's failure_reason, for a failed or cancelled one. */
+  failureReason?: string;
   invoiceId?: string;
   eventId: string;
 }
+
+/** Stripe's failure reasons, in the office's words. */
+const STRIPE_FAILURE: Record<string, string> = {
+  lost_or_stolen_card: "the card was reported lost or stolen",
+  expired_or_canceled_card: "the card has expired or been cancelled",
+  charge_for_pending_refund_disputed: "the payment is being disputed",
+  insufficient_funds: "there wasn't enough in our Stripe balance",
+  declined: "the card's bank declined it",
+  merchant_request: "it was cancelled from our side",
+  unknown: "Stripe didn't say why",
+};
 
 const STRIPE_REASON: Record<string, string> = {
   requested_by_customer: "the customer asked",
@@ -1321,22 +1334,10 @@ export async function recordStripeRefund(refund: StripeRefundInput): Promise<Out
   const projectId = original.projectId;
   const already = await paymentsRepo.getByProviderRef(providerRef);
   if (refund.status === "failed" || refund.status === "canceled") {
-    if (already) {
-      await notify("team-alert", {
-        projectId,
-        data: {
-          title: `A refund failed at Stripe: ${money(refund.amountPence)}`,
-          lines: [
-            `Stripe says refund ${refund.refundId} ${refund.status === "failed" ? "failed" : "was cancelled"}, so the money didn't go back to the customer.`,
-            "It was recorded here while it was pending, with a credit note. Don't refund it again or record it by hand (either counts it twice, and the form refuses the money while the credit note covers it): ask the developer to reverse the recorded refund and its credit note, then sort it out with the customer.",
-          ],
-          urgent: true,
-        },
-        discriminator: `stripe-refund-failed:${refund.refundId}`,
-      });
-    }
-    return { ok: true, value: { recorded: false }, message: `Refund ${refund.status}: nothing recorded.` };
+    return failStripeRefund(refund, original, already);
   }
+  // Once failed, always failed: an older "pending" or "succeeded" arriving late (Stripe doesn't promise order) changes nothing.
+  if (already?.status === "failed") return { ok: true, value: { payment: already, recorded: false }, message: "That refund already failed: nothing changed." };
   if (refund.status !== "succeeded" && refund.status !== "pending") {
     return { ok: true, value: { recorded: false }, message: `Refund ${refund.status}: not yet.` };
   }
@@ -1391,6 +1392,121 @@ export async function recordStripeRefund(refund: StripeRefundInput): Promise<Out
     });
   }
   return { ok: true, value: { payment: result.value.payment, recorded: true, ...(result.value.creditNote ? { creditNote: result.value.creditNote } : {}) }, ...(result.warning ? { warning: result.warning } : {}) };
+}
+
+/**
+ * A refund Stripe now says failed or was cancelled (refund.failed, or
+ * refund.updated / charge.refund.updated with that status): the money never
+ * left, or came back to our balance (§K45).
+ *
+ *  * Recorded while pending: the refund row is marked `failed` (kept, with
+ *    when and why, never deleted), so its invoice is re-settled without it
+ *    (paid again), and the project's totals take it back once
+ *    (`refund-failed`, which tells the family). A credit note that went with
+ *    it stays: it says they don't owe that money, which is still true, and
+ *    with the refund gone it's credit on their account, the money owed back
+ *    to them, shown on the money page as "In credit". No reversal is issued,
+ *    since none is needed for the books to stay true.
+ *  * Never recorded (it failed before we saw it pending): a `failed` row is
+ *    kept as the record, counting for nothing, so a late "pending" for the
+ *    same refund can't record money that never moved.
+ *  * Either way, an urgent team alert with the next steps. Safe to repeat.
+ */
+async function failStripeRefund(refund: StripeRefundInput, original: Payment, already: Payment | null): Promise<Outcome<{ payment?: Payment; recorded: boolean; creditNote?: Invoice }>> {
+  const projectId = original.projectId;
+  const providerRef = `stripe-refund:${refund.refundId}`;
+  const now = new Date().toISOString();
+  const why = refund.failureReason ? (STRIPE_FAILURE[refund.failureReason] ?? refund.failureReason.replace(/_/g, " ")) : null;
+  const word = refund.status === "canceled" ? "was cancelled" : "failed";
+  const note = `Stripe says this refund ${word}${why ? ` (${why})` : ""}: the money didn't reach the customer.`;
+  const invoice = original.invoiceId ? await invoicesRepo.get(original.invoiceId) : null;
+  const warnings: string[] = [];
+  let payment: Payment | undefined;
+
+  if (!already) {
+    // Never counted: keep the attempt on record as failed, so nothing records it later.
+    const kept = await recordPayment(
+      {
+        projectId,
+        ...(original.invoiceId ? { invoiceId: original.invoiceId } : {}),
+        method: "card",
+        provider: "stripe",
+        providerRef,
+        amountPence: -refund.amountPence,
+        status: "failed",
+        receivedAt: refund.refundedAt,
+        recordedBy: "Stripe",
+        reference: refund.refundId,
+        note,
+        eventId: refund.eventId,
+        failedAt: now,
+        ...(refund.failureReason ? { failureReason: refund.failureReason } : {}),
+      },
+      { kind: "system", name: "Stripe" },
+    );
+    if (kept.ok) payment = kept.value.payment;
+  } else {
+    payment = already;
+    if (already.status !== "failed") {
+      payment = await paymentsRepo.update({
+        ...already,
+        status: "failed",
+        failedAt: now,
+        ...(refund.failureReason ? { failureReason: refund.failureReason } : {}),
+        note: [already.note, note].filter(Boolean).join(" · "),
+      });
+      await audit({
+        actor: { kind: "system", name: "Stripe" },
+        action: "payment.refund-failed",
+        entity: "payment",
+        entityId: already.id,
+        detail: { projectId, refundId: refund.refundId, amountPence: refund.amountPence, status: refund.status, failureReason: refund.failureReason ?? null },
+      });
+    }
+    // The invoice, without the refund (it's paid again).
+    if (already.invoiceId) {
+      const pays = await paymentsRepo.listForInvoice(already.invoiceId);
+      const res = await mutateRow<Invoice>("invoices", already.invoiceId, invoicesRepo, (cur) => ({ ok: true, value: settleInvoice(cur, pays) }));
+      if (!res.ok) warnings.push(`the invoice didn't update (${res.error})`);
+    }
+    // The project's totals take it back once (it was counted when the refund was recorded).
+    const counted = Boolean(already.recordedOnProjectAt) || (await loadProject(projectId))?.money.paymentIds?.includes(already.id);
+    if (counted && !payment.reversedOnProjectAt) {
+      const r = await dispatch(projectId, { type: "refund-failed", amountPence: refund.amountPence, paymentId: already.id }, { kind: "system", name: "Stripe" });
+      if (!("error" in r) || r.error === PAYMENT_ALREADY_COUNTED) {
+        payment = await paymentsRepo.update({ ...((await paymentsRepo.get(already.id)) ?? payment), reversedOnProjectAt: now });
+      } else {
+        warnings.push(`the project's totals didn't take it back (${r.error}): Stripe will send it again`);
+      }
+    }
+  }
+
+  const all = await invoicesRepo.listForProject(projectId);
+  const inCredit = Math.max(0, -outstandingPence(all));
+  const project = await loadProject(projectId);
+  const deadline = project?.cancellation?.withinPeriod ? project.cancellation.refundDueBy : null;
+  await notify("team-alert", {
+    projectId,
+    data: {
+      title: `A card refund ${word} at Stripe: ${money(refund.amountPence)}${invoice ? ` on ${invoice.number}` : ""}`,
+      lines: [
+        `${note} Refund ${refund.refundId}.`,
+        already
+          ? `It's marked failed here (kept, not deleted), so ${invoice ? `${invoice.number} shows it paid again` : "the invoice shows it paid again"} and the family's page says it didn't go through.${inCredit > 0 ? ` They're ${money(inCredit)} in credit: that's what's owed back to them.` : ""} Any credit note that went with it stays: it's what makes the money theirs.`
+          : "It was never recorded here as a refund, so nothing changes on their money page: the money is still with us.",
+        `Next: 1) contact the family${project?.customer.phone ? ` (${project.customer.phone})` : ""} and tell them; 2) refund it again, in Stripe if their card works now (it records itself), or by bank transfer to an account they give you, then on the money page "Record a refund" on ${invoice?.number ?? "the invoice they paid"} (How: Bank transfer). Don't refund the same money twice.${deadline ? ` The cancellation refund was due by ${deadline}: do it now.` : ""}`,
+        ...warnings.map((w) => `Not finished: ${w}.`),
+      ],
+      urgent: true,
+    },
+    discriminator: `stripe-refund-failed:${refund.refundId}`,
+  });
+  return {
+    ok: true,
+    value: { ...(payment ? { payment } : {}), recorded: false },
+    message: `Refund ${refund.status}: ${already ? "taken back" : "nothing recorded"}.`,
+    ...(warnings.length ? { warning: warnings.join("; ") } : {}),
+  };
 }
 
 /** A chargeback opened or settled at Stripe: the team must hear at once (the evidence has a deadline). */

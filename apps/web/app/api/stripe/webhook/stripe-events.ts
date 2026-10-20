@@ -10,10 +10,16 @@
  *  * checkout.session.async_payment_succeeded → record it.
  *  * checkout.session.async_payment_failed → tell the team, record nothing.
  *  * charge.refunded (a Charge), charge.refund.updated, refund.created,
- *    refund.updated (a Refund) → record each refund made in Stripe's
- *    dashboard against the payment it came from (a charge.refunded without
- *    its refund list has them fetched by the route). Without these, a
- *    dashboard refund left the invoice "paid".
+ *    refund.updated, refund.failed (a Refund) → record each refund made in
+ *    Stripe's dashboard against the payment it came from (a charge.refunded
+ *    without its refund list has them fetched by the route). Without these,
+ *    a dashboard refund left the invoice "paid". A Refund's status is
+ *    pending, requires_action, succeeded, failed or canceled (Stripe API,
+ *    2026): pending and succeeded record it; failed and canceled mark a
+ *    recorded one failed and take it back (money-server
+ *    recordStripeRefund, §K45); requires_action waits. refund.failed is
+ *    sent for every refund that fails (API 2024-10-28 on);
+ *    charge.refund.updated only for some payment methods, so both count.
  *  * charge.dispute.created / charge.dispute.closed → an urgent team alert
  *    (a chargeback: the money may be leaving us), nothing recorded.
  *  * Anything else → acknowledged and ignored.
@@ -51,8 +57,10 @@ export interface StripeRefundFacts {
   chargeId?: string;
   paymentIntent?: string;
   amountPence: number;
-  /** Stripe's status: pending and succeeded mean the money is going back; failed and canceled that it isn't. */
+  /** Stripe's status: pending and succeeded mean the money is going back; failed and canceled that it isn't; requires_action that it waits on the customer. */
   status: string;
+  /** Why it failed (failed or canceled): lost_or_stolen_card, expired_or_canceled_card, insufficient_funds, declined, merchant_request, … */
+  failureReason?: string;
   /** When Stripe made it. */
   refundedAt: string;
   reason?: string;
@@ -117,7 +125,7 @@ const idOf = (v: unknown): string | undefined => (typeof v === "string" ? str(v)
 const isoOf = (sec: unknown, fallbackSec: number): string =>
   new Date((typeof sec === "number" && sec > 0 ? sec : fallbackSec || Math.floor(Date.now() / 1000)) * 1000).toISOString();
 
-const REFUND_EVENTS = new Set(["charge.refunded", "charge.refund.updated", "refund.created", "refund.updated"]);
+const REFUND_EVENTS = new Set(["charge.refunded", "charge.refund.updated", "refund.created", "refund.updated", "refund.failed"]);
 const DISPUTE_EVENTS = new Set(["charge.dispute.created", "charge.dispute.closed"]);
 
 /** A Refund object as our facts, or null when it isn't one we can use (not pounds, no amount). */
@@ -130,6 +138,7 @@ export function refundFacts(r: Record<string, unknown>, fallbackSec: number): St
   const chargeId = idOf(r.charge);
   const paymentIntent = idOf(r.payment_intent);
   const reason = str(r.reason);
+  const failureReason = str(r.failure_reason);
   return {
     refundId,
     ...(chargeId ? { chargeId } : {}),
@@ -138,6 +147,7 @@ export function refundFacts(r: Record<string, unknown>, fallbackSec: number): St
     status: str(r.status) ?? "succeeded",
     refundedAt: isoOf(r.created, fallbackSec),
     ...(reason ? { reason } : {}),
+    ...(failureReason ? { failureReason } : {}),
   };
 }
 
@@ -220,8 +230,10 @@ function decideRefund(event: StripeEventLike): StripeDecision {
       eventId: event.id,
     };
   }
-  // A Refund object (charge.refund.updated, refund.created, refund.updated).
-  const facts = refundFacts(o, event.created);
+  // A Refund object (charge.refund.updated, refund.created, refund.updated, refund.failed).
+  const facts0 = refundFacts(o, event.created);
+  // refund.failed is a failure whatever the object's status field says.
+  const facts = facts0 && event.type === "refund.failed" && facts0.status !== "canceled" ? { ...facts0, status: "failed" } : facts0;
   if (!facts) return { kind: "ignore", reason: "not a refund in pounds" };
   const metadata = (typeof o.metadata === "object" && o.metadata !== null ? o.metadata : {}) as Record<string, unknown>;
   const invoiceId = str(metadata.invoice_id);

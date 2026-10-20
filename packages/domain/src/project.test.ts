@@ -2269,3 +2269,20 @@ test("cancellation charge: recorded once by a signed-in person, with the refund 
   assert.equal(cancellationSettlement(refunded)!.owedPence, 90_000);
   assert.equal(cancellationSettlement(p), null, "no charge, no settlement");
 });
+
+test("refund-failed: a counted refund that failed at the card provider comes back into the totals once, and the family is told", () => {
+  let p = walk("day-1-end");
+  p = step(p, { type: "payment-recorded", amountPence: 180_000, paymentId: "pay-dep" }, "2026-11-17T18:00:00.000Z");
+  p = step(p, { type: "payment-recorded", amountPence: -60_000, paymentId: "pay-ref" }, "2026-11-18T10:00:00.000Z");
+  assert.equal(p.money.paidPence, 120_000);
+  refuses(p, { type: "refund-failed", amountPence: 60_000, paymentId: "pay-never" }, "2026-11-20T10:00:00.000Z", {}, /never counted/);
+  refuses(p, { type: "refund-failed", amountPence: 0, paymentId: "pay-ref" }, "2026-11-20T10:00:00.000Z", {}, /whole-pence/);
+  const back = step(p, { type: "refund-failed", amountPence: 60_000, paymentId: "pay-ref" }, "2026-11-20T10:00:00.000Z");
+  assert.equal(back.money.paidPence, 180_000, "the money is with us again");
+  assert.match(back.events.at(-1)!.label, /refund of £600 we sent didn't go through/);
+  assert.equal(back.events.at(-1)!.internal, undefined);
+  refuses(back, { type: "refund-failed", amountPence: 60_000, paymentId: "pay-ref" }, "2026-11-20T10:05:00.000Z", {}, /already counted/);
+  // On a cancelled project too.
+  const cancelled = step(p, { type: "cancellation-received", receivedAt: "2026-11-18T07:30:00.000Z", channel: "email", evidenceRef: "DEMO email" }, "2026-11-18T09:00:00.000Z", { actor: ADMIN });
+  assert.equal(step(cancelled, { type: "refund-failed", amountPence: 60_000, paymentId: "pay-ref" }, "2026-11-20T10:00:00.000Z").money.paidPence, 180_000);
+});

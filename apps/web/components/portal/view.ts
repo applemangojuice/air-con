@@ -407,7 +407,9 @@ export function cancelledCopy(p: Project): { title: string; body: string } | nul
   // so the page never says "nothing more is due" or promises the whole refund without the email's caveat.
   const workedEarly = cancelledAfterEarlyWork(p);
   // A refund recorded since the cancellation: what they've paid is now what we've kept, never "we'll refund it".
-  const refundSent = p.events.some((e) => e.type === "payment-recorded" && e.at >= c.recordedAt && e.label.startsWith("Refund of"));
+  // (One that failed at the card provider afterwards doesn't count: §K45.)
+  const refundsSince = p.events.filter((e) => e.type === "payment-recorded" && e.at >= c.recordedAt && e.label.startsWith("Refund of")).length;
+  const refundSent = refundsSince > p.events.filter((e) => e.type === "refund-failed" && e.at >= c.recordedAt).length;
   // With the charge for the work done recorded (reg 36(4)): its numbers, as the email and the pay page give them.
   const s = cancellationSettlement(p);
   const chargeLine = s

@@ -2540,3 +2540,35 @@ changelog and the reasons, so nobody "fixes" a deliberate choice back.
       `invoicesRepo.listAll`/`paymentsRepo.listAll` (paged past Max Rows) and
       `loadAllProjects`; references are "Pilot N" or `P-<short id>` and
       `C-<short id>`. Audited (`accounts.export`); in **More** for admins.
+    - *A Stripe refund that fails* (was known limitation 23's "ask the
+      developer"): the refund events are `refund.created`, `refund.updated`,
+      `refund.failed` (every refund, API 2024-10-28 on) and
+      `charge.refund.updated` (some payment methods), statuses pending,
+      requires_action, succeeded, failed, canceled (Stripe's Refund object;
+      read from stripe-node 23's generated types, the docs host being out
+      of reach here). `refund.failed` joins `REFUND_EVENTS`, `refundFacts`
+      carries `failure_reason`, and a `refund.failed` event is a failure
+      whatever its object's status says. `recordStripeRefund` (signature
+      verified by the route as before): pending/succeeded record it as
+      before; requires_action waits; failed/canceled go to
+      `failStripeRefund`: a recorded refund's row becomes status `failed`
+      (kept, `failedAt`, `failureReason`, a note), its invoice is re-settled
+      without it (paid again), and the totals take it back once through the
+      new reducer action `refund-failed` (keyed `<payment>:failed` in
+      `money.paymentIds`, allowed after close, a customer-visible line), then
+      `reversedOnProjectAt`. The credit note that went with it is never
+      deleted and no reversal is issued: it records that they don't owe the
+      money, still true, so with the refund gone the invoice is over-credited
+      by it, which is exactly the credit owed back (`outstandingPence` < 0,
+      the money page's "In credit", refundable again on the invoice; a
+      second refund reopens nothing, so no second credit note). A refund
+      that failed before it was ever recorded is kept as a `failed` row
+      counting for nothing, so a late `pending` can't record it; once failed,
+      later events for that refund change nothing (Stripe doesn't promise
+      order). Each case sends one urgent team alert (keyed
+      `stripe-refund-failed:<refund>`) with the next steps and, after a
+      cancellation, the refund deadline. The money page lists failed refunds
+      in a red box and words them "refund failed: not sent"; the hub stops
+      counting a failed refund as sent; the accountant's export lists it
+      with `counted` = no. Web tests post signed fake events through the
+      route (`tests/stripe-refund-failure.test.ts`).

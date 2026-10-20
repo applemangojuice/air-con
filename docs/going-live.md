@@ -96,7 +96,8 @@ Git → Production Branch, normally `main`).
      for `checkout.session.completed`,
      `checkout.session.async_payment_succeeded`,
      `checkout.session.async_payment_failed`, `charge.refunded`,
-     `charge.refund.updated`, `charge.dispute.created` and
+     `charge.refund.updated`, `refund.created`, `refund.updated`,
+     `refund.failed`, `charge.dispute.created` and
      `charge.dispute.closed`; its signing secret is `STRIPE_WEBHOOK_SECRET`.
      Money is only ever recorded from that verified webhook. **Refund card
      payments in Stripe's dashboard**: the refund is recorded on the money
@@ -182,6 +183,7 @@ Git → Production Branch, normally `main`).
 | "We couldn't read the business settings just now, so nothing was saved" | The database didn't answer when an invoice, proposal, contract, receipt or booking needed the settings (pages show the defaults meanwhile; writes never use them) | Try again in a moment; if it keeps happening, check `/ops/status` |
 | `/ops/launch` shows "Shared sign-in limits" amber | Migration `0012` hasn't been run, so each server instance counts sign-in requests on its own | Run `supabase/pilot-upgrade.sql` (it includes `0012`) |
 | A refund made in Stripe doesn't appear on the money page | The webhook isn't sent `charge.refunded` | Add `charge.refunded` and `charge.refund.updated` to the endpoint in Stripe (step 3); Stripe resends recent events from its dashboard |
+| A refund that failed at Stripe still shows as refunded | The webhook isn't sent `refund.failed` (and `refund.updated`) | Add them to the endpoint (step 3), then resend the refund's events from Stripe's dashboard: the refund is marked failed and the money shows as owed back |
 | Pages feel slow (a second or more per click) | The functions and the database are far apart | Put Supabase and `regions` in `apps/web/vercel.json` in the same place (London by default) |
 | Property intelligence shows 0 | The property book hasn't been loaded | `/ops/intel` → **Seed sample book**, or the importer ([property-intelligence.md](./property-intelligence.md)) |
 

@@ -15,8 +15,10 @@ import { decideStripeEvent, parseStripeEvent, refundFacts, type StripeRefundFact
  *  * Idempotent: the payment's provider reference is the Checkout Session id
  *    (unique), so Stripe's retries and replays record it once; a refund's is
  *    its refund id, the same way.
- *  * Refunds made in Stripe are recorded against the payment they came from;
- *    disputes (chargebacks) and overpayments are urgent team alerts.
+ *  * Refunds made in Stripe are recorded against the payment they came from,
+ *    and one that later fails (or is cancelled) is marked failed and taken
+ *    back, with an urgent alert (§K45); disputes (chargebacks) and
+ *    overpayments are urgent team alerts.
  *  * 200 for anything handled or deliberately ignored; 500 only when our side
  *    failed, so Stripe retries later.
  */
@@ -87,6 +89,7 @@ export async function POST(request: Request): Promise<Response> {
           status: r.status,
           refundedAt: r.refundedAt,
           ...(r.reason ? { reason: r.reason } : {}),
+          ...(r.failureReason ? { failureReason: r.failureReason } : {}),
           ...(decision.invoiceId ? { invoiceId: decision.invoiceId } : {}),
           eventId: decision.eventId,
         });

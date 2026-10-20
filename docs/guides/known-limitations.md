@@ -140,10 +140,14 @@ says what to do instead. Approvals that need a professional are in
       credit on their account, the team is alerted, and **Record a refund**
       on that invoice pays it back with no credit note.
     - *A card refund that Stripe reports as failed after it was recorded*
-      (rare): the refund and its credit note stay recorded and nothing in the
-      app can reverse them. Don't refund again or record it by hand (both
-      count it twice): ask the developer to reverse the two records in the
-      database, then sort it out with the customer. The urgent alert says so.
+      (rare: an expired card, a closed account): the app marks the refund
+      failed (kept, never deleted), the invoice reads as paid again, and the
+      family is in credit by that amount on the money page (owed back); the
+      credit note that went with it stays (they still don't owe it). An
+      urgent alert says what to do: tell them, then refund again, in Stripe
+      or by bank transfer recorded on the money page. It needs the
+      `refund.failed` and `refund.updated` webhook events (going-live
+      step 3); an endpoint set up before this change doesn't send them.
     - *A cancellation after work began at the family's request* inside the
       period: the office records the charge for that work on the money page
       (CCR reg 36(4); admin guide §5) and the app invoices it, holds what

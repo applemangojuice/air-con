@@ -1990,6 +1990,12 @@ export type ProjectAction =
   | { type: "project-closed"; reason?: string }
   /** Ops: the customer's cancellation reached us (when, how, where it's on file). Closes the project as cancelled. */
   | { type: "cancellation-received"; receivedAt: string; channel: CancellationChannel; evidenceRef: string }
+  /**
+   * System: a refund counted by payment-recorded failed (or was cancelled) at
+   * the card provider, so the money is with us again: the totals take it back
+   * once (`paymentId` is the refund's), and the family is told.
+   */
+  | { type: "refund-failed"; amountPence: number; paymentId: string }
   /** Ops: the charge for work done before a cancellation, after an evidenced early start (reg 36(4)). */
   | { type: "cancellation-charge-recorded"; amountPence: number; basis: string; requestId?: string }
   | { type: "note"; text: string };
@@ -2017,6 +2023,7 @@ const AFTER_CLOSE: ReadonlySet<ProjectAction["type"]> = new Set<ProjectAction["t
   "contract-confirmation-sent",
   "pre-contract-info-sent",
   "cancellation-charge-recorded",
+  "refund-failed",
 ]);
 
 const KIT_STATUSES: readonly KitStatus[] = ["not-ordered", "ordered", "confirmed", "dispatched", "delivered", "inspected"];
@@ -2917,6 +2924,21 @@ export function applyProjectAction(project: Project, action: ProjectAction, now:
         action.amountPence > 0
           ? `Payment of ${fmtPence(action.amountPence)} received. Thank you.`
           : `Refund of ${fmtPence(-action.amountPence)} sent.`,
+        "system",
+      );
+      return ok();
+    }
+
+    case "refund-failed": {
+      if (!isWholePence(action.amountPence) || action.amountPence <= 0) return err("A failed refund needs its whole-pence amount.");
+      const key = `${action.paymentId}:failed`;
+      if (p.money.paymentIds?.includes(key)) return err(PAYMENT_ALREADY_COUNTED);
+      if (!p.money.paymentIds?.includes(action.paymentId)) return err("That refund was never counted in the project's totals.");
+      p.money.paymentIds = [...(p.money.paymentIds ?? []), key];
+      p.money.paidPence += action.amountPence;
+      log(
+        "refund-failed",
+        `The refund of ${fmtPence(action.amountPence)} we sent didn't go through at the card provider, so the money hasn't reached you. We'll be in touch to send it again.`,
         "system",
       );
       return ok();
