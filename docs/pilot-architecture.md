@@ -2825,3 +2825,28 @@ changelog and the reasons, so nobody "fixes" a deliberate choice back.
       weekly while late. Primary sources (legislation.gov.uk, HSE, MCS,
       ENA, the manufacturers) were unreachable from here again: every limit
       is from search-engine extracts and is worded as to be confirmed.
+
+49. **The cheap items round 9 left half-done (known limitations 9c, 9d,
+    9f, 9g, 23a and 31a, before the first real customers).** The runsheet
+    template is `pilot-runsheet-5` (untouched jobs rebuild with the tech
+    lead's targets carried; a started job keeps its steps).
+    - *The charge against the as-built length* (was known limitation 9d):
+      the charge step carries `InstallStep.charge` (`ChargeStep`: the
+      catalogue's `prechargedM` and `gPerM`, and a step-level `limit`
+      holding the new per-job target `charge.tolerance`, ± g, bounds max).
+      `chargeCheck(job, step)` reads the latest as-built length and weighed
+      figure, works out `expectedAdditionalChargeG` and judges the weighed
+      figure with `chargeToleranceG` (the tech lead's figure, else
+      `CHARGE_TOLERANCE_PERCENT` 10 % of the expected figure, at least
+      `CHARGE_TOLERANCE_MIN_G` 50 g); `stepView` makes the weighed slot an
+      exception outside it, with `SlotView.why` (the working), unless an
+      accepted review made after the length it was judged against covers it
+      (the length typed again reopens it). `TargetDef.defaultApplies` marks a
+      company default that `unconfirmedTargets` doesn't wait for (the
+      Commission tab shows **Company default**). `targetHolders` and
+      `applyTarget` carry the step's charge limit. `CommissioningResult`
+      gains `expectedChargeG` and `chargeToleranceG` (Commission tab and
+      certificate). The step card shows `ChargePanel` and the slot a hint
+      with the expected figure; the R32 room-size maximum is unchanged. The
+      10 %/50 g tolerance is the company's, not a manufacturer figure.
+

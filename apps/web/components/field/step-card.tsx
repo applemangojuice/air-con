@@ -3,7 +3,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { canRecord, canSetOutcome, type StaffMember, type StepOutcome, type StepView } from "@aircon/domain";
 import { captureOutcome } from "./capture";
-import { DecayPanel } from "./decay-panel";
+import { ChargePanel, DecayPanel } from "./decay-panel";
 import { Slot } from "./slot";
 import type { MergedJob } from "./use-outbox";
 
@@ -171,6 +171,7 @@ export function StepCard({
           )}
           {step.guidance && <p className="text-base leading-relaxed text-ink-700">{step.guidance}</p>}
           {view.test && <DecayPanel test={view.test} compact={view.test.result === "incomplete" && view.test.fails.length === 0 && view.test.invalid.length === 0} />}
+          {view.charge && <ChargePanel check={view.charge} />}
           {view.latest && view.latest.outcome !== "pass" && (
             <p className={`rounded-xl px-3 py-2 text-sm font-medium ${view.latest.outcome === "na" ? "bg-surface text-ink-900" : "bg-red-50 text-red-900"}`}>
               {OUTCOMES.find((o) => o.value === view.latest!.outcome)!.label} · {view.latest.reason}
@@ -194,6 +195,9 @@ export function StepCard({
                     {...(refused ? { refused } : {})}
                     {...(imageUrl ? { imageUrl } : {})}
                     {...(disabledReason ? { disabledReason } : {})}
+                    {...(view.charge && slot.spec.id === view.charge.addedSpecId && view.charge.expectedG !== undefined
+                      ? { hint: `Expected ${view.charge.expectedG} g from the as-built length (± ${view.charge.toleranceG} g)` }
+                      : {})}
                     meId={me.id}
                   />
                 </li>

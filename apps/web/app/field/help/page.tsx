@@ -142,6 +142,17 @@ export default async function FieldHelpPage() {
           </p>
         </Fold>
 
+        <Fold id="charge" title="The charge">
+          <p>
+            On the <B>F-gas label and charge record</B> step, type the as-built length first. The step works out the charge it needs from the catalogue (max(0, as-built
+            length − pre-charged length) × g/m) and shows it next to the weighed slot. Charge by weight and type what you weighed.
+          </p>
+          <p>
+            Further from it than the job&apos;s tolerance (10% or 50 g, whichever is larger, unless the tech lead set the job&apos;s own) goes to the tech lead as{" "}
+            <B>Needs review</B> with the working: they sign it off with a reason or ask for it again. The R32 room-size maximum still applies.
+          </p>
+        </Fold>
+
         <Fold id="tests" title="The pressure test and the vacuum">
           <p>
             <B>Strength and tightness test</B> (oxygen-free nitrogen): apply the manual&apos;s test pressure, never above the outdoor unit&apos;s nameplate PS, and type it with the

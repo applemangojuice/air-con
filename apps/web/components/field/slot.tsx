@@ -29,6 +29,8 @@ export interface SlotProps {
   disabledReason?: string;
   /** The person, for "by you". */
   meId: string;
+  /** What this reading should be, worked out from the step's other readings (the charge from the as-built length). */
+  hint?: string;
 }
 
 const STATE_CHIP: Record<string, { text: string; tone: string }> = {
@@ -55,7 +57,7 @@ const BIG = "min-h-12 rounded-full px-5 font-semibold";
 const PRIMARY = `${BIG} bg-accent-700 text-white shadow-sm hover:bg-accent-800 disabled:opacity-40`;
 const SECONDARY = `${BIG} border border-line bg-white text-ink-900 hover:bg-surface disabled:opacity-40`;
 
-export function Slot({ projectId, step, slot, waiting, refused, imageUrl, disabledReason, meId }: SlotProps) {
+export function Slot({ projectId, step, slot, waiting, refused, imageUrl, disabledReason, meId, hint }: SlotProps) {
   const { spec, state, record, review } = slot;
   const id = useId();
   const kept = useOutboxDurable();
@@ -178,6 +180,7 @@ export function Slot({ projectId, step, slot, waiting, refused, imageUrl, disabl
         </div>
         <Chip state={state} waiting={waiting} kept={kept} />
       </div>
+      {hint && <p className="mt-1 text-sm font-medium text-ink-900">{hint}</p>}
 
       {captured && (
         <div className="mt-2">
@@ -203,7 +206,7 @@ export function Slot({ projectId, step, slot, waiting, refused, imageUrl, disabl
           )}
           {byLine && <p className="mt-1 text-xs text-ink-500">{byLine}</p>}
           {state === "exception" && !waiting && (
-            <p className="mt-2 text-sm font-medium text-red-800">Saved, and flagged: the tech lead will review this reading. Re-check and capture again if it was a slip.</p>
+            <p className="mt-2 text-sm font-medium text-red-800">Saved, and flagged: the tech lead will review this reading. Re-check and capture again if it was a slip.{slot.why ? ` ${slot.why}` : ""}</p>
           )}
           {state === "accepted" && review && <p className="mt-2 text-sm text-emerald-800">Accepted by {personName(review.by)}: {review.reason}</p>}
           {state === "recapture" && review && <p className="mt-2 text-sm font-medium text-amber-900">{personName(review.by)} asked for this again: {review.reason}</p>}

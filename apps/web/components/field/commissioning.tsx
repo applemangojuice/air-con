@@ -64,7 +64,8 @@ function TargetRow({ projectId, target, canEdit, locked, onAnswer }: { projectId
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const b = BASIS[target.basis];
+  // A company default applies until the tech lead sets a figure: it isn't waiting for anyone.
+  const b = target.basis !== "tech-lead" && def.defaultApplies ? { text: "Company default", tone: "bg-surface text-ink-700" } : BASIS[target.basis];
   const showMin = def.bounds !== "max";
   const showMax = def.bounds !== "min";
 
@@ -91,7 +92,7 @@ function TargetRow({ projectId, target, canEdit, locked, onAnswer }: { projectId
           <p className="font-semibold text-ink-900">{def.label}</p>
           <p className="text-sm text-ink-700">
             {windowText({ ...(target.min !== undefined ? { min: target.min } : {}), ...(target.max !== undefined ? { max: target.max } : {}), unit: def.unit }) ??
-              (target.basis === "tech-lead" && def.recordOnly ? def.recordOnly.replace(/^Use /, "Using ") : target.basis === "tech-lead" ? "Record only" : "Not set")}
+              (target.basis === "tech-lead" && def.recordOnly ? def.recordOnly.replace(/^Use /, "Using ") : target.basis === "tech-lead" ? "Record only" : def.defaultApplies ? `Using ${def.defaultApplies}` : "Not set")}
             {target.basis === "tech-lead" && target.setBy ? ` · ${personName(target.setBy)}` : ""}
             {` · ${target.specCount} reading${target.specCount === 1 ? "" : "s"}`}
           </p>
@@ -174,7 +175,7 @@ function ExceptionRow({ projectId, item, canReview, onAnswer }: { projectId: str
         {slot.record?.value} <span className="text-base font-normal text-ink-700">{slot.spec.unit}</span>
       </p>
       <p className="text-sm text-ink-700">
-        Window {windowText(slot.spec) ?? "none"} · {personName(slot.record?.by ?? "")}, {londonTime(slot.record?.at)}
+        {slot.why ?? `Window ${windowText(slot.spec) ?? "none"}`} · {personName(slot.record?.by ?? "")}, {londonTime(slot.record?.at)}
       </p>
       {canReview ? (
         <div className="mt-3 space-y-2">
@@ -419,6 +420,14 @@ export function Commissioning({ data: page, certificateHref, holds = [] }: { dat
                       <dd className="tabular-nums text-ink-900">{fmtNum(r.decayMicrons, "micron")}</dd>
                       <dt className="text-ink-500">Refrigerant added</dt>
                       <dd className="tabular-nums text-ink-900">{fmtNum(r.additionalChargeG, "g")}</dd>
+                      {r.expectedChargeG !== undefined && (
+                        <>
+                          <dt className="text-ink-500">Expected from the as-built length</dt>
+                          <dd className="tabular-nums text-ink-900">
+                            {r.expectedChargeG} g{r.chargeToleranceG !== undefined ? ` (± ${r.chargeToleranceG} g)` : ""}
+                          </dd>
+                        </>
+                      )}
                       {r.noiseDb !== undefined && (
                         <>
                           <dt className="text-ink-500">Noise QA (1 m)</dt>

@@ -632,6 +632,7 @@ function CommissioningResults({ commissioning }: { commissioning: CommissioningC
               ["Vacuum reached", r.vacuumTest || r.vacuumMicrons === undefined ? "" : `${num(r.vacuumMicrons, 0)} microns`],
               ["Vacuum decay", r.vacuumTest || r.decayMicrons === undefined ? "" : `${num(r.decayMicrons, 0)} microns`],
               ["Refrigerant added", r.additionalChargeG !== undefined ? `${num(r.additionalChargeG, 0)} g` : ""],
+              ["Expected from the as-built length", r.expectedChargeG !== undefined ? `${num(r.expectedChargeG, 0)} g${r.chargeToleranceG !== undefined ? ` (± ${num(r.chargeToleranceG, 0)} g)` : ""}` : ""],
               ["Temperature drop, cooling", splits(r.coolingSplitC)],
               ["Temperature rise, heating", splits(r.heatingSplitC)],
               ["Noise", r.noiseDb !== undefined ? `${num(r.noiseDb, 0)} dB(A)` : ""],

@@ -1,4 +1,4 @@
-import { JOB_TARGETS, decayResultText, pressureDecayRows, vacuumDecayRows, type DecayTestView } from "@aircon/domain";
+import { JOB_TARGETS, decayResultText, pressureDecayRows, vacuumDecayRows, type ChargeCheckView, type DecayTestView } from "@aircon/domain";
 
 /**
  * A pressure or vacuum decay test as the readings decide it: the result,
@@ -55,6 +55,41 @@ export function DecayPanel({ test, compact = false }: { test: DecayTestView; com
           ))}
         </dl>
       )}
+    </div>
+  );
+}
+
+const CHARGE_TONE: Record<ChargeCheckView["result"], string> = {
+  within: "border-emerald-200 bg-emerald-50 text-emerald-900",
+  outside: "border-red-300 bg-red-50 text-red-900",
+  incomplete: "border-line bg-surface text-ink-900",
+};
+
+/**
+ * The charge step's check: what the as-built length needs (worked out from
+ * the length typed and the catalogue's figures), next to what was weighed,
+ * and whether it's inside the job's tolerance. Outside it, the tech lead
+ * signs the weighed figure off with a reason on the Commission tab.
+ */
+export function ChargePanel({ check }: { check: ChargeCheckView }) {
+  return (
+    <div role={check.result === "outside" ? "alert" : undefined} className={`rounded-xl border px-3 py-2 text-sm ${CHARGE_TONE[check.result]}`}>
+      <p className="text-base font-semibold">
+        {check.result === "outside" ? "Charge: needs the tech lead's sign-off" : check.result === "within" ? "Charge: within tolerance" : "Charge against the as-built length"}
+      </p>
+      {check.expectedG !== undefined && (
+        <dl className="mt-1 grid grid-cols-2 gap-x-4 gap-y-1">
+          <div>
+            <dt className="text-xs font-semibold uppercase tracking-wide text-ink-500">Expected</dt>
+            <dd className="tabular-nums">{check.expectedG} g (± {check.toleranceG} g)</dd>
+          </div>
+          <div>
+            <dt className="text-xs font-semibold uppercase tracking-wide text-ink-500">Weighed</dt>
+            <dd className="tabular-nums">{check.weighedG !== undefined ? `${check.weighedG} g` : "Not yet"}</dd>
+          </div>
+        </dl>
+      )}
+      <p className="mt-1">{check.words}</p>
     </div>
   );
 }

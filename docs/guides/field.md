@@ -249,6 +249,19 @@ shorter than the manual's minimum: the manual says how any extra may be
 laid. On day 3 the charge step checks the whole length (on a multi-split,
 all the runs added up) against the unit's limits the same way.
 
+**The charge** (day 3, F-gas, **F-gas label and charge record**, one per
+outdoor unit): type the as-built length first. The step works out the
+charge that length needs from the catalogue's figures, max(0, as-built
+length − pre-charged length) × g/m, and shows it next to the weighed slot
+("Expected 300 g from the as-built length (± 50 g)"). Charge by weight and
+type what you weighed. A figure further from it than the job's tolerance
+(10% of the expected figure or 50 g, whichever is larger, unless the
+technical lead set the job's own) is flagged **Needs review** with the
+working: the technical lead signs it off with a reason, or asks for it
+again. The R32 room-size maximum still applies as before. A model with no
+charge rate in the catalogue has no expected figure: work it out from the
+manual.
+
 **The pressure test and the vacuum** (day 3, F-gas):
 
 - *Strength and tightness test.* Oxygen-free nitrogen at the manual's test
@@ -430,7 +443,10 @@ clear it.
    reading after the hold if the manual gives one, flare torque for each
    pipe size (and **Flare torque, pipe size not in the catalogue** when an
    indoor unit has no pipe sizes on record: set it from the manual, and add
-   the sizes to the catalogue), condensate fall. On a multi-split, any
+   the sizes to the catalogue), condensate fall. **Charge: allowed
+   difference from the as-built figure** shows **Company default** (10% or
+   50 g, whichever is larger) and needn't be confirmed: set a ± g figure
+   only if the manual or the job needs one. On a multi-split, any
    reducer on an outdoor port is tightened as the manual says, not to the
    field flare's window. Type the figure and the manual page → **Set
    target**. Readings already taken are judged against what you set; a
@@ -441,7 +457,11 @@ clear it.
    review, and anything for this job still on your phone (the
    certificate is made from what the server has, so **Sign** waits for it to
    sync: **Sync first**).
-3. Review every **Needs review** reading.
+3. Review every **Needs review** reading. A weighed charge outside the
+   tolerance shows the working (the as-built length, the expected figure and
+   how far off it is): **Accept** it with the reason (an extra coil laid, a
+   manual's own figure), or **Capture again**. If the length is typed again
+   afterwards, it comes back to you.
 4. **Sign as \<your name\>**. That completes the install and issues the
    commissioning certificate. It can't be undone from the field. If a
    reading arrived from another phone since your screen loaded, signing is

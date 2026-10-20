@@ -327,8 +327,10 @@ with their names; the planning consent item adds itself before day 1.
 - In the evening the installer's end-of-day update (with the photos they
   picked) goes to the family; you'll see it under the project's Messages.
 - Last day: the technical lead sets the job's test targets from the
-  manual, reviews anything flagged **Needs review**, and signs
-  commissioning on site.
+  manual, reviews anything flagged **Needs review** (a weighed charge more
+  than 10% or 50 g from what the as-built length needs is one), and signs
+  commissioning on site. The certificate shows the charge added next to the
+  figure the as-built length needed.
 
 ### 3.10 Handover
 

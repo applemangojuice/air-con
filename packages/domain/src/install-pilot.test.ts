@@ -44,6 +44,8 @@ import {
   buildRunsheet,
   NUMERIC_KINDS,
   carryTargets,
+  chargeCheck,
+  chargeToleranceG,
   decayRetestMarkers,
   decayTest,
   withDecayTests,
@@ -377,6 +379,66 @@ test("additional charge expected = max(0, run − pre-charge) × g/m, from the c
   assert.ok(charge.evidence.some((e) => e.role === "fgas-label" && e.kind === "photo"));
 });
 
+test("charge against the as-built length: expected from the length typed, judged with the job's tolerance, signed off by the tech lead", () => {
+  // Single split on out-1: 10 m pre-charged, 20 g/m.
+  assert.equal(chargeToleranceG(100), 50, "10% of 100 g is 10 g: 50 g is larger");
+  assert.equal(chargeToleranceG(800), 80, "10% of 800 g");
+  assert.equal(chargeToleranceG(0), 50);
+  assert.equal(chargeToleranceG(800, 30), 30, "the job's own tolerance");
+  const steps = runsheetFromDesign(design(1, "single"), "v-std", CATALOGUE);
+  const charge = steps.find((s) => s.title === "F-gas label and charge record")!;
+  assert.deepEqual([charge.charge?.prechargedM, charge.charge?.gPerM, charge.charge?.limit.targetKey], [10, 20, "charge.tolerance"]);
+  assert.match(charge.guidance ?? "", /Type the as-built length first/);
+  const length = charge.evidence.find((e) => e.role === "as-built-length")!;
+  const added = charge.evidence.find((e) => e.role === "additional-charge")!;
+  const rec = (specId: string, value: number, at = AT, id = `${specId}-${value}`): EvidenceRecord => ({ id, specId, value, at, by: TECH.name });
+
+  // Nothing typed: incomplete, says what to do.
+  assert.equal(chargeCheck(job(steps), charge)!.result, "incomplete");
+  assert.match(chargeCheck(job(steps), charge)!.words, /Type the as-built length/);
+  // 25 m as built: (25 − 10) × 20 = 300 g, ± 50 g.
+  let j = job(steps, [rec(length.id, 25)]);
+  assert.match(chargeCheck(j, charge)!.words, /Expected from the as-built length: 300 g .*Weigh in 300 g \(± 50 g\)/);
+  j = job(steps, [rec(length.id, 25), rec(added.id, 330)]);
+  assert.deepEqual([chargeCheck(j, charge)!.result, chargeCheck(j, charge)!.differenceG], ["within", 30]);
+  assert.equal(stepView(j, charge).slots.find((v) => v.spec.id === added.id)!.state, "pass");
+  // 400 g weighed: 100 g over, outside ± 50 g: an exception with the reason, whatever the R32 window says.
+  j = job(steps, [rec(length.id, 25, "2026-11-10T09:00:00.000Z"), rec(added.id, 400, "2026-11-10T09:05:00.000Z")]);
+  const view = stepView(j, charge);
+  const slot = view.slots.find((v) => v.spec.id === added.id)!;
+  assert.equal(view.charge!.result, "outside");
+  assert.equal(slot.state, "exception");
+  assert.match(slot.why ?? "", /Weighed 400 g, 100 g more than the 300 g the as-built length needs .*outside ± 50 g/);
+  assert.equal(openExceptions(j).length, 1);
+  assert.notEqual(view.state, "done");
+  // The tech lead accepts it with a reason: accepted, and the step can finish.
+  const accepted = withExceptionReview(j, { specId: added.id, evidenceId: `${added.id}-400`, resolution: "accepted", reason: "DEMO: extra 3 m coiled behind the unit", by: TECH.name, at: "2026-11-10T09:10:00.000Z" });
+  assert.equal(stepView(accepted, charge).slots.find((v) => v.spec.id === added.id)!.state, "accepted");
+  assert.equal(openExceptions(accepted).length, 0);
+  // The length typed again after the sign-off: the sign-off no longer covers it (judged against another length).
+  const retyped = { ...accepted, evidence: [...accepted.evidence, rec(length.id, 24, "2026-11-10T09:20:00.000Z", "len-2")] };
+  assert.equal(stepView(retyped, charge).slots.find((v) => v.spec.id === added.id)!.state, "exception");
+  // Less than expected is outside too.
+  j = job(steps, [rec(length.id, 25), rec(added.id, 200)]);
+  assert.match(chargeCheck(j, charge)!.words, /100 g less/);
+  // The tech lead's own tolerance (± 120 g) re-judges it.
+  const wider = setJobTarget(steps, { key: "charge.tolerance", max: 120, note: "DEMO manual p.20" }, TECH.name, AT);
+  const charge2 = wider.find((s) => s.id === charge.id)!;
+  j = job(wider, [rec(length.id, 25), rec(added.id, 400)]);
+  assert.deepEqual([chargeCheck(j, charge2)!.result, chargeCheck(j, charge2)!.toleranceBasis, chargeCheck(j, charge2)!.toleranceG], ["within", "job", 120]);
+  assert.equal(jobTargets(wider).find((t) => t.key === "charge.tolerance")!.basis, "tech-lead");
+  // A shorter run than the pre-charge needs nothing: 0 g expected, ± 50 g.
+  j = job(steps, [rec(length.id, 8), rec(added.id, 0)]);
+  assert.deepEqual([chargeCheck(j, charge)!.expectedG, chargeCheck(j, charge)!.result], [0, "within"]);
+  // The commissioning result carries the expected figure and the tolerance.
+  j = job(steps, [rec(length.id, 25), rec(added.id, 310)]);
+  const r = commissioningFromJob(j)[0]!;
+  assert.deepEqual([r.additionalChargeG, r.expectedChargeG, r.chargeToleranceG], [310, 300, 50]);
+  // No charge rate in the catalogue: no check (the step says the rate is missing).
+  const noRate = runsheetFromDesign(design(1, "single"), "v-std", CATALOGUE.map((c) => (c.id === "out-1" ? { ...c, specs: { prechargedPipeM: 10 } } : c)));
+  assert.equal(noRate.find((s) => s.title === "F-gas label and charge record")!.charge, undefined);
+});
+
 test("risks from the survey: asbestos check for older homes, access check at height, pump test", () => {
   const modern = runsheetFromDesign(design(1, "single"), "v-std", CATALOGUE, measured());
   assert.ok(!modern.some((s) => s.id === "d1-asbestos"), "post-2000, none suspected: no asbestos step");
@@ -565,7 +627,10 @@ test("targets: the job's targets, set by the tech lead, re-judge readings; commi
   for (const k of ["pressure.test", "pressure.hold", "pressure.decay", "vacuum.target", "vacuum.hold", "vacuum.decay", "vacuum.rise", "torque.6.35", "torque.9.52", "torque.12.7", "condensate.fall"]) assert.ok(keys.includes(k as never), k);
   assert.equal(jobTargets(steps).find((t) => t.key === "pressure.test")!.specCount, 2, "the applied pressure × two systems");
   assert.equal(jobTargets(steps).find((t) => t.key === "pressure.decay")!.specCount, 2, "one allowed fall per system's test");
-  assert.deepEqual(unconfirmedTargets(steps).length, keys.length);
+  // The charge tolerance is a company default that applies until set: it's listed, but needn't be confirmed.
+  assert.ok(keys.includes("charge.tolerance"));
+  assert.deepEqual(unconfirmedTargets(steps).length, keys.length - 1);
+  assert.ok(!unconfirmedTargets(steps).includes("charge.tolerance"));
 
   assert.equal(targetError("pressure.test", 30, undefined), "Set the maximum too: the outdoor unit's nameplate PS.");
   assert.equal(targetError("pressure.test", 40, 30), "The minimum is above the maximum.");

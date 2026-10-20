@@ -124,15 +124,21 @@ says what to do instead. Approvals that need a professional are in
    technical lead reads the outdoor unit's port and reducer table in the
    manual, adds any reducers to the purchase order, and checks them on the
    day.
-9d. **The weighed charge isn't compared with the as-built length.** The
-   charge step shows the design's figure and the formula, and asks the
-   engineer to charge from the as-built length; nothing works out the
-   expected figure from the length they type or flags a weighed figure far
-   from it (only the R32 room-size maximum is an exception). A design with
-   no charge rate in the catalogue can't be approved, and the step says the
-   rate is missing instead of "design: 0 g". *Instead:* the technical lead
-   checks the weighed figure against max(0, as-built length − pre-charged
-   length) × g/m before signing.
+9d. **The weighed charge is checked against the as-built length** (§K49;
+   was "isn't compared"). The charge step works out max(0, as-built length −
+   pre-charged length) × g/m from the length the engineer types, per outdoor
+   unit, shows it next to the weighed figure, and flags a figure further off
+   than the job's tolerance (10% or 50 g, whichever is larger, unless the
+   technical lead sets the job's own) for the technical lead's sign-off with
+   a reason. But: *a job already started before this change keeps its old
+   charge step*, without the check; a model with no pre-charged length or
+   charge rate in the catalogue has no expected figure (the step says the
+   rate is missing, and the design can't be approved without it); the
+   10%/50 g tolerance is the company's own default, not a manufacturer
+   figure; and most catalogue charge rates are search-engine extracts until
+   the technical lead verifies the item. *Instead:* on an older job, check
+   the weighed figure against the formula before signing; verify each
+   outdoor unit's pre-charged length and g/m against its manual.
 9e. **The electrics design is a starting point, not the circuit design.**
    The breaker comes from the manufacturer (or a labelled rule of thumb)
    and the cable from the breaker alone; nothing works out maximum demand,

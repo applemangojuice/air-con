@@ -149,7 +149,7 @@ const ROUTINES: Routine[] = [
         A variation: check the price, then <B>Send to the customer for their OK</B>. Tell the crew not to start it until it says approved.
       </>,
       <>Evening: the installer&apos;s end-of-day update goes to the customer; you&apos;ll see it under the project&apos;s Messages.</>,
-      <>Last day: the tech lead reviews anything flagged Needs review and signs commissioning on site.</>,
+      <>Last day: the tech lead reviews anything flagged Needs review (a weighed charge far from what the as-built length needs among them) and signs commissioning on site.</>,
     ],
   },
   {

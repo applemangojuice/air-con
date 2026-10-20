@@ -125,6 +125,21 @@ export interface InstallStep {
    * test only clears with a retest (every reading taken again).
    */
   decay?: DecayStep;
+  /**
+   * The charge step: the weighed added charge is checked against what the
+   * as-built length the engineer types needs (max(0, length − pre-charged
+   * length) × g/m, from the catalogue). Outside the job's tolerance the
+   * weighed figure is an exception the tech lead signs off with a reason.
+   */
+  charge?: ChargeStep;
+}
+
+/** The catalogue figures the charge step works the expected charge out from, and the job's tolerance on it. */
+export interface ChargeStep {
+  prechargedM: number;
+  gPerM: number;
+  /** The job's tolerance (± g): blank is the company default (10 % of the expected charge or 50 g, whichever is larger). A per-job target. */
+  limit: DecayLimit;
 }
 
 /** A step-level decay test: its kind, the job's limit on the fall (or rise), and any retest the tech lead's target change left owing. */
@@ -690,6 +705,9 @@ export interface CommissioningResult {
   /** The evacuation and decay test as measured: readings, the target, the rise and its limit, and the result. */
   vacuumTest?: DecayRecord<VacuumDecayFigures>;
   additionalChargeG?: number;
+  /** What the as-built length needed (max(0, length − pre-charged) × g/m) and the tolerance it was judged with. */
+  expectedChargeG?: number;
+  chargeToleranceG?: number;
   coolingSplitC: Record<string, number>;
   heatingSplitC: Record<string, number>;
   noiseDb?: number;
@@ -721,7 +739,7 @@ export interface InstallJobV2 extends InstallJob {
 }
 
 /** Bumped when the template changes; a job keeps the version it was built with. */
-export const INSTALL_TEMPLATE_VERSION: string = "pilot-runsheet-4";
+export const INSTALL_TEMPLATE_VERSION: string = "pilot-runsheet-5";
 
 /** R32 GWP for the F-gas label (tCO2e = kg × 675 / 1000). */
 export const RUNSHEET_GWP = R32_GWP;
@@ -792,7 +810,8 @@ export type TargetKey =
   | "torque.12.7"
   | "torque.15.88"
   | "torque.unsized"
-  | "condensate.fall";
+  | "condensate.fall"
+  | "charge.tolerance";
 
 export interface TargetDef {
   key: TargetKey;
@@ -807,6 +826,12 @@ export interface TargetDef {
    * default that then applies). False: a number is needed, from the manual.
    */
   recordOnly?: string | false;
+  /**
+   * A company default applies until the tech lead sets a figure, so the
+   * target needn't be confirmed before commissioning is signed (the words
+   * say what applies meanwhile).
+   */
+  defaultApplies?: string;
 }
 
 export const JOB_TARGETS: Record<TargetKey, TargetDef> = {
@@ -908,6 +933,15 @@ export const JOB_TARGETS: Record<TargetKey, TargetDef> = {
     bounds: "min",
     hint: "Often 1/100 (10 mm/m) in ducted and cassette manuals; wall units usually just say \"slope downwards\". Confirm per indoor unit, or confirm as record only.",
   },
+  "charge.tolerance": {
+    key: "charge.tolerance",
+    label: "Charge: allowed difference from the as-built figure",
+    unit: "g",
+    bounds: "max",
+    hint: "How far the weighed added charge may be from the figure the as-built length needs (max(0, length − pre-charged length) × g/m, from the catalogue), either way. Left alone, it's the company's 10% of that figure or 50 g, whichever is larger. Outside it, the weighed figure waits for your sign-off with a reason. A company default, not a manufacturer figure.",
+    recordOnly: "Use 10% or 50 g",
+    defaultApplies: "10% or 50 g (company default)",
+  },
 };
 
 export const TARGET_KEYS = Object.keys(JOB_TARGETS) as TargetKey[];
@@ -968,6 +1002,16 @@ export function expectedAdditionalChargeG(runM: number, prechargedM: number, gPe
   return Math.round(Math.max(0, runM - prechargedM) * Math.max(0, gPerM));
 }
 
+/** The company's default tolerance on the weighed charge: 10 % of the expected figure, never less than 50 g. */
+export const CHARGE_TOLERANCE_PERCENT = 10;
+export const CHARGE_TOLERANCE_MIN_G = 50;
+
+/** The tolerance (± g) on a weighed charge: the job's figure when the tech lead set one, else the company default. */
+export function chargeToleranceG(expectedG: number, jobToleranceG?: number): number {
+  if (typeof jobToleranceG === "number" && Number.isFinite(jobToleranceG) && jobToleranceG >= 0) return jobToleranceG;
+  return Math.max(CHARGE_TOLERANCE_MIN_G, Math.ceil((Math.max(0, expectedG) * CHARGE_TOLERANCE_PERCENT) / 100));
+}
+
 /* ---------------- generation ---------------- */
 
 interface SlotDef {
@@ -999,6 +1043,7 @@ interface StepDef {
   guidance?: string;
   equipment?: InstallStep["equipment"];
   decay?: DecayStep;
+  charge?: ChargeStep;
   slots: SlotDef[];
 }
 
@@ -1756,7 +1801,10 @@ export function runsheetFromDesign(
       item: sysItem(s),
       systemId: s.sel.id,
       requires: "fgas",
-      guidance: `Charge by weight from the outdoor unit's formula, using the as-built length. ${formula}${totalLimits.min !== undefined || totalLimits.max !== undefined ? ` ${totalLimits.words}` : ""} Fill in the F-gas label in the unit: factory, added and total charge in kg and tCO2e (R32, GWP ${R32_GWP}).${roomNote}`,
+      guidance: `Charge by weight from the outdoor unit's formula, using the as-built length. ${formula}${totalLimits.min !== undefined || totalLimits.max !== undefined ? ` ${totalLimits.words}` : ""}${typeof gpm === "number" && typeof pre === "number" ? " Type the as-built length first: the app works out the charge it needs and shows it next to what you weigh; a weighed figure outside the job's tolerance waits for the tech lead's sign-off." : ""} Fill in the F-gas label in the unit: factory, added and total charge in kg and tCO2e (R32, GWP ${R32_GWP}).${roomNote}`,
+      ...(typeof gpm === "number" && typeof pre === "number"
+        ? { charge: { prechargedM: pre, gPerM: gpm, limit: { targetKey: "charge.tolerance" as const, unit: "g", window: RECORD_ONLY(`Company default: ${CHARGE_TOLERANCE_PERCENT}% of the expected figure or ${CHARGE_TOLERANCE_MIN_G} g, whichever is larger.`) } } }
+        : {}),
       slots: [
         {
           key: "length",
@@ -1919,6 +1967,7 @@ export function runsheetFromDesign(
       ...(d.systemId ? { systemId: d.systemId } : {}),
       ...(d.equipment ? { equipment: d.equipment } : {}),
       ...(d.decay ? { decay: d.decay } : {}),
+      ...(d.charge ? { charge: d.charge } : {}),
       evidence: d.slots.map((s) => specFromSlot(d.key, s)),
     };
     return step;
@@ -2193,6 +2242,8 @@ export interface SlotView {
   state: SlotState;
   record?: EvidenceRecord;
   review?: ExceptionReview;
+  /** Why a reading is an exception when its own window doesn't say (the charge against the as-built length). */
+  why?: string;
 }
 
 const timeOf = (iso: string | undefined) => {
@@ -2267,6 +2318,8 @@ export interface StepView {
   missing: number;
   /** A strength/tightness or vacuum decay step: the readings judged together. */
   test?: DecayTestView;
+  /** The charge step: the weighed figure against what the as-built length needs. */
+  charge?: ChargeCheckView;
 }
 
 /** The latest outcome recorded for a step (by time; ties go to the later record). */
@@ -2281,7 +2334,18 @@ export function latestStepStatus(job: Pick<InstallJobV2, "stepStatuses">, stepId
 
 export function stepView(job: Pick<InstallJobV2, "evidence" | "exceptionReviews" | "stepStatuses">, step: InstallStep): StepView {
   const test = decayTest(job, step) ?? undefined;
+  const charge = chargeCheck(job, step) ?? undefined;
   let slots = step.evidence.map((spec) => slotView(job, spec));
+  if (charge?.result === "outside") {
+    // Outside the job's tolerance, the weighed figure waits for the tech lead; an acceptance counts only if made after the length it was judged against.
+    slots = slots.map((v) => {
+      if (v.spec.id !== charge.addedSpecId || v.state === "missing" || v.state === "recapture") return v;
+      const signed = v.review?.resolution === "accepted" && timeOf(v.review.at) >= timeOf(charge.lengthAt);
+      return signed
+        ? { spec: v.spec, state: "accepted" as const, ...(v.record ? { record: v.record } : {}), review: v.review!, why: charge.words }
+        : { spec: v.spec, state: "exception" as const, ...(v.record ? { record: v.record } : {}), why: charge.words };
+    });
+  }
   if (test) {
     // The test judges its readings together: no reading is an exception on its own, and a failed run's readings are taken again.
     const retake = new Set(test.retestNeeded ? test.toTake : []);
@@ -2294,7 +2358,7 @@ export function stepView(job: Pick<InstallJobV2, "evidence" | "exceptionReviews"
   const required = slots.filter((s) => !s.spec.optional);
   const missing = required.filter((s) => s.state === "missing" || s.state === "recapture").length;
   const latest = latestStepStatus(job, step.id);
-  const base = { step, slots, missing, ...(latest ? { latest } : {}), ...(test ? { test } : {}) };
+  const base = { step, slots, missing, ...(latest ? { latest } : {}), ...(test ? { test } : {}), ...(charge ? { charge } : {}) };
   if (latest?.outcome === "na" && latest.reason?.trim()) return { ...base, state: "na" };
   if (latest?.outcome === "blocked") return { ...base, state: "blocked" };
   if (latest?.outcome === "fail") return { ...base, state: "failed" };
@@ -2471,7 +2535,7 @@ export interface JobTarget {
 
 /** Everything on a step that carries a per-job target: its slots, and a decay test's limit. */
 function targetHolders(step: InstallStep): Pick<EvidenceSpec, "targetKey" | "min" | "max" | "window">[] {
-  return step.decay ? [...step.evidence, step.decay.limit] : step.evidence;
+  return [...step.evidence, ...(step.decay ? [step.decay.limit] : []), ...(step.charge ? [step.charge.limit] : [])];
 }
 
 /** The per-job targets this runsheet uses, as they stand. */
@@ -2502,10 +2566,10 @@ export function jobTargets(runsheet: InstallStep[]): JobTarget[] {
   return TARGET_KEYS.filter((k) => out.has(k)).map((k) => out.get(k)!);
 }
 
-/** Targets the tech lead hasn't set or confirmed yet. Commissioning can't be signed while any remain. */
+/** Targets the tech lead hasn't set or confirmed yet (a company default that applies meanwhile doesn't count). Commissioning can't be signed while any remain. */
 export function unconfirmedTargets(runsheet: InstallStep[]): TargetKey[] {
   return jobTargets(runsheet)
-    .filter((t) => t.basis !== "tech-lead")
+    .filter((t) => t.basis !== "tech-lead" && !t.def.defaultApplies)
     .map((t) => t.key);
 }
 
@@ -2549,6 +2613,7 @@ function applyTarget(runsheet: InstallStep[], key: TargetKey, bounds: { min?: nu
     ...step,
     evidence: step.evidence.map(set),
     ...(step.decay ? { decay: { ...step.decay, limit: set(step.decay.limit) } } : {}),
+    ...(step.charge ? { charge: { ...step.charge, limit: set(step.charge.limit) } } : {}),
   }));
 }
 
@@ -2734,6 +2799,75 @@ export function withRetestMarkers(runsheet: InstallStep[], markers: { stepId: st
   });
 }
 
+/* ---------------- the charge against the as-built length ---------------- */
+
+export interface ChargeCheckView {
+  /** incomplete: the length or the weighed figure isn't in yet. */
+  result: "incomplete" | "within" | "outside";
+  lengthM?: number;
+  expectedG?: number;
+  weighedG?: number;
+  toleranceG?: number;
+  /** Weighed minus expected, g. */
+  differenceG?: number;
+  /** The job's tolerance set by the tech lead, or the company default. */
+  toleranceBasis: "job" | "default";
+  /** The weighed-charge slot this check judges. */
+  addedSpecId?: string;
+  /** When the as-built length it was judged against was captured. */
+  lengthAt?: string;
+  /** The check in words, the same on every surface. */
+  words: string;
+}
+
+/** A captured number on a slot (latest wins), with when it was taken. */
+function capturedNumber(job: Pick<InstallJob, "evidence">, spec: EvidenceSpec | undefined): { value: number; at: string } | undefined {
+  if (!spec) return undefined;
+  const r = latestEvidence(job, spec.id);
+  return r && typeof r.value === "number" && Number.isFinite(r.value) ? { value: r.value, at: r.at } : undefined;
+}
+
+/**
+ * The charge step's weighed figure against what the as-built length needs:
+ * max(0, length − pre-charged length) × g/m (the catalogue's figures on the
+ * step), with the job's tolerance (the tech lead's ± g, else 10 % or 50 g,
+ * whichever is larger). Null for a step without the check (no charge rate
+ * in the catalogue, or a runsheet from before it).
+ */
+export function chargeCheck(job: Pick<InstallJob, "evidence">, step: InstallStep): ChargeCheckView | null {
+  const c = step.charge;
+  if (!c) return null;
+  const lengthSpec = step.evidence.find((e) => e.role === "as-built-length");
+  const addedSpec = step.evidence.find((e) => e.role === "additional-charge");
+  const length = capturedNumber(job, lengthSpec);
+  const weighed = capturedNumber(job, addedSpec);
+  const basis: ChargeCheckView["toleranceBasis"] = c.limit.window?.basis === "tech-lead" && c.limit.max !== undefined ? "job" : "default";
+  const base = { toleranceBasis: basis, ...(addedSpec ? { addedSpecId: addedSpec.id } : {}) };
+  if (!length || length.value < 0) {
+    return { ...base, result: "incomplete", ...(weighed ? { weighedG: weighed.value } : {}), words: "Type the as-built length: the charge it needs is worked out from it." };
+  }
+  const expectedG = expectedAdditionalChargeG(length.value, c.prechargedM, c.gPerM);
+  const toleranceG = chargeToleranceG(expectedG, basis === "job" ? c.limit.max : undefined);
+  const tol = `± ${toleranceG} g${basis === "job" ? ", the job's tolerance" : ""}`;
+  const working = `max(0, ${length.value} m − ${c.prechargedM} m pre-charged) × ${c.gPerM} g/m = ${expectedG} g`;
+  const known = { ...base, lengthM: length.value, lengthAt: length.at, expectedG, toleranceG };
+  if (!weighed) {
+    return { ...known, result: "incomplete", words: `Expected from the as-built length: ${expectedG} g (${working}). Weigh in ${expectedG} g (${tol}).` };
+  }
+  const differenceG = Math.round((weighed.value - expectedG) * 10) / 10;
+  const outside = Math.abs(differenceG) > toleranceG;
+  const off = differenceG === 0 ? "exactly that" : `${Math.abs(differenceG)} g ${differenceG > 0 ? "more" : "less"}`;
+  return {
+    ...known,
+    weighedG: weighed.value,
+    differenceG,
+    result: outside ? "outside" : "within",
+    words: outside
+      ? `Weighed ${weighed.value} g, ${off} than the ${expectedG} g the as-built length needs (${working}): outside ${tol}. The tech lead signs it off with a reason, or asks for it again.`
+      : `Weighed ${weighed.value} g against ${expectedG} g expected from the as-built length (${working}): ${differenceG === 0 ? "exactly that" : off}, within ${tol}.`,
+  };
+}
+
 /* ---------------- commissioning ---------------- */
 
 /** A step's latest captured value for a role, if any. */
@@ -2823,6 +2957,11 @@ export function commissioningFromJob(job: InstallJobV2): CommissioningResult[] {
     set("decayMicrons", "vacuum-decay");
     set("additionalChargeG", "additional-charge");
     set("noiseDb", "noise-measured");
+    for (const s of steps) {
+      const c = chargeCheck(job, s);
+      if (c?.expectedG !== undefined) res.expectedChargeG = c.expectedG;
+      if (c?.toleranceG !== undefined) res.chargeToleranceG = c.toleranceG;
+    }
     for (const s of steps) {
       const t = decayTest(job, s);
       if (!t) continue;

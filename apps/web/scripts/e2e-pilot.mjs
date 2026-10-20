@@ -321,7 +321,10 @@ function readingFor(slotText) {
   const n = Number;
   // The pressure test's gauge: a digital manifold reading to 0.1 bar (the default allowance on the fall).
   if (/Gauge resolution/.test(slotText)) return "0.1";
-  let m = slotText.match(/window (-?[\d.]+) to (-?[\d.]+)/);
+  // The charge: what the as-built length typed above needs (the step works it out), so it's within the job's tolerance.
+  let m = slotText.match(/Expected (\d+(?:\.\d+)?) g from the as-built length/);
+  if (m) return m[1];
+  m = slotText.match(/window (-?[\d.]+) to (-?[\d.]+)/);
   if (m) return String(Math.round(((n(m[1]) + n(m[2])) / 2) * 100) / 100);
   m = slotText.match(/window at least (-?[\d.]+)/);
   if (m) return String(n(m[1]) + 1);
