@@ -295,7 +295,10 @@ whenever you change anything.
    have it in writing. If both are blank, proposals are blocked. Nothing
    about warranty years appears anywhere until it's set here.
 10. **Legal**: leave the two "a solicitor has reviewed" boxes unticked until
-    one has.
+    one has. **Terms version** should read `pilot-draft-2` (the terms no
+    longer cap our liability at the price paid, and say a change over £42 has
+    its own right to cancel). If you saved settings before this change it
+    still says `pilot-draft-1`: type `pilot-draft-2`.
 11. **Messages**: the SMS sender name (`DangItsHot`).
 12. **Save settings**. The red box at the top should now be green: "All the
     pre-contract (Schedule 2) details are in."
@@ -350,7 +353,15 @@ email, the same way you did; installers land on the field app.
    (some approximate): replace them with yours.
 3. Under **How sure we are**: once you've checked the figures against the
    manufacturer's datasheet, set **Confidence** to **Verified**, click
-   **Checked today**, and add the datasheet under **Sources**.
+   **Checked today**, and add the datasheet under **Sources**. While you're
+   there, check three figures the design checks read: **Factory
+   refrigerant charge (kg)** on each outdoor unit (from the nameplate or the
+   manual: a multi-split without it can't be designed, because the smallest
+   room it may serve depends on it; 15 researched outdoor units, mostly
+   Mitsubishi, don't have it yet), **Sound power (LWA)** for the noise check,
+   and **Wi-Fi / app**: start it with "Built-in" only when the datasheet
+   says Wi-Fi is built in, because that's what puts "App control" on a
+   proposal.
 4. Make sure at least one priced indoor and outdoor unit is set to the
    **Standard** tier and one to **Premium** (the Quiet option).
 5. **Save changes**.

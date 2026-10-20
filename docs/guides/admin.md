@@ -156,8 +156,11 @@ The project → **Start the design** (or **Open the design**) → **Draft the
 design**. It is drafted from the measured survey and the catalogue.
 
 - **Checks** at the top: each rule is a pass or a **CHECK** with the
-  reason: planning constraints, noise at the nearest neighbour, mounting,
-  access, catalogue data. They're for the engineer's eye, not decisions.
+  reason: planning constraints, noise at the nearest neighbour (MCS
+  020(a): 37.0 dB(A) from the heat pump, an estimate), the room size for the
+  R32 charge (a system over 1.84 kg can't serve a room below its minimum
+  floor area: approval is blocked), mounting, access, catalogue data.
+  They're for the engineer's eye, not decisions.
 - **Rooms**: the suggested size ("rule-of-thumb estimate for review, not a
   heat-loss calculation"), the size picked, condensate, pipe run, the indoor
   unit for each option, and **tick the photos that form the approved
@@ -188,7 +191,7 @@ The project → **Build the proposal** → **Start the proposal**.
    reason).
    - **Planning and noise**: when an option's approved design has its
      outdoor-unit count (permitted development, Class G), unit size or noise
-     at the neighbour's window (42 dB(A)) in review or blocked, the option
+     at the neighbour's window (MCS 020(a)) in review or blocked, the option
      shows an amber warning with the design's own words, and the proposal
      can't go until you either write a **Note for the customer** (**Start
      from the suggested note** gives a short one: a planning application may

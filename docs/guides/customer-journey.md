@@ -169,8 +169,8 @@ and its button opens the change to answer, until they've said yes or no.
 | **Your install starts \<day\>** | Email and text | The day before day 1, at about 4pm (5pm in summer): arrival, who's coming, parking |
 | **Your installer is on the way** | Text (email if no mobile, or if texts aren't set up) | When the installer taps On my way, each morning they do. One that can't go within 45 minutes (or by the arrival time it gives) is never sent late, and no reminder goes once the survey or install has started, or for a closed or cancelled project |
 | **Your install: day 1 of 3 done** | Email | When the installer ends the day with an update: what's done, what's next, and the 2 to 4 photos they picked |
-| **A change to your installation needs your OK** | Email and text | When the office sends a variation for their approval. They approve or decline on their page |
-| **You agreed a change to your installation** | Email | When they approve it: what changes, the price, the record of their yes |
+| **A change to your installation needs your OK** | Email and text | When the office sends a variation for their approval. They approve or decline on their page. Over £42 the email also carries the change's own cancellation information and form, and how to ask for the work to start straight away |
+| **You agreed a change to your installation** | Email | When they approve it: what changes, the price, the record of their yes. Over £42: the last day they can cancel the change, that the extra work waits for their written request to start (a reply with the words given) or for that day, the cancellation instructions and the form |
 | **Update: \<title\>** | Email | When you send an update on a problem or snag by hand |
 
 ### 7. Handover

@@ -2576,3 +2576,69 @@ changelog and the reasons, so nobody "fixes" a deliberate choice back.
       counting a failed refund as sent; the accountant's export lists it
       with `counted` = no. Web tests post signed fake events through the
       route (`tests/stripe-refund-failure.test.ts`).
+
+46. **Pre-launch review, round 8 (four findings and the round's medium list,
+    before the first real customers).**
+    - *R32 room size* (A2L, IEC 60335-2-40 Annex GG / BS EN 378-1 Annex C):
+      `EquipmentSpecs` gains `factoryChargeKg` (outdoor) and `releaseHeightM`
+      (indoor h0), carried by `SPEC_FIELDS` (editor, CSV, zod) and filled in
+      the researched seed from each item's own notes (the higher figure where
+      the research found two; 15 outdoor units have none) and in the DEMO
+      catalogue. `a2lSystemCheck` (design-record) works out factory plus added
+      charge per system (`refrigerant.factoryChargeKg`/`totalChargeKg`) and,
+      above `A2L_ROOM_CHECK_ABOVE_KG` (1.84 kg, 6 m³ × LFL 0.307), each room's
+      `a2lMinFloorAreaM2` = (m ÷ (2.5 × LFL^1.25 × h0))², rounded up; a room
+      below it, a room whose area is estimated, a floor or ceiling unit with
+      no h0 (`releaseHeightOf`: blank is a wall unit at 1.8 m, said so) and a
+      multi-split whose charge can't be worked out are **compatibility
+      errors**, so `designApprovalErrors` blocks them, and `bestMulti` never
+      suggests such a multi-split. Rule `refrigerant-room` ("Room size for the
+      R32 charge") shows the figures and says the manual's table decides and
+      can be stricter (close within ×1.25 is review). The runsheet's charge
+      step carries `max` on the added charge (the smallest room's
+      `a2lMaxChargeKg`, at least 1.84 kg, less the catalogue factory charge),
+      so an as-built over-charge is an exception for the tech lead. The
+      manufacturer-requirements guidance names the factory charge and the
+      minimum floor area table.
+    - *The handover pack's warranty* is `packWarrantyText`: the wording
+      frozen on the accepted proposal (`ProposalRecord.warranty`), else the
+      settings' (no accepted proposal), else none. The catalogue's `warranty`
+      field is internal research and never reaches a family; the registration
+      reminder keys on the maker (Daikin 90 days, else 30).
+    - *Noise, MCS 020(a)*: `OutdoorPosition.reflectingSurfaces` ("one" |
+      "two" | "three", `DIRECTIVITY_Q` 2/4/8) is a required survey answer for
+      a chosen position; `directivityOf` uses it, else guesses from the base
+      (never a pass). The rule compares the heat pump's own level with
+      `MCS_HEAT_PUMP_LIMIT_DB` (37.0: the 42 dB(A) `NOISE_LIMIT_DB` includes
+      an assumed 40 dB(A) background; read from extracts of MCS 020(a) Issue
+      1.1 and a gov.uk review, to confirm), no barrier credit, the last 1 dB
+      in review. The PD check, compliance guidance, suggested planning note
+      and survey copy no longer anchor on 42; the old demo engine (design.ts)
+      uses the same criterion and drops its 6 dB screening credit.
+    - *Variations over £42* (until solicitor question 13 is answered):
+      `variationHasOwnRight` (> `VARIATION_OWN_RIGHT_ABOVE_PENCE`, reg 27(3)),
+      `variationCancellationEndsOn` (the settings' days, at least 14, from the
+      London day agreed), `variationStart` (go / wait / none) and
+      `recordVariationEarlyStart` (`variation.earlyStart`: when they asked,
+      where it is, who recorded it). `variation-approval` and
+      `variation-accepted` carry `ownRight` and render
+      `variationCancellationInstructions` (Part A completed for a change: from
+      the day agreed, or for parts from possession if later) plus the model
+      form and `VARIATION_EARLY_START_WORDS`; the variation document freezes
+      `cancellation` (days, endsOn). The Issues page shows the period and
+      **Record their written request** (`recordVariationStartAction`,
+      `proposal.issue`); the field card shows `variationStart`'s text. Nothing
+      blocks resolving the issue: the app can't stop the crew, it tells them.
+    - *Terms `pilot-draft-2`* (the settings default; a saved `pilot-draft-1`
+      is changed by hand): a change over £42 has its own right to cancel; the
+      liability cap at "the price you paid us" is gone (foreseeable loss or
+      damage we cause, including to the home, and statutory rights untouched).
+    - *Medium list*: analytics never store a postcode, price or consent
+      (`lib/analytics-meta`, and the quote form stops sending them);
+      `wifiBuiltIn` decides "App control"; `premiumIsQuieter` decides whether
+      the Quiet option may say quieter (else "Premium", neutral copy); the
+      parking prep item asks for information and says the cost is ours unless
+      the proposal lists it; `/a` and the letter make no track-record or
+      "already designed" claims; `loadIntel("demo")` and the no-database
+      fallback need `demoModeAllowed`, `isSampleIntel` labels the sample
+      DEMO, and **Seed sample book** runs only on a demo deployment.

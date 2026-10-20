@@ -1,7 +1,7 @@
 # Known limitations
 
 An honest list of what the pilot platform doesn't do, or does only
-partly, as of 20 October 2026. None of these stops the four pilots; each
+partly, as of 20 October 2026 (round 8). None of these stops the four pilots; each
 says what to do instead. Approvals that need a professional are in
 [approvals-required.md](approvals-required.md).
 
@@ -26,8 +26,15 @@ says what to do instead. Approvals that need a professional are in
    them have no catalogue record. Designs only use a combination marked
    verified, after the technical lead checks the official table.
 5. **Outdoor-unit sound power is missing for most units**, so the noise
-   check at the neighbour's window (MCS 020) can't run fully. The technical
-   lead completes it from the datasheet.
+   check at the neighbour's window (MCS 020(a)) can't run fully. The technical
+   lead completes it from the datasheet. The check itself is an estimate:
+   the heat pump's own level at the assessment position against 37.0 dB(A)
+   (the 42 dB(A) limit includes an assumed 40 dB(A) background), with the
+   reflecting surfaces the surveyor counts (Q2, Q4, Q8) and no barrier
+   credit, so a position a barrier would save reads as review. *Instead:* the
+   technical lead runs the full MCS 020(a) calculation (with any barrier) for
+   anything in review, and confirms the 37.0 dB(A) figure against the
+   current issue (approvals item 13).
 6. **Room sizing is a rule of thumb**, labelled "for review, not a heat-loss
    calculation". The technical lead picks every size.
 7. **Commissioning targets are set by the technical lead, per job.** No
@@ -35,11 +42,48 @@ says what to do instead. Approvals that need a professional are in
    was verified, so the app shows the unverified candidates as hints, records
    every reading, and only judges readings once the technical lead sets the
    targets from the manual.
+   - *A pressure drop isn't worked out.* The test pressure and the pressure
+     at the end of the hold are each checked against the same window, never
+     against each other, and the hold time and the temperatures at the start
+     and end aren't asked for (the vacuum decay is the same: each reading on
+     its own). *Instead:* set the test-pressure target's minimum to the
+     manual's test pressure, so any drop below it is flagged; the engineer
+     writes the hold time and temperatures in the step's note and marks the
+     step **Fail** for any drop the temperature doesn't explain; the
+     technical lead compares "Test pressure" and "After the hold" on the
+     **Commission** tab before signing.
+   - *The R32 room size is re-checked from the catalogue's factory charge.*
+     The charge step flags an added charge over what the smallest room on
+     the system allows, worked out with the catalogue's factory charge, not
+     the nameplate figure the engineer types. *Instead:* if the nameplate
+     differs, the technical lead re-checks total charge against the manual's
+     minimum floor area table before signing.
 8. **Model codes and generations need confirming** with the UK distributor
    before ordering (for example Daikin FTXM-A vs FTXM-R, Panasonic CKE vs
    ZKE, Mitsubishi MXZ VF3/VF4/VF5).
 9. **Warranty terms are unconfirmed** for all three brands on air-to-air
-   systems. The app shows no warranty years anywhere until you set them.
+   systems. The app shows no warranty years anywhere until you set them, and
+   the catalogue's own **Warranty** notes (research, "NOT confirmed") never
+   reach a family: the handover pack states the warranty wording frozen on
+   their accepted proposal.
+9a. **Manufacturer minimums aren't modelled.** The design checks maximum
+   pipe lengths, height differences, ports and connected capacity, but not
+   the manuals' minimum pipe length (per room or in total), the fewest indoor
+   units a multi-split takes, the height between two indoor units, or a
+   height limit that depends on whether the outdoor unit is above or below.
+   A run under the minimum reads as a pass. *Instead:* the technical lead
+   checks them from the installation manual (the **Manufacturer installation
+   requirements** item now names minimum lengths), and the crew coils any
+   excess rather than cutting a run below the manual's minimum.
+9b. **R32 room size needs each outdoor unit's factory charge.** Above 1.84 kg
+   in one system, every room it serves needs a minimum floor area (IEC
+   60335-2-40 Annex GG formula; the manual's own table can be stricter, and
+   the technical lead checks it). 15 researched outdoor units, mostly
+   Mitsubishi, have no factory charge on record: a multi-split on one can't
+   be approved, and the engine won't suggest it, until it's added from the
+   nameplate or manual (START-HERE step 9). Indoor units without a height
+   are taken as wall units at 1.8 m; a floor or ceiling unit needs its
+   height set.
 
 ## The field app
 
@@ -161,6 +205,18 @@ says what to do instead. Approvals that need a professional are in
       it: the app makes no deduction for the equipment (reg 34(9)-(10)
       would need advice first). The unpaid part of a part-paid invoice is
       credited when the cancellation is recorded.
+    - *A change over £42 agreed during the install* is treated as a contract
+      of its own until a solicitor says otherwise (approvals item 7a): the
+      family can cancel it within 14 days of agreeing, and the crew only
+      starts it inside those days once the family has asked in writing (the
+      office records their reply on the Issues page). No reply means the
+      extra work waits for the end of the 14 days: book a return visit.
+      Nothing stops a crew physically doing the work early; the field card
+      says **don't start it** until then.
+    - *Parking*: the prep list asks the family for parking information; a
+      permit or a suspended bay is ours to arrange and pay for unless the
+      proposal lists it (**Add a cost** → "Parking permit"), because the
+      pre-contract information says there are no other costs.
     - *The 0% VAT rate for energy-saving materials* can't be put on a
       proposal issued after 31 March 2027; a job that straddles the date
       (issued before, installed after) goes to the accountant (approvals
@@ -210,6 +266,11 @@ says what to do instead. Approvals that need a professional are in
     morning's run (inside its 7 days). Emails you send from the office are
     never held back by it. If real leads ever get near it, move to a paid
     Resend plan and raise the numbers in `lib/email-budget.ts`.
+29a. **Website analytics record how far a visitor got through the quote**,
+    never the postcode they typed, the price or their consent choices (the
+    server drops them even if an old page sends them). Analytics from before
+    this change may still hold postcodes and prices in `analytics_events`;
+    delete those rows in Supabase if you want them gone.
 30. **Service-level promises (credits for missed dates) are switched off**
     until they're worked out; the website makes no such promise.
 31. **No finance offers** until an FCA-authorised lender or broker is in
@@ -217,10 +278,12 @@ says what to do instead. Approvals that need a professional are in
 
 ## Legal text
 
-32. **The terms (`pilot-draft-1`) and the cancellation wording haven't been
+32. **The terms (`pilot-draft-2`) and the cancellation wording haven't been
     reviewed by a solicitor.** The model cancellation form was
-    reconstructed from research, not copied from the official PDF.
-    `/ops/launch` stays amber until it's reviewed and ticked in Settings.
+    reconstructed from research, not copied from the official PDF, and the
+    instructions for a change agreed during the install are our own
+    completion of it. `/ops/launch` stays amber until it's reviewed and
+    ticked in Settings.
 
 ## Running the site
 

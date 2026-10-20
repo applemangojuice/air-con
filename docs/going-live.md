@@ -185,7 +185,7 @@ Git → Production Branch, normally `main`).
 | A refund made in Stripe doesn't appear on the money page | The webhook isn't sent `charge.refunded` | Add `charge.refunded` and `charge.refund.updated` to the endpoint in Stripe (step 3); Stripe resends recent events from its dashboard |
 | A refund that failed at Stripe still shows as refunded | The webhook isn't sent `refund.failed` (and `refund.updated`) | Add them to the endpoint (step 3), then resend the refund's events from Stripe's dashboard: the refund is marked failed and the money shows as owed back |
 | Pages feel slow (a second or more per click) | The functions and the database are far apart | Put Supabase and `regions` in `apps/web/vercel.json` in the same place (London by default) |
-| Property intelligence shows 0 | The property book hasn't been loaded | `/ops/intel` → **Seed sample book**, or the importer ([property-intelligence.md](./property-intelligence.md)) |
+| Property intelligence shows 0 | The property book hasn't been loaded | The importer ([property-intelligence.md](./property-intelligence.md)). **Seed sample book** (made-up homes on real street names) only appears on a demo deployment, never on the live site |
 
 **The key idea:** the site only falls back to demo mode (works, saves
 nothing) when Supabase is *unconfigured*. Once the keys are set but the

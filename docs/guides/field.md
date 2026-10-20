@@ -139,8 +139,11 @@ loft hatch, and a torch for the fuse board.
       and height drop, and whether the condensate drains by gravity or needs
       a pump.
    5. **Outdoor**: a photo with the unit drawn on it, distance to the nearest
-      neighbour's window, base or bracket, access equipment, where defrost
-      water will go.
+      neighbour's window (to a point 1 m out from the centre of their nearest
+      habitable-room window or glazed door: MCS 020(a)'s assessment
+      position), **Hard surfaces within 1 m of the unit** (the ground counts:
+      one, two against a wall, three in a corner or side return), base or
+      bracket, access equipment, where defrost water will go.
    6. **Electrics**: fuse board photo, spare ways, earthing, cable route and
       length, and the old-board asbestos check.
    7. **Permissions**: the permitted-development questions for the outdoor
@@ -303,8 +306,13 @@ open on your account too) and partly on site.
 **Design approval** (desk). The project → **Open the design**. Check each
 room's suggested size (a rule of thumb, not a heat-loss calculation), pick
 the size, confirm the outdoor unit, the pipe runs and condensate, and look
-at every **CHECK** light: planning, noise at the nearest neighbour (the
-full MCS 020 calculation is yours), mounting, access, catalogue data.
+at every **CHECK** light: planning, noise at the nearest neighbour (an
+estimate against the 37.0 dB(A) MCS 020(a) leaves the heat pump, with no
+barrier credit; the full MCS 020(a) calculation is yours), **Room size for
+the R32 charge** (over 1.84 kg in one system, every room it serves needs the
+manual's minimum floor area: the app uses the IEC 60335-2-40 formula and
+blocks approval when a room is too small or not measured; check the
+manual's own table), mounting, access, catalogue data.
 Multi-split only from a combination the catalogue marks verified. Then
 **Approve and sign**: that locks the layout photos the crew works from.
 
