@@ -265,7 +265,8 @@ test("a survey with nobody down to do it alerts the team once, on the working da
   assert.equal(fri.kind === "notify" && fri.discriminator, "survey-unassigned:2026-10-26T10:00:00.000Z", "one alert per slot, whichever day sends it");
   assert.match(fri.kind === "notify" ? (fri.data as { title: string }).title : "", /No surveyor for Demo Person \(DEMO\)'s survey on 2026-10-26 at 10:00/);
   assert.ok(alert("2026-10-24"), "the weekend run catches up (same key: sent once)");
-  assert.match(alert("2026-10-26")!.kind === "notify" ? (alert("2026-10-26")!.data as { title: string }).title : "", /survey today at 10:00/);
+  const onTheDay = alert("2026-10-26");
+  assert.match(onTheDay?.kind === "notify" ? (onTheDay.data as { title: string }).title : "", /survey today at 10:00/);
   assert.equal(alert("2026-10-27"), undefined, "after the slot: nothing");
   // Someone assigned: no alert, and the day-before reminder names them.
   const assigned = project((x) => {
