@@ -1,5 +1,5 @@
 import type { CatalogueItem } from "./catalogue.ts";
-import { A2L_ROOM_CHECK_ABOVE_KG, a2lMaxChargeKg, releaseHeightOf, type DesignRecord, type DesignVariant, type SystemSelection } from "./design-record.ts";
+import { A2L_ROOM_CHECK_ABOVE_KG, a2lMaxChargeKg, multiSplitReducers, releaseHeightOf, type DesignRecord, type DesignVariant, type PortReducer, type SystemSelection } from "./design-record.ts";
 import {
   VACUUM_STANDARD_MICRON,
   judgePressureDecay,
@@ -756,6 +756,7 @@ export type EvidenceRole =
   | "serial-outdoor"
   | "flare-liquid"
   | "flare-gas"
+  | "reducer-torque"
   | "condensate-fall"
   | "strength-test"
   | "strength-start-temp"
@@ -812,6 +813,7 @@ export type TargetKey =
   | "torque.12.7"
   | "torque.15.88"
   | "torque.unsized"
+  | "torque.reducer"
   | "condensate.fall"
   | "charge.tolerance";
 
@@ -926,6 +928,14 @@ export const JOB_TARGETS: Record<TargetKey, TargetDef> = {
     unit: "N·m",
     bounds: "min-max",
     hint: "An indoor unit on this job has no pipe sizes in the catalogue, so its flares have no torque window. Set it from the manual's torque table for the flare size actually fitted (every unsized flare on this job uses it: if they differ, add the sizes to the catalogue item instead), and add the sizes to the catalogue.",
+    recordOnly: false,
+  },
+  "torque.reducer": {
+    key: "torque.reducer",
+    label: "Reducer joint torque (multi-split ports)",
+    unit: "N·m",
+    bounds: "min-max",
+    hint: "A port on the outdoor unit is a different size from the pipe, so a reducer goes on it. Set the reducer joint's torque from the outdoor unit's manual: it's often lower than the field flare's. No figure was verified in the research.",
     recordOnly: false,
   },
   "condensate.fall": {
@@ -1675,9 +1685,17 @@ export function runsheetFromDesign(
       ],
     });
   }
+  // A multi-split with its port sizes on record: the reducers each room's flares step tightens and records.
+  const reducers = new Map<string, PortReducer[]>();
+  for (const s of systems) {
+    for (const red of multiSplitReducers(s.outdoor, s.rooms.map((r) => ({ roomId: r.id, roomName: r.name, ...(r.indoor ? { indoor: r.indoor } : {}) }))) ?? []) {
+      reducers.set(red.roomId, [...(reducers.get(red.roomId) ?? []), red]);
+    }
+  }
   for (const r of rooms) {
     const liquid = flareSize(r.indoor?.specs?.liquidPipeMm);
     const gas = flareSize(r.indoor?.specs?.gasPipeMm);
+    const roomReducers = reducers.get(r.id) ?? [];
     const flareSlot = (key: string, line: "Liquid" | "Gas", size: FlareSizeMm | null, role: EvidenceRole): SlotDef => {
       const cand = size ? torqueCandidate(size, r.indoor?.manufacturer) : null;
       return {
@@ -1709,11 +1727,27 @@ export function runsheetFromDesign(
       systemId: r.systemId,
       requires: "fgas",
       guidance: `Calibrated torque wrench on every flare, indoor and outdoor ends. Record the setting you used for each line.${
-        (systems.find((x) => x.sel.id === r.systemId)?.rooms.length ?? 1) > 1
-          ? " Multi-split: where the outdoor unit's port is a different size from this pipe, fit the reducer the manual names and tighten its nuts as the manual says (often less than the normal torque), not to this line's window, which is for the field flares."
-          : ""
+        roomReducers.length
+          ? ` Multi-split: ${roomReducers.map((x) => `outdoor port ${x.port} is ${x.portMm} mm ${x.line} and this pipe ${x.pipeMm} mm`).join("; ")}. Fit the reducer (often in the outdoor unit's accessory bag, else on the kit list), tighten it to the job's reducer torque from the manual (often less than the field flare's), and record it.`
+          : (systems.find((x) => x.sel.id === r.systemId)?.rooms.length ?? 1) > 1
+            ? " Multi-split: where the outdoor unit's port is a different size from this pipe, fit the reducer the manual names and tighten its nuts as the manual says (often less than the normal torque), not to this line's window, which is for the field flares."
+            : ""
       }`,
-      slots: [flareSlot("liquid", "Liquid", liquid, "flare-liquid"), flareSlot("gas", "Gas", gas, "flare-gas")],
+      slots: [
+        flareSlot("liquid", "Liquid", liquid, "flare-liquid"),
+        flareSlot("gas", "Gas", gas, "flare-gas"),
+        ...roomReducers.map(
+          (x): SlotDef => ({
+            key: `reducer-${x.line}`,
+            kind: "torque",
+            label: `Reducer at outdoor port ${x.port}, ${x.line} line (${x.portMm} to ${x.pipeMm} mm)`,
+            unit: "N·m",
+            role: "reducer-torque",
+            targetKey: "torque.reducer",
+            window: RECORD_ONLY("Record the wrench setting. The tech lead sets the reducer torque from the outdoor unit's manual before sign-off."),
+          }),
+        ),
+      ],
     });
   }
   for (const r of rooms) {

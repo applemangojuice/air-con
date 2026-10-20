@@ -1177,3 +1177,31 @@ test("round 9: no charge rate in the catalogue reads as unknown, never 'design: 
   assert.match(added.label, /no charge rate in the catalogue: work it out from the manual/);
   assert.doesNotMatch(added.label, /design: 0 g/);
 });
+
+test("multi-split reducers: a port that differs from the pipe adds a reducer to the bill of materials and a torque reading on the flares step; unknown ports stay as today's guidance", async () => {
+  const { multiSplitReducers } = await import("./design-record.ts");
+  const ported = CATALOGUE.map((c) => (c.id === "out-multi" ? { ...c, specs: { ...c.specs, portSizesMm: "A 6.35/9.52, B 6.35/9.52" } } : c));
+  // Room 1 has a 2.5 kW unit (9.52 gas), room 2 a 5 kW one (12.7 gas): room 2 takes a 9.52 port and needs a gas reducer.
+  const rooms = [
+    { roomId: "room-1", roomName: "Main bedroom", indoor: ported.find((c) => c.id === "in-25")! },
+    { roomId: "room-2", roomName: "Living room", indoor: ported.find((c) => c.id === "in-50")! },
+  ];
+  const outdoor = ported.find((c) => c.id === "out-multi")!;
+  assert.deepEqual(multiSplitReducers(outdoor, rooms), [{ roomId: "room-2", roomName: "Living room", port: "A", line: "gas", portMm: 9.52, pipeMm: 12.7 }]);
+  assert.equal(multiSplitReducers(CATALOGUE.find((c) => c.id === "out-multi"), rooms), null, "no port sizes on record");
+  assert.equal(multiSplitReducers(outdoor, rooms.slice(0, 1)), null, "a single split");
+  assert.deepEqual(multiSplitReducers({ ...outdoor, specs: { ...outdoor.specs, portSizesMm: "A 6.35/9.52, B 6.35/12.7" } }, rooms), [], "a port of each size: none");
+
+  const steps = runsheetFromDesign(design(2, "multi"), "v-std", ported);
+  const living = steps.find((s) => s.title === "Flares and torque" && s.roomId === "room-2")!;
+  const red = living.evidence.find((e) => e.role === "reducer-torque")!;
+  assert.match(red.label, /Reducer at outdoor port A, gas line \(9\.52 to 12\.7 mm\)/);
+  assert.deepEqual([red.kind, red.targetKey], ["torque", "torque.reducer"]);
+  assert.match(living.guidance ?? "", /outdoor port A is 9\.52 mm gas and this pipe 12\.7 mm/);
+  assert.ok(unconfirmedTargets(steps).includes("torque.reducer"), "the tech lead sets it from the manual before sign-off");
+  assert.equal(steps.find((s) => s.title === "Flares and torque" && s.roomId === "room-1")!.evidence.some((e) => e.role === "reducer-torque"), false);
+  // Unknown ports: no reducer slot, today's guidance.
+  const unknown = runsheetFromDesign(design(2, "multi"), "v-std", CATALOGUE).find((s) => s.title === "Flares and torque" && s.roomId === "room-2")!;
+  assert.equal(unknown.evidence.some((e) => e.role === "reducer-torque"), false);
+  assert.match(unknown.guidance ?? "", /fit the reducer the manual names/);
+});

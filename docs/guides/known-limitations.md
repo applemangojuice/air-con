@@ -115,15 +115,19 @@ says what to do instead. Approvals that need a professional are in
    are taken as wall units at 1.8 m; a floor or ceiling unit needs its
    height set.
 
-9c. **Multi-split reducers aren't modelled.** The catalogue has no port
-   sizes for multi-split outdoor units, so the design's bill of materials
-   and the kit never add a reducer, the job pack's flare heads are the
-   indoor units' sizes only, and the runsheet records one torque reading per
-   line (the field flares), not the reducer's joint. The flares step tells
-   the crew to tighten a reducer's nuts as the manual says. *Instead:* the
-   technical lead reads the outdoor unit's port and reducer table in the
-   manual, adds any reducers to the purchase order, and checks them on the
-   day.
+9c. **Multi-split reducers are modelled where the catalogue has the port
+   sizes** (§K49; was "aren't modelled"). An outdoor unit's **Outdoor port
+   sizes per branch** puts a reducer on the bill of materials wherever a
+   port differs from the indoor unit's pipe, and a torque reading for it on
+   the flares step, against a target the technical lead sets from the
+   manual. But: *no researched outdoor unit has its port sizes yet* (three
+   Panasonic multi-splits' notes say 1/4" liquid and 3/8" gas a port, not
+   filled until checked in the manual), so today every job still gets the
+   guidance only; which room goes on which port is the app's best fit (the
+   biggest pipes first), not the crew's choice; a reducer supplied with the
+   unit still shows as a line to price (at £0). *Instead:* fill the port
+   sizes from the manual for the multi-splits you'll fit, and check the
+   reducers in the accessory bag before ordering.
 9d. **The weighed charge is checked against the as-built length** (§K49;
    was "isn't compared"). The charge step works out max(0, as-built length −
    pre-charged length) × g/m from the length the engineer types, per outdoor

@@ -775,3 +775,15 @@ test("access at height: a tower, podium, scaffold or MEWP is planned; a ladder a
   assert.doesNotMatch(find(lower).detail, /isn't accepted/, "the survey's own limit decides");
   assert.ok(standard(mewp).installDays >= standard(draft([ROOMS[0]!])).installDays);
 });
+
+test("multi-split reducers: the outdoor unit's port sizes add a reducer line wherever a port differs from the indoor unit's pipe", () => {
+  const plain = standard(draft(ROOMS.slice(0, 2)));
+  assert.equal(plain.bom.some((l) => /^reducer-/.test(l.sku)), false, "no port sizes on record: no reducer, today's guidance");
+  // Ports of 6.35/15.88 on the DEMO duo: every indoor pipe differs on the gas line.
+  const catalogue = DEMO_CATALOGUE.map((c) => (c.id === "demo-out-duo50" ? { ...c, specs: { ...c.specs, portSizesMm: "A 6.35/15.88, B 6.35/15.88" } } : c));
+  const s = standard(draft(ROOMS.slice(0, 2), { catalogue }));
+  const reducers = s.bom.filter((l) => /^reducer-/.test(l.sku));
+  assert.ok(reducers.length >= 1);
+  assert.ok(reducers.every((l) => l.category === "materials" && /15\.88 mm to/.test(l.label) && /accessory bag/.test(l.note ?? "")));
+  assert.equal(reducers.reduce((n, l) => n + l.qty, 0), 2, "one per room's gas line");
+});

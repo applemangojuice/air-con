@@ -60,6 +60,13 @@ export interface EquipmentSpecs {
   minIndoorUnits?: number | null;
   /** Multi-splits: the least indoor capacity connected (cooling, kW). */
   minConnectedKw?: number | null;
+  /**
+   * Multi-splits: each outdoor port's liquid/gas size, mm, from the manual
+   * ("A 6.35/9.52, B 6.35/9.52, C 6.35/12.7"). Where a port differs from the
+   * indoor unit's pipe, the design adds a reducer (parsePortSizes). Blank:
+   * not on record, and the runsheet says to check the manual.
+   */
+  portSizesMm?: string | null;
   prechargedPipeM: number | null;
   additionalChargeGPerM: number | null;
   /** Outdoor units: the refrigerant charged at the factory (nameplate), kg. With the added charge it sets the R32 minimum room size. */
@@ -98,6 +105,7 @@ export const SPEC_FIELDS: { key: keyof EquipmentSpecs; label: string; unit?: str
   { key: "maxIndoorHeightDiffM", label: "Maximum height between indoor units (multi-split)", unit: "m", kind: "number" },
   { key: "minIndoorUnits", label: "Fewest indoor units connected (multi-split)", kind: "number" },
   { key: "minConnectedKw", label: "Minimum connected indoor capacity (multi-split)", unit: "kW", kind: "number" },
+  { key: "portSizesMm", label: "Outdoor port sizes per branch, liquid/gas (multi-split), e.g. A 6.35/9.52, B 6.35/12.7", unit: "mm", kind: "text" },
   { key: "prechargedPipeM", label: "Pre-charged (chargeless) pipe length", unit: "m", kind: "number" },
   { key: "additionalChargeGPerM", label: "Additional charge per metre", unit: "g/m", kind: "number" },
   { key: "factoryChargeKg", label: "Factory refrigerant charge", unit: "kg", kind: "number" },
@@ -108,6 +116,33 @@ export const SPEC_FIELDS: { key: keyof EquipmentSpecs; label: string; unit?: str
   { key: "operatingRangeCoolingC", label: "Operating range, cooling", unit: "°C", kind: "text" },
   { key: "operatingRangeHeatingC", label: "Operating range, heating", unit: "°C", kind: "text" },
 ];
+
+/** One outdoor port of a multi-split, as the catalogue records it. */
+export interface PortSize {
+  port: string;
+  liquidMm: number;
+  gasMm: number;
+}
+
+/**
+ * The ports in a catalogue item's `portSizesMm`: entries split by commas or
+ * semicolons, each "A 6.35/9.52" (or just "6.35/9.52", lettered in order).
+ * Null when blank, or when any entry can't be read (never half a list).
+ */
+export function parsePortSizes(text: string | null | undefined): PortSize[] | null {
+  const raw = (text ?? "").trim();
+  if (!raw) return null;
+  const out: PortSize[] = [];
+  for (const [i, part] of raw.split(/[,;]+/).map((x) => x.trim()).filter(Boolean).entries()) {
+    const m = part.match(/^(?:([A-Za-z0-9]{1,3})\s*[:=]?\s+)?(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)$/);
+    if (!m) return null;
+    const liquidMm = Number(m[2]);
+    const gasMm = Number(m[3]);
+    if (!(liquidMm > 0 && gasMm > 0 && liquidMm <= 30 && gasMm <= 40)) return null;
+    out.push({ port: m[1] ?? String.fromCharCode(65 + i), liquidMm, gasMm });
+  }
+  return out.length ? out : null;
+}
 
 export interface CatalogueItem {
   id: string;

@@ -1,6 +1,7 @@
 import {
   CATALOGUE_KINDS,
   SPEC_FIELDS,
+  parsePortSizes,
   catalogueFromCsv,
   catalogueItemErrors,
   catalogueToCsv,
@@ -118,6 +119,7 @@ const specsSchema = z
     maxIndoorHeightDiffM: nullableNum,
     minIndoorUnits: num.int().min(1).max(9).nullable().optional(),
     minConnectedKw: nullableNum,
+    portSizesMm: nullableText(SPEC_TEXT_MAX).refine((v) => !v || parsePortSizes(v) !== null, "Port sizes look like: A 6.35/9.52, B 6.35/12.7 (liquid/gas, mm, one per port)"),
     prechargedPipeM: nullableNum,
     additionalChargeGPerM: nullableNum,
     factoryChargeKg: num.positive().max(50).nullable().optional(),

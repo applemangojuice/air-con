@@ -457,6 +457,7 @@ const TARGETS = {
   "Vacuum decay: rise limit": { max: "200" },
   "Decay test": { max: "500" },
   "Flare torque": {},
+  "Reducer joint torque": { min: "15", max: "20" },
   "Condensate drain fall": { recordOnly: true },
 };
 async function setTargets(page) {

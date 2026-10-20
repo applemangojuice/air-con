@@ -460,11 +460,15 @@ clear it.
    reading after the hold if the manual gives one, flare torque for each
    pipe size (and **Flare torque, pipe size not in the catalogue** when an
    indoor unit has no pipe sizes on record: set it from the manual, and add
-   the sizes to the catalogue), condensate fall. **Charge: allowed
+   the sizes to the catalogue), **Reducer joint torque (multi-split
+   ports)** when the catalogue's port sizes put a reducer on the job (set it
+   from the outdoor unit's manual), condensate fall. **Charge: allowed
    difference from the as-built figure** shows **Company default** (10% or
    50 g, whichever is larger) and needn't be confirmed: set a ± g figure
    only if the manual or the job needs one. On a multi-split, any
-   reducer on an outdoor port is tightened as the manual says, not to the
+   reducer on an outdoor port is tightened as the manual says (where the
+   catalogue has the unit's port sizes, the flares step names the port and
+   asks for the reducer's torque reading), not to the
    field flare's window. Type the figure and the manual page → **Set
    target**. Readings already taken are judged against what you set; a
    change that would pass a test that already failed leaves it failed,

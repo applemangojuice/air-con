@@ -39,7 +39,7 @@ const SPEC_KEYS = [
   "coolingKw", "heatingKw", "seer", "scop", "energyClassCooling", "energyClassHeating", "soundPressureLowDb",
   "soundPressureHighDb", "soundPowerDb", "dimensionsMm", "weightKg", "refrigerant", "liquidPipeMm", "gasPipeMm",
   "maxPipeM", "maxHeightDiffM", "minPipeM", "maxPipePerBranchM", "minTotalPipeM", "maxTotalPipeM", "maxIndoorHeightDiffM", "minIndoorUnits",
-  "minConnectedKw", "prechargedPipeM", "additionalChargeGPerM", "factoryChargeKg", "releaseHeightM", "powerSupply", "recommendedBreakerA",
+  "minConnectedKw", "portSizesMm", "prechargedPipeM", "additionalChargeGPerM", "factoryChargeKg", "releaseHeightM", "powerSupply", "recommendedBreakerA",
   "wifi", "operatingRangeCoolingC", "operatingRangeHeatingC",
 ];
 

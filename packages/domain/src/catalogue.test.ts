@@ -387,3 +387,17 @@ test("DEMO data is labelled DEMO everywhere, and its first nineteen ids match th
   assert.deepEqual(DEMO_CATALOGUE.slice(0, seedIds.length).map((i) => i.id), seedIds);
   assert.ok(DEMO_COMPATIBILITY.every((r) => r.source?.title?.includes("DEMO")));
 });
+
+test("multi-split port sizes: one per port, liquid/gas mm, lettered in order when unlabelled; anything unreadable is no list", async () => {
+  const { parsePortSizes } = await import("./catalogue.ts");
+  assert.deepEqual(parsePortSizes("A 6.35/9.52, B 6.35/9.52; C: 6.35/12.7"), [
+    { port: "A", liquidMm: 6.35, gasMm: 9.52 },
+    { port: "B", liquidMm: 6.35, gasMm: 9.52 },
+    { port: "C", liquidMm: 6.35, gasMm: 12.7 },
+  ]);
+  assert.deepEqual(parsePortSizes("6.35/9.52, 6.35/12.7")?.map((p) => p.port), ["A", "B"]);
+  assert.equal(parsePortSizes(""), null);
+  assert.equal(parsePortSizes(null), null);
+  assert.equal(parsePortSizes("A 6.35/9.52, B big"), null, "half a list is no list");
+  assert.equal(parsePortSizes("A 0/9.52"), null);
+});

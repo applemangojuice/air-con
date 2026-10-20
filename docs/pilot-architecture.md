@@ -2941,4 +2941,18 @@ changelog and the reasons, so nobody "fixes" a deliberate choice back.
       tab asks it when the crew has a subcontractor, `signCommissioning`
       keeps it only then. The pack renders a "Health and safety file"
       section.
+    - *Multi-split reducers* (was known limitation 9c):
+      `EquipmentSpecs.portSizesMm` (text, `SPEC_FIELDS`, the catalogue zod
+      refuses what `parsePortSizes` can't read; `build-catalogue-data.mjs`
+      writes null for every researched item: none has one yet).
+      `multiSplitReducers(outdoor, rooms)` (design-record) assigns ports to
+      rooms (biggest gas pipe first, an exact port where there is one, else
+      the nearest) and returns a `PortReducer` per line that differs; null
+      for a single split, no ports on record or an indoor unit without
+      pipe sizes. `buildBom` adds a generic `reducer-<line>-<port>-<pipe>`
+      line per reducer (unpriced: the office prices it, £0 if it comes in
+      the accessory bag); the runsheet's flares step gains a torque slot per
+      reducer (role `reducer-torque`, new target `torque.reducer`,
+      recordOnly false) and names the port in its guidance; unknown keeps
+      the old guidance. The tools list names the reducers.
 

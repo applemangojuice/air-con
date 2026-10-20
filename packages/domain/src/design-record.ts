@@ -1,5 +1,6 @@
 import {
   PROVISIONAL_RULE_WARNING,
+  parsePortSizes,
   findRule,
   fmtKw,
   isConnectable,
@@ -1170,6 +1171,52 @@ function pipeLine(mats: Mat[], liquid: string, gas: string): Mat[] {
   return mats.filter((m) => /pipe|line set|line-set|lineset/.test(m.text) && !/trunking/.test(m.text) && pair.test(m.text));
 }
 
+/** A reducer where a multi-split's outdoor port differs from the indoor unit's pipe. */
+export interface PortReducer {
+  roomId: string;
+  roomName: string;
+  port: string;
+  line: "liquid" | "gas";
+  portMm: number;
+  pipeMm: number;
+}
+
+const sameSize = (a: number, b: number) => Math.abs(a - b) <= 0.3;
+
+/**
+ * The reducers a multi-split needs, from the outdoor unit's port sizes in the
+ * catalogue (`portSizesMm`) and each indoor unit's pipe sizes: rooms with the
+ * biggest gas pipes first take a port of their own size where there is one,
+ * else the nearest, and every line where the port and the pipe differ gets
+ * a reducer. Null when it can't be said: a single split, no port sizes on
+ * record, or an indoor unit with no pipe sizes (the manual decides, as today).
+ */
+export function multiSplitReducers(outdoor: CatalogueItem | undefined, rooms: { roomId: string; roomName: string; indoor?: CatalogueItem }[]): PortReducer[] | null {
+  if (rooms.length < 2) return null;
+  const ports = parsePortSizes(outdoor?.specs?.portSizesMm);
+  if (!ports) return null;
+  const sized = rooms.map((r) => ({ r, liquid: r.indoor?.specs?.liquidPipeMm, gas: r.indoor?.specs?.gasPipeMm }));
+  if (sized.some((x) => typeof x.liquid !== "number" || typeof x.gas !== "number")) return null;
+  const free = [...ports];
+  const out: PortReducer[] = [];
+  for (const x of [...sized].sort((a, b) => b.gas! - a.gas!)) {
+    if (!free.length) break;
+    let idx = free.findIndex((p) => sameSize(p.liquidMm, x.liquid!) && sameSize(p.gasMm, x.gas!));
+    if (idx < 0) {
+      idx = 0;
+      free.forEach((p, i) => {
+        const d = Math.abs(p.gasMm - x.gas!) * 10 + Math.abs(p.liquidMm - x.liquid!);
+        const best = Math.abs(free[idx]!.gasMm - x.gas!) * 10 + Math.abs(free[idx]!.liquidMm - x.liquid!);
+        if (d < best) idx = i;
+      });
+    }
+    const p = free.splice(idx, 1)[0]!;
+    if (!sameSize(p.liquidMm, x.liquid!)) out.push({ roomId: x.r.roomId, roomName: x.r.roomName, port: p.port, line: "liquid", portMm: p.liquidMm, pipeMm: x.liquid! });
+    if (!sameSize(p.gasMm, x.gas!)) out.push({ roomId: x.r.roomId, roomName: x.r.roomName, port: p.port, line: "gas", portMm: p.gasMm, pipeMm: x.gas! });
+  }
+  return out;
+}
+
 function buildBom(input: {
   systems: SystemSelection[];
   rooms: RoomDesignInput[];
@@ -1206,6 +1253,20 @@ function buildBom(input: {
   // Per room: pipe, interconnect, condensate, trunking, sleeve.
   for (const s of systems) {
     const outdoor = byId.get(s.outdoorItemId);
+    // A multi-split whose port sizes are on record: a reducer wherever a port differs from the pipe (often in the unit's accessory bag).
+    for (const r of multiSplitReducers(
+      outdoor,
+      s.roomIds.map((id) => ({ roomId: id, roomName: roomOf(id)?.roomName ?? id, ...(byId.get(roomUnits.find((u) => u.roomId === id)?.indoorItemId ?? "") ? { indoor: byId.get(roomUnits.find((u) => u.roomId === id)!.indoorItemId)! } : {}) })),
+    ) ?? []) {
+      bom.generic(
+        `reducer-${r.line}-${r.portMm}-${r.pipeMm}`,
+        `Reducer, ${r.portMm} mm to ${r.pipeMm} mm (${r.line} line, multi-split port)`,
+        1,
+        "each",
+        "materials",
+        `${r.roomName}: outdoor port ${r.port} is ${r.portMm} mm ${r.line}, the pipe ${r.pipeMm} mm (check the outdoor unit's accessory bag first)`,
+      );
+    }
     for (const roomId of s.roomIds) {
       const room = roomOf(roomId);
       if (!room) continue;

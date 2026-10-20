@@ -160,6 +160,14 @@ export default async function FieldHelpPage() {
           </p>
         </Fold>
 
+        <Fold id="reducers" title="Multi-split reducers">
+          <p>
+            Where the catalogue has the outdoor unit&apos;s port sizes and a port differs from the pipe, the <B>Flares and torque</B> step names the port and asks for the
+            reducer&apos;s torque: fit the reducer (often in the unit&apos;s accessory bag) and tighten it to the job&apos;s reducer torque from the manual. No port sizes on record: fit
+            what the manual names and tighten it as it says.
+          </p>
+        </Fold>
+
         <Fold id="charge" title="The charge">
           <p>
             On the <B>F-gas label and charge record</B> step, type the as-built length first. The step works out the charge it needs from the catalogue (max(0, as-built

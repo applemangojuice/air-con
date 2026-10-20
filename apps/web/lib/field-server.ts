@@ -763,6 +763,8 @@ function toolsFor(job: InstallJobV2 | null, measured: MeasuredSurvey | null | un
   }
   if (sizes.size) out.push({ label: `Flare heads: ${[...sizes].sort((a, b) => Number(a) - Number(b)).map((s) => `${s} mm`).join(", ")}`, why: "Pipe sizes on this design" });
   if (unsized) out.push({ label: "Flare heads for the indoor unit whose pipe sizes aren't in the catalogue", why: "Check its manual for the sizes" });
+  const reducerSlots = steps.flatMap((s) => s.evidence.filter((e) => e.targetKey === "torque.reducer").map((e) => `${s.item ?? ""}: ${e.label}`));
+  if (reducerSlots.length) out.push({ label: `Reducers for the outdoor unit's ports (${reducerSlots.length}), and the crowfoot heads for them`, why: "A multi-split port differs from its pipe: check the unit's accessory bag, else the kit list" });
   if (steps.some((s) => s.title === "Brazed joint in the pipe run")) {
     out.push({ label: "Brazing kit, nitrogen purge regulator and brazing rods", why: "A run on this job is longer than one coil" });
     out.push({ label: "Fire extinguisher and fire blanket", why: "Hot work: a brazed joint" });

@@ -623,7 +623,12 @@ were verified show as stale: check the datasheet again before quoting.
 change before saving; dates may be 2026-10-18 or day-first 18/10/2026, as a
 spreadsheet saves them). If a save is refused, the message names the field
 as the form labels it, with why (for example "Operating range, heating: 230
-characters, at most 200"). **Compatibility rules** lists which outdoor units
+characters, at most 200"). A multi-split outdoor unit's **Outdoor port sizes
+per branch** (liquid/gas mm, one per port: "A 6.35/9.52, B 6.35/12.7", from
+its manual) makes the design add a reducer to the bill of materials wherever
+a port differs from the indoor unit's pipe (often in the unit's accessory
+bag: price the line at £0 if so), and the crew records its torque. Blank, it
+stays the manual's call. **Compatibility rules** lists which outdoor units
 take which indoor units; only use a multi-split combination marked
 verified against the manufacturer's table.
 
