@@ -336,6 +336,31 @@ The project → **Invoices and payments** (the Money page).
   invoice. Never change them because an email asks; tell families you'll
   never ask them to pay a different account by email.
 
+**For the accountant** (admins only): the menu's **More** → **Money: for
+the accountant** (`/ops/money`). Pick the dates (London dates, both
+included; or **This month**, **Last month**, **Tax year so far**) →
+**Show**: the totals for the period, then three downloads (CSV):
+
+- **Invoices and credit notes**: every one issued in the period, with its
+  number, date issued and due, kind, project and customer reference, net,
+  VAT and total in pounds (net and VAT only when you're VAT registered),
+  tax code and rate, the invoice a credit note is against and why, status,
+  what was paid on it and still owed at the end date, whether the contract
+  was cancelled, and what counts as revenue.
+- **Payments and refunds**: card (Stripe) and bank transfer alike, refunds
+  as negative amounts, with the provider's reference (Stripe's `pi_` or
+  `re_`), the customer's own reference, the invoice and the project.
+  Pending, failed and DEMO ones are listed with `counted` = no.
+- **Summary**: invoices issued, credit notes, net invoiced, revenue net of
+  VAT, received and refunded (by card, bank transfer and other), net
+  received, what customers owed at the end date and who was in credit.
+  The totals match the two files to the penny.
+
+A cancelled contract is never revenue, except a charge for work done
+before the cancellation. Send the three files to your accountant each
+month (or quarter), with the bank statement. Text a spreadsheet could run
+as a formula has an apostrophe in front.
+
 ## 5. Cancellations, problems and changes
 
 **A family cancels.** Any clear statement counts: email, letter, call,
@@ -511,8 +536,8 @@ verified against the manufacturer's table.
 
 | Role | Can |
 | --- | --- |
-| **Admin** | Everything, including Settings and Staff |
-| **Technical lead** | Everything except Settings and Staff; approves designs, reviews the compliance checklist, signs commissioning (needs a current F-gas certificate) |
+| **Admin** | Everything, including Settings, Staff and the accountant's export |
+| **Technical lead** | Everything except Settings, Staff and the accountant's export; approves designs, reviews the compliance checklist, signs commissioning (needs a current F-gas certificate) |
 | **Surveyor** | Surveys, drafting designs and proposals, sees margins, sends messages, the Pilots page |
 | **Installer** | The field app for jobs they're on; sends on-my-way texts |
 | **Electrician** | The field app for jobs they're on; electrical steps (needs Part P) |

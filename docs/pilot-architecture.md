@@ -2518,3 +2518,25 @@ changelog and the reasons, so nobody "fixes" a deliberate choice back.
       credit against it. Goods: supply-and-install's equipment follows reg
       34 (we collect it, at our cost); no deduction for goods is made or
       suggested.
+    - *The accountant's export* (was known limitation 21's "print each money
+      page"): `/ops/money` (page) and `GET /ops/money/export?file=invoices|
+      payments|summary&from&to` (route), behind a new admin-only permission,
+      `finance.export` (tech leads hold everything but it, Settings and
+      Staff; external staff never). Pure `accounts.ts`: London calendar days
+      (`londonDayOf`), both ends included, at most three years
+      (`accountsRangeProblem`); pounds to two decimals (`poundsCell`), our own
+      money cells left as numbers, every text cell starting = + - @ tab or CR
+      defused with an apostrophe (`accountsCell`); CRLF, a BOM from the
+      route. The invoices file lists every non-draft invoice and credit note
+      issued in the range (void ones listed, counting nothing); the payments
+      file every payment and refund dated in it, with `counted` = no for
+      DEMO, pending and failed ones. Revenue (`revenue_net_gbp`, the summary's
+      "Revenue, net of VAT") is nothing on a cancelled contract except a
+      `cancellation-charge` and credit against it. "Owed at the end date" is
+      rebuilt as of the end of `to` (`asOf`: invoices issued by then, a void
+      one until its `voidedAt`, which `recordCancellation` now stamps;
+      payments by then, paid amounts re-settled from them); the summary's
+      totals equal the files' columns to the penny (tested). Loaded with
+      `invoicesRepo.listAll`/`paymentsRepo.listAll` (paged past Max Rows) and
+      `loadAllProjects`; references are "Pilot N" or `P-<short id>` and
+      `C-<short id>`. Audited (`accounts.export`); in **More** for admins.

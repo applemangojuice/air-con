@@ -37,11 +37,12 @@ test("admin holds every permission", () => {
   assert.deepEqual(sorted(permissionsFor(person(["admin"]))), [...PERMISSIONS].sort());
 });
 
-test("tech lead holds everything but settings and staff admin", () => {
+test("tech lead holds everything but settings, staff admin and the accountant's export", () => {
   const perms = permissionsFor(person(["tech-lead"]));
-  assert.equal(perms.size, PERMISSIONS.length - 2);
+  assert.equal(perms.size, PERMISSIONS.length - 3);
   assert.ok(!perms.has("settings.edit"));
   assert.ok(!perms.has("staff.edit"));
+  assert.ok(!perms.has("finance.export"), "the export of every customer's money is admins' alone");
   for (const p of ["design.approve", "compliance.review", "install.review", "commissioning.sign"] as Permission[]) {
     assert.ok(perms.has(p), p);
   }

@@ -38,6 +38,8 @@ const MORE = [
   { href: "/ops/intel", label: "Intel" },
   { href: "/ops/analytics", label: "Analytics" },
   { href: "/ops/finance", label: "Finance" },
+  // Admins only (finance.export): every customer's money, for the accountant.
+  { href: "/ops/money", label: "Money: for the accountant", admin: true },
   { href: "/ops/status", label: "Status" },
   { href: "/ops/help", label: "Help: daily routine" },
 ];
@@ -112,7 +114,7 @@ export default async function OpsLayout({ children }: { children: ReactNode }) {
               panelClassName="w-48 overflow-hidden rounded-2xl border border-line bg-white py-1 text-ink-900 shadow-lg"
             >
               <ul>
-                {MORE.map((item) => (
+                {MORE.filter((item) => !("admin" in item) || staff?.roles.includes("admin")).map((item) => (
                   <li key={item.href}>
                     <NavLink
                       href={item.href}

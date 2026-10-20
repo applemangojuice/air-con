@@ -1,5 +1,5 @@
 import { invoiceNumber, mergeSettings, type Invoice } from "@aircon/domain";
-import { db, isUniqueViolation, isUuid, jsonObject, must, nowIso, type Row } from "./base";
+import { db, isUniqueViolation, isUuid, jsonObject, must, nowIso, selectAllPages, type Row } from "./base";
 import * as settingsRepo from "./settings";
 
 /**
@@ -53,6 +53,20 @@ export async function listForProject(projectId: string): Promise<Invoice[]> {
     "invoices listForProject",
   );
   return (data ?? []).map(fromRow);
+}
+
+/** Every invoice and credit note on every project, page by page (Max Rows never cuts it short): the accountant's export. */
+export async function listAll(): Promise<Invoice[]> {
+  const rows = await selectAllPages<Row>(
+    (from, to, count) =>
+      db()
+        .from(TABLE)
+        .select("*", count ? { count: "exact" } : undefined)
+        .order("id")
+        .range(from, to) as unknown as PromiseLike<{ data: unknown[] | null; error: { message: string } | null; count?: number | null }>,
+    "invoices listAll",
+  );
+  return rows.map(fromRow);
 }
 
 export async function list(opts: { statuses?: Invoice["status"][] } = {}): Promise<Invoice[]> {

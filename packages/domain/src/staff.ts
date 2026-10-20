@@ -85,6 +85,8 @@ export type Permission =
   | "staff.edit"
   | "catalogue.edit"
   | "finance.view-margin"
+  /** The accountant's export of every invoice, payment, refund and credit note (§K45): admins only. */
+  | "finance.export"
   | "survey.conduct"
   | "design.edit"
   | "design.approve"
@@ -107,6 +109,7 @@ export const PERMISSIONS: Permission[] = [
   "staff.edit",
   "catalogue.edit",
   "finance.view-margin",
+  "finance.export",
   "survey.conduct",
   "design.edit",
   "design.approve",
@@ -126,7 +129,7 @@ export const PERMISSIONS: Permission[] = [
 /** What each role grants on its own. A person's permissions are the union. */
 export const ROLE_PERMISSIONS: Record<StaffRole, readonly Permission[]> = {
   admin: PERMISSIONS,
-  "tech-lead": PERMISSIONS.filter((p) => p !== "settings.edit" && p !== "staff.edit"),
+  "tech-lead": PERMISSIONS.filter((p) => p !== "settings.edit" && p !== "staff.edit" && p !== "finance.export"),
   surveyor: [
     "projects.view-all",
     "projects.edit",
@@ -153,6 +156,7 @@ export const EXTERNAL_DENIED: ReadonlySet<Permission> = new Set<Permission>([
   "projects.view-all",
   "projects.edit",
   "finance.view-margin",
+  "finance.export",
   "settings.edit",
   "staff.edit",
   "pilots.view",

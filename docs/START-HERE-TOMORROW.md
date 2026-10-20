@@ -270,7 +270,9 @@ whenever you change anything.
    one sentence in **Rationale**, e.g. "Not VAT registered; accountant to
    confirm." If you are registered: tick it, add your VAT number, pick the
    code your accountant agrees, and tick **Accountant has confirmed this**
-   only when they have.
+   only when they have. For your accountant's books later: **More** →
+   **Money: for the accountant** downloads every invoice, credit note,
+   payment and refund for any dates, with a summary (admin guide §4).
 4. **Pricing**: your real day rates (installer, electrician, technical lead,
    surveyor). The defaults (£220, £250, £280, £40 an hour) are placeholders.
    Keep **A technical lead must sign off the design** on.

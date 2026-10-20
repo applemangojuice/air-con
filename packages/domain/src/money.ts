@@ -88,7 +88,7 @@ export interface Invoice {
   createdBy?: string;
   /** Who issued it. */
   issuedBy?: string;
-  /** Drafts only: voided, and why. */
+  /** Voided (a draft, or an unpaid invoice when the contract was cancelled), and why. */
   voidedAt?: string;
   voidReason?: string;
   /** The form submission that created it, so a double click can't issue it twice (unique: migration 0013). */

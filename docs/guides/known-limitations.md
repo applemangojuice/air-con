@@ -113,12 +113,15 @@ says what to do instead. Approvals that need a professional are in
     billing. You issue each invoice; bank transfers are recorded by hand once
     seen; card payments only through Stripe, if you set it up. A service-plan
     offer is never charged automatically.
-21. **No accounting-software link** (Xero, QuickBooks), and no export of
-    every invoice and payment across projects. The Pilots page downloads a
-    CSV of pilot metrics (not an accounting record: a cancelled pilot
-    counts only the money kept as revenue, with `cancelled` = yes). *For
-    the accountant:* print each project's invoices, credit notes and
-    receipts to PDF from its money page (four pilots, four pages).
+21. **No accounting-software link** (Xero, QuickBooks). *For the
+    accountant:* **Money: for the accountant** (`/ops/money`, admins only)
+    downloads CSVs of every invoice and credit note, every payment and
+    refund, and a summary that reconciles them, for any dates (admin guide
+    §4); importing them into accounting software is by hand. "Owed at the
+    end date" rebuilds that day from the records: an invoice voided before
+    this change (when cancellations didn't stamp the time) counts as void
+    on every date. The Pilots page CSV is pilot metrics, not an accounting
+    record.
 22. **Documents go by email only.** The proposal, contract confirmation and
     cancellation form are sent by email, and only once the family has agreed
     to that (the law's default is paper). There's no paper route: no way to

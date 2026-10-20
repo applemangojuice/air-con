@@ -51,6 +51,7 @@ export * from "./proposal.ts";
 export * from "./compliance.ts";
 export * from "./issues.ts";
 export * from "./money.ts";
+export * from "./accounts.ts";
 export * from "./comms.ts";
 export * from "./documents.ts";
 export * from "./pilots.ts";

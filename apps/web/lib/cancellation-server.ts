@@ -109,7 +109,8 @@ export async function recordCancellation(projectId: string, input: CancellationI
         else warnings.push(`${inv.number} still shows ${money(left)} unpaid: credit it on the money page (${cn.error}).`);
         continue;
       }
-      await invoicesRepo.update({ ...inv, status: "void" });
+      // When it stopped being owed, so the accountant's "owed at the end date" is right for earlier dates (accounts.ts).
+      await invoicesRepo.update({ ...inv, status: "void", voidedAt: now, voidReason: "The contract was cancelled" });
       voided.push(inv.number);
     }
   } catch (err) {

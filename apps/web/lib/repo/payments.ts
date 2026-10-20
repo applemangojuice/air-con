@@ -1,5 +1,5 @@
 import type { Payment } from "@aircon/domain";
-import { db, isUniqueViolation, isUuid, jsonObject, must, uuidOrNull, type Row } from "./base";
+import { db, isUniqueViolation, isUuid, jsonObject, must, selectAllPages, uuidOrNull, type Row } from "./base";
 
 /**
  * `payments`: verified payments only (nothing is "paid" without a row here).
@@ -56,6 +56,20 @@ export async function findStripeByIntent(paymentIntent: string): Promise<Payment
   );
   const row = (data ?? [])[0];
   return row ? fromRow(row) : null;
+}
+
+/** Every payment and refund on every project, page by page: the accountant's export. */
+export async function listAll(): Promise<Payment[]> {
+  const rows = await selectAllPages<Row>(
+    (from, to, count) =>
+      db()
+        .from(TABLE)
+        .select("*", count ? { count: "exact" } : undefined)
+        .order("id")
+        .range(from, to) as unknown as PromiseLike<{ data: unknown[] | null; error: { message: string } | null; count?: number | null }>,
+    "payments listAll",
+  );
+  return rows.map(fromRow);
 }
 
 export async function listForProject(projectId: string): Promise<Payment[]> {
