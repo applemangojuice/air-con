@@ -2318,3 +2318,95 @@ changelog and the reasons, so nobody "fixes" a deliberate choice back.
       says why it came and how to have the quote deleted (company email).
       The **Unfinished** tab offers its pre-written email only for drafts
       that may be reminded. The privacy notice says so.
+
+44. **Pre-launch review, round 7 (three findings, six smaller fixes and the
+    round's medium list, before the first real customers).**
+    - *An invoice asks for what's left after account credit* (refines §K30's
+      account credit): `finishIssue` freezes `toPayPence`
+      (`invoiceOutstanding` at issue) and `accountCredit` (`accountCreditUsedOn`,
+      with the credit notes from `accountCreditNotes`) on the invoice
+      snapshot; `InvoiceDoc` prints "Less: credit on your account (credit
+      note DIH-x)" and "To pay" from them, and the invoice-issued email gets
+      `outstandingPence` (its subject and "Left to pay"). The receipt freezes
+      `stillToPayPence` (`invoiceOutstanding` once the payment is applied) and
+      prints the customer's own reference, never `manual:<uuid>`. Older
+      snapshots without the fields keep the old sums.
+    - *Overpayments can be recorded*: `recordManualPayment` still refuses more
+      than is owed as a likely typo, unless `overpaid` (the money page's **More
+      than is owed arrived** tick, also offered on a paid invoice): then it's
+      recorded in full, the extra is account credit, and an urgent team alert
+      says so; a refund against that invoice pays it back with no credit note.
+    - *VAT on documents follows the tax code*: invoice columns and the VAT
+      summary show for any code but outside-scope (a zero-esm 0% invoice
+      shows its rate, never "We aren't VAT registered"); credit notes are
+      titled and numbered as such; a variation document shows VAT rows only
+      off outside-scope. `proposalIssueErrors` refuses zero-esm after
+      `ZERO_ESM_LAST_DAY` (2027-03-31).
+    - *The pay page keeps §K40's late-cancellation rule*: its wording is
+      `payHeadline`'s (with the cancellation record): inside the period the
+      refund and its date with the email's deduction caveat; after it, "We've
+      received your cancellation" and that we'll be in touch, no refund
+      promised. `cancelledAfterEarlyWork` (an early start and the install
+      under way) means no surface says "nothing more is due" (email
+      `workStartedEarly`, hub, pay page); the hub's `cancelledCopy` stops
+      promising the refund once one has been recorded since the cancellation
+      and names what wasn't refunded.
+    - *A part-paid invoice at cancellation*: `recordCancellation` credits its
+      unpaid remainder (a reduction credit note against it, keyed
+      `cancel-credit:<invoice>:<receivedAt>`), so nothing reads as owed
+      (`owedInvoices`, overdue, the hub); fully unpaid ones are still voided.
+    - *Kept drawings go before a survey submit* (refines §K33's drawings with
+      no signal): kept drawings (`drawingWaitingToSave`) are retried every 30
+      s while any wait, on `visibilitychange` and before `/submit`, never two
+      saves of one at a time; `SubmitSection` lists them ("N drawings not
+      saved yet", **Save it now**, open the photo) and the submit waits for
+      them like photos still uploading.
+    - *Catalogue editor*: free-text specs take `SPEC_TEXT_MAX` (200) characters
+      (the Perfera heating range is 71); `issuesOf` names the form's label
+      with the length and the limit; the CSV import reads day-first dates
+      (`csvDate`), never month-first.
+    - *A survey nobody is down to do*: readiness block `survey-no-surveyor`
+      (owner ops, "Assign a surveyor"); `BoardCard.surveyUnassigned`;
+      `Pulse.surveysUnassigned` on Today and in the digest; calendar entries
+      say who (`whoLine`: "No surveyor" / "No crew" in amber) and the day view
+      lists them (`unassignedOn`); daily-ops job `survey-unassigned` sends one
+      urgent team alert from the working day before (key
+      `survey-unassigned:<slot>`).
+    - *Planning and noise reach the people who decide*: the design's
+      unit-count, outdoor-volume and noise rules (`PLANNING_NOISE_RULE_IDS`,
+      `planningNoiseFlags`: review or fail) show on the compliance page
+      beside the survey's answers; `syncCompliance` reopens an approved
+      planning-pd or noise-assessment reviewed before the approved design
+      version was created. In the builder a flagged option warns, and issue
+      needs `ProposalRecord.planningNote` (customer-visible: proposal page,
+      proposal and contract documents, both contract emails, the document
+      hash; `defaultPlanningNote` suggests one) or `planningNotApplicable`
+      (internal, stripped by `customerSafeProposal`): `planningNoteErrors`.
+      Nothing concludes that planning is or isn't needed.
+    - *Kit and the cancellation period*: `kit-update` carries `deliveredTo`
+      and says "has arrived with our team" (never "delivered") for kit we
+      hold, with when the period starts; a new email-only event
+      `cancellation-period` goes when the goods period starts (`goodsPeriodStarted`
+      in the action map: goods-received, kit-updated, install day 1 for kit we
+      held), keyed `goods:<day>`, time-sensitive (expires after its last day,
+      never on a closed or cancelled project); the DEMO seed records it.
+    - *Team emails about a customer*: Reply-To stays the company inbox; every
+      team alert with a project or customer, the change-request email and the
+      quote lead alerts carry `TEAM_REPLY_LINE` with the customer's phone and
+      email.
+    - *Stale editors* (staff, catalogue): the page passes the row's
+      `updated_at` (`getStamped`), the save compares and writes with
+      `updateIfUnchanged`, and answers the new token (`ActionResult.version`);
+      a catalogue save keeps `active` (Retire / Restore is its own action) and
+      the form follows the stored item when untouched; a staff photo upload
+      writes only `photo_media_id` (`setPhoto`).
+    - *Pilot metrics*: a cancelled contract's revenue is the money kept, net
+      of VAT; `PilotMetrics.cancelled` and the CSV's `cancelled` column.
+    - *Field*: a 401 on a photo upload is held (retryable, "Sign in again and
+      it will send"), not permanent; **Me** shows when the 30-day sign-in
+      ends (sessions are still fixed, not sliding: renewing would let a stolen
+      cookie live for ever). field.md no longer says to add the app to the
+      Home Screen (iOS's own cookie jar can't receive a sign-in link).
+    - *The iOS scaffold* (`apps/mobile`, never released) sends the quote
+      consents (`quote-consent-v1`, the web funnel's words) and each upload's
+      content type.
