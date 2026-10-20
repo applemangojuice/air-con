@@ -1,6 +1,7 @@
 import {
   daysBetween,
   handoverDeadlines,
+  documentsConsentCovers,
   proposalOverdue,
   proposalPromisedBy,
   reviewRequestDue,
@@ -250,10 +251,16 @@ export function dailyJobsFor(project: Project, todayIso: string, settings: Pilot
         event: "team-alert",
         data: {
           title: `Late: the proposal for ${p.customer.name || "a customer"}`,
-          lines: [
-            `We told them it would be with them by ${by}, and it isn't issued yet (${late} day${late === 1 ? "" : "s"} late).`,
-            "Their project page now says it's taking longer than we said, with an apology. Send it, or email them a new date.",
-          ],
+          lines: documentsConsentCovers(p)
+            ? [
+                `We told them it would be with them by ${by}, and it isn't issued yet (${late} day${late === 1 ? "" : "s"} late).`,
+                "Their project page now says it's taking longer than we said, with an apology. Send it, or email them a new date.",
+              ]
+            : [
+                `We told them it would be with them by ${by}, and it isn't issued yet (${late} day${late === 1 ? "" : "s"} late).`,
+                "They haven't agreed to get their documents by email, so it can't be issued: the pilot can't send them on paper. Their page asks them to agree.",
+                "Get in touch and talk it through. If they agree, record it in the project's Proposal box (how and when). If they'd still rather have paper, tell them honestly that the pilot can't do paper, and close the project with the reason.",
+              ],
           urgent: late > PROPOSAL_LATE_ALERT_EVERY_DAYS,
         },
         discriminator: `proposal-late:${by}:${late}`,

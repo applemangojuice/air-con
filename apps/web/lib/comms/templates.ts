@@ -107,7 +107,8 @@ export interface CommsData {
   };
   "survey-reminder": { scheduledFor: string; durationMinutes?: number; mode?: "in-person" | "video"; surveyorName?: string };
   "surveyor-on-my-way": { etaMinutes: number; at: string; name?: string };
-  "survey-complete": { proposalBy?: string };
+  /** needsDocumentsConsent: they didn't agree to documents by email at the survey, and the proposal can't go without it. */
+  "survey-complete": { proposalBy?: string; needsDocumentsConsent?: boolean };
   "proposal-issued": ProposalDetails & { version: number; validUntil: string; optionCount?: number; engineerApproved?: boolean };
   "proposal-reminder": { version?: number; validUntil: string };
   "proposal-accepted": {
@@ -891,7 +892,11 @@ const TEMPLATES: { [E in CommsEventId]: Renderer<E> } = {
             : "We send you a proposal with a fixed price.",
         ],
       },
-      { p: "There's nothing you need to do until then." },
+      d.needsDocumentsConsent
+        ? {
+            p: "One thing from you: we can only email your proposal and contract with your OK. If you're happy to get them by email, tick the box under Proposal on your project page. During the pilot we can't send them on paper, so if you'd rather not have them by email, reply to this email and we'll talk it through.",
+          }
+        : { p: "There's nothing you need to do until then." },
     ],
     cta: "Open your project",
   }),

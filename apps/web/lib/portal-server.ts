@@ -472,13 +472,15 @@ export async function customerHomes(): Promise<{ name: string; email: string; ho
     const p = await loadProject(id);
     if (!p) continue;
     const stage = currentStage(p);
+    // A change waiting for their OK is an issue, not on the snapshot: the same next step as the hub's.
+    const issues = await safe("homes issues", async () => (await issuesRepo.listForProject(id)).filter((i) => i.customerVisible), [] as Issue[]);
     homes.push({
       id,
       addressLine: p.customer.addressLine,
       postcode: p.customer.postcode,
       stage,
       stageTitle: STAGE_INFO[stage].title,
-      next: customerNextAction(p),
+      next: customerNextAction(p, issues),
       closed: p.closure.closed,
     });
   }

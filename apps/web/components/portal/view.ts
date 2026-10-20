@@ -5,6 +5,8 @@ import {
   cancellationCopy,
   cancellationStatus,
   currentStage,
+  customerNextAction,
+  documentsConsentCovers,
   earlyStartWording,
   hasCurrentQualification,
   isStageComplete,
@@ -18,9 +20,10 @@ import {
   PROPOSAL_TURNAROUND_WORKING_DAYS,
   proposalOverdue,
   proposalPromisedBy,
+  variationsAwaitingCustomer,
 } from "@aircon/domain";
 import { blockLabel, shortDay } from "./schedule.ts";
-import type { HubFacts, PersonCard } from "./types.ts";
+import type { HubFacts, HubIssue, PersonCard } from "./types.ts";
 import { realPhone } from "@/components/site/claims";
 import { fmtDay, fmtInstantDay, money } from "@/lib/format";
 
@@ -165,9 +168,36 @@ export function proposalLate(project: Project, today: string): boolean {
 /** What the hub says once we've missed the date we gave. */
 export const PROPOSAL_LATE_LINE = "It's taking a little longer than we said. Sorry. We'll email you the moment it's ready.";
 
+/** Past the date, but it can't go until they agree to email delivery: say what it's waiting for, not sorry. */
+export const PROPOSAL_NEEDS_CONSENT_LINE = "We can only send it once you've agreed to get your documents by email.";
+
+/** The line for a proposal past its date: our apology, unless what holds it is their OK to email it. */
+export function proposalLateLine(project: Project): string {
+  return documentsConsentCovers(project) ? PROPOSAL_LATE_LINE : PROPOSAL_NEEDS_CONSENT_LINE;
+}
+
 /** The on-my-way promise in the words of the channel it'll really go by (HubFacts.onTheWay). */
 export function onTheWayPromise(onTheWay: HubFacts["onTheWay"]): string {
   return onTheWay === "sms" ? "We'll text you when we're on the way." : onTheWay === "email" ? "We'll email you when we're on the way." : "";
+}
+
+/**
+ * The hub's "Your next step": the domain's one next action, told about the
+ * changes waiting for the customer's OK (they're issues, not on the
+ * snapshot). The card, the panels' quiet echoes and /portal all use this.
+ */
+export function hubNextAction(data: { project: Project; issues: readonly HubIssue[] }): { label: string; href?: string } | null {
+  return customerNextAction(data.project, data.issues);
+}
+
+/** The line under "Answer a change to your installation": which change, what it does to the price, and that nothing extra happens without their yes. */
+export function variationNextDetail(issues: readonly HubIssue[]): string | null {
+  const waiting = variationsAwaitingCustomer(issues);
+  if (!waiting.length) return null;
+  const delta = (pence: number) => (pence > 0 ? `+${money(pence)}` : pence < 0 ? money(pence) : "no change to your price");
+  const total = waiting.reduce((sum, i) => sum + (i.variation?.totalDeltaPence ?? 0), 0);
+  const what = waiting.length === 1 ? `Change #${waiting[0]!.number}: ${waiting[0]!.title} (${delta(total)}).` : `${waiting.length} changes (${delta(total)} in all).`;
+  return `${what} We need your yes or no: nothing extra is done without your yes.`;
 }
 
 /**
@@ -197,7 +227,7 @@ export function waitingCopy(project: Project, onTheWay: HubFacts["onTheWay"] = n
         p.design.status === "approved"
           ? "Your design has been signed off by our engineer. We're putting your proposal together."
           : "We're designing your system from the survey. A qualified engineer checks and signs it off before you see a price.";
-      if (today && proposalLate(p, today)) return { title: "We're working on your proposal", body: `${design} ${PROPOSAL_LATE_LINE}` };
+      if (today && proposalLate(p, today)) return { title: "We're working on your proposal", body: `${design} ${proposalLateLine(p)}` };
       return { title: "We're working on your proposal", body: by ? `${design} It should be with you by ${shortDay(by)}.` : design };
     }
     case "booking":

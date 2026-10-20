@@ -197,7 +197,7 @@ export default async function FieldHelpPage() {
             <li>Every room needs its measurements and a tagged photo, with the unit drawn where it would go.</li>
             <li>Older homes: answer the asbestos questions. Suspected asbestos means stop and raise it.</li>
             <li>
-              Before you leave, ask about <B>Documents by email</B>. Without it the proposal has to go on paper.
+              Before you leave, ask about <B>Documents by email</B>. Without it no proposal can go: the pilot can&apos;t send documents on paper. If they&apos;d rather not, the office gets in touch.
             </li>
             <li>
               <B>Check and submit</B> lists anything missing. <B>Submit survey</B> sends it to the tech lead; you can&apos;t edit it afterwards.

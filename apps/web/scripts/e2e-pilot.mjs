@@ -1067,6 +1067,17 @@ try {
     check("the update's time is London time", minutesOff <= 10 || minutesOff >= 1430, stamp?.[0]);
     check("updates feed says 'Day 1 done' once", !(await has(customer, /Day 1 done: Day 1 done/)));
     check("customer sees the variation to decide", await has(customer, /A change needs your answer[\s\S]*DEMO: 2 m more trunking/));
+    // The top card says so too (the email and text said it needs their OK), never "nothing for you to do".
+    check(
+      "the next-step card names the change waiting for their OK",
+      (await has(customer, /Your next step\s*Answer a change to your installation\s*Change #\d+: DEMO: 2 m more trunking \(\+£[\d,.]+\)/i)) && !(await has(customer, /Nothing for you to do right now/)),
+      (await text(customer)).slice(0, 400),
+    );
+    await customer.locator("#next-title").locator("xpath=..").getByRole("button", { name: "Answer a change to your installation" }).click();
+    check("…and its button opens the change to answer", await visible(customer.locator("#changes-waiting").getByRole("button", { name: /^Yes, go ahead/ })));
+    await go(customer, `/portal`);
+    check("'Your homes' gives the same next step", await waitFor(customer, /Next: Answer a change to your installation/), (await text(customer)).slice(0, 300));
+    await go(customer, `/p/${ids.pid}`);
     await shot(customer, "H-variation");
     // A yes is an agreement to pay: a second step, with their typed name and the exact words.
     await customer.getByRole("button", { name: /^Yes, go ahead/ }).click();
@@ -1081,6 +1092,7 @@ try {
     ]);
     ids.variationId = decided.url().match(/variations\/([0-9a-f-]{36})$/)[1];
     check("variation accepted on the portal", await waitFor(customer, /You said yes/));
+    check("answered, the next step no longer asks for it", !(await has(customer, /Answer a change to your installation/)), (await text(customer)).slice(0, 300));
     check("the customer's timeline dates the install to the day it really started", await has(customer, new RegExp(`Install\\s*(?:, (?:now|done)\\s*)?${londonDayLabel(new Date())}`)), (await text(customer)).match(/Install[^\n]*\n[^\n]*/)?.[0]);
     await go(customer, `/p/${ids.pid}/documents`);
     check("the agreed change is in the customer's documents", await waitFor(customer, /Change #\d+: DEMO: 2 m more trunking/));

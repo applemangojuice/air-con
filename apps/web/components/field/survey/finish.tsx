@@ -95,7 +95,7 @@ export function ConsentSection({
             &ldquo;Are you happy to receive your proposal and contract documents by email?&rdquo;
           </blockquote>
           <p className="text-sm text-ink-500">
-            Only record it if they say yes. This isn&apos;t signing anything: the proposal arrives later by email and they accept it online, in their own time. Without it, the documents have to go on paper.
+            Only record it if they say yes. This isn&apos;t signing anything: the proposal arrives later by email and they accept it online, in their own time. The pilot can&apos;t send documents on paper, so without it no proposal can go: if they&apos;d rather not, tell them the office will get in touch to talk it through.
           </p>
           {needsEmail && (
             <TextField
@@ -230,7 +230,7 @@ export function SubmitSection({
           <button type="button" className="font-semibold underline" onClick={() => go({ s: "consent" })}>
             Ask before you leave
           </button>
-          : without it the proposal has to go on paper.
+          : without it no proposal can go (the pilot can&apos;t send documents on paper).
         </Callout>
       )}
 

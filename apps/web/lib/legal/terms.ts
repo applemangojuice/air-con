@@ -81,7 +81,7 @@ export function termsSections(s: PublicSettings): TermsSection[] {
       items: [
         "After the survey we design your system, and a qualified engineer checks and signs off the design before we send you a price.",
         "Your proposal sets out the equipment for each room and where it goes, what's included and what isn't, the total price, how and when you pay, the install plan, the guarantees, your right to cancel, how long the proposal is open, and these terms, in the version that applies to you.",
-        "We'll ask whether you're happy to get your proposal, contract and cancellation information by email. If you'd rather have them on paper, just say.",
+        "We'll ask whether you're happy to get your proposal, contract and cancellation information by email. During the pilot we can only send them by email, never on paper, and only with your agreement. If you'd rather not have them by email, tell us and we'll talk it through; we won't send you a proposal until you've agreed.",
         "You accept online by typing your name and confirming that you accept and agree to pay the total. That is when the contract is made. We then email you a confirmation of your contract with these terms and the cancellation form.",
         "Once you've accepted, we can't change your proposal. Any change after that is a variation (section 6).",
       ],

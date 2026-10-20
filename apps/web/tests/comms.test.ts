@@ -112,7 +112,7 @@ const FULL: { [E in CommsEventId]: CommsData[E] } = {
   },
   "survey-reminder": { scheduledFor: "2026-11-03T10:00:00.000Z", durationMinutes: 90, mode: "in-person", surveyorName: "Alex Demo" },
   "surveyor-on-my-way": { etaMinutes: 20, at: "2026-11-03T09:40:00.000Z", name: "Alex Demo" },
-  "survey-complete": { proposalBy: "2026-11-10" },
+  "survey-complete": { proposalBy: "2026-11-10", needsDocumentsConsent: true },
   "proposal-issued": {
     version: 2,
     validUntil: "2026-12-03",
@@ -634,6 +634,24 @@ test("survey bookings: the same slot is one message; a new slot is another; cust
   assert.equal(notice.event, "survey-booked");
   assert.equal((notice.data as CommsData["survey-booked"]).rescheduled, true);
   assert.notDeepEqual(keysOf(moved, resched), keysOf(p, book), "a new slot is a new message");
+});
+
+test("survey done without the email agreement: the email asks for it, and never promises paper", () => {
+  const p = baseProject();
+  p.survey.status = "submitted";
+  p.survey.submittedAt = "2026-11-03T12:00:00.000Z";
+  const submit: ProjectAction = { type: "survey-submitted", surveyRecordId: "00000000-0000-4000-8000-0000000000cc" };
+  const [without] = commsForAction(p, submit);
+  assert.equal(without.event, "survey-complete");
+  assert.equal((without.data as CommsData["survey-complete"]).needsDocumentsConsent, true);
+  const asks = render("survey-complete", without.data as CommsData["survey-complete"]).text;
+  assert.match(asks, /we can only email your proposal and contract with your OK/);
+  assert.match(asks, /can't send them on paper[\s\S]*reply to this email and we'll talk it through/);
+  assert.doesNotMatch(asks, /nothing you need to do/);
+  p.proposal.documentsByEmailConsent = { at: "2026-11-03T11:50:00.000Z", channel: "in-person", email: p.customer.email };
+  const [agreed] = commsForAction(p, submit);
+  assert.equal((agreed.data as CommsData["survey-complete"]).needsDocumentsConsent, undefined);
+  assert.match(render("survey-complete", agreed.data as CommsData["survey-complete"]).text, /There's nothing you need to do until then/);
 });
 
 test("on-my-way: a retry is deduped, a corrected ETA is a new text", () => {

@@ -231,3 +231,24 @@ test("a proposal past the date we gave alerts the team the next day, then every 
   assert.ok(!jobsOf(submitted((p) => (p.proposal = { ...p.proposal, status: "changes-requested" })), "2026-10-19").includes("proposal-late"), "a revision has no promised date");
   assert.ok(DAILY_JOB_IDS.includes("proposal-late"));
 });
+
+test("a late proposal held by the customer's email agreement tells the team what it's waiting for, not to send it", () => {
+  const submitted = (consent: boolean) =>
+    project((p) => {
+      p.survey = { ...p.survey, status: "submitted", submittedAt: "2026-10-12T15:00:00.000Z" };
+      p.customer = { ...p.customer, email: "demo.person@example.com" };
+      if (consent) p.proposal.documentsByEmailConsent = { at: "2026-10-12T15:00:00.000Z", channel: "portal", email: "demo.person@example.com" };
+      else delete p.proposal.documentsByEmailConsent;
+    });
+  const linesOf = (p: Project) => {
+    const alert = dailyJobsFor(p, "2026-10-16", DEFAULT_SETTINGS).find((j) => j.job === "proposal-late");
+    assert.ok(alert && alert.kind === "notify");
+    return (alert.data as { lines: string[] }).lines.join(" ");
+  };
+  // Ours to send: send it, or a new date.
+  assert.match(linesOf(submitted(true)), /Send it, or email them a new date/);
+  // Theirs to agree: no "send it" the gate would refuse, no paper promise, and what to do instead.
+  const held = linesOf(submitted(false));
+  assert.doesNotMatch(held, /Send it, or email them a new date|apology/);
+  assert.match(held, /haven't agreed to get their documents by email[\s\S]*can't send them on paper[\s\S]*Get in touch/);
+});

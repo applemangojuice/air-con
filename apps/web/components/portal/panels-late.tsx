@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { useId, useRef, useState } from "react";
-import { handoverDeadlines, isFullName, variationAgreeWording } from "@aircon/domain";
+import { VARIATIONS_ANSWER_LABEL, VARIATION_ANSWER_LABEL, handoverDeadlines, isFullName, variationAgreeWording } from "@aircon/domain";
 import { Input, Textarea } from "@/components/kit/form";
 import { fmtDate, fmtDay, fmtInstantDay, fmtInstantDayTime, money } from "@/lib/format";
 import {
   ActionFeedback,
+  CHANGES_WAITING_ID,
   Callout,
   Explainer,
   Locked,
@@ -17,6 +18,7 @@ import {
   Sub,
   primaryCls,
   useAction,
+  useEchoesNextStep,
   ReachUs,
 } from "./bits";
 import { useHub } from "./controller";
@@ -88,6 +90,8 @@ function VariationCard({ issue }: { issue: HubIssue }) {
   const wording = variationAgreeWording(v);
   const nameOk = isFullName(name);
   const nameId = useId();
+  // The next-step card already leads here: its button is the filled one, so this choice starts quiet.
+  const echo = useEchoesNextStep(VARIATION_ANSWER_LABEL, VARIATIONS_ANSWER_LABEL);
   return (
     <article className="space-y-3 rounded-2xl border border-accent-100 bg-white p-4 shadow-sm sm:p-5" aria-labelledby={`var-${issue.id}`}>
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -161,6 +165,7 @@ function VariationCard({ issue }: { issue: HubIssue }) {
               setConfirming(true);
             }}
             disabled={readOnly}
+            quiet={echo}
           >
             Yes, go ahead ({up ? "+" : ""}
             {money(v.totalDeltaPence)})
@@ -203,7 +208,7 @@ export function InstallPanel({ data, state }: PanelProps) {
         </Callout>
       )}
       {waiting.length > 0 && (
-        <div className="space-y-3">
+        <div id={CHANGES_WAITING_ID} className="scroll-mt-4 space-y-3">
           <Sub>A change needs your answer</Sub>
           {waiting.map((issue) => (
             <VariationCard key={issue.id} issue={issue} />

@@ -16,6 +16,9 @@ import {
   createProject,
   currentStage,
   customerNextAction,
+  VARIATION_ANSWER_LABEL,
+  VARIATIONS_ANSWER_LABEL,
+  variationsAwaitingCustomer,
   kitOrderDepositProblem,
   daysBetween,
   earliestInstallStart,
@@ -539,8 +542,11 @@ test("proposal-issue gate: email consent, an email address, and every Schedule 2
   const noConsent = blockersFor(walk("design-approved"), c({}), "proposal-issue").find((b) => b.code === "documents-consent-missing");
   assert.deepEqual(
     noConsent && { severity: noConsent.severity, owner: noConsent.owner, action: noConsent.action },
-    { severity: "block", owner: "customer", action: "Ask the customer to confirm they're happy to get documents by email" },
+    { severity: "block", owner: "customer", action: "Get in touch: ask if they're happy to get documents by email, and record it if they are" },
   );
+  // There's no paper route in the pilot: the gate says so, and never promises paper.
+  assert.match(noConsent!.message, /can't send them on paper/);
+  assert.doesNotMatch(noConsent!.message + noConsent!.action, /must be given on paper|arrange paper/);
   const consented = walk("documents-consent-recorded");
   assert.ok(!codes(blockersFor(consented, c({}), "proposal-issue")).includes("documents-consent-missing"));
 
@@ -565,8 +571,11 @@ test("documents-consent-recorded: once, by the customer or ops, before acceptanc
   assert.equal(ev.actor, "customer");
   assert.equal(ev.internal, undefined);
   // What they agreed to, in which words, for which address (reg 10(2), provable under reg 17).
-  assert.equal(p.proposal.documentsByEmailConsent?.wordingVersion, "docs-by-email/portal-1");
+  assert.equal(p.proposal.documentsByEmailConsent?.wordingVersion, "docs-by-email/portal-2");
   assert.match(p.proposal.documentsByEmailConsent?.text ?? "", /happy to receive my proposal and contract documents by email/);
+  // The words they ticked promise nothing we can't do: no paper copies in the pilot, and what happens if they'd rather not.
+  assert.match(p.proposal.documentsByEmailConsent?.text ?? "", /can't send them on paper[\s\S]*we'll get in touch to talk it through/);
+  assert.doesNotMatch(DOCUMENTS_CONSENT_WORDING.portal.text, /arrange paper copies/);
   assert.equal(p.proposal.documentsByEmailConsent?.email, p.customer.email);
   assert.equal(p.proposal.documentsByEmailConsent?.recordedBy, undefined, "they ticked it themselves");
   const again = step(p, { type: "documents-consent-recorded", channel: "in-person", evidence: "Said so at the door" }, T.issue, { actor: ADMIN });
@@ -1719,6 +1728,34 @@ test("customerNextAction: one clear label per state", () => {
   assert.equal(label(walk("project-closed")), null);
   assert.deepEqual(customerNextAction(walk("feedback-requested")), { label: "Tell us how it's going", href: "/p/proj-1#aftercare" });
   assert.equal(label(walk()), null); // feedback given
+});
+
+test("customerNextAction: a change sent for their OK is the next step, until they answer it", () => {
+  const day1 = walk("day-1");
+  assert.equal(customerNextAction(day1), null, "on its own, an install day is ours");
+  const sent = { kind: "variation" as const, status: "awaiting-customer" as const, customerVisible: true, variation: { status: "proposed" as const, totalDeltaPence: 14_400 } };
+  assert.deepEqual(customerNextAction(day1, [sent]), { label: VARIATION_ANSWER_LABEL, href: "/p/proj-1#install" });
+  assert.equal(customerNextAction(day1, [sent, { ...sent, status: "in-progress" as const }])?.label, VARIATIONS_ANSWER_LABEL, "two waiting: one step names them both");
+  // Before it's theirs to answer, once answered, withdrawn, or not shown to them: the step is ours again.
+  for (const other of [
+    { ...sent, variation: { ...sent.variation, status: "draft" as const }, status: "open" as const, customerVisible: false },
+    { ...sent, variation: { ...sent.variation, status: "accepted" as const }, status: "in-progress" as const },
+    { ...sent, variation: { ...sent.variation, status: "declined" as const }, status: "resolved" as const },
+    { ...sent, status: "rejected" as const },
+    { ...sent, customerVisible: false },
+    { ...sent, kind: "snag" as const },
+  ]) {
+    assert.equal(customerNextAction(day1, [other]), null, JSON.stringify(other));
+  }
+  // It comes before anything else that's open (a deposit, prep, an invoice) ...
+  const prep = walk("booking-confirmed");
+  assert.equal(customerNextAction(prep)?.label, "Get your home ready");
+  assert.equal(customerNextAction(prep, [sent])?.label, VARIATION_ANSWER_LABEL);
+  const deposit = step(walk("proposal-accepted"), { type: "deposit-requested", amountPence: 129_000 }, T.dates, { actor: ADMIN });
+  assert.equal(customerNextAction(deposit, [sent])?.label, VARIATION_ANSWER_LABEL);
+  // ... but never on a closed project.
+  assert.equal(customerNextAction(walk("project-closed"), [sent]), null);
+  assert.deepEqual(variationsAwaitingCustomer([sent, { ...sent, status: "closed" as const }]), [sent]);
 });
 
 /* ------------------------------------------------------------------ */

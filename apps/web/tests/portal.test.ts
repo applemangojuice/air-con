@@ -273,6 +273,22 @@ test("an overdue proposal says sorry instead of repeating a date that's gone", (
   assert.equal(view.proposalLate(p, "2026-10-19"), false);
 });
 
+test("a late proposal that waits on their OK to email it says so, without blaming us or promising paper", async () => {
+  const { DOCUMENTS_CONSENT_HINT } = await import("@aircon/domain");
+  const p = project();
+  p.survey.status = "submitted";
+  p.survey.submittedAt = "2026-10-12T15:00:00.000Z";
+  assert.equal(view.proposalLate(p, "2026-10-19"), true);
+  assert.equal(view.proposalLateLine(p), "We can only send it once you've agreed to get your documents by email.");
+  assert.doesNotMatch(view.waitingCopy(p, null, "2026-10-19").body, /Sorry|15 Oct/);
+  // Once they've agreed, the delay is ours: the apology is back.
+  p.proposal.documentsByEmailConsent = { at: "2026-10-19T09:00:00.000Z", channel: "portal" };
+  assert.match(view.proposalLateLine(p), /taking a little longer than we said\. Sorry/);
+  // The box they tick never promises paper copies the pilot can't send.
+  assert.doesNotMatch(DOCUMENTS_CONSENT_HINT, /paper copies|arrange paper/);
+  assert.match(DOCUMENTS_CONSENT_HINT, /can't send them on paper[\s\S]*get in touch/);
+});
+
 test("waitingCopy promises a text on the way only when one will really go", () => {
   const promise = view.onTheWayPromise;
   assert.equal(promise("sms"), "We'll text you when we're on the way.");
@@ -428,4 +444,28 @@ test("a change the family just answered leaves the waiting list at once, as the 
   // The page has caught up (whatever it says now, it's the server's): the answer steps aside.
   const caughtUp = { issues: [{ ...waiting, status: "resolved" as const, variation: { ...waiting.variation, status: "declined" as const } }] } as unknown as Parameters<typeof withDecisions>[0];
   assert.equal(withDecisions(caughtUp, { v1: { status: "accepted", at: "x" } }), caughtUp);
+});
+
+test("the hub's next step names a change waiting for their OK, never 'nothing for you to do'", async () => {
+  const { VARIATION_ANSWER_LABEL, VARIATIONS_ANSWER_LABEL } = await import("@aircon/domain");
+  const p = accepted("2026-10-01T10:00:00.000Z");
+  p.booking = { ...p.booking, status: "booked", dates: ["2026-11-10", "2026-11-11", "2026-11-12"] };
+  p.install = { ...p.install, status: "in-progress", days: [{ n: 1, date: "2026-11-10", status: "in-progress", startedAt: "2026-11-10T08:00:00.000Z" } as Project["install"]["days"][number]] };
+  assert.equal(view.hubNextAction({ project: p, issues: [] }), null, "an install day on its own is ours");
+  assert.match(view.waitingCopy(p).title, /Install day 1 in progress/);
+  const change = { id: "v1", number: 3, kind: "variation" as const, title: "DEMO: 2 m more trunking", status: "awaiting-customer" as const, raisedAt: "2026-11-10T10:00:00.000Z", raisedBy: "us" as const, photos: [], variation: { description: "DEMO", priceDeltaNetPence: 12_000, taxPence: 2_400, totalDeltaPence: 14_400, status: "proposed" as const } };
+  const next = view.hubNextAction({ project: p, issues: [change] });
+  assert.deepEqual(next, { label: VARIATION_ANSWER_LABEL, href: `/p/${p.id}#install` });
+  assert.equal(view.stageForHash("#install", p), "install", "the button opens the Install panel, where the change is");
+  assert.equal(view.variationNextDetail([change]), "Change #3: DEMO: 2 m more trunking (+£144). We need your yes or no: nothing extra is done without your yes.");
+  // Two waiting (one a credit): one step for both, the total in all.
+  const credit = { ...change, id: "v2", number: 4, variation: { ...change.variation, priceDeltaNetPence: -2_000, taxPence: -400, totalDeltaPence: -2_400 } };
+  assert.equal(view.hubNextAction({ project: p, issues: [change, credit] })?.label, VARIATIONS_ANSWER_LABEL);
+  assert.equal(view.variationNextDetail([change, credit]), "2 changes (+£120 in all). We need your yes or no: nothing extra is done without your yes.");
+  assert.match(view.variationNextDetail([credit])!, /\(-£24\)/);
+  // Answered (the page's own copy of the answer, before the refresh lands): the calm line is back.
+  const { withDecisions } = await import("../components/portal/answers.ts");
+  const answered = withDecisions({ project: p, issues: [change] } as unknown as Parameters<typeof withDecisions>[0], { v1: { status: "accepted", at: "2026-11-10T11:00:00.000Z" } });
+  assert.equal(view.hubNextAction(answered), null);
+  assert.equal(view.variationNextDetail(answered.issues), null);
 });

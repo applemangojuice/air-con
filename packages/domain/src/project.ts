@@ -10,6 +10,7 @@ import {
   type PrepItem,
   type TimelineDateKind,
 } from "./project-v1.ts";
+import type { IssueKind, IssueStatus, VariationStatus } from "./issues.ts";
 import { DEFAULT_SETTINGS, schedule2Missing, type PilotSettings } from "./settings.ts";
 import { ROLE_LABEL, can, meetsRequirement, type StaffMember, type StaffRole } from "./staff.ts";
 import { addWorkingDays, nextWorkingDay, notWorkingReason } from "./working-days.ts";
@@ -271,13 +272,18 @@ export interface CrewMember {
 export type ContractType = "supply-and-install" | "install-only";
 export const CONTRACT_TYPES: readonly ContractType[] = ["supply-and-install", "install-only"];
 
-/** How the customer agreed to get contract documents by email instead of on paper (CCR reg 10(2)). */
+/**
+ * How the customer agreed to get contract documents by email instead of on
+ * paper (CCR reg 10(2)). The pilot has no paper route: without this
+ * agreement no proposal can be issued, and the copy says so (never "we'll
+ * post them").
+ */
 export type DocumentsConsentChannel = "portal" | "in-person" | "email";
 
 /** The portal's tick box (the hub's proposal panel and the survey booking form), word for word. */
 export const DOCUMENTS_CONSENT_LABEL = "I'm happy to receive my proposal and contract documents by email";
 export const DOCUMENTS_CONSENT_HINT =
-  "Your proposal, contract and cancellation form are legal documents. We can only email them if you agree; otherwise we'll arrange paper copies, which takes a little longer.";
+  "Your proposal, contract and cancellation form are legal documents, so we need your OK to email them. During the pilot we can't send them on paper: if you'd rather not have them by email, leave this unticked and we'll get in touch to talk it through.";
 
 /**
  * The words each way of agreeing used, versioned. Reg 10(2) lets the
@@ -288,7 +294,8 @@ export const DOCUMENTS_CONSENT_HINT =
  * evidence is.
  */
 export const DOCUMENTS_CONSENT_WORDING: Record<DocumentsConsentChannel, { version: string; text: string }> = {
-  portal: { version: "docs-by-email/portal-1", text: `${DOCUMENTS_CONSENT_LABEL}. ${DOCUMENTS_CONSENT_HINT}` },
+  // portal-1 (until 20 Oct 2026) ended "otherwise we'll arrange paper copies, which takes a little longer."
+  portal: { version: "docs-by-email/portal-2", text: `${DOCUMENTS_CONSENT_LABEL}. ${DOCUMENTS_CONSENT_HINT}` },
   "in-person": {
     version: "docs-by-email/in-person-1",
     text: "Asked in person: \"Are you happy to receive your proposal and contract documents by email?\" The customer said yes.",
@@ -431,7 +438,7 @@ export interface Project {
     contractTotalPence?: number;
     /** Set at issue; supply-and-install until then. */
     contractType: ContractType;
-    /** Agreement to get the contract documents by email (else they must be on paper). Proposal issue needs it. */
+    /** Agreement to get the contract documents by email (the law's default is paper, which the pilot can't do). Proposal issue needs it. */
     documentsByEmailConsent?: DocumentsConsentRecord;
     /**
      * When the issue email carrying the Schedule 2 information, the
@@ -1091,9 +1098,9 @@ export function blockersFor(project: Project, ctx: ReadinessContext, gate: GateI
       if (!p.proposal.documentsByEmailConsent) {
         block(
           "documents-consent-missing",
-          "The customer hasn't agreed to get the contract documents by email (without that, they must be given on paper).",
+          "The customer hasn't agreed to get the contract documents by email. The pilot can't send them on paper, so the proposal can't go until they do.",
           "customer",
-          "Ask the customer to confirm they're happy to get documents by email",
+          "Get in touch: ask if they're happy to get documents by email, and record it if they are",
         );
       } else if (!documentsConsentCovers(p)) {
         block(
@@ -3405,11 +3412,42 @@ export function projectFees(project: Project): { changeFeesGbp: number; surveyPa
   };
 }
 
+/** What the next step needs to know about an issue: the customer's hub copy (HubIssue) and the stored Issue both fit. */
+export interface NextActionIssue {
+  kind: IssueKind;
+  status: IssueStatus;
+  /** Absent on the hub's copy, which only ever holds customer-visible issues. */
+  customerVisible?: boolean;
+  variation?: { status: VariationStatus; totalDeltaPence: number };
+}
+
+/** The next-step labels for changes waiting on the customer (one, or several). */
+export const VARIATION_ANSWER_LABEL = "Answer a change to your installation";
+export const VARIATIONS_ANSWER_LABEL = "Answer the changes to your installation";
+
+/**
+ * The changes the office has sent the customer that still wait for their
+ * yes or no: customer-visible, proposed, still open. Exactly the ones the
+ * hub's Install panel asks them to answer.
+ */
+export function variationsAwaitingCustomer<T extends NextActionIssue>(issues: readonly T[]): T[] {
+  return issues.filter(
+    (i) =>
+      i.kind === "variation" &&
+      i.customerVisible !== false &&
+      i.variation?.status === "proposed" &&
+      (i.status === "open" || i.status === "in-progress" || i.status === "awaiting-customer"),
+  );
+}
+
 /**
  * The ONE thing the customer should do now, or null when the ball is in our
- * court. Every customer screen leads with this.
+ * court. Every customer screen leads with this. `issues` are the project's
+ * customer-visible issues: a change sent for their OK lives there, not on
+ * the snapshot, and it comes first (the crew is waiting on the answer, and
+ * the email and text already told them it needs their OK).
  */
-export function customerNextAction(project: Project): { label: string; href?: string } | null {
+export function customerNextAction(project: Project, issues: readonly NextActionIssue[] = []): { label: string; href?: string } | null {
   const p = project;
   const base = `/p/${p.id}`;
   const feedbackDue = Boolean(p.aftercare.feedbackRequestedAt) && !p.aftercare.feedback;
@@ -3418,6 +3456,11 @@ export function customerNextAction(project: Project): { label: string; href?: st
     return p.closure.reason !== "cancelled" && feedbackDue
       ? { label: "Tell us how it's going", href: `${base}#aftercare` }
       : null;
+  }
+
+  const changes = variationsAwaitingCustomer(issues);
+  if (changes.length) {
+    return { label: changes.length === 1 ? VARIATION_ANSWER_LABEL : VARIATIONS_ANSWER_LABEL, href: `${base}#install` };
   }
 
   // Time-limited or money first: these hold everything else up.

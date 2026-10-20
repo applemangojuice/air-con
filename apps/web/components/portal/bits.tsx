@@ -337,6 +337,9 @@ export const secondaryCls = (block = true) => `${SECONDARY} ${block ? "w-full sm
  */
 export const NextStepContext = createContext<string | null>(null);
 
+/** The Install panel's "A change needs your answer" block, which "Answer a change to your installation" scrolls to. */
+export const CHANGES_WAITING_ID = "changes-waiting";
+
 /** True when the next-step card already offers this action: the panel's copy of it is then the quiet one. */
 export function useEchoesNextStep(...labels: string[]): boolean {
   const label = useContext(NextStepContext);

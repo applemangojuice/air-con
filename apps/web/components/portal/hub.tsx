@@ -2,10 +2,19 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { currentStage, customerNextAction, isStageComplete, projectTimeline, stageState, type Project, type ProjectStageId } from "@aircon/domain";
+import {
+  VARIATIONS_ANSWER_LABEL,
+  VARIATION_ANSWER_LABEL,
+  currentStage,
+  isStageComplete,
+  projectTimeline,
+  stageState,
+  type Project,
+  type ProjectStageId,
+} from "@aircon/domain";
 import { ProjectStepper } from "@/components/project/timeline";
 import { fmtDay, fmtDayTime, money } from "@/lib/format";
-import { NextStepContext, primaryCls } from "./bits";
+import { CHANGES_WAITING_ID, NextStepContext, primaryCls } from "./bits";
 import { useHub } from "./controller";
 import type { HubSlots, PanelProps } from "./panel-types";
 import { BookingPanel, KitPanel } from "./panels-booking";
@@ -14,13 +23,13 @@ import { AftercarePanel, HandoverPanel, InstallPanel } from "./panels-late";
 import { blockLabel } from "./schedule";
 import { ContactCard, DocumentsCard, PaymentsCard, UpdatesFeed } from "./side";
 import type { HubData } from "./types";
-import { cancelledCopy, defaultStage, showsCancelledPanel, stageCancelled, stageForHash, toPayLine, waitingCopy } from "./view";
+import { cancelledCopy, defaultStage, hubNextAction, showsCancelledPanel, stageCancelled, stageForHash, toPayLine, variationNextDetail, waitingCopy } from "./view";
 
 /**
  * The customer hub (contract §G F1): one page for the whole journey.
  *
  *   Your home at …          (where we are)
- *   Your next step          (the ONE thing to do, from customerNextAction)
+ *   Your next step          (the ONE thing to do, from customerNextAction via hubNextAction)
  *   the eight stages        (stepper; the selected stage's panel opens in place)
  *   updates · contact · documents · payments
  *
@@ -58,6 +67,9 @@ function scrollToId(id: string) {
 function nextDetail(label: string, data: HubData): string | null {
   const p = data.project;
   switch (label) {
+    case VARIATION_ANSWER_LABEL:
+    case VARIATIONS_ANSWER_LABEL:
+      return variationNextDetail(data.issues);
     case "Book your home survey":
       return `About ${data.scheduling.surveyDurationMinutes} minutes at your home. ${p.survey.feeGbp > 0 ? `£${p.survey.feeGbp}.` : "Free, with no obligation."}`;
     case "Get ready for your survey":
@@ -94,7 +106,7 @@ function nextDetail(label: string, data: HubData): string | null {
 function NextStep({ data, go }: { data: HubData; go: (stage: ProjectStageId, anchor?: string) => void }) {
   const hub = useHub();
   const p = data.project;
-  const next = customerNextAction(p);
+  const next = hubNextAction(data);
   const staff = hub.mode === "staff";
 
   if (!next) {
@@ -122,7 +134,8 @@ function NextStep({ data, go }: { data: HubData; go: (stage: ProjectStageId, anc
   const onClick = () => {
     if (hash) {
       const stage = stageForHash(hash, p);
-      if (stage) go(stage, stage === "price" && p.survey.status === "not-booked" ? "book-survey" : undefined);
+      const answering = next.label === VARIATION_ANSWER_LABEL || next.label === VARIATIONS_ANSWER_LABEL;
+      if (stage) go(stage, stage === "price" && p.survey.status === "not-booked" ? "book-survey" : answering ? CHANGES_WAITING_ID : undefined);
     } else if (toProposal) go("proposal");
     else if (toPay) go("booking");
   };
@@ -236,7 +249,7 @@ export function Hub({ data, slots, controls, refLabel }: { data: HubData; slots?
     <Panel data={data} state={stageState(p, selected)} goTo={go} slots={slots} />
   );
   // The card's action is the one filled button; panels repeating it draw theirs quietly.
-  const nextLabel = customerNextAction(p)?.label ?? null;
+  const nextLabel = hubNextAction(data)?.label ?? null;
 
   return (
     <NextStepContext.Provider value={nextLabel}>

@@ -2,6 +2,7 @@ import {
   CANCELLATION_RULE_STATUS,
   baseIdempotencyKey,
   cancellationStatus,
+  documentsConsentCovers,
   type CommsEventId,
   type MessageRecord,
   type Project,
@@ -130,7 +131,11 @@ export function commsForAction(project: Project, action: ProjectAction, actor?: 
       return [
         notice(
           "survey-complete",
-          { proposalBy: submitted ? addWorkingDays(submitted, PROPOSAL_TURNAROUND_WORKING_DAYS) : undefined },
+          {
+            proposalBy: submitted ? addWorkingDays(submitted, PROPOSAL_TURNAROUND_WORKING_DAYS) : undefined,
+            // Not agreed at the survey: the proposal can't go until they do, so the email asks (never "nothing to do").
+            ...(documentsConsentCovers(p) ? {} : { needsDocumentsConsent: true }),
+          },
           action.surveyRecordId,
         ),
       ];

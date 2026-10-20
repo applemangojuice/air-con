@@ -128,8 +128,10 @@ loft hatch, and a torch for the fuse board.
    8. **Risks**: working at height, hidden services, pets, anything else.
    9. **Assumptions & unknowns**: anything you couldn't check.
    10. **Documents by email**: ask "Are you happy to receive your proposal
-       and contract documents by email?" and record the answer. Without it
-       the proposal has to go on paper.
+       and contract documents by email?" and record it only if they say yes.
+       Without it no proposal can go: the pilot can't send documents on
+       paper. If they'd rather not, tell them the office will get in touch
+       to talk it through (the office sees it on the project).
 5. **Check and submit** lists anything missing. **Submit survey** sends it
    to the technical lead. You can't edit it afterwards.
 

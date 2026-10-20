@@ -499,6 +499,9 @@ function Fixes(props: BuilderProps & { flushEdits: () => Promise<boolean> }) {
         <p className="text-sm text-ink-700">
           Did {props.customer.name || "the customer"} tell you they&apos;re happy to get documents by email? Record how. (They can also agree on their project page.)
         </p>
+        <p className="mt-1 text-sm text-ink-500">
+          Rather have paper? The pilot can&apos;t send the proposal, contract or cancellation form on paper. Talk it through; if they still want paper, tell them honestly and close the project with the reason.
+        </p>
         <div className="mt-2">
           <Input
             label="How and when they agreed"

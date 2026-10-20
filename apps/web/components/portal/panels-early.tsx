@@ -29,7 +29,7 @@ import {
 import { useHub } from "./controller";
 import type { PanelProps } from "./panel-types";
 import { SlotPicker } from "./pickers";
-import { PROPOSAL_LATE_LINE, arrivalTime, onMyWayFresh, proposalLate, proposalReadyBy } from "./view";
+import { arrivalTime, onMyWayFresh, proposalLate, proposalLateLine, proposalReadyBy } from "./view";
 
 /* ------------------------------------------------------------------ */
 /* Shared copy                                                         */
@@ -316,7 +316,7 @@ export function SurveyPanel({ data, state, goTo }: PanelProps) {
       <StageShell info={info} state={state}>
         <Callout tone="good" title={readyBy && !late ? `Survey done. Your proposal will be ready by ${fmtDay(readyBy)}.` : "Survey done."}>
           Thanks for having us. Next, we design your system from what we measured, and a qualified engineer signs it off before you see a price.
-          {late ? ` ${PROPOSAL_LATE_LINE}` : ""}
+          {late ? ` ${proposalLateLine(p)}` : ""}
         </Callout>
         {report && (
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-white p-4">
@@ -545,7 +545,7 @@ export function ProposalPanel({ data, state, goTo, slots }: PanelProps) {
               detail:
                 readyBy && p.proposal.status === "not-issued"
                   ? proposalLate(p, data.today)
-                    ? PROPOSAL_LATE_LINE
+                    ? proposalLateLine(p)
                     : `Due by ${fmtDay(readyBy)}`
                   : undefined,
             },
