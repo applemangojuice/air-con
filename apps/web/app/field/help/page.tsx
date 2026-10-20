@@ -60,7 +60,7 @@ const steps: ReactNode[] = [
     <B>Leaving:</B> <B>Actions</B> → <B>End day 1</B> (or 2, or 3) → check the summary → pick 2 to 4 photos → preview → send.
   </>,
   <>
-    <B>Last day:</B> the tech lead signs on the <B>Commission</B> tab, then you do the <B>Handover</B> with the customer.
+    <B>Before day 1:</B> the tech lead sets the job&apos;s targets on the <B>Commission</B> tab (the pressure and vacuum steps show the hold to keep, or that it isn&apos;t set yet: ask before you start). <B>Last day:</B> the tech lead signs on the <B>Commission</B> tab, then you do the <B>Handover</B> with the customer.
   </>,
 ];
 
@@ -326,7 +326,7 @@ export default async function FieldHelpPage() {
             handover pack carries the file: the routes as built, the R32, the isolators, the manuals and your line.
           </p>
           <p>
-            <B>Commission</B> (the tech lead signs): the results for each system, from the evidence, with the pressure and vacuum tests worked out; the manufacturer&apos;s targets (test pressure and PS, hold times, the allowed fall, the vacuum target and rise limit, torques, drain fall); every Needs review item looked at. A failed pressure or vacuum test stops the signature until it&apos;s retested. <B>Sign commissioning</B> completes the install and issues the certificate. It can&apos;t be undone from the field.
+            <B>Commission</B> (the tech lead signs): the results for each system, from the evidence, with the pressure and vacuum tests worked out; the manufacturer&apos;s targets (test pressure and PS, hold times, the allowed fall, the vacuum target and rise limit, torques, drain fall); every Needs review item looked at. Set the targets before day 1: a target that would fail a test already taken asks you to confirm it first. A failed pressure or vacuum test stops the signature until it&apos;s retested. <B>Sign commissioning</B> completes the install and issues the certificate. It can&apos;t be undone from the field.
           </p>
           <p>
             <B>Handover</B>, with the customer beside you: show them the remote, the modes, the app, cleaning the filters, and what&apos;s normal (steam when it defrosts, a few drips). The handover pack appears once commissioning is signed. They pick <B>All good</B> or <B>There&apos;s a snag</B> (write each snag down), type their name and sign. Each snag becomes an issue with an owner and a date, and the customer can see it.

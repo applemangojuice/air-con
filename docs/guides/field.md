@@ -460,9 +460,17 @@ release and leak check) are yours or another F-gas holder's. Anything a
 crew member flags **Needs review** comes to you; an ordinary installer can't
 clear it.
 
-**Commissioning** (the job's **Commission** tab, on the last day):
+**Commissioning** (the job's **Commission** tab: the targets **before day
+1**, the rest on the last day):
 
-1. **This job's targets**: the manufacturer figures weren't verified in our
+1. **This job's targets**, set as soon as the booking is confirmed, and
+   always before the pressure and vacuum tests on day 3: the crew's step
+   cards show your hold time ("Hold at least 60 min"), or "Hold time not set
+   yet: ask the tech lead". A hold set after a test was taken judges it
+   again, and a shorter hold than the manual's then fails it for good (a
+   full retest, with the charge pumped down first). If a target you type
+   would fail a test already taken, the app asks you to tick that the figure
+   is right before saving, so a typo can't fail it. The manufacturer figures weren't verified in our
    research, so you set each one from this model's installation manual:
    nitrogen test pressure (the manual's figure as the minimum, the outdoor
    unit's nameplate PS as the maximum), the pressure test's hold time and

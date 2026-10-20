@@ -13,7 +13,7 @@ const TONE: Record<DecayTestView["result"], string> = {
   incomplete: "border-line bg-surface text-ink-900",
 };
 
-export function DecayPanel({ test, compact = false }: { test: DecayTestView; compact?: boolean }) {
+export function DecayPanel({ test, compact = false, holdMin }: { test: DecayTestView; compact?: boolean; holdMin?: number | null }) {
   const rows = test.pressure ? pressureDecayRows(test.pressure) : test.vacuum ? vacuumDecayRows(test.vacuum) : [];
   const name = test.kind === "pressure" ? "Strength and tightness test" : "Vacuum decay test";
   return (
@@ -21,6 +21,13 @@ export function DecayPanel({ test, compact = false }: { test: DecayTestView; com
       <p className="text-base font-semibold">
         {name}: {decayResultText(test)}
       </p>
+      {test.result === "incomplete" && holdMin !== undefined && (
+        <p className="mt-1 font-medium">
+          {holdMin !== null
+            ? `Hold at least ${holdMin} min: the tech lead's figure from the manual.`
+            : "Hold time not set yet: ask the tech lead for the manual's hold time before you start. A hold shorter than the manual's fails once it's set, and a failed test needs a full retest."}
+        </p>
+      )}
       {test.fails.length > 0 && (
         <ul className="mt-1 list-disc space-y-1 pl-5">
           {test.fails.map((f) => (

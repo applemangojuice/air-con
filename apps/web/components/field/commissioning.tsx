@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import {
   JOB_TARGETS,
+  TARGET_FAILS_PREFIX,
   commissioningFromJob,
   commissioningSignErrors,
   electricalRefsFromJob,
@@ -64,6 +65,9 @@ function TargetRow({ projectId, target, canEdit, locked, onAnswer }: { projectId
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // A change that fails a test already taken asks first (the server refuses it until this is ticked).
+  const [confirmFails, setConfirmFails] = useState(false);
+  const failsTaken = Boolean(error?.startsWith(TARGET_FAILS_PREFIX));
   // A company default applies until the tech lead sets a figure: it isn't waiting for anyone.
   const b = target.basis !== "tech-lead" && def.defaultApplies ? { text: "Company default", tone: "bg-surface text-ink-700" } : BASIS[target.basis];
   const showMin = def.bounds !== "max";
@@ -77,11 +81,15 @@ function TargetRow({ projectId, target, canEdit, locked, onAnswer }: { projectId
     setBusy(true);
     const r = await postAnswer<{ applied: TargetAnswer }>(
       `/api/field/jobs/${projectId}/targets`,
-      { key: target.key, ...(lo !== undefined ? { min: lo } : {}), ...(hi !== undefined ? { max: hi } : {}), ...(note.trim() ? { note: note.trim() } : {}) },
+      { key: target.key, ...(lo !== undefined ? { min: lo } : {}), ...(hi !== undefined ? { max: hi } : {}), ...(note.trim() ? { note: note.trim() } : {}), ...(failsTaken && confirmFails ? { confirmFails: true } : {}) },
       NO_REPLY,
     );
     setBusy(false);
-    if (!r.ok) return setError(r.error);
+    if (!r.ok) {
+      if (!r.error.startsWith(TARGET_FAILS_PREFIX)) setConfirmFails(false);
+      return setError(r.error);
+    }
+    setConfirmFails(false);
     onAnswer(r.data.applied);
   }
 
@@ -130,6 +138,12 @@ function TargetRow({ projectId, target, canEdit, locked, onAnswer }: { projectId
             <p role="alert" className="text-sm font-medium text-red-700">
               {error}
             </p>
+          )}
+          {failsTaken && (
+            <label className="flex min-h-12 cursor-pointer items-start gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3">
+              <input type="checkbox" checked={confirmFails} onChange={(e) => setConfirmFails(e.target.checked)} className="mt-1 h-5 w-5 accent-accent-600" />
+              <span className="text-sm font-semibold text-red-900">The figure is right: fail the test already taken (a full retest is then needed)</span>
+            </label>
           )}
           <div className="flex flex-wrap gap-2">
             <button type="button" disabled={busy} onClick={() => void save(false)} className={`${PRIMARY} flex-1`}>

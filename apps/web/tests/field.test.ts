@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   commissioningSignErrors,
   createProject,
+  TARGET_FAILS_PREFIX,
   decayTest,
   generateQuote,
   INSTALL_TEMPLATE_VERSION,
@@ -861,6 +862,36 @@ test("decay: a failed strength test can't be accepted, a target change leaves it
   const retested = (await installJobsRepo.loadForProject(PROJECT))!;
   const t = decayTest(retested, retested.runsheet.find((s) => s.id === step.id)!)!;
   assert.deepEqual([t.result, t.failedRuns, t.pressure?.allowanceFrom], ["pass", 1, "tech-lead"]);
+});
+
+test("round 10: a target typed wrongly after a good test asks first, so a typo can't fail it for good", async () => {
+  await seed("in-progress");
+  const tech = staffMember("aa000000-0000-4000-8000-0000000000f4", { roles: ["tech-lead"], qualifications: FGAS.qualifications });
+  const step = (await installJobsRepo.loadForProject(PROJECT))!.runsheet.find((s) => s.decay?.kind === "pressure")!;
+  const spec = (role: string) => step.evidence.find((e) => e.role === role)!;
+  // The review's repro: 30 bar g to 29.9 after 60 min at a steady 15 °C on a 0.1 bar gauge passes with no hold target yet.
+  const readings: [string, number][] = [["strength-test", 30], ["strength-start-temp", 15], ["strength-hold", 29.9], ["strength-end-temp", 15], ["strength-hold-time", 60], ["gauge-resolution", 0.1]];
+  for (const [i, [role, value]] of readings.entries()) {
+    await evidenceRepo.appendIdempotent(PROJECT, { id: `typo-${i}`, specId: spec(role).id, value, at: `2026-11-12T1${i}:00:00.000Z`, by: tech.name, byStaffId: tech.id });
+  }
+  const now = async () => {
+    const j = (await installJobsRepo.loadForProject(PROJECT))!;
+    return decayTest(j, j.runsheet.find((s) => s.id === step.id)!)!.result;
+  };
+  assert.equal(await now(), "pass");
+  // 600 typed for 60: refused with the reason, nothing saved.
+  await assert.rejects(field.setTarget(PROJECT, tech, { key: "pressure.hold", min: 600 }), (e: Error) => e.message.startsWith(TARGET_FAILS_PREFIX) && /Strength and tightness test/.test(e.message) && /only a full retest clears it/.test(e.message));
+  const untouched = (await installJobsRepo.loadForProject(PROJECT))!;
+  assert.equal(untouched.runsheet.find((s) => s.id === step.id)!.evidence.find((e) => e.role === "strength-hold-time")!.min, undefined);
+  assert.equal(await now(), "pass");
+  // The right figure saves straight away; a figure that really fails it saves only once confirmed.
+  await field.setTarget(PROJECT, tech, { key: "pressure.hold", min: 60 });
+  assert.equal(await now(), "pass");
+  await assert.rejects(field.setTarget(PROJECT, tech, { key: "pressure.hold", min: 90 }), (e: Error) => e.message.startsWith(TARGET_FAILS_PREFIX));
+  await field.setTarget(PROJECT, tech, { key: "pressure.hold", min: 90 }, true);
+  assert.equal(await now(), "fail", "confirmed: the test fails and owes a retest");
+  // A hold over 24 hours is a typo the server refuses outright.
+  await assert.rejects(field.setTarget(PROJECT, tech, { key: "vacuum.hold", min: 6000 }), /over 24 hours/);
 });
 
 test("decay: a runsheet stored before the decay tests is read with them, ids and targets kept; a signed one as signed", async () => {

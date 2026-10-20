@@ -377,8 +377,15 @@ with their names; the planning consent item adds itself before day 1.
   at their request, they pay for the work done up to then.
 - In the evening the installer's end-of-day update (with the photos they
   picked) goes to the family; you'll see it under the project's Messages.
-- Last day: the technical lead sets the job's test targets from the
-  manual, reviews anything flagged **Needs review** (a weighed charge more
+- **Before day 1** (once the booking is confirmed): the technical lead sets
+  the job's test targets from the manual on the field app's **Commission**
+  tab, above all the pressure and vacuum hold times. The crew's pressure and
+  vacuum steps show the hold to keep, or "Hold time not set yet"; a test
+  taken before the hold is set is judged again when it's set, and a hold
+  shorter than the manual's then fails and needs a full retest (with the
+  charge in, that means pumping it down first). A target change that would
+  fail a test already taken asks the technical lead to confirm first.
+- Last day: the technical lead reviews anything flagged **Needs review** (a weighed charge more
   than 10% or 50 g from what the as-built length needs is one), and signs
   commissioning on site. The certificate shows the charge added next to the
   figure the as-built length needed.

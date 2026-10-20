@@ -64,8 +64,17 @@ says what to do instead. Approvals that need a professional are in
      resolution typed too coarse loosens the default allowance (it's printed
      on the certificate); and readings are put in order by the time the
      phone stamped them, so a phone with a badly wrong clock could mix two
-     runs. *Instead:* set the targets from the manual before the install
-     day, and use a phone with automatic time.
+     runs. Round 10: the crew's pressure and vacuum step cards show the hold
+     to keep, or "Hold time not set yet: ask the tech lead"; a target change
+     that would fail a test already taken asks the technical lead to tick
+     that the figure is right first (so a typo can't fail it for good); and
+     a hold over 24 hours is refused as a typo. Still not built: *the
+     targets live on each job, not on the catalogue's model* (a model fitted
+     before is set again, about 10 figures a job), and *nothing prompts the
+     technical lead to set them early* (no Today card or booking warning).
+     *Instead:* set the targets from the manual as soon as the booking is
+     confirmed, and always before day 3's tests; keep a note of each model's
+     figures to copy; use a phone with automatic time.
    - *The R32 room size is re-checked from the catalogue's factory charge.*
      The charge step flags an added charge over what the smallest room on
      the system allows, worked out with the catalogue's factory charge, not

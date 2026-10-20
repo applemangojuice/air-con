@@ -23,6 +23,8 @@ const bodySchema = z.object({
   min: bound,
   max: bound,
   note: z.string().max(500).optional(),
+  /** The tech lead saw that it fails a test already taken, and means it. */
+  confirmFails: z.boolean().optional(),
 });
 
 export async function POST(request: Request, { params }: Params): Promise<Response> {
@@ -40,7 +42,7 @@ export async function POST(request: Request, { params }: Params): Promise<Respon
       ...(b.min !== undefined ? { min: b.min } : {}),
       ...(b.max !== undefined ? { max: b.max } : {}),
       ...(b.note ? { note: b.note } : {}),
-    });
+    }, b.confirmFails === true);
     return { ok: true, applied };
   });
 }

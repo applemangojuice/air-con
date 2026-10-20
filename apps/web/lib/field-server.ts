@@ -45,6 +45,8 @@ import {
   transitionIssue,
   variationStart,
   DESIGN_CHANGE_REFUSAL,
+  decayNewlyFailed,
+  TARGET_FAILS_PREFIX,
   withExceptionReview,
   asBuiltRunsFromJob,
   healthSafetyFileFor,
@@ -1597,6 +1599,8 @@ export async function setTarget(
   projectId: string,
   staff: StaffMember,
   input: { key: TargetKey; min?: number; max?: number; note?: string },
+  /** The tech lead has seen that the change fails a test already taken, and means it (decayNewlyFailed). */
+  confirmFails = false,
 ): Promise<{ job: InstallJobV2; applied: { input: typeof input; by: string; at: string; retest: { stepId: string; evidenceId: string; reasons: string[] }[] } }> {
   const project = await projectForStaff(projectId, staff);
   const today = londonToday();
@@ -1610,12 +1614,22 @@ export async function setTarget(
   const at = nowIso();
   // A change that would pass a failed pressure or vacuum test leaves it owing a retest: it never clears one by itself.
   let retest: { stepId: string; evidenceId: string; reasons: string[] }[] = [];
+  // A change that fails a test already taken asks first: once failed, only a full retest clears it, even if the figure was a typo.
+  if (!confirmFails) {
+    const failing = decayNewlyFailed(job, setJobTarget(job.runsheet, input, staff.name, at));
+    if (failing.length) {
+      throw new FieldError(
+        `${TARGET_FAILS_PREFIX} ${failing.map((f) => `${f.title}: ${f.reasons.join(" ")}`).join(" ")} Once it fails, only a full retest clears it, even if you correct the figure later. Check it against the manual; if it's right, tick the box and save again.`,
+        409,
+      );
+    }
+  }
   const saved = await mutateJob(projectId, (parts) => {
     const next = setJobTarget(parts.runsheet, input, staff.name, at);
     retest = decayRetestMarkers({ evidence: job.evidence, runsheet: parts.runsheet }, next);
     return { ...parts, runsheet: withRetestMarkers(next, retest) };
   });
-  await audit({ actor: staff, action: "install.target", entity: "project", entityId: projectId, detail: { ...input, ...(retest.length ? { retestOwing: retest.map((r) => r.stepId) } : {}) } });
+  await audit({ actor: staff, action: "install.target", entity: "project", entityId: projectId, detail: { ...input, ...(retest.length ? { retestOwing: retest.map((r) => r.stepId) } : {}), ...(confirmFails ? { confirmedFails: true } : {}) } });
   // What was applied, exactly: the screen applies the same setJobTarget (and retest markers) to its own copy at once.
   return { job: asV2(saved, job), applied: { input, by: staff.name, at, retest } };
 }

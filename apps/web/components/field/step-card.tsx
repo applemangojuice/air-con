@@ -170,7 +170,14 @@ export function StepCard({
             </p>
           )}
           {step.guidance && <p className="text-base leading-relaxed text-ink-700">{step.guidance}</p>}
-          {view.test && <DecayPanel test={view.test} compact={view.test.result === "incomplete" && view.test.fails.length === 0 && view.test.invalid.length === 0} />}
+          {view.test && (
+            <DecayPanel
+              test={view.test}
+              compact={view.test.result === "incomplete" && view.test.fails.length === 0 && view.test.invalid.length === 0}
+              // Before they start: the hold the manual asks for, or that it isn't set yet (round 10).
+              holdMin={step.evidence.find((e) => e.role === (view.test!.kind === "pressure" ? "strength-hold-time" : "vacuum-hold-time"))?.min ?? null}
+            />
+          )}
           {view.charge && <ChargePanel check={view.charge} />}
           {view.latest && view.latest.outcome !== "pass" && (
             <p className={`rounded-xl px-3 py-2 text-sm font-medium ${view.latest.outcome === "na" ? "bg-surface text-ink-900" : "bg-red-50 text-red-900"}`}>

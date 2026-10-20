@@ -2662,6 +2662,9 @@ export function unconfirmedTargets(runsheet: InstallStep[]): TargetKey[] {
 }
 
 /** Why these numbers can't be a window, or null. Both empty is fine ("record only", confirmed) where the target allows it. */
+/** The longest hold a target may ask for: the longest manufacturer hold seen (a 24-hour airtight test, search extract only). Above it is a typo. */
+export const MAX_HOLD_MINUTES = 24 * 60;
+
 export function targetError(key: TargetKey, min: number | undefined, max: number | undefined): string | null {
   const def = JOB_TARGETS[key];
   if (!def) return "Unknown target.";
@@ -2679,6 +2682,9 @@ export function targetError(key: TargetKey, min: number | undefined, max: number
     return key === "pressure.test" ? "Set the manual's test pressure and the nameplate PS." : `Set ${def.label.toLowerCase()} from the manual: it can't be record only.`;
   }
   if ((key === "pressure.hold" || key === "vacuum.hold") && min !== undefined && min <= 0) return "A hold time is more than 0 minutes.";
+  if ((key === "pressure.hold" || key === "vacuum.hold") && min !== undefined && min > MAX_HOLD_MINUTES) {
+    return `A hold over 24 hours (${MAX_HOLD_MINUTES.toLocaleString("en-GB")} minutes) isn't a figure a manual gives: check it (minutes, not seconds).`;
+  }
   if (key === "vacuum.target" && max !== undefined && max > VACUUM_STANDARD_MICRON) {
     return `500 micron always applies: a figure above it would change nothing. Use 500 micron, or the manual's if it's stricter.`;
   }
@@ -2874,6 +2880,30 @@ export function decayRetestMarkers(job: Pick<InstallJob, "evidence" | "runsheet"
     const last = [...job.evidence].reverse().find((e) => ids.has(e.specId) && e.id);
     if (!last?.id) continue;
     out.push({ stepId: step.id, evidenceId: last.id, reasons: before.fails.length ? before.fails : ["The test failed against the targets when it was taken."] });
+  }
+  return out;
+}
+
+/** The start of the refusal a target change that fails a test already taken gets (the Commission tab then shows a tick-box). */
+export const TARGET_FAILS_PREFIX = "This fails a test already taken.";
+
+/**
+ * The decay tests a target change would newly fail: each test on the job
+ * that passes now and fails with the new runsheet's targets, with why. The
+ * tech lead confirms before such a change is saved (round 10): a failed test
+ * only clears with a full retest, so a typo in a target would otherwise
+ * stand even after it's corrected.
+ */
+export function decayNewlyFailed(job: Pick<InstallJob, "evidence" | "runsheet">, next: InstallStep[]): { stepId: string; title: string; reasons: string[] }[] {
+  const out: { stepId: string; title: string; reasons: string[] }[] = [];
+  for (const step of job.runsheet) {
+    if (!step.decay) continue;
+    const before = decayTest(job, step);
+    const after = next.find((s) => s.id === step.id);
+    if (before?.result !== "pass" || !after?.decay) continue;
+    const now = decayTest(job, after);
+    if (now?.result !== "fail") continue;
+    out.push({ stepId: step.id, title: step.title, reasons: now.fails });
   }
   return out;
 }
