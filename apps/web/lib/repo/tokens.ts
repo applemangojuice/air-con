@@ -8,6 +8,13 @@ import { compact, db, isUuid, must, optStr, type Row } from "./base";
 
 const TABLE = "login_tokens";
 
+/**
+ * `purpose` of a sign-in email's token, whose email also carries a code
+ * (§K45). The tokens inside operational emails stay `login`: they carry no
+ * code. A free-text column, so no migration.
+ */
+export const SIGN_IN_CODE_PURPOSE = "login-code";
+
 export interface LoginToken {
   id: string;
   tokenHash: string;
@@ -72,6 +79,29 @@ export async function recentSignInLinks(email: string, sinceIso: string, nowIso:
     .lte("expires_at", signInHorizon);
   if (res.error) throw new Error(`login_tokens count: ${res.error.message}`);
   return res.count ?? 0;
+}
+
+/**
+ * The newest unused, unexpired sign-in token for this address and kind
+ * minted since `sinceIso` that carries a code (`purpose` SIGN_IN_CODE_PURPOSE):
+ * the only one whose code is accepted (lib/auth/magic consumeSignInCode).
+ */
+export async function newestWithCode(email: string, kind: "staff" | "customer", sinceIso: string, nowIso: string): Promise<LoginToken | null> {
+  const data = must(
+    await db()
+      .from(TABLE)
+      .select("*")
+      .eq("email", email.trim().toLowerCase())
+      .eq("subject_kind", kind)
+      .eq("purpose", SIGN_IN_CODE_PURPOSE)
+      .gte("created_at", sinceIso)
+      .gt("expires_at", nowIso)
+      .order("created_at", { ascending: false })
+      .limit(1),
+    "login_tokens newestWithCode",
+  );
+  const row = (data ?? [])[0];
+  return row ? fromRow(row) : null;
 }
 
 export async function findByHash(tokenHash: string): Promise<LoginToken | null> {

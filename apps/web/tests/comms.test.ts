@@ -7,6 +7,7 @@ import {
   DEFAULT_SETTINGS,
   EARLY_START_WORDING_VERSION,
   FOLLOW_UP_EVENTS,
+  CODE_PLACEHOLDER,
   LINK_PLACEHOLDER,
   applyProjectAction,
   createProject,
@@ -995,6 +996,33 @@ test("magic links: sent once from memory, never stored, never retried", async ()
   assert.match(after.error ?? "", /Ask for a new link/);
   assert.equal((await f.outbox.resend(after.id)).status, "skipped");
   assert.equal(f.sent.length, 0);
+});
+
+test("a sign-in email's code: in the email that's sent, never in the stored copy, never sent again", async () => {
+  const h = await harness({ email: true, emailOk: [true] });
+  const link = "https://dang.example/auth/verify?t=staff-token-2";
+  const r = await h.outbox.notify("magic-link", {
+    to: "staff@example.test",
+    data: { link, name: "Alex Demo", audience: "staff", expiresInMinutes: 20, code: "042917", codeMinutes: 15 },
+    discriminator: "tok-code",
+  });
+  assert.equal(r.status, "sent");
+  const sent = h.sent[0]!.body;
+  assert.ok(sent.includes("042 917"), "the code, in two threes");
+  assert.ok(sent.includes(link));
+  assert.match(sent, /type this code/);
+  assert.match(sent, /works once, for 15 minutes/);
+  const stored = (await h.store.get(r.results[0]!.messageId!))!;
+  const kept = `${stored.subject}${stored.bodyText}${stored.bodyHtml}`;
+  assert.ok(!kept.includes("042917") && !kept.includes("042 917"), "the code isn't in the database");
+  assert.ok(stored.bodyText.includes(CODE_PLACEHOLDER) && stored.bodyText.includes(LINK_PLACEHOLDER));
+  assert.equal((await h.outbox.resend(stored.id)).status, "skipped", "a stored sign-in email can't be sent again");
+
+  // Without a code (an older caller), the email reads as before.
+  const plain = await harness({ email: true, emailOk: [true] });
+  await plain.outbox.notify("magic-link", { to: "staff@example.test", data: { link, audience: "staff" }, discriminator: "tok-plain" });
+  assert.ok(!plain.sent[0]!.body.includes(CODE_PLACEHOLDER));
+  assert.doesNotMatch(plain.sent[0]!.body, /type this code/);
 });
 
 test("concurrent notifies for one occurrence store exactly one message", async () => {

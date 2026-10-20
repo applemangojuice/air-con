@@ -439,8 +439,11 @@ status, channel and message type.
   An expired one stops counting the day after it expires.
 - Someone leaving: untick **Active** → **Save changes**. They can't sign
   in; their past work keeps their name.
-- People sign in at `/login` with the email on their record. Sessions last
-  30 days on each device.
+- People sign in at `/login` with the email on their record: the link in
+  the email, or its 6-digit code typed on the sign-in page (for the Home
+  Screen app, or when an email app opens the link in its own browser). The
+  code lasts 15 minutes and goes with the link: using either uses up both.
+  Sessions last 30 days on each device.
 
 ## 9. Settings and the catalogue
 

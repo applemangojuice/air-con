@@ -185,7 +185,10 @@ for **Ready**.
    a sign-in link**.
 3. Open the email "Your Dang, It's Hot sign-in link" → **Sign in** → on the
    page that opens, click **Continue as …**. The link works once and lasts
-   20 minutes.
+   20 minutes. (Reading your email on another device, or the link opened in
+   your email app's own browser? The email has a 6-digit code too: type it
+   on the sign-in page under **Enter the 6-digit code from the email**. It
+   lasts 15 minutes.)
 4. You land on **Today**, the office home page (the **Board** is in the top
    menu). This first sign-in made your admin account. You stay signed in on
    this device for 30 days.

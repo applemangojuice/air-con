@@ -8,8 +8,19 @@ import * as staffRepo from "@/lib/repo/staff";
 import * as tokensRepo from "@/lib/repo/tokens";
 import { requireDb } from "@/lib/supabase-server";
 import { withLegacyContact } from "@/lib/legacy-contact";
-import { isAdminEmail, isPlausibleEmail, linkMayCarryToken, linkMayShowOnScreen, normaliseEmail, safeNextPath } from "./access";
-import { base64urlEncode } from "./session";
+import {
+  SIGN_IN_CODE_DIGITS,
+  SIGN_IN_CODE_MAX_MINUTES,
+  isAdminEmail,
+  isPlausibleEmail,
+  linkMayCarryToken,
+  linkMayShowOnScreen,
+  normaliseEmail,
+  normaliseSignInCode,
+  safeNextPath,
+  signInCodeMinutes,
+} from "./access";
+import { base64urlEncode, constantTimeEqual, hmacSha256Hex, sessionSecret } from "./session";
 
 /**
  * Magic links (contract §C). A link carries a random token; the database
@@ -27,6 +38,13 @@ import { base64urlEncode } from "./session";
  *    showing a real person's link on screen would let anyone sign in as them.
  *  * Unknown and inactive addresses get no link and no hint (the page says
  *    the same thing either way).
+ *  * Every sign-in email also carries a 6-digit code (§K45) for signing in
+ *    in another browser (an email app's own, the Home Screen web app). It's
+ *    never stored: it's derived from the token's stored hash with the
+ *    session secret, so a database copy alone can't produce one. It lasts
+ *    as long as the link or 15 minutes, whichever is shorter; only the
+ *    newest one for an address works; using either the code or the link
+ *    spends both (one row, one `used_at`).
  */
 
 export const STAFF_LINK_TTL_MINUTES = 20;
@@ -66,19 +84,34 @@ async function createToken(input: {
   email: string;
   next?: string;
   ttlMinutes: number;
-}): Promise<{ raw: string; link: string; tokenId: string; expiresAt: string }> {
+  /** A sign-in email's token, whose email carries a code too. */
+  withCode?: boolean;
+}): Promise<{ raw: string; hash: string; link: string; tokenId: string; expiresAt: string }> {
   const raw = generateToken();
+  const hash = await hashToken(raw);
   const expiresAt = new Date(Date.now() + input.ttlMinutes * 60_000).toISOString();
   const row = await tokensRepo.insert({
-    tokenHash: await hashToken(raw),
+    tokenHash: hash,
     subjectKind: input.kind,
     subjectId: input.subjectId,
     email: input.email,
-    purpose: "login",
+    purpose: input.withCode ? tokensRepo.SIGN_IN_CODE_PURPOSE : "login",
     ...(input.next ? { nextPath: input.next } : {}),
     expiresAt,
   });
-  return { raw, link: verifyUrl(raw), tokenId: row.id, expiresAt };
+  return { raw, hash, link: verifyUrl(raw), tokenId: row.id, expiresAt };
+}
+
+/**
+ * A token's 6-digit code: HMAC-SHA256 of its stored hash and address under
+ * the session secret, 48 bits of it reduced to six digits. Deterministic, so
+ * nothing extra is stored; keyed, so the hash in the database isn't enough
+ * to work it out. Null without a usable secret (then nobody can sign in anyway).
+ */
+export async function signInCodeFor(tokenHash: string, email: string, secret: string | null = sessionSecret()): Promise<string | null> {
+  if (!secret) return null;
+  const mac = await hmacSha256Hex(secret, `dih-sign-in-code:${tokenHash}:${normaliseEmail(email)}`);
+  return (Number.parseInt(mac.slice(0, 12), 16) % 10 ** SIGN_IN_CODE_DIGITS).toString().padStart(SIGN_IN_CODE_DIGITS, "0");
 }
 
 /**
@@ -97,7 +130,7 @@ export async function issueMagicLink(input: {
    * Over it, nothing is sent (`heldBack`), with the same answer as any refusal.
    */
   budget?: EmailPool;
-}): Promise<{ sent: boolean; devLink?: string; heldBack?: boolean }> {
+}): Promise<{ sent: boolean; devLink?: string; devCode?: string; heldBack?: boolean }> {
   const email = normaliseEmail(input.email);
   if (!isPlausibleEmail(email)) return { sent: false };
   requireDb();
@@ -143,14 +176,21 @@ export async function issueMagicLink(input: {
   }
   if (input.budget && !(await spendEmailBudget(input.budget))) return { sent: false, heldBack: true };
   const next = input.next ? safeNextPath(input.next, "") || undefined : undefined;
-  const token = await createToken({ kind: input.kind, subjectId, email, next, ttlMinutes });
+  const token = await createToken({ kind: input.kind, subjectId, email, next, ttlMinutes, withCode: true });
+  const code = await signInCodeFor(token.hash, email);
 
   const live = emailConfigured();
   let sent = false;
   try {
     const result = await notify("magic-link", {
       to: email,
-      data: { link: token.link, name: name || undefined, audience: input.kind, expiresInMinutes: ttlMinutes },
+      data: {
+        link: token.link,
+        name: name || undefined,
+        audience: input.kind,
+        expiresInMinutes: ttlMinutes,
+        ...(code ? { code, codeMinutes: signInCodeMinutes(ttlMinutes) } : {}),
+      },
       discriminator: token.tokenId,
     });
     // Honest: "sent" only on a provider acknowledgement, never "demo" or "queued".
@@ -161,7 +201,7 @@ export async function issueMagicLink(input: {
 
   // Relative, so the on-screen link works on whatever host is serving this page.
   return linkMayShowOnScreen({ env: process.env, emailLive: live, email, demoAccount: isDemo })
-    ? { sent, devLink: verifyPath(token.raw) }
+    ? { sent, devLink: verifyPath(token.raw), ...(code ? { devCode: code } : {}) }
     : { sent };
 }
 
@@ -279,6 +319,36 @@ export async function consumeToken(raw: string | null | undefined): Promise<Toke
   const now = new Date();
   const row = await liveToken(raw, now);
   if (!row) return null;
+  if (!(await tokensRepo.markUsed(row.id, now.toISOString()))) return null;
+  return {
+    kind: row.subjectKind,
+    subjectId: row.subjectId,
+    email: row.email,
+    ...(row.nextPath ? { next: row.nextPath } : {}),
+  };
+}
+
+/**
+ * Exchange a typed code for its token's subject, exactly once: only the
+ * newest sign-in email's code for this address and kind, inside its life
+ * (the link's, or 15 minutes, whichever is shorter), compared in constant
+ * time. On success the token is spent, so its link is dead too. Null for
+ * anything else, with no hint which: the caller counts the attempt first
+ * (signInCodeLimits).
+ */
+export async function consumeSignInCode(input: { email: string; kind: "staff" | "customer"; code: string }): Promise<TokenSubject | null> {
+  const email = normaliseEmail(input.email);
+  const code = normaliseSignInCode(input.code);
+  if (!code || !isPlausibleEmail(email)) return null;
+  const now = new Date();
+  const since = new Date(now.getTime() - SIGN_IN_CODE_MAX_MINUTES * 60_000).toISOString();
+  const row = await tokensRepo.newestWithCode(email, input.kind, since, now.toISOString());
+  if (!row || row.usedAt) return null;
+  const created = Date.parse(row.createdAt ?? "");
+  const lifeMinutes = (Date.parse(row.expiresAt) - created) / 60_000;
+  if (!Number.isFinite(created) || now.getTime() >= created + signInCodeMinutes(lifeMinutes) * 60_000) return null;
+  const expected = await signInCodeFor(row.tokenHash, row.email);
+  if (!expected || !constantTimeEqual(expected, code)) return null;
   if (!(await tokensRepo.markUsed(row.id, now.toISOString()))) return null;
   return {
     kind: row.subjectKind,

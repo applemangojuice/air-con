@@ -3,9 +3,10 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { audit } from "@/lib/audit";
-import { breakGlassLimits, isPlausibleEmail, normaliseEmail, safeNextPath, staffLanding } from "@/lib/auth/access";
+import { breakGlassLimits, isPlausibleEmail, normaliseEmail, safeNextPath, signInCodeLimits, staffLanding } from "@/lib/auth/access";
 import { isDemoRoleKey } from "@/lib/auth/demo-staff";
-import { issueMagicLink } from "@/lib/auth/magic";
+import { consumeSignInCode, issueMagicLink } from "@/lib/auth/magic";
+import { signInSubject } from "@/lib/auth/sign-in";
 import { breakGlassSession, ensureDemoStaff, setSession, staffSession } from "@/lib/auth/server";
 import { emailConfigured } from "@/lib/email";
 import { demoModeAllowed } from "@/lib/auth/demo-guard";
@@ -27,9 +28,16 @@ export interface LinkState {
   status: "idle" | "sent" | "error";
   message?: string;
   devLink?: string;
+  /** With `devLink` only (development, or a DEMO account on a demo deployment): the code that email would carry. */
+  devCode?: string;
   email?: string;
   /** Whether an email provider is configured at all (the same for every address, so no hint). */
   emailLive?: boolean;
+}
+
+export interface CodeState {
+  status: "idle" | "error";
+  message?: string;
 }
 
 export interface BreakGlassState {
@@ -68,7 +76,12 @@ export async function requestMagicLink(_prev: LinkState, form: FormData): Promis
   }
   try {
     const result = await issueMagicLink({ email, kind: "staff", next: next || undefined });
-    return { status: "sent", email, emailLive: emailConfigured(), ...(result.devLink ? { devLink: result.devLink } : {}) };
+    return {
+      status: "sent",
+      email,
+      emailLive: emailConfigured(),
+      ...(result.devLink ? { devLink: result.devLink, ...(result.devCode ? { devCode: result.devCode } : {}) } : {}),
+    };
   } catch (err) {
     console.error("[login] magic link failed:", err);
     // Not a passing hiccup: the pilot migration hasn't been run (the banner above says how to fix it).
@@ -78,6 +91,43 @@ export async function requestMagicLink(_prev: LinkState, form: FormData): Promis
     }
     return { status: "error", message: "We couldn't send a link just now. Please try again.", email };
   }
+}
+
+/**
+ * The 6-digit code from a sign-in email (§K45), typed in the browser the
+ * person wants to be signed in on (the Home Screen app, say, when the email
+ * app opened the link in its own). Bound to the address it was sent to;
+ * every attempt counts against that address and the network first
+ * (`signInCodeLimits`); it signs in exactly as the link would and spends it.
+ */
+export async function signInWithCode(_prev: CodeState, form: FormData): Promise<CodeState> {
+  const email = normaliseEmail(field(form, "email")).slice(0, 254);
+  if (!isPlausibleEmail(email)) return { status: "error", message: "Ask for a sign-in email first." };
+  if (!getServiceClient()) return { status: "error", message: "Sign-in needs a database, and this deployment doesn't have one connected." };
+  const limited = await sharedRateLimits(signInCodeLimits(await clientIp(), "staff", email));
+  if (!limited.ok) {
+    return { status: "error", message: "Too many tries for now. Tap the link in the email instead, or wait 15 minutes and ask for a new one." };
+  }
+  let subject;
+  try {
+    subject = await consumeSignInCode({ email, kind: "staff", code: field(form, "code") });
+  } catch (err) {
+    console.error("[login] sign-in code check failed:", err);
+    return { status: "error", message: "Signing in isn't working right now. Please try the link in the email." };
+  }
+  const wrong = "That code didn't work. Check it against the newest email (codes last 15 minutes and work once), or tap the link in it instead.";
+  if (!subject) return { status: "error", message: wrong };
+  const signIn = await signInSubject(subject, "code");
+  if (!signIn.ok) return { status: "error", message: wrong };
+  try {
+    await setSession(signIn.session);
+  } catch (err) {
+    console.error("[login] could not sign a session:", err);
+    return { status: "error", message: "Signing in isn't working right now. Please try the link in the email." };
+  }
+  await signIn.record();
+  // Where the email's link was going (the `next` this page asked for when it sent it).
+  redirect(signIn.landing);
 }
 
 export async function demoSignIn(form: FormData): Promise<void> {

@@ -158,7 +158,18 @@ type Session =
   signed-in account). The button POSTs (same-origin only), which exchanges
   the token for a session and redirects to its `next` (same-origin only), or
   the person's home.
-- `issueMagicLink({ email, kind, next?, ttlMinutes? }) → { sent, devLink? }`
+- **Sign-in codes** (§K45): every `issueMagicLink` email also carries a
+  6-digit code, `signInCodeFor(token_hash, email)` (HMAC under
+  `SESSION_SECRET`, never stored; the token's `purpose` is `login-code`).
+  `consumeSignInCode({ email, kind, code })` accepts only the newest such
+  token for the address and kind, within min(link life, 15 minutes),
+  compared in constant time, and spends it (one `used_at`: link and code
+  die together). Staff type it on `/login` (`signInWithCode`), families on
+  `/portal`, a project or document page (`POST /auth/code`, JSON,
+  same-origin); attempts are capped per address and per network
+  (`signInCodeLimits`, rate-limit-shared). Both paths, and `/auth/verify`,
+  sign in through `lib/auth/sign-in.ts` `signInSubject`.
+- `issueMagicLink({ email, kind, next?, ttlMinutes? }) → { sent, devLink?, devCode? }`
   sends via the outbox (`magic-link` event). Unknown or inactive addresses
   get nothing and no hint. `devLink` (shown on screen when no email provider
   is set up) only in development, or on a demo deployment
@@ -2410,3 +2421,41 @@ changelog and the reasons, so nobody "fixes" a deliberate choice back.
     - *The iOS scaffold* (`apps/mobile`, never released) sends the quote
       consents (`quote-consent-v1`, the web funnel's words) and each upload's
       content type.
+
+45. **The five gaps round 7 left (before the first real customers).**
+    - *Sign-in codes* (known limitation 10's Home Screen advice is back):
+      a magic link tapped in the Gmail or Outlook app signs in that app's
+      own browser, and the Home Screen web app has its own cookie jar, so
+      every sign-in email (`issueMagicLink`: staff, portal, the office's
+      30-day **Email them a sign-in link**) carries a 6-digit code beside
+      the link. No migration: the code is derived, not stored
+      (`signInCodeFor`: HMAC-SHA256 of the token's stored hash and address
+      under `SESSION_SECRET`, 48 bits reduced to six digits), so a database
+      copy alone can't produce one, and it's consumed with the link because
+      it *is* the link's row (`markUsed`). Tokens that carry a code have
+      `purpose` `login-code` (a free-text column); the 30-day tokens inside
+      operational emails (`customerLink`) stay `login` and never accept a
+      code. `consumeSignInCode` takes only the newest code-carrying token
+      for (address, kind) created in the last 15 minutes (a used newest one
+      refuses, it never falls back to an older one), checks min(link life,
+      15 minutes) from `created_at`, compares in constant time, and spends
+      it. Attempts count before anything is checked (`signInCodeLimits`, in
+      `rate_limits` via 0012): 5 a quarter hour and 10 a day per address
+      and kind, 10 and 40 per network; an address resting from wrong tries
+      still has its link. The stored message keeps `CODE_PLACEHOLDER` (the
+      outbox fills it from memory on the first send, like the link, and a
+      stored one is never sent again). Staff: `/login` shows **Enter the
+      6-digit code from the email** after sending and **Already have a code
+      from a sign-in email?** any time (`signInWithCode`, a server action).
+      Families: the same on `/portal`, project and document pages, through
+      `POST /auth/code` (JSON only, same-origin: `isSameOrigin`, shared with
+      `/auth/verify`), answering `{ ok, next }` with the cookie; a project
+      or document target is checked against that project's own address
+      (`codeTargetEmail`, read only). The link and the code sign in through
+      one function (`signInSubject`). Scanners still can't sign anyone in:
+      the link's page needs a tap, the code needs typing. On-screen
+      `devCode` follows `linkMayShowOnScreen`. The field app has its own
+      manifest (`/field.webmanifest`, start `/field`), linked from the field
+      layout, so a Home Screen icon added there opens the field app; the
+      field guide, `/field/help` (**Signing in, and the Home Screen**) and
+      the customer guide say to sign in there with the code.

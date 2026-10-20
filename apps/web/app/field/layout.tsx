@@ -26,6 +26,9 @@ import { Mark } from "@/components/site/logo";
 export const metadata: Metadata = {
   title: { default: "Field", template: "%s · Field" },
   robots: { index: false, follow: false },
+  // Added to the Home Screen from here, the icon opens the field app (app/field.webmanifest).
+  manifest: "/field.webmanifest",
+  appleWebApp: { capable: true, title: "Field", statusBarStyle: "default" },
 };
 
 export const viewport: Viewport = {

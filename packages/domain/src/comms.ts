@@ -372,6 +372,14 @@ export function readdressedKey(key: string, to: string): string {
  */
 export const LINK_PLACEHOLDER = "[[link added when sent]]";
 
+/**
+ * Stands in for a sign-in email's one-time code in its stored body, on the
+ * same rule: the code exists only in memory for the first send (the web's
+ * lib/auth/magic.ts derives it from the token), so a stored message can't
+ * sign anyone in either.
+ */
+export const CODE_PLACEHOLDER = "[[code added when sent]]";
+
 export interface MessageRecord {
   id: string;
   idempotencyKey: string;

@@ -9,7 +9,7 @@ import { getSettings } from "@/lib/settings-server";
 
 /**
  * Help for surveyors and installers, on the phone: the job day in eight
- * steps up top, then one fold per topic (on my way, evidence, outcomes,
+ * steps up top, then one fold per topic (signing in and the Home Screen, on my way, evidence, outcomes,
  * issues and variations, end of day, the sync badge, surveys, sign-off) and
  * who to call. Linked from the Me tab and the job pack. The words match the
  * buttons on the screens they describe.
@@ -97,6 +97,21 @@ export default async function FieldHelpPage() {
       </section>
 
       <div className="space-y-3">
+        <Fold id="sign-in" title="Signing in, and the Home Screen">
+          <p>
+            On <B>Sign in</B>, type your work email → <B>Email me a sign-in link</B>. The email has a <B>Sign in</B> link and a 6-digit code. The link works for 20 minutes, the
+            code for 15; either one works once, and using one uses up both.
+          </p>
+          <p>
+            If the link opens inside your email app (Gmail, Outlook), you&apos;d be signed in there, not in Safari or Chrome. Instead, go back to the sign-in page where you
+            want to be signed in, and type the code under <B>Enter the 6-digit code from the email</B>.
+          </p>
+          <p>
+            <B>On the Home Screen:</B> once you&apos;re signed in, open the field app (Today), then <B>Share</B> → <B>Add to Home Screen</B> on an iPhone (or Chrome&apos;s
+            menu → <B>Add to Home screen</B> on Android). The icon opens the field app. It has its own sign-in, apart from the browser&apos;s: the first time, sign in there
+            with the code, never the link (a link always opens the browser).
+          </p>
+        </Fold>
         <Fold id="on-my-way" title="On my way and Arrived">
           <p>
             <B>On my way</B> texts the customer the arrival time you pick (20, 30, 45 or 60 minutes, or type one). You see the exact text before it goes. It needs signal: with none, tap <B>Call them instead</B>.

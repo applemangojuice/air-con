@@ -496,6 +496,8 @@ export type LinkTarget = { kind: "project"; projectId: string } | { kind: "docum
 export interface LinkResult {
   /** Development, or a DEMO address on a demo deployment: the link itself, since nothing was emailed. */
   devLink?: string;
+  /** With `devLink` only: the code that email would have carried (§K45). */
+  devCode?: string;
   emailLive: boolean;
   /** The shared email budget for links asked for from the website was used up: nothing went. */
   heldBack?: boolean;
@@ -531,6 +533,30 @@ async function customerEmailForProject(projectId: string): Promise<string | null
 }
 
 /**
+ * The address a sign-in code typed for this target is checked against
+ * (§K45): the one its link would have gone to, read only (the link made any
+ * record it needed). Null when there's none, which the caller answers like a
+ * wrong code.
+ */
+export async function codeTargetEmail(target: LinkTarget): Promise<string | null> {
+  try {
+    if (target.kind === "email") return normaliseEmail(target.email);
+    const projectId =
+      target.kind === "project"
+        ? target.projectId
+        : isUuid(target.documentId)
+          ? await documentsRepo.get(target.documentId).then((doc) => (doc && isCustomerVisible(doc) ? doc.projectId : null))
+          : null;
+    if (!projectId || !isUuid(projectId)) return null;
+    const email = normaliseEmail((await loadProject(projectId))?.customer.email ?? "");
+    return isPlausibleEmail(email) ? email : null;
+  } catch (err) {
+    console.error("[portal] sign-in code target failed:", err);
+    return null;
+  }
+}
+
+/**
  * Email a sign-in link for a project, a document or an address. The
  * answer is the same whether or not anything matched (no hints about who's
  * a customer or what exists); the address is never shown back. Failures
@@ -555,7 +581,11 @@ export async function sendSignInLink(target: LinkTarget, opts: { budget?: EmailP
     }
     if (!email || !isPlausibleEmail(email)) return { emailLive };
     const result = await issueMagicLink({ email, kind: "customer", next, ...(opts.budget ? { budget: opts.budget } : {}) });
-    return { emailLive, ...(result.devLink ? { devLink: result.devLink } : {}), ...(result.heldBack ? { heldBack: true } : {}) };
+    return {
+      emailLive,
+      ...(result.devLink ? { devLink: result.devLink, ...(result.devCode ? { devCode: result.devCode } : {}) } : {}),
+      ...(result.heldBack ? { heldBack: true } : {}),
+    };
   } catch (err) {
     console.error("[portal] sign-in link failed:", err);
     return { emailLive };

@@ -16,6 +16,17 @@ why. The message list comes from the app's own message catalogue
   page (or their project page), type their email and press **Email me a
   sign-in link**. That link lasts 60 minutes. Or you send them one: the
   project → **Admin** box → **Email them a sign-in link** (30 days).
+- **Every sign-in email also has a 6-digit code** ("Signing in on another
+  browser … type this code"). A link tapped in the Gmail or Outlook app
+  opens in that app's own browser, so they'd be signed in there; instead
+  they type the code on the page where they asked for the link, under
+  **Enter the 6-digit code from the email** (or on `/portal` under
+  **Already have a code from a sign-in email?**, with their email). The
+  code works once, for 15 minutes (even in a 30-day email), only for that
+  address, and only the newest email's code works; using the code or the
+  link uses up both. Five wrong tries rest that address's codes for a
+  quarter of an hour (the link still works). The links inside our other
+  emails (proposal, booking, invoices) carry no code.
 - Their email address is their identity: they only ever see their own home.
 - **Your homes** (`/portal`) lists every home they have with us.
 

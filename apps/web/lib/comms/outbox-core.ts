@@ -1,4 +1,5 @@
 import {
+  CODE_PLACEHOLDER,
   COMMS_EVENTS,
   FOLLOW_UP_EVENTS,
   LINK_PLACEHOLDER,
@@ -9,6 +10,7 @@ import {
   type PilotSettings,
   type Project,
 } from "@aircon/domain";
+import { formatSignInCode } from "../auth/access.ts";
 import { escapeHtml } from "../email.ts";
 import { expiryOf, messageExpiry, staleReason } from "./expiry.ts";
 import type { MessageStore, StoredMessage } from "../repo/messages.ts";
@@ -32,8 +34,9 @@ import { linkPathFor, renderMessage, templateContext, type CommsData, type Rende
  * a fresh single-use token, is minted at the moment a provider takes the
  * message: first send, cron retry or resend alike, so a resend never replays
  * a spent token. A demo message is never sent, so it never gets a token. A
- * magic-link message's link exists only in memory for its first send; if
- * that fails, it's not retried (the person asks for a new link).
+ * magic-link message's link and code (CODE_PLACEHOLDER) exist only in
+ * memory for its first send; if that fails, it's not retried (the person
+ * asks for a new link).
  *
  * Follow-ups (FOLLOW_UP_EVENTS) never go to a customer who opted out, checked
  * at notify and again when a queued one is sent. A review request needs a
@@ -55,6 +58,10 @@ import { linkPathFor, renderMessage, templateContext, type CommsData, type Rende
  */
 
 export type Channel = MessageRecord["channel"];
+
+/** A sign-in email's link and code, held in memory for its first send only. */
+type LiveSignIn = { link: string; code?: string };
+
 
 export interface Recipient {
   email?: string | null;
@@ -275,25 +282,34 @@ export function createOutbox(deps: OutboxDeps) {
 
   /**
    * The message as it goes to the provider: the placeholder replaced by a
-   * link minted now (or the in-memory magic link). Null when the link can't
-   * be made again (a stored magic-link message).
+   * link minted now (or the in-memory magic link and code). Null when the
+   * link or code can't be made again (a stored magic-link message).
    */
   async function contentForSend(
     m: MessageRecord,
-    liveLink?: string,
+    live?: LiveSignIn,
   ): Promise<{ subject: string; text: string; html?: string } | null> {
     const content = { subject: m.subject ?? "", text: m.bodyText, html: m.bodyHtml };
-    if (![content.subject, content.text, content.html ?? ""].some((x) => x.includes(LINK_PLACEHOLDER))) return content;
-    let link = liveLink;
-    if (!link) {
+    const has = (placeholder: string) => [content.subject, content.text, content.html ?? ""].some((x) => x.includes(placeholder));
+    const needsLink = has(LINK_PLACEHOLDER);
+    const needsCode = has(CODE_PLACEHOLDER);
+    if (!needsLink && !needsCode) return content;
+    // A code is never kept, so a stored one can't be sent again.
+    if (needsCode && !live?.code) return null;
+    let link = live?.link;
+    if (!link && needsLink) {
       if (m.event === "magic-link") return null;
       link = m.linkPath ? await linkForSend({ ...m, linkPath: m.linkPath }) : deps.appUrl();
     }
-    const fill = (x: string, value: string) => x.split(LINK_PLACEHOLDER).join(value);
+    const fill = (x: string, html: boolean) => {
+      let out = link === undefined ? x : x.split(LINK_PLACEHOLDER).join(html ? escapeHtml(link) : link);
+      if (live?.code) out = out.split(CODE_PLACEHOLDER).join(html ? escapeHtml(live.code) : live.code);
+      return out;
+    };
     return {
-      subject: fill(content.subject, link),
-      text: fill(content.text, link),
-      ...(content.html === undefined ? {} : { html: fill(content.html, escapeHtml(link)) }),
+      subject: fill(content.subject, false),
+      text: fill(content.text, false),
+      ...(content.html === undefined ? {} : { html: fill(content.html, true) }),
     };
   }
 
@@ -363,8 +379,8 @@ export function createOutbox(deps: OutboxDeps) {
     return dispatchMessage(copy, settings, undefined, mode);
   }
 
-  /** Send one stored message now and record what happened. `liveLink`: a magic link, on its first send only. */
-  async function dispatchMessage(m: MessageRecord, settings?: PilotSettings, liveLink?: string, mode: SendMode = "first"): Promise<ChannelResult> {
+  /** Send one stored message now and record what happened. `liveLink`: a magic link (and its code), on its first send only. */
+  async function dispatchMessage(m: MessageRecord, settings?: PilotSettings, liveLink?: LiveSignIn, mode: SendMode = "first"): Promise<ChannelResult> {
     const base = { channel: m.channel, key: m.idempotencyKey, messageId: m.id, to: m.to };
     try {
       if (settings?.comms.disabledEvents.includes(m.event)) {
@@ -497,7 +513,8 @@ export function createOutbox(deps: OutboxDeps) {
       if (pending.length === 0) return done(event, results);
 
       const link = storedLinkFor(event, opts, projectId);
-      const liveLink = event === "magic-link" ? (opts.data as CommsData["magic-link"]).link : undefined;
+      const magic = event === "magic-link" ? (opts.data as CommsData["magic-link"]) : undefined;
+      const liveLink: LiveSignIn | undefined = magic ? { link: magic.link, ...(magic.code ? { code: formatSignInCode(magic.code) } : {}) } : undefined;
       const ctx = templateContext({
         settings,
         project,

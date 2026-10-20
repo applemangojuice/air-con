@@ -1,13 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { audit } from "@/lib/audit";
-import { deadLinkLanding, maskEmail, safeNextPath, sameEmail, staffLanding, type DeadLinkReason } from "@/lib/auth/access";
+import { deadLinkLanding, isSameOrigin, maskEmail, sameEmail, type DeadLinkReason } from "@/lib/auth/access";
 import { consumeToken, deadTokenSubject, peekToken, type TokenSubject } from "@/lib/auth/magic";
-import { customerSession, sessionCookie, staffForToken, staffSession } from "@/lib/auth/server";
+import { sessionCookie } from "@/lib/auth/server";
+import { signInSubject } from "@/lib/auth/sign-in";
 import { SESSION_COOKIE, verifySession, type Session } from "@/lib/auth/session";
 import { BRAND } from "@/lib/brand";
 import { escapeHtml } from "@/lib/email";
-import * as customersRepo from "@/lib/repo/customers";
-import { claimProjectOnSignIn } from "@/lib/project-service";
 import { getServiceClient } from "@/lib/supabase-server";
 
 /**
@@ -164,16 +162,7 @@ export async function GET(request: NextRequest) {
 }
 
 /** Cross-site POSTs could sign someone into the wrong account, so only our own page may post here. */
-function sameOrigin(request: NextRequest): boolean {
-  const origin = request.headers.get("origin");
-  if (!origin) return true; // very old browsers omit it on same-origin form posts
-  if (origin === "null") return false; // sandboxed frames and the like
-  try {
-    return new URL(origin).host === request.nextUrl.host;
-  } catch {
-    return false;
-  }
-}
+const sameOrigin = (request: NextRequest) => isSameOrigin(request.headers.get("origin"), request.nextUrl.host);
 
 /** The signed cookie, or null when signing is impossible (production without SESSION_SECRET). */
 async function signedCookie(session: Parameters<typeof sessionCookie>[0]) {
@@ -202,33 +191,12 @@ export async function POST(request: NextRequest) {
   // Used a moment ago (a double tap), or since: carry on if still signed in.
   if (!subject) return deadLink(request, raw ? "expired" : "missing", raw);
 
-  if (subject.kind === "staff") {
-    const staff = await staffForToken(subject);
-    if (!staff) return redirectTo(request, "/login?error=expired");
-    const cookie = await signedCookie(staffSession(staff));
-    if (!cookie) return redirectTo(request, "/login?error=unavailable");
-    const res = redirectTo(request, staffLanding(staff, subject.next));
-    res.cookies.set(cookie.name, cookie.value, cookie.options);
-    await audit({ actor: staff, action: "auth.sign-in", entity: "staff", entityId: staff.id, detail: { via: "magic-link" } });
-    return res;
-  }
-
-  const customer = subject.subjectId ? await customersRepo.get(subject.subjectId) : null;
-  if (!customer) return redirectTo(request, "/portal?link=expired");
-  // The address is proven now: a project made under it that wasn't theirs yet (funnel) joins them.
-  await claimProjectOnSignIn(customer, subject.next);
-  const projectIds = await customersRepo.projectIdsFor(customer.id);
-  const cookie = await signedCookie(customerSession(customer, projectIds));
-  if (!cookie) return redirectTo(request, "/portal?link=unavailable");
-  const fallback = projectIds.length === 1 ? `/p/${projectIds[0]}` : "/portal";
-  const res = redirectTo(request, safeNextPath(subject.next, fallback));
+  const signIn = await signInSubject(subject, "magic-link");
+  if (!signIn.ok) return redirectTo(request, signIn.landing);
+  const cookie = await signedCookie(signIn.session);
+  if (!cookie) return redirectTo(request, subject.kind === "staff" ? "/login?error=unavailable" : "/portal?link=unavailable");
+  const res = redirectTo(request, signIn.landing);
   res.cookies.set(cookie.name, cookie.value, cookie.options);
-  await audit({
-    actor: { kind: "customer", id: customer.id, name: customer.name },
-    action: "auth.sign-in",
-    entity: "customer",
-    entityId: customer.id,
-    detail: { via: "magic-link" },
-  });
+  await signIn.record();
   return res;
 }

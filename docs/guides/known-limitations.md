@@ -44,9 +44,10 @@ says what to do instead. Approvals that need a professional are in
 ## The field app
 
 10. **No native app.** It's a website on the phone: use it in Safari or
-    Chrome, with a bookmark to `/field`. A Home Screen icon opens the public
-    home page, and on an iPhone it doesn't share Safari's sign-in (sign-in
-    links always open in the browser), so don't use one for the field app.
+    Chrome, or add it to the Home Screen from `/field` (the icon opens the
+    field app). The Home Screen app has its own sign-in, apart from the
+    browser's, and a sign-in link always opens the browser, so sign in there
+    with the 6-digit code from the sign-in email (field guide §1).
     Staff sign-ins last a fixed 30 days and aren't renewed as you use them:
     **Me** says when this phone's runs out (in amber in the last 3 days);
     sign out and in again with signal before a job day. A photo refused
@@ -158,7 +159,9 @@ says what to do instead. Approvals that need a professional are in
 24. **Texts are one-way.** The sender name `DangItsHot` can't receive
     replies; every text gives your phone number instead. Until Twilio is set
     up, texts are recorded but not sent (families still get every email).
-25. **Customers sign in by email link only.** No passwords; one email
+25. **Customers sign in by email only**: the link, or the 6-digit code in
+    the same sign-in email (15 minutes, the newest email's only; links in
+    our other emails carry no code). No passwords; one email
     address is one customer. A family sharing a home with two email
     addresses uses the one on the project (change it on the project to move
     access). Removing the email takes the project away from whoever owned

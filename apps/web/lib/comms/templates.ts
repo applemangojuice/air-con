@@ -1,4 +1,5 @@
 import {
+  CODE_PLACEHOLDER,
   COMMS_EVENTS,
   EARLY_START_WORDING_VERSION,
   FOLLOW_UP_EVENTS,
@@ -98,7 +99,18 @@ interface ProposalDetails {
 
 /** What each event needs beyond the shared context. Optional fields are left out of the copy when absent. */
 export interface CommsData {
-  "magic-link": { link: string; name?: string; audience?: "staff" | "customer"; expiresInMinutes?: number };
+  "magic-link": {
+    link: string;
+    name?: string;
+    audience?: "staff" | "customer";
+    expiresInMinutes?: number;
+    /**
+     * The sign-in code (§K45). Like `link`, only for the first send: the
+     * stored body has CODE_PLACEHOLDER, and the outbox fills it in memory.
+     */
+    code?: string;
+    codeMinutes?: number;
+  };
   "survey-booked": {
     scheduledFor: string; // UK wall-clock as UTC
     durationMinutes?: number;
@@ -842,7 +854,22 @@ const TEMPLATES: { [E in CommsEventId]: Renderer<E> } = {
         { p: expiry },
       ],
       cta: "Sign in",
-      after: [{ small: "If you didn't ask for this, you can ignore it: nobody can sign in without the link." }],
+      after: d.code
+        ? [
+            {
+              p: [
+                staff
+                  ? "Signing in on another browser, or in the app on your Home Screen? Go to the sign-in page there and type this code: "
+                  : "Signing in on another browser, or the link opened somewhere you didn't want? Go to our sign-in page and type this code: ",
+                { strong: CODE_PLACEHOLDER },
+              ],
+            },
+            {
+              small: `The code works once, for ${minutesPhrase(d.codeMinutes ?? 15)}, and only for this email address. Using the code or the link uses up both. We'll never ask you for it by phone or text.`,
+            },
+            { small: "If you didn't ask for this, you can ignore it: nobody can sign in without the link or the code." },
+          ]
+        : [{ small: "If you didn't ask for this, you can ignore it: nobody can sign in without the link." }],
     };
   },
 

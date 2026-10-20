@@ -29,13 +29,26 @@ is the longer one. Every picture here is fictional DEMO data.
    email** → **Email me a sign-in link**.
 3. Open the email on the same phone → **Sign in** → **Continue as …**. The
    link works once, for 20 minutes.
-4. Keep using the field app in the browser you signed in with (Safari or
-   Chrome): bookmark `/field`. Don't add it to the Home Screen on an
-   iPhone: an icon there opens the website's home page, and on iPhone it
-   doesn't share Safari's sign-in, so a sign-in link can never reach it.
+   - The email also has a **6-digit code**. If the link opens inside your
+     email app (Gmail and Outlook open links in their own browser, so
+     you'd be signed in there, not in Safari or Chrome), go back to the
+     sign-in page in the browser you want instead: under **Enter the
+     6-digit code from the email**, type it → **Sign in with the code**.
+     The code works once, for 15 minutes, and only for that email address.
+     Using the code or the link uses up both. If you asked for two emails,
+     only the newest one's code works.
+   - Already on the sign-in page with a code and nothing on screen? Open
+     **Already have a code from a sign-in email?**, type your email and the
+     code.
+4. **Add the field app to your Home Screen.** Once you're signed in, open
+   **Today** (`/field`), then on an iPhone **Share** → **Add to Home
+   Screen** (in Chrome on Android: the menu → **Add to Home screen**). The
+   icon opens the field app full screen. It has its own sign-in, separate
+   from the browser's, so the first time you open it you sign in there:
+   type your email → **Email me a sign-in link**, read the code in your
+   email app, come back to the icon and type the code. Never tap the link
+   for this: a link always opens the browser, not the Home Screen app.
    You stay signed in on that phone for 30 days; **Me** says until when.
-   If an email app opens the sign-in link in its own browser, use **Open in
-   Safari** (or Chrome) before you tap **Continue**.
 
 Subcontractors only ever see the jobs they're on: no prices, no margins,
 no other families. On the crew's phones (installers, the electrician and any

@@ -45,6 +45,8 @@ export const metadata: Metadata = {
     template: `%s · ${BRAND.name}`,
   },
   description: DESCRIPTION,
+  // A route, so the field layout can link its own (app/field.webmanifest).
+  manifest: "/manifest.webmanifest",
   // The share image comes from app/opengraph-image.tsx. Deliberately NO
   // og/twitter title or description here: Next only falls back to each
   // page's own <title>/description when the parent didn't set them, so

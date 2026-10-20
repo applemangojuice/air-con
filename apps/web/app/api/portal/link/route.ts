@@ -13,7 +13,7 @@ import { getServiceClient } from "@/lib/supabase-server";
  *                          { email }       from /portal: to that address, if it's a customer's
  *
  * The answer is always the same `{ ok: true, emailLive }` (plus, in
- * development only, the link itself, since nothing is emailed there), so it
+ * development only, the link and its code, since nothing is emailed there), so it
  * never reveals whether a project, document or customer exists, or what
  * address we hold. Rate-limited per address and per target; over the
  * per-target limit it quietly sends nothing.
@@ -55,5 +55,9 @@ export async function POST(request: Request): Promise<Response> {
 
   // Each link is an email anyone can ask for: from the shared daily budget for those (lib/email-budget).
   const result = await sendSignInLink(target, { budget: "sign-in" });
-  return portalJson({ ok: true, emailLive: result.emailLive, ...(result.devLink ? { devLink: result.devLink } : {}) });
+  return portalJson({
+    ok: true,
+    emailLive: result.emailLive,
+    ...(result.devLink ? { devLink: result.devLink, ...(result.devCode ? { devCode: result.devCode } : {}) } : {}),
+  });
 }

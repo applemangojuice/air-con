@@ -467,3 +467,68 @@ export function maskEmail(email: string): string {
   if (at < 1) return "***";
   return `${clean[0]}***${clean.slice(at)}`;
 }
+
+/* ------------------------------------------------------------------ */
+/* Sign-in codes                                                       */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Every sign-in email carries a 6-digit code beside its link (§K45), so
+ * someone whose email app opens links in its own browser, or who uses the
+ * Home Screen web app (its own cookie jar), can sign in where they choose by
+ * typing it. A mail scanner can't: the link's page needs a tap, and the code
+ * needs typing into our page.
+ */
+export const SIGN_IN_CODE_DIGITS = 6;
+/** A code lasts as long as its link, or this, whichever is shorter. */
+export const SIGN_IN_CODE_MAX_MINUTES = 15;
+
+/** How long a sign-in email's code works, for a link that lasts `linkMinutes`. */
+export function signInCodeMinutes(linkMinutes: number): number {
+  return Math.max(1, Math.min(SIGN_IN_CODE_MAX_MINUTES, Math.floor(linkMinutes)));
+}
+
+/** The code as typed: spaces and dashes dropped. Null unless exactly six digits remain. */
+export function normaliseSignInCode(raw: string | null | undefined): string | null {
+  const clean = String(raw ?? "").replace(/[\s-]+/g, "");
+  return /^\d{6}$/.test(clean) ? clean : null;
+}
+
+/** "123456" → "123 456", the way the email prints it (easier to read off one screen and type on another). */
+export function formatSignInCode(code: string): string {
+  return code.length === SIGN_IN_CODE_DIGITS ? `${code.slice(0, 3)} ${code.slice(3)}` : code;
+}
+
+/**
+ * The brakes on typing codes, all counted in the database (rate-limit-shared):
+ * per address (and kind) and per network, a quarter hour and a day. Only the
+ * newest code for an address is ever accepted, so each guess is one in a
+ * million, and these keep a whole day's guesses against one inbox to 10.
+ * Someone hammering an address only blocks its codes: the link still works.
+ */
+export function signInCodeLimits(ip: string, kind: "staff" | "customer", email: string): { key: string; limit: number; windowMs: number }[] {
+  const who = `${kind}:${normaliseEmail(email)}`;
+  return [
+    { key: `code-email:${who}`, limit: 5, windowMs: 15 * 60_000 },
+    { key: `code-email-day:${who}`, limit: 10, windowMs: 24 * 60 * 60_000 },
+    { key: `code-ip:${ip}`, limit: 10, windowMs: 15 * 60_000 },
+    { key: `code-ip-day:${ip}`, limit: 40, windowMs: 24 * 60 * 60_000 },
+  ];
+}
+
+/**
+ * Did this POST come from our own pages? Cross-site posts to a sign-in
+ * endpoint could sign a visitor into someone else's account (login CSRF), so
+ * /auth/verify and /auth/code refuse them. A missing Origin is allowed (very
+ * old browsers omit it on same-origin form posts); "null" (sandboxed frames)
+ * is not.
+ */
+export function isSameOrigin(origin: string | null, host: string): boolean {
+  if (!origin) return true;
+  if (origin === "null") return false;
+  try {
+    return new URL(origin).host === host;
+  } catch {
+    return false;
+  }
+}
