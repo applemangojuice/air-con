@@ -1152,7 +1152,10 @@ try {
     await sheet.getByText(/Recorded in demo mode/).waitFor();
     await sheet.getByRole("button", { name: "Done" }).click();
 
+    // The London day day 1 really started on: a walk that crosses midnight mustn't compare with a later "today".
+    const d1Before = new Date();
     const d1 = await startDay(installer, 1);
+    ids.day1Labels = [...new Set([londonDayLabel(d1Before), londonDayLabel(new Date())])];
     check("starting early is explained (the booked day isn't today)", /Starting it today records today as day 1/.test(d1.intro) || /Starts your clock/.test(d1.intro));
     check("day 1 started (ready-to-install gate passed)", /Day 1 started/.test(d1.outcome), d1.outcome);
     // Started early, the job is now today's: Today and the customer's timeline say so.
@@ -1259,7 +1262,7 @@ try {
     ids.variationId = decided.url().match(/variations\/([0-9a-f-]{36})$/)[1];
     check("variation accepted on the portal", await waitFor(customer, /You said yes/));
     check("answered, the next step no longer asks for it", !(await has(customer, /Answer a change to your installation/)), (await text(customer)).slice(0, 300));
-    check("the customer's timeline dates the install to the day it really started", await has(customer, new RegExp(`Install\\s*(?:, (?:now|done)\\s*)?${londonDayLabel(new Date())}`)), (await text(customer)).match(/Install[^\n]*\n[^\n]*/)?.[0]);
+    check("the customer's timeline dates the install to the day it really started", await has(customer, new RegExp(`Install\\s*(?:, (?:now|done)\\s*)?(?:${ids.day1Labels.join("|")})`)), (await text(customer)).match(/Install[^\n]*\n[^\n]*/)?.[0]);
     await go(customer, `/p/${ids.pid}/documents`);
     check("the agreed change is in the customer's documents", await waitFor(customer, /Change #\d+: DEMO: 2 m more trunking/));
 
