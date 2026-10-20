@@ -106,7 +106,7 @@ function PackPreview({ pack, missing }: { pack: HandoverPackSnapshot; missing: s
         <div>
           <dt className="font-semibold text-ink-900">Warranty</dt>
           <dd className="text-ink-700">
-            {pack.warranty.text ?? "No warranty wording in our settings yet: the office confirms it."}
+            {pack.warranty.text ?? "The contract states no manufacturer warranty: the office confirms what applies."}
             {pack.warranty.registered ? " Registered." : pack.warranty.dueOn ? ` We register it for you by ${fmtDate(pack.warranty.dueOn)}.` : ""}
           </dd>
         </div>

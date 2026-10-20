@@ -437,7 +437,7 @@ export function ItemForm({
 
       <Card>
         <div className="grid gap-4 lg:grid-cols-2">
-          <Textarea label="Warranty" rows={4} value={d.warranty} onChange={(e) => set("warranty", e.target.value)} hint="The manufacturer's terms as you have them in writing." />
+          <Textarea label="Warranty" rows={4} value={d.warranty} onChange={(e) => set("warranty", e.target.value)} hint="Internal notes on the manufacturer's terms: never shown to families. What families are told is Settings → Warranty, frozen on each proposal." />
           <Textarea label="Notes" rows={4} value={d.notes} onChange={(e) => set("notes", e.target.value)} hint="Where figures came from, what still needs checking." />
         </div>
       </Card>

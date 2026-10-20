@@ -51,6 +51,7 @@ import {
   type Learning,
   type MeasuredSurvey,
   type MediaItem,
+  type PilotSettings,
   type Project,
   type ProposalRecord,
   type Severity,
@@ -1694,6 +1695,18 @@ export const CARE_GUIDE: string[] = [
   "If something's not right, switch it off at the remote and tell us: don't open the units.",
 ];
 
+/**
+ * The warranty the handover pack states: the wording frozen on the accepted
+ * proposal (what the contract gave the family), or, with no accepted
+ * proposal on record, the settings'. Never the catalogue's `warranty` field:
+ * that's internal research ("up to 5 years with an accredited installer …
+ * NOT confirmed"), not terms anyone has confirmed in writing.
+ */
+export function packWarrantyText(accepted: Pick<ProposalRecord, "warranty"> | null, settings: Pick<PilotSettings, "warranty">): string | null {
+  if (accepted) return accepted.warranty?.trim() || null;
+  return settings.warranty.manufacturerSummary?.trim() || null;
+}
+
 /** How many as-built photos the pack carries (finished first, then progress). */
 export const AS_BUILT_MAX = 12;
 
@@ -1728,9 +1741,11 @@ export async function handoverDraft(projectId: string, staff: StaffMember, opts:
   const progress = job ? runsheetProgress(job) : null;
   const catalogue = await catalogueRepo.list().catch(() => [] as CatalogueItem[]);
   const outdoorModels = new Set(equipment.filter((e) => /outdoor/i.test(e.room)).map((e) => e.model));
-  const notes = catalogue.filter((c) => c.kind === "outdoor" && c.model && outdoorModels.has(c.model) && c.warranty).map((c) => `${c.model}: ${c.warranty}`);
-  const warrantyText = [settings.warranty.manufacturerSummary, ...notes].filter(Boolean).join(" ") || null;
-  const dueOn = project.handover.warrantyDueOn ?? (/daikin/i.test(notes.join(" ")) ? addDaysIso(completedOn, 90) : addDaysIso(completedOn, 30));
+  const accepted = await proposalsRepo.acceptedForProject(projectId).catch(() => null);
+  const warrantyText = packWarrantyText(accepted, settings);
+  // Our own registration reminder: Daikin's deadline is 90 days, the default 30 (the catalogue's maker, never its research notes).
+  const daikin = catalogue.some((c) => c.kind === "outdoor" && c.model && outdoorModels.has(c.model) && /daikin/i.test(c.manufacturer ?? ""));
+  const dueOn = project.handover.warrantyDueOn ?? addDaysIso(completedOn, daikin ? 90 : 30);
   const crewLead = project.booking.crew.find((c) => c.role === "tech-lead") ?? project.booking.crew.find((c) => !c.external);
   // The as-built photos: what the customer can already see of the finished job, frozen into the pack.
   const asBuilt = (await mediaRepo.listForProject(projectId, { customerVisibleOnly: true }).catch(() => [] as MediaItem[]))

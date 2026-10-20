@@ -762,6 +762,24 @@ test("handover: the same tap published twice is one pack and one email; the answ
   await assert.rejects(field.publishHandoverPack(OTHER, INSTALLER, { requestId: tap }), /Not found|isn't one of yours|not found/i);
 });
 
+test("handover: the pack's warranty is the contract's wording, never the catalogue's research notes", async () => {
+  await seedHandover();
+  const catalogueRepo = await import("../lib/repo/catalogue.ts");
+  const research =
+    "Panasonic UK: 3 years standard; up to 5 years parts & labour when installed by a Panasonic Accredited Installer who registers the unit on the PRO Club portal. NOT confirmed: confirm current T&Cs before quoting customers.";
+  for (const item of CATALOGUE) await catalogueRepo.upsert({ ...item, ...(item.kind === "outdoor" ? { warranty: research } : {}) });
+  const draft = await field.handoverDraft(PROJECT, FGAS);
+  const text = JSON.stringify(draft.snapshot);
+  assert.ok(!text.includes("Accredited Installer") && !text.includes("NOT confirmed"), "no catalogue warranty text in the pack");
+  // No accepted proposal here: the settings' wording (none by default), never invented.
+  const { getSettings } = await import("../lib/settings-server.ts");
+  assert.equal(draft.snapshot.warranty.text, (await getSettings())?.warranty.manufacturerSummary?.trim() || null);
+  // With an accepted proposal, its frozen wording wins over today's settings.
+  assert.equal(field.packWarrantyText({ warranty: "DEMO: the manufacturer's standard parts warranty, as set out in your contract." }, { warranty: { workmanshipYears: null, manufacturerSummary: "Changed since" } }), "DEMO: the manufacturer's standard parts warranty, as set out in your contract.");
+  assert.equal(field.packWarrantyText({ warranty: null }, { warranty: { workmanshipYears: null, manufacturerSummary: "Set after the contract" } }), null, "the contract stated none, so the pack states none");
+  assert.equal(field.packWarrantyText(null, { warranty: { workmanshipYears: null, manufacturerSummary: " DEMO summary " } }), "DEMO summary");
+});
+
 test("handover: signing an already-signed handover answers with the sign-off on record, not an error", async () => {
   await seedHandover();
   await field.publishHandoverPack(PROJECT, INSTALLER, { requestId: "7c7c7c7c-2222-4222-8222-00000000f6e3" });
