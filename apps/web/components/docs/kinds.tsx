@@ -6,6 +6,7 @@ import {
   PD_CHECKS,
   TAX_CODES,
   earlyStartWording,
+  variationHasOwnRight,
   type Annotation,
   type CertificateSnapshot,
   type CommissioningCertificateSnapshot,
@@ -428,9 +429,11 @@ export function VariationDoc({ snap }: { snap: VariationSnapshot }) {
           ]}
         />
         <p>
-          {v.status === "accepted"
-            ? "This change is part of your contract, on the same terms, and paid with your balance. Changed your mind? Tell us before we start this extra work and we won't do it."
-            : "No extra work is done without your written yes. If you decline, we carry on exactly as agreed."}
+          {v.status !== "accepted"
+            ? "No extra work is done without your written yes. If you decline, we carry on exactly as agreed."
+            : snap.cancellation || variationHasOwnRight(v)
+              ? `This change is part of your contract and paid with your balance. You can cancel it${snap.cancellation ? ` until the end of ${fmtDate(snap.cancellation.endsOn)}` : " within 14 days of agreeing to it"} without giving a reason (the cancellation information and a form are in the email we sent you). We only start the extra work before then if you ask us to in writing; if you then cancel, you pay for the work done up to the time you tell us.`
+              : "This change is part of your contract, on the same terms, and paid with your balance. Changed your mind? Tell us before we start this extra work and we won't do it."}
         </p>
       </DocSection>
     </>

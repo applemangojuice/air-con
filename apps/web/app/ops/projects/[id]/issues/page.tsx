@@ -4,15 +4,17 @@ import {
   GATE_LABEL,
   ISSUE_KIND_LABEL,
   ROLE_LABEL,
+  VARIATION_EARLY_START_WORDS,
   VARIATION_STATUS_LABEL,
   can,
   isOpen,
+  variationStart,
   type Issue,
   type IssueStatus,
 } from "@aircon/domain";
 import { Badge, StatusChip } from "@/components/kit/badge";
 import { EmptyState, PageHeader } from "@/components/kit/layout";
-import { Disclosure, IssueTransitionForm, RaiseIssueForm, VariationSendForm } from "@/components/ops/command/forms";
+import { Disclosure, IssueTransitionForm, RaiseIssueForm, VariationSendForm, VariationStartRequestForm } from "@/components/ops/command/forms";
 import { fmtInstant } from "@/components/ops/command/model";
 import { requireStaff } from "@/lib/auth/server";
 import { fmtDate, money } from "@/lib/format";
@@ -20,7 +22,8 @@ import { contractTaxRatePct } from "@/lib/variation-server";
 import { issueKindDefaults } from "@/lib/ops-core-server";
 import { loadProject } from "@/lib/project-service";
 import * as issuesRepo from "@/lib/repo/issues";
-import { raiseIssueAction, sendVariationAction, transitionIssueAction } from "../actions";
+import { getSettings } from "@/lib/settings-server";
+import { raiseIssueAction, recordVariationStartAction, sendVariationAction, transitionIssueAction } from "../actions";
 
 export const metadata: Metadata = { title: "Issues · ops", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -64,6 +67,9 @@ export default async function ProjectIssuesPage({ params }: { params: Promise<{ 
   const taxRatePct = drafts.length ? await contractTaxRatePct(id) : 0;
   const vatNote = taxRatePct > 0 ? `(${taxRatePct}% VAT is added)` : "(no VAT is charged on this contract)";
   const defaults = issueKindDefaults();
+  const now = new Date().toISOString();
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/London" }).format(new Date());
+  const cancellationDays = issues.some((i) => i.variation?.status === "accepted") ? ((await getSettings().catch(() => null))?.scheduling.cancellationDays ?? 14) : 14;
   const open = issues.filter(isOpen);
   const done = issues.filter((i) => !isOpen(i));
 
@@ -131,6 +137,27 @@ export default async function ProjectIssuesPage({ params }: { params: Promise<{ 
                           {i.variation.taxPence ? `, ${money(i.variation.totalDeltaPence)} with VAT` : ""} · {VARIATION_STATUS_LABEL[i.variation.status]}
                         </p>
                       )}
+                      {i.variation?.status === "accepted" &&
+                        (() => {
+                          const start = variationStart(i, now, cancellationDays);
+                          if (!start.endsOn) return null;
+                          return (
+                            <div className={`mt-3 rounded-2xl border p-3 ${start.state === "wait" ? "border-amber-200 bg-amber-50/60" : "border-emerald-200 bg-emerald-50/60"}`}>
+                              <p className="text-sm font-semibold text-ink-900">
+                                {start.state === "wait"
+                                  ? `Their own 14 days: they can cancel this change until the end of ${fmtDate(start.endsOn)}. The crew waits until they've asked in writing to start now.`
+                                  : i.variation?.earlyStart
+                                    ? `They asked in writing on ${fmtInstant(i.variation.earlyStart.requestedAt)}: the crew may go ahead. They can still cancel this change until the end of ${fmtDate(start.endsOn)}, paying for the work done.`
+                                    : `Their 14 days to cancel this change ended on ${fmtDate(start.endsOn)}: the crew may go ahead.`}
+                              </p>
+                              {start.state === "wait" && canPrice && (
+                                <div className="mt-2">
+                                  <VariationStartRequestForm action={recordVariationStartAction.bind(null, id)} issueId={i.id} today={today} words={VARIATION_EARLY_START_WORDS} />
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
                       {i.variation?.status === "draft" && isOpen(i) && canPrice && (
                         <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50/60 p-3">
                           <p className="mb-2 text-sm font-semibold text-ink-900">Check it, then send it to the customer</p>

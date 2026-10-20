@@ -6,10 +6,14 @@ import {
   createIssue,
   defaultsForKind,
   isOpen,
+  recordVariationEarlyStart,
   sendVariationToCustomer,
   transitionIssue,
   variationAmounts,
+  variationCancellationEndsOn,
+  variationHasOwnRight,
   variationPricing,
+  variationStart,
   type Issue,
   type IssueKind,
 } from "./issues.ts";
@@ -172,4 +176,35 @@ test("transitionIssue: history appended, resolvedAt stamped once, reopening clea
   assert.equal(noted.history.at(-1)!.note, "Update.");
   assert.throws(() => transitionIssue(start, "done" as never, "DEMO", "x", AT));
   assert.equal(Object.keys(ISSUE_STATUS_LABEL).length, 6);
+});
+
+test("a priced change over £42 has its own 14 days: the crew waits for a written request or the end of the period", () => {
+  assert.equal(variationHasOwnRight({ totalDeltaPence: 4200 }), false, "£42 or less: none");
+  assert.equal(variationHasOwnRight({ totalDeltaPence: 4201 }), true);
+  assert.equal(variationHasOwnRight({ totalDeltaPence: -12_000 }), false, "money off: none");
+  // Agreed at 23:30 London time on 1 Nov (BST over): the period runs 14 days from that London day.
+  assert.equal(variationCancellationEndsOn("2026-11-01T23:30:00.000Z", 14), "2026-11-15");
+  assert.equal(variationCancellationEndsOn("2026-10-20T23:30:00.000Z", 14), "2026-11-04", "23:30 UTC on 20 Oct is 00:30 on 21 Oct in London");
+  assert.equal(variationCancellationEndsOn("2026-11-01T10:00:00.000Z", 10), "2026-11-15", "never fewer than 14");
+  const v = (total: number, extra: Record<string, unknown> = {}) =>
+    issue("variation", {
+      variation: { description: "DEMO: pump", priceDeltaNetPence: total, taxPence: 0, totalDeltaPence: total, status: "accepted", decidedAt: AT, acceptance: { at: AT, name: "DEMO Sam Taylor", wording: "I agree", contentHash: "x", priceDeltaNetPence: total, taxPence: 0, totalDeltaPence: total }, ...extra },
+    });
+  assert.deepEqual(variationStart(v(4000), AT), { state: "go", text: "Customer approved: go ahead." });
+  const waiting = variationStart(v(18_000), AT);
+  assert.equal(waiting.state, "wait");
+  assert.equal(waiting.endsOn, "2026-11-24");
+  assert.match(waiting.text, /can cancel this change until 2026-11-24: don't start it until the office says they've asked in writing/);
+  assert.equal(variationStart(v(18_000), "2026-11-25T08:00:00.000Z").state, "go", "their 14 days are over");
+  assert.equal(variationStart(v(18_000, { status: "proposed" }), AT).state, "none");
+  // The office records their written request: then the crew may go ahead, once only.
+  assert.throws(() => recordVariationEarlyStart(v(18_000), { requestedAt: AT, evidence: "short" }, "DEMO Office", AT), /where their written request is/);
+  assert.throws(() => recordVariationEarlyStart(v(4000), { requestedAt: AT, evidence: "Reply email, 10:02, quoted" }, "DEMO Office", AT), /no cancellation period of its own/);
+  assert.throws(() => recordVariationEarlyStart(v(18_000, { status: "proposed" }), { requestedAt: AT, evidence: "Reply email, 10:02, quoted" }, "DEMO Office", AT), /hasn't agreed/);
+  assert.throws(() => recordVariationEarlyStart(v(18_000), { requestedAt: "2026-12-01T00:00:00.000Z", evidence: "Reply email, 10:02, quoted" }, "DEMO Office", AT), /future/);
+  const asked = recordVariationEarlyStart(v(18_000), { requestedAt: AT, evidence: 'Reply email from their address, 10:02: "Please start the extra work now"' }, "DEMO Office", AT);
+  assert.equal(asked.variation!.earlyStart!.recordedBy, "DEMO Office");
+  assert.match(asked.history.at(-1)!.note, /written request to start the extra work now is on file/);
+  assert.equal(variationStart(asked, AT).state, "go");
+  assert.throws(() => recordVariationEarlyStart(asked, { requestedAt: AT, evidence: "Reply email again, quoted" }, "DEMO Office", AT), /already recorded/);
 });

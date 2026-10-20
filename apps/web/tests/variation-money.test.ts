@@ -84,6 +84,25 @@ test("a variation the customer accepts on the portal is billed by the balance in
   assert.match(copy!.bodyText, /I agree to pay £180 more/);
   assert.match(copy!.bodyText, /Jordan Okafor/);
   assert.equal(copy!.linkPath, `/d/${doc!.id}`);
+  // £180 is over £42: the change has its own right to cancel, said correctly, with the instructions and the form,
+  // and the extra work waits for their written request (never "tell us before we start").
+  assert.ok(!/Tell us before we start this extra work/.test(copy!.bodyText), "no 'only before we start'");
+  assert.match(copy!.bodyText, /You can cancel this change until the end of/);
+  assert.match(copy!.bodyText, /Right to cancel this change/);
+  assert.match(copy!.bodyText, /Model cancellation form/i);
+  assert.match(copy!.bodyText, /Please start the extra work now/);
+  const snapCancel = (doc!.snapshot as { cancellation?: { days: number; endsOn: string } }).cancellation;
+  assert.equal(snapCancel?.days, 14);
+  assert.match(snapCancel?.endsOn ?? "", /^\d{4}-\d{2}-\d{2}$/);
+  const { variationStart } = await import("@aircon/domain");
+  assert.equal(variationStart(accepted, new Date().toISOString()).state, "wait", "the crew waits for their written request");
+  const { recordVariationStartRequest } = await import("../lib/variation-server.ts");
+  const office = OFFICE;
+  const recorded = await recordVariationStartRequest(demo3.id, yes.id, { requestedAt: new Date(Date.now() - 60_000).toISOString(), evidence: 'Reply email from Jordan: "Please start the extra work now..."' }, office);
+  assert.ok(recorded.ok, JSON.stringify(recorded));
+  assert.equal(variationStart((await issuesRepo.get(yes.id))!, new Date().toISOString()).state, "go", "recorded: the crew may start");
+  const again = await recordVariationStartRequest(demo3.id, yes.id, { requestedAt: new Date().toISOString(), evidence: "A second time, refused" }, office);
+  assert.equal(again.ok, false);
   assert.equal(accepted.status, "in-progress", "an accepted variation is work to do");
   assert.equal((await issuesRepo.get(no.id))!.status, "resolved", "a declined one is settled");
 

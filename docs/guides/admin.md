@@ -288,6 +288,17 @@ can start.
   Check the price → **Send to the customer for their OK**. The family
   approves or declines on their page. Tell the crew not to start until it
   says approved.
+- **A variation over £42** is treated as its own off-premises contract
+  until a solicitor says otherwise: its emails carry the cancellation
+  information and the model form, and the family can cancel it within 14
+  days of agreeing. The crew can only start it inside those 14 days once the
+  family has asked in writing: their reply to the change's email ("Please
+  start the extra work now…"). When it arrives, the project's **Issues** →
+  the change → **Record their written request** (the day and time it
+  arrived, and where it is, quoted); the crew's card then says go ahead.
+  No reply? The work waits for the end of the 14 days (its date is on the
+  change): book a return visit. If they cancel the change after it started
+  at their request, they pay for the work done up to then.
 - In the evening the installer's end-of-day update (with the photos they
   picked) goes to the family; you'll see it under the project's Messages.
 - Last day: the technical lead sets the job's test targets from the

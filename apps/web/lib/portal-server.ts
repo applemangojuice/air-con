@@ -26,6 +26,8 @@ import {
   type ProjectStageId,
   type StaffMember,
   type VariationAcceptance,
+  variationCancellationEndsOn,
+  variationHasOwnRight,
 } from "@aircon/domain";
 import { audit } from "./audit";
 import { isPlausibleEmail, normaliseEmail } from "./auth/access";
@@ -805,13 +807,18 @@ export async function decideVariation(
         }
       : undefined;
   const delta = money(issue.variation.totalDeltaPence);
+  // Above £42 the change has its own 14 days: the extra work waits for their written request (variationStart).
+  const ownRight = variationHasOwnRight(issue.variation);
+  const goAhead = ownRight
+    ? "It has its own 14 days to cancel: the crew waits for their written request to start now (the office records it on the Issues page), or the end of those days."
+    : "Go ahead with the change.";
   // The decision moves the issue on (F6's transitionIssue): accepted is work to do, declined is settled.
   const moved = transitionIssue(
     issue,
     decision === "accept" ? "in-progress" : "resolved",
     name,
     decision === "accept"
-      ? `Accepted on the portal (${issue.variation.totalDeltaPence >= 0 ? "+" : ""}${delta}). Go ahead with the change.`
+      ? `Accepted on the portal (${issue.variation.totalDeltaPence >= 0 ? "+" : ""}${delta}). ${goAhead}`
       : "Declined on the portal. Carry on as agreed.",
     now,
   );
@@ -843,7 +850,11 @@ export async function decideVariation(
     [
       `${issue.variation.description}`,
       `Price change: ${issue.variation.totalDeltaPence >= 0 ? "+" : ""}${delta} (including any VAT).`,
-      decision === "accept" ? "Next: invoice the variation and let the crew know it's a go." : "Next: let the crew know it's a no, and carry on as agreed.",
+      decision === "accept"
+        ? ownRight
+          ? "Next: invoice the variation. They can cancel this change for 14 days, so the crew doesn't start it until they've asked in writing (their reply to the change's email: record it on the project's Issues page) or the 14 days are over."
+          : "Next: invoice the variation and let the crew know it's a go."
+        : "Next: let the crew know it's a no, and carry on as agreed.",
     ],
     `variation:${issueId}:${status}`,
     true,
@@ -867,6 +878,9 @@ async function recordAcceptedVariation(project: Project, issue: Issue, acceptanc
   const v = issue.variation!;
   const contract = (await listDocuments(project.id, { kind: "contract", customerVisibleOnly: true }).catch(() => []))[0];
   const contractTotal = project.proposal.contractTotalPence ?? project.money.contractTotalPence;
+  // Above £42 the change has its own right to cancel, from the day it was agreed (variationHasOwnRight).
+  const days = Math.max(14, settings.scheduling.cancellationDays);
+  const cancellation = variationHasOwnRight(v) ? { days, endsOn: variationCancellationEndsOn(acceptance.at, days) } : undefined;
   let documentId: string | undefined;
   try {
     const doc = await createDocument(
@@ -879,6 +893,7 @@ async function recordAcceptedVariation(project: Project, issue: Issue, acceptanc
         issue: { id: issue.id, number: issue.number, kind: issue.kind, title: issue.title, ...(issue.detail ? { detail: issue.detail } : {}), raisedAt: issue.raisedAt, mediaIds: issue.mediaIds, variation: v },
         ...(contract ? { contractRef: contract.ref } : {}),
         ...(contractTotal !== undefined ? { contractTotalPence: contractTotal } : {}),
+        ...(cancellation ? { cancellation } : {}),
       },
       { title: `Change #${issue.number}: ${issue.title}`, customerVisible: true, createdBy: acceptance.name },
     );
@@ -900,6 +915,7 @@ async function recordAcceptedVariation(project: Project, issue: Issue, acceptanc
         name: acceptance.name,
         wording: acceptance.wording,
         ...(contractTotal !== undefined ? { newContractTotalPence: contractTotal + v.totalDeltaPence } : {}),
+        ...(cancellation ? { ownRight: cancellation } : {}),
       },
       discriminator: issue.id,
       ...(documentId ? { path: `/d/${documentId}` } : {}),

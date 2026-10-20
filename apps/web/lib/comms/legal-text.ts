@@ -154,3 +154,45 @@ export function cancellationForm(t: TraderDetails): string[] {
   const trader = traderBlock(t, { phone: false });
   return CANCELLATION_FORM.map((line) => line.replace("{TRADER}", trader));
 }
+
+/**
+ * The cancellation information for a priced change agreed while we're
+ * working in the home, which above £42 we treat as an off-premises contract
+ * of its own (issues.ts variationHasOwnRight) until a solicitor says
+ * otherwise. Part A's wording, completed for a change: the period runs from
+ * the day the change is agreed (note 1(a)), or for any equipment or parts in
+ * it from the day the customer has the last of them, if later (note 1(c));
+ * note 5 as for the contract; note 6 because the extra work usually starts
+ * inside the period on request. NEEDS SOLICITOR REVIEW with the rest.
+ */
+export const VARIATION_CANCELLATION_INSTRUCTIONS: readonly { heading?: string; text: string }[] = [
+  { heading: "Right to cancel this change", text: "You have the right to cancel this change within {DAYS} days without giving any reason." },
+  {
+    text: "The cancellation period will expire after {DAYS} days from the day on which you agreed to the change or, for any equipment or parts it includes, from the day on which you acquire physical possession of the last of them, if that is later.",
+  },
+  {
+    text: "To exercise the right to cancel, you must inform us ({TRADER}) of your decision to cancel this change by a clear statement (e.g. a letter sent by post, fax or e-mail). You may use the attached model cancellation form, but it is not obligatory.",
+  },
+  {
+    text: "To meet the cancellation deadline, it is sufficient for you to send your communication concerning your exercise of the right to cancel before the cancellation period has expired.",
+  },
+  { heading: "Effects of cancellation", text: "If you cancel this change, we will reimburse to you all payments received from you for it." },
+  { text: "We will make the reimbursement without undue delay, and not later than:" },
+  { text: "(a) 14 days after the day we receive back from you any goods supplied, or" },
+  { text: "(b) (if earlier) 14 days after the day you provide evidence that you have returned the goods, or" },
+  { text: "(c) if there were no goods supplied, 14 days after the day on which we are informed about your decision to cancel this change." },
+  {
+    text: "We will make the reimbursement using the same means of payment as you used for the initial transaction, unless you have expressly agreed otherwise; in any event, you will not incur any fees as a result of the reimbursement.",
+  },
+  { text: `If the change includes equipment or parts: ${RETURN_OF_GOODS}` },
+  {
+    text: "If you requested to begin the performance of services during the cancellation period, you shall pay us an amount which is in proportion to what has been provided until you have communicated us your cancellation from this change, in comparison with the full coverage of the change.",
+  },
+];
+
+/** The change's instructions with our details filled in, one entry per paragraph. */
+export function variationCancellationInstructions(t: TraderDetails, opts: { days?: number } = {}): { heading?: string; text: string }[] {
+  const trader = traderBlock(t);
+  const days = String(periodDays(opts));
+  return VARIATION_CANCELLATION_INSTRUCTIONS.map((p) => ({ ...p, text: p.text.replace("{TRADER}", trader).split("{DAYS}").join(days) }));
+}

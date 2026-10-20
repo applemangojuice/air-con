@@ -164,7 +164,7 @@ export default async function FieldHelpPage() {
             <B>Request a variation</B> when the customer asks for more, or the job needs something that isn&apos;t in the scope (a longer pipe run, a pump, a unit moved). Say what and why (the customer reads it) and an estimated price.
           </p>
           <p className="rounded-xl bg-amber-50 px-3 py-2 font-semibold text-amber-900">
-            Then wait. Never do unapproved extra work. The office checks the price, the customer approves or declines it in their portal, and its status shows under Issues. Work they haven&apos;t approved isn&apos;t in their contract.
+            Then wait. Never do unapproved extra work. The office checks the price, the customer approves or declines it in their portal, and its status shows under Issues. Work they haven&apos;t approved isn&apos;t in their contract. A change over £42 has its own 14 days to cancel: even once approved, start it only when its card says go ahead (the family has asked in writing, or the 14 days are over).
           </p>
         </Fold>
 

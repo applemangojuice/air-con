@@ -250,6 +250,13 @@ price change, £ before VAT** → **Send to the office**.
 > **Then wait.** The office checks the price, the family approves or
 > declines it on their page, and its status shows under **Issues**. Never do
 > unapproved extra work: it isn't in their contract.
+>
+> **A change over £42 has its own 14 days to cancel**, like the contract
+> (until a solicitor tells us otherwise). Even approved, its card says
+> **don't start it** until the family has asked in writing for the work to
+> start now (they reply to the change's email; the office records it) or
+> the 14 days are over. Start it only when the card says **go ahead**. If
+> they'd rather keep their 14 days, the office books a return visit.
 
 ## 8. End of day
 

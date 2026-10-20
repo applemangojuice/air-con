@@ -609,6 +609,36 @@ export function VariationSendForm({
   );
 }
 
+/** The customer's written request to start a change's extra work now, as the office records it. */
+export function VariationStartRequestForm({ action, issueId, today, words }: { action: Action; issueId: string; today: string; words: string }) {
+  const id = useId();
+  return (
+    <ActionForm action={action}>
+      <input type="hidden" name="issueId" value={issueId} />
+      <p className="mb-2 text-sm text-ink-700">
+        Only once they&apos;ve replied in writing, for example: &ldquo;{words}&rdquo;
+      </p>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <div>
+          <L htmlFor={`${id}-d`}>Day it arrived</L>
+          <input id={`${id}-d`} name="date" type="date" required max={today} defaultValue={today} className={compactInput} />
+        </div>
+        <div>
+          <L htmlFor={`${id}-t`}>Time (London)</L>
+          <input id={`${id}-t`} name="time" required placeholder="14:05" className={compactInput} />
+        </div>
+        <div className="sm:col-span-3">
+          <L htmlFor={`${id}-e`}>Where it is and what it says</L>
+          <textarea id={`${id}-e`} name="evidence" required minLength={10} rows={2} maxLength={500} placeholder="Reply email from their address, 14:05: &quot;Please start the extra work now…&quot;" className={CONTROL} />
+        </div>
+        <div className="sm:col-span-3">
+          <SubmitButton busyLabel="Saving…">Record their written request</SubmitButton>
+        </div>
+      </div>
+    </ActionForm>
+  );
+}
+
 /* ------------------------------------------------------------------ */
 /* Time                                                                */
 /* ------------------------------------------------------------------ */

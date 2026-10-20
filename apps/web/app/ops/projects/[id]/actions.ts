@@ -35,7 +35,7 @@ import { recordCertificate } from "@/lib/certificates-server";
 import { resend } from "@/lib/comms/outbox";
 import { emailConfigured } from "@/lib/email";
 import { isValidUkPostcode, normalisePostcode } from "@/lib/format";
-import { sendVariation } from "@/lib/variation-server";
+import { recordVariationStartRequest, sendVariation } from "@/lib/variation-server";
 import { DEMO_PILOT_FROM, dispatch, loadProject, pilotNumberHolder, pilotTakenMessage } from "@/lib/project-service";
 import * as issuesRepo from "@/lib/repo/issues";
 import * as learningsRepo from "@/lib/repo/learnings";
@@ -549,6 +549,27 @@ export async function sendVariationAction(projectId: string, fd: FormData): Prom
   if (!result.ok) return refused(result.error);
   refresh(projectId);
   return done(result.message ?? "Sent to the customer.");
+}
+
+const variationStartSchema = z.object({
+  issueId: uuid,
+  date: isoDate,
+  time: z.string().trim().regex(/^\d{1,2}:\d{2}$/, "Use a time like 14:05"),
+  evidence: text(500).pipe(z.string().min(10, "Say where their written request is and what it says (their reply email, quoted).")),
+});
+
+/** The customer asked in writing (their reply email) for a change's extra work to start inside its own 14 days. */
+export async function recordVariationStartAction(projectId: string, fd: FormData): Promise<ActionResult> {
+  const staff = await guard(projectId, "proposal.issue");
+  if (!staff) return notFound();
+  const parsed = variationStartSchema.safeParse({ issueId: field(fd, "issueId"), date: field(fd, "date"), time: field(fd, "time"), evidence: field(fd, "evidence") });
+  if (!parsed.success) return refused(firstIssue(parsed.error));
+  const requestedAt = londonToUtcIso(parsed.data.date, parsed.data.time);
+  if (!requestedAt) return refused("Pick the day and time their request arrived.");
+  const result = await recordVariationStartRequest(projectId, parsed.data.issueId, { requestedAt, evidence: parsed.data.evidence }, staff);
+  if (!result.ok) return refused(result.error);
+  refresh(projectId);
+  return done(result.message ?? "Recorded.");
 }
 
 /* ------------------------------------------------------------------ */

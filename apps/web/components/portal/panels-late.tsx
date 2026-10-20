@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useId, useRef, useState } from "react";
-import { VARIATIONS_ANSWER_LABEL, VARIATION_ANSWER_LABEL, handoverDeadlines, isFullName, variationAgreeWording, variationsAwaitingCustomer } from "@aircon/domain";
+import { VARIATIONS_ANSWER_LABEL, VARIATION_ANSWER_LABEL, handoverDeadlines, isFullName, variationAgreeWording, variationHasOwnRight, variationsAwaitingCustomer } from "@aircon/domain";
 import { Input, Textarea } from "@/components/kit/form";
 import { fmtDate, fmtDay, fmtInstantDay, fmtInstantDayTime, money } from "@/lib/format";
 import {
@@ -121,7 +121,10 @@ function VariationCard({ issue }: { issue: HubIssue }) {
               : v.totalDeltaPence < 0
                 ? `It takes ${money(-v.totalDeltaPence)} off your contract price.`
                 : "It doesn't change your price."}{" "}
-            We&apos;ll email you a copy and keep it in your documents. Changed your mind later? Tell us before we start this work and we won&apos;t do it.
+            We&apos;ll email you a copy and keep it in your documents.{" "}
+            {variationHasOwnRight(v)
+              ? "You can still cancel this change within 14 days of agreeing to it, without giving a reason: the email has the details and a cancellation form. We only start the extra work within those 14 days if you ask us to in writing, by replying to that email."
+              : "Changed your mind later? Tell us before we start this work and we won't do it."}
           </p>
           <Input
             id={nameId}

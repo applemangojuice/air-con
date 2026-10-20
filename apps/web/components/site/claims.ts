@@ -177,7 +177,7 @@ export function toPublicSettings(settings: PilotSettings, todayIso: string): Pub
         }
       : { offered: false },
     legal: {
-      termsVersion: text(s.legal.termsVersion) ?? "pilot-draft-1",
+      termsVersion: text(s.legal.termsVersion) ?? "pilot-draft-2",
       termsReviewed: s.legal.termsReviewed === true,
       cancellationReviewed: s.legal.cancellationReviewed === true,
     },

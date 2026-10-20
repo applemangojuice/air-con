@@ -47,7 +47,7 @@ test("defaults are the conservative pilot set", () => {
   assert.equal(s.serviceArea.outcodes.length, 17);
   assert.equal(s.sla.enabled, false);
   assert.deepEqual(s.warranty, { workmanshipYears: null, manufacturerSummary: null });
-  assert.deepEqual(s.legal, { termsVersion: "pilot-draft-1", termsReviewed: false, cancellationReviewed: false });
+  assert.deepEqual(s.legal, { termsVersion: "pilot-draft-2", termsReviewed: false, cancellationReviewed: false });
   assert.equal(s.comms.smsSenderId, "DangItsHot");
   assert.equal(s.comms.smsSenderId.length <= 11, true); // alphanumeric sender id limit
   assert.deepEqual(s.finance, {});

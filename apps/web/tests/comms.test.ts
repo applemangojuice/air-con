@@ -490,6 +490,32 @@ test("the proposal email carries the Schedule 2 information, the instructions an
   assert.match(render("proposal-issued", MIN["proposal-issued"], ctxFor({}, none)).text, /We don't offer a separate guarantee on our workmanship\./);
 });
 
+test("a priced change over £42 carries its own cancellation information, the form and the early-start step; £42 or less doesn't", () => {
+  const ask = render("variation-approval", { title: "Condensate pump in the loft room", description: "No fall to an outside wall.", totalDeltaPence: 18_000, issueNumber: 4, ownRight: { days: 14 } });
+  assert.match(ask.text, /you can still cancel this change within 14 days of agreeing to it, without giving a reason/);
+  assert.match(ask.text, /Right to cancel this change/);
+  assert.match(ask.text, /from the day on which you agreed to the change/);
+  assert.match(ask.text, /MODEL CANCELLATION FORM/i);
+  assert.match(ask.text, /we only start it inside those 14 days if you ask us to in writing/);
+  assert.match(ask.text, /Please start the extra work now/);
+  const small = render("variation-approval", { title: "Two extra clips", totalDeltaPence: 3_000 });
+  assert.doesNotMatch(small.text, /Right to cancel this change|cancellation form/i);
+  const copy = render("variation-accepted", {
+    title: "Condensate pump in the loft room",
+    priceDeltaNetPence: 18_000,
+    taxPence: 0,
+    totalDeltaPence: 18_000,
+    acceptedAt: "2026-12-01T11:30:00.000Z",
+    name: "Sam Taylor",
+    wording: "I agree to pay £180 more",
+    ownRight: { days: 14, endsOn: "2026-12-15" },
+  });
+  assert.match(copy.text, /You can cancel this change until the end of Tuesday 15 December/);
+  assert.match(copy.text, /We won't start this extra work before then unless you ask us to in writing/);
+  assert.doesNotMatch(copy.text, /Tell us before we start this extra work/, "never 'only before we start'");
+  assert.match(copy.text, /Right to cancel this change/);
+});
+
 test("review request: the same words for everyone, no incentive, the review site as its one link", () => {
   const m = render("review-request", {});
   assert.match(m.text, /we're asking what we ask every customer at this point/);

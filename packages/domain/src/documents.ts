@@ -214,6 +214,8 @@ export interface VariationSnapshot extends DocumentHeader {
   issue: VariationIssue;
   contractRef?: string;
   contractTotalPence?: number;
+  /** Above £42, the change's own right to cancel: the period and its last day (variationCancellationEndsOn). */
+  cancellation?: { days: number; endsOn: string };
 }
 
 /** What a certificate document is: each kind is its own series of versions. */

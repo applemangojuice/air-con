@@ -271,7 +271,8 @@ test("payment terms are frozen at issue: a later settings change never changes t
   // The full terms text is frozen with it, and emailed in full.
   assert.ok(issued.termsText && issued.termsText.length >= 10, "the terms text is on the record");
   assert.deepEqual(issued.termsText!.map((t) => t.id).slice(0, 3), ["who", "price", "survey"]);
-  assert.ok(issued.termsText!.some((t) => t.id === "liability" && /limited to the price you paid us/.test(t.items.join(" "))));
+  assert.ok(issued.termsText!.some((t) => t.id === "liability" && /including damage to your home and belongings/.test(t.items.join(" ")) && /nothing in them affects your statutory rights/.test(t.items.join(" "))));
+  assert.ok(!issued.termsText!.some((t) => /limited to the price you paid us/.test(t.items.join(" "))), "no cap at the price paid (£0 on a 0% deposit)");
   const before = (await server.loadCustomerProposal(DEMO2))!;
   assert.deepEqual(before.proposal.termsText, issued.termsText, "the customer sees the frozen text");
   const issueMail = (await messagesRepo.listForProject(DEMO2)).find((m) => m.event === "proposal-issued" && m.channel === "email" && /version 2/.test(m.subject ?? ""));

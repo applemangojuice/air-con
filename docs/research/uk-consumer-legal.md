@@ -1292,10 +1292,28 @@ threshold is £88,000 (para 1(3), para 4).
     are not obliged to use any ADR scheme? Should we join one (e.g. through a trade association
     or competent-person scheme)? (§1.9, fact-check)
 12. *Caveats added by the fact-check, not yet verified:*
-    - the 42 dB(A) figure and the current MCS 020(a) issue (§7);
+    - the 42 dB(A) figure and the current MCS 020(a) issue (§7); since round 8 the
+      design compares the heat pump's own level with 37.0 dB(A) (the 42 dB(A)
+      includes an assumed 40 dB(A) background), read from extracts of MCS 020(a)
+      Issue 1.1 and a gov.uk review, to confirm against the current issue;
     - the 2026–27 VAT registration threshold (§8);
     - the PECR maximum penalty under the new Schedule 1: the DUAA Sch 13 text is still missing
       from the mirror (§4).
+13. **Is an on-site variation a new off-premises contract?** A priced change raised by the crew
+    in the home and agreed on the family's phone, usually while the crew waits, is a fresh
+    agreement to pay (reg 5(a)); reg 28(2) treats extra services on an urgent-repair visit as
+    carrying their own right. Until this is answered, the app treats a change over £42
+    (reg 27(3)) as one: the approval email carries the cancellation information and the model
+    form, the copy of the agreed change says the family can cancel within 14 days, and the
+    extra work waits for their written request (reg 36(1)) or the end of the period. Also: is
+    a change that includes parts (a pump, a moved unit) a sales contract whose period runs from
+    possession of the goods? The app's text says "from the day you agreed, or for any equipment
+    or parts from the day you have the last of them, if later". (§1.1, §1.5, §1.7)
+14. **Liability clause** (terms `pilot-draft-2`): the cap "limited to the price you paid us"
+    was removed (on a 0% deposit that was £0 throughout the install, and CRA s31 and s57 limit
+    such caps anyway). The terms now say we're responsible for foreseeable loss or damage we
+    cause, including to the home and belongings, with the death, injury and fraud carve-outs and
+    "nothing affects your statutory rights". Approve the wording. (§2)
 
 ---
 

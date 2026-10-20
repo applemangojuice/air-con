@@ -1,10 +1,19 @@
-import { TAX_CODES, contractTaxCode, sendVariationToCustomer, type Issue, type StaffMember, type TaxCodeId } from "@aircon/domain";
+import {
+  TAX_CODES,
+  contractTaxCode,
+  recordVariationEarlyStart,
+  sendVariationToCustomer,
+  variationHasOwnRight,
+  type Issue,
+  type StaffMember,
+  type TaxCodeId,
+} from "@aircon/domain";
 import { audit } from "./audit";
 import { notify } from "./comms/outbox";
 import { fail, type Outcome } from "./purchasing-server";
 import * as issuesRepo from "./repo/issues";
 import * as proposalsRepo from "./repo/proposals";
-import { getSettingsStrict } from "./settings-server";
+import { getSettings, getSettingsStrict } from "./settings-server";
 
 /**
  * Variations between the field and the customer (plan §4: variation → owner
@@ -37,6 +46,8 @@ export async function notifyVariation(issue: Issue): Promise<void> {
   try {
     // The customer approves or declines in the portal (/api/portal/variations); an accepted
     // variation is billed on its own or picked up by the balance invoice (planInvoices).
+    // Above £42 the change has its own right to cancel: the email carries the information and the form.
+    const days = variationHasOwnRight(issue.variation) ? ((await getSettings())?.scheduling.cancellationDays ?? 14) : null;
     await notify("variation-approval", {
       projectId: issue.projectId,
       data: {
@@ -44,6 +55,7 @@ export async function notifyVariation(issue: Issue): Promise<void> {
         description: issue.variation.description,
         totalDeltaPence: issue.variation.totalDeltaPence,
         issueNumber: issue.number,
+        ...(days !== null ? { ownRight: { days: Math.max(14, days) } } : {}),
       },
       discriminator: issue.id,
     });
@@ -81,4 +93,29 @@ export async function sendVariation(
   });
   await notifyVariation(saved);
   return { ok: true, value: saved, message: `Variation #${saved.number} sent to the customer for their OK.` };
+}
+
+/**
+ * The office records the customer's written request (their reply email) to
+ * start a change's extra work inside its own cancellation period; the crew
+ * sees "go ahead" from then. Permission (proposal.issue) is the caller's job.
+ */
+export async function recordVariationStartRequest(
+  projectId: string,
+  issueId: string,
+  input: { requestedAt: string; evidence: string },
+  staff: StaffMember,
+): Promise<Outcome<Issue>> {
+  const issue = await issuesRepo.get(issueId);
+  if (!issue || issue.projectId !== projectId) return fail("That variation isn't on this project.", 404);
+  if (staff.external) return fail("The office records the customer's request.", 403);
+  let next: Issue;
+  try {
+    next = recordVariationEarlyStart(issue, input, staff.name, new Date().toISOString());
+  } catch (err) {
+    return fail(err instanceof Error ? err.message : String(err));
+  }
+  const saved = await issuesRepo.update(next);
+  await audit({ actor: staff, action: "issue.variation-early-start", entity: "issue", entityId: issue.id, detail: { projectId, requestedAt: saved.variation?.earlyStart?.requestedAt } });
+  return { ok: true, value: saved, message: `Their request is on file: the crew can start change #${saved.number}.` };
 }

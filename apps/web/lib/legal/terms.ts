@@ -99,6 +99,7 @@ export function termsSections(s: PublicSettings): TermsSection[] {
       items: [
         "If you'd like something changed, or we find something during the install that couldn't be seen at the survey, we'll explain it and give you the price difference in writing. We only go ahead once you've agreed to it in writing, by name, and we send you a copy.",
         "Nothing extra is added on the day without your written agreement.",
+        `A change that adds more than £42 has its own right to cancel, as the contract does: you can cancel it within ${days} days of agreeing to it without giving a reason, and we send the cancellation information and a form with it. We only start that extra work inside those ${days} days if you ask us to in writing; if you then cancel the change, you pay for the work done up to the time you tell us.`,
         "If we find something unsafe to work on, such as suspected asbestos, we stop that part of the work and agree the next step with you.",
       ],
     },
@@ -150,7 +151,8 @@ export function termsSections(s: PublicSettings): TermsSection[] {
       id: "liability",
       title: "Our responsibility to you",
       items: [
-        "Nothing in these terms limits our liability for death or personal injury caused by negligence, for fraud, or for anything else that can't be limited by law. Otherwise, our liability under a contract is limited to the price you paid us. We're not liable for losses that aren't a foreseeable result of our breaking these terms.",
+        "We're responsible for loss or damage we cause that's a foreseeable result of our breaking these terms or not using reasonable care and skill, including damage to your home and belongings. We're not responsible for loss or damage that wasn't foreseeable.",
+        "Nothing in these terms limits our liability for death or personal injury caused by negligence, for fraud, or for anything else that can't be limited by law, and nothing in them affects your statutory rights.",
       ],
     },
     {

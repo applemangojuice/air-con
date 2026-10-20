@@ -1194,6 +1194,7 @@ try {
     const agree = customer.getByRole("button", { name: /^I agree to pay £[\d,.]+ more/ });
     await agree.waitFor({ timeout: 10_000 });
     check("accepting a variation asks them to agree to pay, by name", (await agree.count()) === 1 && (await customer.getByLabel("Your full name").count()) === 1);
+    check("…and says the change has its own 14 days to cancel (over £42)", await has(customer, /You can still cancel this change within 14 days of agreeing to it/));
     await customer.getByLabel("Your full name").fill(CUSTOMER.name.replace(" (DEMO)", ""));
     await shot(customer, "H-variation-agree");
     const [decided] = await Promise.all([
@@ -1206,6 +1207,19 @@ try {
     check("the customer's timeline dates the install to the day it really started", await has(customer, new RegExp(`Install\\s*(?:, (?:now|done)\\s*)?${londonDayLabel(new Date())}`)), (await text(customer)).match(/Install[^\n]*\n[^\n]*/)?.[0]);
     await go(customer, `/p/${ids.pid}/documents`);
     check("the agreed change is in the customer's documents", await waitFor(customer, /Change #\d+: DEMO: 2 m more trunking/));
+
+    // £120 is over £42: the change has its own 14 days, so the crew waits for the family's written request, which the office records.
+    await go(admin, `/ops/projects/${ids.pid}/issues`);
+    check("the office sees the change's own 14 days, and that the crew waits", await waitFor(admin, /Their own 14 days: they can cancel this change until the end of/));
+    const askedAt = new Date(Date.now() - 120_000);
+    const startForm = admin.locator("main form").filter({ has: admin.getByLabel("Where it is and what it says") });
+    await startForm.getByLabel("Day it arrived").fill(new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/London" }).format(askedAt));
+    await startForm.getByLabel("Time (London)").fill(new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/London", hour: "2-digit", minute: "2-digit", hour12: false }).format(askedAt));
+    await startForm.getByLabel("Where it is and what it says").fill('DEMO: reply email from the customer: "Please start the extra work now."');
+    await startForm.getByRole("button", { name: "Record their written request" }).click();
+    check("their written request is recorded: the crew may go ahead", await waitFor(admin, /They asked in writing on .+?: the crew may go ahead/));
+    await go(installer, `/field/issues`);
+    check("the crew's phone says the change is a go", await waitFor(installer, /asked in writing for us to start now: go ahead/));
 
     // Day 2: installer, then the electrician and the tech lead for their locked steps.
     await go(installer, `/field/jobs/${ids.pid}/day/2`);

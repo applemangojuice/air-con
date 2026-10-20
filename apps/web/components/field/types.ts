@@ -102,7 +102,7 @@ export interface FieldIssue {
   raisedBy: string;
   customerVisible: boolean;
   /** Variation decision; the money only for staff who may see prices. */
-  variation?: { status: VariationStatus; totalDeltaPence?: number; description: string };
+  variation?: { status: VariationStatus; totalDeltaPence?: number; description: string; start?: { state: "go" | "wait" | "none"; text: string } };
   mediaUrls: string[];
   customerName?: string;
 }

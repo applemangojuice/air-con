@@ -7,6 +7,7 @@ import {
   RESCHEDULE_FEES,
   ROLE_LABEL,
   TAX_CODES,
+  VARIATION_EARLY_START_WORDS,
   cancellationSentence,
   earlyStartWording,
   effectiveTaxCode,
@@ -26,7 +27,7 @@ import {
 import { brandedEmail, escapeHtml } from "../email.ts";
 import { fmtDate, fmtDay, fmtDayTime, money } from "../format.ts";
 import { fitSms, gsmSafe, smsLength } from "../providers/sms.ts";
-import { CANCELLATION_NOTICE_VERSION, cancellationForm, cancellationInstructions, type TraderDetails } from "./legal-text.ts";
+import { CANCELLATION_NOTICE_VERSION, cancellationForm, cancellationInstructions, variationCancellationInstructions, type TraderDetails } from "./legal-text.ts";
 import { onTheWayChannel, onTheWayLine, type OnTheWayChannel } from "./on-the-way.ts";
 
 /**
@@ -203,7 +204,14 @@ export interface CommsData {
     /** The install was already complete (commissioning signed) when the day was ended: "next" is behind them. */
     complete?: { handoverPack: boolean };
   };
-  "variation-approval": { title: string; description?: string; totalDeltaPence: number; issueNumber?: number };
+  "variation-approval": {
+    title: string;
+    description?: string;
+    totalDeltaPence: number;
+    issueNumber?: number;
+    /** Above £42: the change has its own right to cancel (variationHasOwnRight), so it carries the information and form. */
+    ownRight?: { days: number };
+  };
   "variation-accepted": {
     title: string;
     description?: string;
@@ -217,6 +225,8 @@ export interface CommsData {
     wording: string;
     /** The contract total with this change, when known. */
     newContractTotalPence?: number;
+    /** Above £42: its own right to cancel, to the end of `endsOn` (variationCancellationEndsOn). */
+    ownRight?: { days: number; endsOn: string };
   };
   "cancellation-confirmed": {
     /** When the cancellation reached us (an instant), and how. */
@@ -841,6 +851,19 @@ function cancellationAppendix(ctx: TemplateContext, contractType: ContractType |
   ];
 }
 
+/** A priced change's own cancellation information and the model form (variationHasOwnRight). */
+function variationCancellationAppendix(ctx: TemplateContext, days: number): Block[] {
+  const trader = traderOf(ctx.settings);
+  return [
+    { h: "Cancelling this change" },
+    ...variationCancellationInstructions(trader, { days }).flatMap((para): Block[] =>
+      para.heading ? [{ p: { strong: para.heading } }, { p: para.text }] : [{ p: para.text }],
+    ),
+    { h: "Model cancellation form" },
+    { box: cancellationForm(trader) },
+  ];
+}
+
 /* ------------------------------------------------------------------ */
 /* Templates                                                           */
 /* ------------------------------------------------------------------ */
@@ -1377,6 +1400,15 @@ const TEMPLATES: { [E in CommsEventId]: Renderer<E> } = {
         ...(d.description ? [{ quote: d.description } as Block] : []),
         { p: `This change ${price}.` },
         { p: "Nothing changes until you say yes. You can approve or decline it on your project page, or call us to talk it through." },
+        ...(d.ownRight
+          ? ([
+              { p: `If you agree, you can still cancel this change within ${d.ownRight.days} days of agreeing to it, without giving a reason. The information and a form you can use are below.` },
+              {
+                p: `We'd usually do this work while we're with you, but we only start it inside those ${d.ownRight.days} days if you ask us to in writing: once you've agreed, reply to the copy of the change we email you with "${VARIATION_EARLY_START_WORDS}" If you'd rather keep your ${d.ownRight.days} days, we'll agree a date to come back once they're over.`,
+              },
+              ...variationCancellationAppendix(ctx, d.ownRight.days),
+            ] as Block[])
+          : []),
       ],
       cta: "Review the change",
       sms: [
@@ -1412,9 +1444,25 @@ const TEMPLATES: { [E in CommsEventId]: Renderer<E> } = {
             ? "It's added to your contract and paid with your balance (or invoiced on its own), on the same payment terms."
             : "It's part of your contract now, on the same terms.",
         },
-        {
-          p: `Changed your mind? Tell us before we start this extra work and we won't do it: reply to this email${settings.company.phone && !isPlaceholderPhone(settings.company.phone) ? ` or call ${settings.company.phone}` : ""}. Your cancellation rights on the contract itself are unchanged.`,
-        },
+        ...(d.ownRight
+          ? ([
+              {
+                p: [
+                  "You can cancel this change until the end of ",
+                  { strong: dayLong(d.ownRight.endsOn) },
+                  ", without giving a reason: reply to this email or use the form below. Your cancellation rights on the contract itself are unchanged.",
+                ],
+              },
+              {
+                p: `We won't start this extra work before then unless you ask us to in writing. To have us do it now, reply to this email with "${VARIATION_EARLY_START_WORDS}" If you cancel the change after we've started, you pay for the work done up to the time you tell us.`,
+              },
+              ...variationCancellationAppendix(ctx, d.ownRight.days),
+            ] as Block[])
+          : [
+              {
+                p: `Changed your mind? Tell us before we start this extra work and we won't do it: reply to this email${settings.company.phone && !isPlaceholderPhone(settings.company.phone) ? ` or call ${settings.company.phone}` : ""}. Your cancellation rights on the contract itself are unchanged.`,
+              },
+            ]),
       ],
       cta: "See the change in your documents",
     };

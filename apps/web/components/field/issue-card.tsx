@@ -68,8 +68,10 @@ export function IssueCard({ issue, showJob = false, canUpdate = true }: { issue:
       <h3 className="mt-2 text-lg font-semibold leading-snug text-ink-900">{issue.title}</h3>
       {issue.detail && <p className="mt-1 text-base text-ink-700">{issue.detail}</p>}
       {issue.variation && (
-        <p className={`mt-3 rounded-xl border px-3 py-2 text-sm font-semibold ${VARIATION[issue.variation.status]!.tone}`}>
-          {VARIATION[issue.variation.status]!.text}
+        <p
+          className={`mt-3 rounded-xl border px-3 py-2 text-sm font-semibold ${issue.variation.start?.state === "wait" ? VARIATION.proposed!.tone : VARIATION[issue.variation.status]!.tone}`}
+        >
+          {issue.variation.start?.text ?? VARIATION[issue.variation.status]!.text}
           {issue.variation.totalDeltaPence !== undefined ? ` · ${issue.variation.totalDeltaPence >= 0 ? "+" : ""}${money(issue.variation.totalDeltaPence)}` : ""}
         </p>
       )}

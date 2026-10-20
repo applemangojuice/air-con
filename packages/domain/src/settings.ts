@@ -240,7 +240,7 @@ export const DEFAULT_SETTINGS: PilotSettings = {
   sla: { enabled: false },
   // No warranty claims anywhere until these are set.
   warranty: { workmanshipYears: null, manufacturerSummary: null },
-  legal: { termsVersion: "pilot-draft-1", termsReviewed: false, cancellationReviewed: false },
+  legal: { termsVersion: "pilot-draft-2", termsReviewed: false, cancellationReviewed: false },
   comms: { smsSenderId: "DangItsHot", disabledEvents: [] },
   finance: {},
   features: { showPrototypeNav: false },

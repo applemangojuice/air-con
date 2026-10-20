@@ -70,6 +70,8 @@ export interface Issue {
     decidedBy?: string;
     /** The customer's agreement to pay, as they gave it (accepted variations from the portal). */
     acceptance?: VariationAcceptance;
+    /** The customer's written request to start the extra work inside its own cancellation period, as the office recorded it. */
+    earlyStart?: VariationEarlyStart;
   };
   resolution?: string;
   resolvedAt?: string;
@@ -104,6 +106,107 @@ export interface VariationAcceptance {
   totalDeltaPence: number;
   ip?: string;
   userAgent?: string;
+}
+
+/**
+ * The customer's written request to start a change's extra work before its
+ * own cancellation period ends (CCR reg 36(1): an express request on a
+ * durable medium), as recorded by the office: when they asked, and where
+ * the request is (their reply email, quoted).
+ */
+export interface VariationEarlyStart {
+  requestedAt: string;
+  evidence: string;
+  recordedBy: string;
+  recordedAt: string;
+}
+
+/* ---------------- a change's own right to cancel ---------------- */
+
+/**
+ * Above £42 (CCR reg 27(3)), a priced change agreed while we're working in
+ * the home is treated as an off-premises contract in its own right until a
+ * solicitor says otherwise (approvals: "Is an on-site variation a new
+ * off-premises contract?"): it carries the cancellation information and
+ * form, and its extra work waits for the customer's written request or the
+ * end of its period. A change that takes money off, or costs £42 or less,
+ * carries none of that.
+ */
+export const VARIATION_OWN_RIGHT_ABOVE_PENCE = 4200;
+
+export function variationHasOwnRight(v: { totalDeltaPence: number } | undefined | null): boolean {
+  return Boolean(v) && v!.totalDeltaPence > VARIATION_OWN_RIGHT_ABOVE_PENCE;
+}
+
+/** The words the customer is asked to reply with, to have the extra work start inside its period. */
+export const VARIATION_EARLY_START_WORDS =
+  "Please start the extra work now. I understand that if I cancel this change after you've started, I'll pay for the work done up to then.";
+
+const londonDay = (iso: string): string => {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso;
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return "";
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/London", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date(t));
+  const get = (k: string) => parts.find((x) => x.type === k)?.value ?? "";
+  return `${get("year")}-${get("month")}-${get("day")}`;
+};
+
+const plusDays = (day: string, n: number): string => {
+  const d = new Date(`${day}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+};
+
+/** The last day the customer can cancel a change: the cancellation days after the London day they agreed it (never fewer than 14). */
+export function variationCancellationEndsOn(acceptedAt: string, days = 14): string {
+  const day = londonDay(acceptedAt);
+  return day ? plusDays(day, Math.max(14, Math.round(days))) : "";
+}
+
+export interface VariationStart {
+  /** go: the crew may do the extra work; wait: not yet; none: nothing agreed to start. */
+  state: "go" | "wait" | "none";
+  /** The change's own last day to cancel, when it has one. */
+  endsOn?: string;
+  /** For the crew and the office, in plain words. */
+  text: string;
+}
+
+/** Whether the extra work of a change may start now, and why. */
+export function variationStart(issue: Pick<Issue, "variation">, nowIso: string, days = 14): VariationStart {
+  const v = issue.variation;
+  if (!v || v.status !== "accepted") return { state: "none", text: "Not agreed: don't do this work." };
+  if (!variationHasOwnRight(v)) return { state: "go", text: "Customer approved: go ahead." };
+  const endsOn = variationCancellationEndsOn(v.acceptance?.at ?? v.decidedAt ?? nowIso, days);
+  if (v.earlyStart) return { state: "go", endsOn, text: "Customer approved and asked in writing for us to start now: go ahead." };
+  if (londonDay(nowIso) > endsOn) return { state: "go", endsOn, text: "Customer approved and their 14 days to cancel this change are over: go ahead." };
+  return {
+    state: "wait",
+    endsOn,
+    text: `Customer approved, but they can cancel this change until ${endsOn}: don't start it until the office says they've asked in writing for us to start now.`,
+  };
+}
+
+/**
+ * The office records the customer's written request to start a change's
+ * extra work now. Only an accepted change with its own right to cancel,
+ * once; the evidence says where the request is (their reply, quoted).
+ */
+export function recordVariationEarlyStart(issue: Issue, input: { requestedAt: string; evidence: string }, by: string, now: string): Issue {
+  const v = issue.variation;
+  if (issue.kind !== "variation" || !v) throw new Error("That isn't a variation.");
+  if (v.status !== "accepted") throw new Error("The customer hasn't agreed to this change.");
+  if (!variationHasOwnRight(v)) throw new Error("This change has no cancellation period of its own: the crew can go ahead.");
+  if (v.earlyStart) throw new Error("Their request to start is already recorded.");
+  const evidence = input.evidence.trim();
+  if (evidence.length < 10) throw new Error("Say where their written request is and what it says (their reply email, quoted).");
+  const requested = Date.parse(input.requestedAt);
+  if (!Number.isFinite(requested)) throw new Error("When did they ask?");
+  if (requested > Date.parse(now) + 60_000) throw new Error("That's in the future.");
+  const next: Issue = JSON.parse(JSON.stringify(issue)) as Issue;
+  next.variation = { ...next.variation!, earlyStart: { requestedAt: new Date(requested).toISOString(), evidence, recordedBy: by.trim() || "Unknown", recordedAt: now } };
+  next.history = [...(next.history ?? []), { at: now, by: by.trim() || "Unknown", note: `Their written request to start the extra work now is on file: ${evidence}` }];
+  return next;
 }
 
 const gbp = (pence: number) => {
