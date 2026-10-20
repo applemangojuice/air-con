@@ -380,6 +380,14 @@ with their names; the planning consent item adds itself before day 1.
   No reply? The work waits for the end of the 14 days (its date is on the
   change): book a return visit. If they cancel the change after it started
   at their request, they pay for the work done up to then.
+- **The family cancels a change they agreed** (email, letter or call): the
+  project's **Issues** → the change → **They cancelled this change** → the
+  day and time it reached us, how and where it's on file → **Record their
+  cancellation**. The change closes, the crew's card says don't do it, and
+  it drops out of the balance. If it was already invoiced (its own invoice,
+  or a balance issued after it), the message says so: issue a credit note
+  against that invoice for the change (**a reduction**) and refund what they
+  paid on it within 14 days of when they told us.
 - In the evening the installer's end-of-day update (with the photos they
   picked) goes to the family; you'll see it under the project's Messages.
 - **Before day 1** (once the booking is confirmed): the technical lead sets

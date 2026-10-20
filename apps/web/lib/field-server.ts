@@ -686,7 +686,7 @@ function toFieldIssue(i: Issue, staff: StaffMember, urls: Map<string, string>, c
             description: i.variation.description,
             ...(seesPrices(staff) ? { totalDeltaPence: i.variation.totalDeltaPence } : {}),
             // Agreed above £42: the extra work waits for the customer's written request or the end of its 14 days.
-            ...(i.variation.status === "accepted" ? { start: (({ state, text }) => ({ state, text }))(variationStart(i, new Date().toISOString(), days)) } : {}),
+            ...(i.variation.status === "accepted" || i.variation.status === "cancelled" ? { start: (({ state, text }) => ({ state, text }))(variationStart(i, new Date().toISOString(), days)) } : {}),
           },
         }
       : {}),

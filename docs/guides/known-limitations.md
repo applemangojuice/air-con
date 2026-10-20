@@ -361,7 +361,15 @@ says what to do instead. Approvals that need a professional are in
       office records their reply on the Issues page). No reply means the
       extra work waits for the end of the 14 days: book a return visit.
       Nothing stops a crew physically doing the work early; the field card
-      says **don't start it** until then.
+      says **don't start it** until then. If they cancel it (round 10), the
+      office records it on the change (**They cancelled this change**): it's
+      never done or billed from then on. But: *an invoice already raised for
+      it isn't credited by itself, nor a payment refunded* (the office does
+      both, as the message says), the family gets no acknowledgement email,
+      and *a charge for work already done at their written request isn't
+      modelled*. *Instead:* email them to acknowledge it; if work had begun,
+      take advice before charging (solicitor question 2) and agree any charge
+      with them as a new change.
     - *Parking*: the prep list asks the family for parking information; a
       permit or a suspended bay is ours to arrange and pay for unless the
       proposal lists it (**Add a cost** → "Parking permit"), because the

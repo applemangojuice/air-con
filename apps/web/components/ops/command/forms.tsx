@@ -696,6 +696,34 @@ export function VariationStartRequestForm({ action, issueId, today, words }: { a
   );
 }
 
+/** The customer cancelled a change they'd agreed, as the office records it. */
+export function VariationCancelForm({ action, issueId, today }: { action: Action; issueId: string; today: string }) {
+  const id = useId();
+  return (
+    <ActionForm action={action}>
+      <input type="hidden" name="issueId" value={issueId} />
+      <p className="mb-2 text-sm text-ink-700">Any clear statement counts (email, letter, a call). From then on the crew&apos;s card says don&apos;t do it, and it isn&apos;t billed.</p>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <div>
+          <L htmlFor={`${id}-d`}>Day it reached us</L>
+          <input id={`${id}-d`} name="date" type="date" required max={today} defaultValue={today} className={compactInput} />
+        </div>
+        <div>
+          <L htmlFor={`${id}-t`}>Time (London)</L>
+          <input id={`${id}-t`} name="time" required placeholder="14:05" className={compactInput} />
+        </div>
+        <div className="sm:col-span-3">
+          <L htmlFor={`${id}-e`}>How they told us, and where it&apos;s on file</L>
+          <textarea id={`${id}-e`} name="evidence" required minLength={10} rows={2} maxLength={500} placeholder="Email from their address, 14:05: &quot;We'd like to cancel the extra trunking…&quot;" className={CONTROL} />
+        </div>
+        <div className="sm:col-span-3">
+          <SubmitButton busyLabel="Saving…" variant="secondary">Record their cancellation</SubmitButton>
+        </div>
+      </div>
+    </ActionForm>
+  );
+}
+
 /* ------------------------------------------------------------------ */
 /* Time                                                                */
 /* ------------------------------------------------------------------ */

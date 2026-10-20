@@ -80,20 +80,38 @@ export interface Issue {
     unitsUnchangedOnSite?: boolean;
     /** Who in the office confirmed the same before it went to the customer, and when. */
     unitsUnchangedConfirmed?: { by: string; at: string };
+    /** The customer cancelled the change after agreeing it, as the office recorded it (status "cancelled"). */
+    cancellation?: VariationCancellation;
   };
   resolution?: string;
   resolvedAt?: string;
   history: { at: string; by: string; note: string; status?: IssueStatus }[];
 }
 
-export type VariationStatus = "draft" | "proposed" | "accepted" | "declined";
+export type VariationStatus = "draft" | "proposed" | "accepted" | "declined" | "cancelled";
 
 export const VARIATION_STATUS_LABEL: Record<VariationStatus, string> = {
   draft: "With the office to check",
   proposed: "Waiting for the customer",
   accepted: "Accepted",
   declined: "Declined",
+  cancelled: "Cancelled by the customer",
 };
+
+/**
+ * The customer cancelled a change they'd agreed (its own right to cancel, or
+ * by agreement), as the office recorded it: when it reached us, how and where
+ * it's on file. A cancelled change is never billed or done; what they paid on
+ * it comes back (CCR reg 34: within 14 days of being told, wording to verify).
+ */
+export interface VariationCancellation {
+  receivedAt: string;
+  evidence: string;
+  recordedBy: string;
+  recordedAt: string;
+  /** Inside the change's own 14 days (a change over £42); false: after them, or a change with no right of its own (cancelled by agreement). */
+  withinPeriod: boolean;
+}
 
 /**
  * The durable record of a customer agreeing to a priced change: what they
@@ -204,6 +222,7 @@ export interface VariationStart {
 /** Whether the extra work of a change may start now, and why. */
 export function variationStart(issue: Pick<Issue, "variation">, nowIso: string, days = 14): VariationStart {
   const v = issue.variation;
+  if (v?.status === "cancelled") return { state: "none", text: "The customer cancelled this change: don't do this work." };
   if (!v || v.status !== "accepted") return { state: "none", text: "Not agreed: don't do this work." };
   if (!variationHasOwnRight(v)) return { state: "go", text: "Customer approved: go ahead." };
   const endsOn = variationCancellationEndsOn(v.acceptance?.at ?? v.decidedAt ?? nowIso, days);
@@ -235,6 +254,50 @@ export function recordVariationEarlyStart(issue: Issue, input: { requestedAt: st
   const next: Issue = JSON.parse(JSON.stringify(issue)) as Issue;
   next.variation = { ...next.variation!, earlyStart: { requestedAt: new Date(requested).toISOString(), evidence, recordedBy: by.trim() || "Unknown", recordedAt: now } };
   next.history = [...(next.history ?? []), { at: now, by: by.trim() || "Unknown", note: `Their written request to start the extra work now is on file: ${evidence}` }];
+  return next;
+}
+
+/**
+ * The office records that the customer cancelled a change they'd agreed:
+ * when it reached us and where it's on file. Only an accepted change, once.
+ * The change is never billed or done from then on (the issue closes, the
+ * crew's card says don't do it); an invoice already raised for it is the
+ * office's to credit, and what was paid to refund.
+ */
+export function recordVariationCancellation(issue: Issue, input: { receivedAt: string; evidence: string }, by: string, now: string, days = 14): Issue {
+  const v = issue.variation;
+  if (issue.kind !== "variation" || !v) throw new Error("That isn't a variation.");
+  if (v.status === "cancelled") throw new Error("Their cancellation of this change is already recorded.");
+  if (v.status !== "accepted") throw new Error("Only a change they agreed can be cancelled: one they haven't answered can simply be declined or withdrawn.");
+  const evidence = input.evidence.trim();
+  if (evidence.length < 10) throw new Error("Say how they told us and where it's on file (their email, quoted, or the call and who took it).");
+  const received = Date.parse(input.receivedAt);
+  if (!Number.isFinite(received)) throw new Error("When did it reach us?");
+  if (received > Date.parse(now) + 60_000) throw new Error("That's in the future.");
+  const agreedAt = v.acceptance?.at ?? v.decidedAt;
+  if (agreedAt && received < Date.parse(agreedAt)) throw new Error("That's before they agreed the change.");
+  const endsOn = variationHasOwnRight(v) && agreedAt ? variationCancellationEndsOn(agreedAt, days) : "";
+  const withinPeriod = Boolean(endsOn) && londonDay(new Date(received).toISOString()) <= endsOn;
+  const who = by.trim() || "Unknown";
+  const next: Issue = JSON.parse(JSON.stringify(issue)) as Issue;
+  next.variation = {
+    ...next.variation!,
+    status: "cancelled",
+    cancellation: { receivedAt: new Date(received).toISOString(), evidence, recordedBy: who, recordedAt: now, withinPeriod },
+  };
+  next.status = "closed";
+  next.resolvedAt = now;
+  next.resolution = "Cancelled by the customer: not done, not billed.";
+  next.nextAction = "Don't do this work. Credit any invoice raised for it and refund what they paid on it.";
+  next.history = [
+    ...(next.history ?? []),
+    {
+      at: now,
+      by: who,
+      note: `The customer cancelled this change${withinPeriod ? ` inside its own cancellation period (to ${endsOn})` : endsOn ? `, after its own cancellation period ended (${endsOn}): cancelled by agreement` : " (by agreement)"}: ${evidence}`,
+      status: "closed",
+    },
+  ];
   return next;
 }
 

@@ -14,7 +14,7 @@ import {
 } from "@aircon/domain";
 import { Badge, StatusChip } from "@/components/kit/badge";
 import { EmptyState, PageHeader } from "@/components/kit/layout";
-import { Disclosure, IssueTransitionForm, RaiseIssueForm, VariationSendForm, VariationStartRequestForm } from "@/components/ops/command/forms";
+import { Disclosure, IssueTransitionForm, RaiseIssueForm, VariationCancelForm, VariationSendForm, VariationStartRequestForm } from "@/components/ops/command/forms";
 import { fmtInstant } from "@/components/ops/command/model";
 import { requireStaff } from "@/lib/auth/server";
 import { fmtDate, money } from "@/lib/format";
@@ -23,7 +23,7 @@ import { issueKindDefaults } from "@/lib/ops-core-server";
 import { loadProject } from "@/lib/project-service";
 import * as issuesRepo from "@/lib/repo/issues";
 import { getSettings } from "@/lib/settings-server";
-import { raiseIssueAction, recordVariationStartAction, sendVariationAction, transitionIssueAction } from "../actions";
+import { raiseIssueAction, recordVariationCancelAction, recordVariationStartAction, sendVariationAction, transitionIssueAction } from "../actions";
 
 export const metadata: Metadata = { title: "Issues · ops", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -158,6 +158,17 @@ export default async function ProjectIssuesPage({ params }: { params: Promise<{ 
                             </div>
                           );
                         })()}
+                      {i.variation?.status === "accepted" && canPrice && (
+                        <Disclosure summary="They cancelled this change" className="mt-2">
+                          <VariationCancelForm action={recordVariationCancelAction.bind(null, id)} issueId={i.id} today={today} />
+                        </Disclosure>
+                      )}
+                      {i.variation?.status === "cancelled" && i.variation.cancellation && (
+                        <p className="mt-2 rounded-2xl border border-line bg-surface px-3 py-2 text-sm text-ink-900">
+                          Cancelled by the customer ({fmtInstant(i.variation.cancellation.receivedAt)}
+                          {i.variation.cancellation.withinPeriod ? ", inside its own 14 days" : ""}): not done, not billed. Recorded by {i.variation.cancellation.recordedBy}. Credit any invoice raised for it and refund what they paid on it.
+                        </p>
+                      )}
                       {i.variation?.status === "draft" && isOpen(i) && canPrice && (
                         <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50/60 p-3">
                           <p className="mb-2 text-sm font-semibold text-ink-900">Check it, then send it to the customer</p>

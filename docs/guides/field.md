@@ -357,7 +357,9 @@ price change, £ before VAT** → **Send to the office**.
 > **don't start it** until the family has asked in writing for the work to
 > start now (they reply to the change's email; the office records it) or
 > the 14 days are over. Start it only when the card says **go ahead**. If
-> they'd rather keep their 14 days, the office books a return visit.
+> they'd rather keep their 14 days, the office books a return visit. If they
+> cancel it, the card says **The customer cancelled this change: don't do
+> this work**.
 
 ## 8. End of day
 

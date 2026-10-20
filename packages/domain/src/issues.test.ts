@@ -9,6 +9,7 @@ import {
   createIssue,
   defaultsForKind,
   isOpen,
+  recordVariationCancellation,
   recordVariationEarlyStart,
   sendVariationToCustomer,
   transitionIssue,
@@ -245,4 +246,30 @@ test("a priced change over £42 has its own 14 days: the crew waits for a writte
   assert.match(asked.history.at(-1)!.note, /written request to start the extra work now is on file/);
   assert.equal(variationStart(asked, AT).state, "go");
   assert.throws(() => recordVariationEarlyStart(asked, { requestedAt: AT, evidence: "Reply email again, quoted" }, "DEMO Office", AT), /already recorded/);
+});
+
+test("round 10: the customer cancels a change they agreed: recorded once, never billed or done", async () => {
+  const { acceptedVariationsPence } = await import("./money.ts");
+  const agreed = issue("variation", {
+    status: "in-progress",
+    variation: { description: "DEMO: 2 m more trunking", priceDeltaNetPence: 90_000, taxPence: 0, totalDeltaPence: 90_000, status: "accepted", decidedAt: AT, acceptance: { at: AT, name: "DEMO Sam Taylor", wording: "I agree", contentHash: "x", priceDeltaNetPence: 90_000, taxPence: 0, totalDeltaPence: 90_000 } },
+  });
+  assert.equal(acceptedVariationsPence([agreed]), 90_000);
+  assert.throws(() => recordVariationCancellation(agreed, { receivedAt: AT, evidence: "short" }, "DEMO Office", AT), /how they told us/);
+  assert.throws(() => recordVariationCancellation(agreed, { receivedAt: "2026-11-09T09:00:00.000Z", evidence: "Email from their address, quoted" }, "DEMO Office", AT), /before they agreed/);
+  assert.throws(() => recordVariationCancellation({ ...agreed, variation: { ...agreed.variation!, status: "proposed" } }, { receivedAt: AT, evidence: "Email from their address, quoted" }, "DEMO Office", AT), /Only a change they agreed/);
+  const now = "2026-11-12T10:00:00.000Z";
+  const cancelled = recordVariationCancellation(agreed, { receivedAt: "2026-11-12T09:30:00.000Z", evidence: 'Email from their address, 09:30: "We\'d like to cancel the trunking"' }, "DEMO Office", now);
+  assert.equal(agreed.variation!.status, "accepted", "pure");
+  assert.equal(cancelled.variation!.status, "cancelled");
+  assert.equal(cancelled.variation!.cancellation!.withinPeriod, true, "inside its own 14 days (agreed 10 Nov)");
+  assert.equal(cancelled.status, "closed");
+  assert.equal(acceptedVariationsPence([cancelled]), 0, "never billed: out of the balance and the money totals");
+  assert.deepEqual(variationStart(cancelled, now), { state: "none", text: "The customer cancelled this change: don't do this work." });
+  assert.match(cancelled.history.at(-1)!.note, /cancelled this change inside its own cancellation period \(to 2026-11-24\)/);
+  assert.throws(() => recordVariationCancellation(cancelled, { receivedAt: now, evidence: "Email again, quoted here" }, "DEMO Office", now), /already recorded/);
+  // After its 14 days, or a small change with no right of its own: by agreement.
+  const late = recordVariationCancellation(agreed, { receivedAt: "2026-11-30T09:00:00.000Z", evidence: "Phone call, taken by DEMO Ada" }, "DEMO Office", "2026-11-30T10:00:00.000Z");
+  assert.equal(late.variation!.cancellation!.withinPeriod, false);
+  assert.match(late.history.at(-1)!.note, /after its own cancellation period ended \(2026-11-24\): cancelled by agreement/);
 });

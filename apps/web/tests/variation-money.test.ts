@@ -154,4 +154,13 @@ test("a variation is priced and invoiced on the contract's tax code, never on th
     invoice.value.lines.map((l) => [l.netPence, l.taxPence, l.totalPence, l.taxCode]),
     [[10_000, 2_000, 12_000, "standard-20"]],
   );
+
+  // Round 10: the customer cancels the change: it leaves the money totals, and the office is told to credit the invoice.
+  const { recordVariationCancellationRequest } = await import("../lib/variation-server.ts");
+  const cancelled = await recordVariationCancellationRequest(demo3.id, draft.id, { receivedAt: new Date().toISOString(), evidence: "DEMO: email from their address, quoted" }, OFFICE);
+  assert.ok(cancelled.ok, !cancelled.ok ? cancelled.error : "");
+  assert.equal(cancelled.value.variation?.status, "cancelled");
+  assert.match(cancelled.warning ?? "", new RegExp(`It's on invoice ${invoice.value.number} already: issue a credit note`));
+  const after = (await loadMoney(demo3.id))!;
+  assert.ok(!(after.plans.variation.variations ?? []).some((v) => v.id === draft.id), "a cancelled change is never offered for billing");
 });

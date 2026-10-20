@@ -286,7 +286,7 @@ export function InstallPanel({ data, state }: PanelProps) {
                   #{i.number} {i.title}
                 </span>
                 <span className="text-sm text-ink-500">
-                  {i.variation!.status === "accepted" ? "You said yes" : "You said no"}
+                  {i.variation!.status === "accepted" ? "You said yes" : i.variation!.status === "cancelled" ? "You cancelled it: not done, not charged" : "You said no"}
                   {i.variation!.decidedAt ? `, ${fmtInstantDay(i.variation!.decidedAt)}` : ""} · {i.variation!.totalDeltaPence >= 0 ? "+" : ""}
                   {money(i.variation!.totalDeltaPence)}
                 </span>

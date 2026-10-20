@@ -1,6 +1,7 @@
 import {
   TAX_CODES,
   contractTaxCode,
+  recordVariationCancellation,
   recordVariationEarlyStart,
   sendVariationToCustomer,
   variationHasOwnRight,
@@ -11,6 +12,7 @@ import {
 import { audit } from "./audit";
 import { notify } from "./comms/outbox";
 import { fail, type Outcome } from "./purchasing-server";
+import * as invoicesRepo from "./repo/invoices";
 import * as issuesRepo from "./repo/issues";
 import * as proposalsRepo from "./repo/proposals";
 import { getSettings, getSettingsStrict } from "./settings-server";
@@ -120,4 +122,49 @@ export async function recordVariationStartRequest(
   const saved = await issuesRepo.update(next);
   await audit({ actor: staff, action: "issue.variation-early-start", entity: "issue", entityId: issue.id, detail: { projectId, requestedAt: saved.variation?.earlyStart?.requestedAt } });
   return { ok: true, value: saved, message: `Their request is on file: the crew can start change #${saved.number}.` };
+}
+
+/**
+ * The office records that the customer cancelled a change they'd agreed
+ * (their email, letter or call): it's never done or billed from then on.
+ * An invoice already raised for it (its own, or a balance issued after it
+ * was agreed) stays as it is: the answer says so, for a credit note and a
+ * refund of what they paid on it. Permission (proposal.issue) is the
+ * caller's job.
+ */
+export async function recordVariationCancellationRequest(
+  projectId: string,
+  issueId: string,
+  input: { receivedAt: string; evidence: string },
+  staff: StaffMember,
+): Promise<Outcome<Issue>> {
+  const issue = await issuesRepo.get(issueId);
+  if (!issue || issue.projectId !== projectId) return fail("That variation isn't on this project.", 404);
+  if (staff.external) return fail("The office records the customer's cancellation.", 403);
+  const days = (await getSettings())?.scheduling.cancellationDays ?? 14;
+  let next: Issue;
+  try {
+    next = recordVariationCancellation(issue, input, staff.name, new Date().toISOString(), days);
+  } catch (err) {
+    return fail(err instanceof Error ? err.message : String(err));
+  }
+  const saved = await issuesRepo.update(next);
+  await audit({
+    actor: staff,
+    action: "issue.variation-cancelled",
+    entity: "issue",
+    entityId: issue.id,
+    detail: { projectId, receivedAt: saved.variation?.cancellation?.receivedAt, withinPeriod: saved.variation?.cancellation?.withinPeriod },
+  });
+  // Billed already? The office credits it and refunds what was paid on it (CCR reg 34: 14 days from being told).
+  const invoices = await invoicesRepo.listForProject(projectId).catch(() => []);
+  const live = invoices.filter((i) => i.status !== "void" && i.status !== "draft");
+  const own = live.find((i) => i.issueId === issue.id);
+  const agreedAt = issue.variation?.decidedAt ?? issue.variation?.acceptance?.at;
+  const balance = live.find((i) => i.kind === "balance" && i.issuedAt && (!agreedAt || agreedAt <= i.issuedAt));
+  const billed = own ?? balance;
+  const warning = billed
+    ? `It's on invoice ${billed.number} already: issue a credit note against it for the change (Money → the invoice → credit note, "a reduction"), and refund anything they paid on it within 14 days of when they told us.`
+    : undefined;
+  return { ok: true, value: saved, message: `Change #${saved.number} is cancelled: the crew's card says don't do it, and it won't be billed.`, ...(warning ? { warning } : {}) };
 }
