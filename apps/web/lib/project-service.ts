@@ -511,6 +511,7 @@ export async function buildReadinessContext(project: Project, actor?: StaffMembe
       statutory: c.statutory,
       gate: c.gate,
     })),
+    ...(survey?.data?.site?.tenure === "leaseholder" || survey?.data?.site?.tenure === "tenant" ? { authorityConsentNeeded: true } : {}),
     crew,
     openIssues: issues.filter(isOpen).map((i) => ({
       id: i.id,

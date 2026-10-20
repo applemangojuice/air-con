@@ -138,7 +138,7 @@ export const COMPLIANCE_TEMPLATE: ComplianceTemplateItem[] = [
     allowNa: false,
     basis: "Internal: the right person signs",
     guidance:
-      "Confirm the person accepting owns the home, or has the owner's written permission: the landlord for a tenant, the freeholder or managing agent for a leasehold flat. The survey records the tenure and the decision maker.",
+      "Confirm the person accepting owns the home, or has the owner's written permission: the landlord for a tenant, the freeholder or managing agent for a leasehold flat (most leases need their consent for holes in the outside wall and anything fixed to it). The survey records the tenure and the decision maker. For a leaseholder or tenant, approving needs the written consent attached, and install day 1 waits for it.",
     evidenceHint:
       "The survey's tenure and signatory answers. For a leaseholder or tenant, the freeholder's or landlord's written consent.",
   },
@@ -193,7 +193,7 @@ export const COMPLIANCE_TEMPLATE: ComplianceTemplateItem[] = [
     ownerRole: "tech-lead",
     basis: "Manufacturer manuals and warranty terms",
     guidance:
-      "From the installation manual for each chosen model: maximum and minimum pipe lengths (per indoor unit and, on a multi-split, in total) and height difference (outdoor to indoor, and between indoor units on a multi-split, which can depend on whether the outdoor unit is above or below), the fewest indoor units and least connected capacity a multi-split runs with, pre-charged length and extra charge per metre, the factory charge, breaker size, clearances, condensate fall, and anything the warranty depends on (accredited installer, registration deadline). R32 is mildly flammable: when a system's total charge (factory plus added) is over 1.84 kg, check every room it serves against the manual's minimum floor area table (the design's \"Room size for the R32 charge\" check uses the IEC 60335-2-40 formula; the manual's table can be stricter).",
+      "From the installation manual for each chosen model: maximum and minimum pipe lengths (per indoor unit and, on a multi-split, in total) and height difference (outdoor to indoor, and between indoor units on a multi-split, which can depend on whether the outdoor unit is above or below), the fewest indoor units and least connected capacity a multi-split runs with, pre-charged length and extra charge per metre, the factory charge, breaker size and the RCD type it needs (Type A, F or B), the indoor-outdoor interconnect cable, flare torques and any reducers on a multi-split's ports, clearances, condensate fall, and anything the warranty depends on (accredited installer, registration deadline). R32 is mildly flammable: when a system's total charge (factory plus added) is over 1.84 kg, check every room it serves against the manual's minimum floor area table (the design's \"Room size for the R32 charge\" check uses the IEC 60335-2-40 formula; the manual's table can be stricter).",
     evidenceHint: "The manual pages or links for the chosen models, and a note of anything that changed the design.",
   },
   {
@@ -234,8 +234,23 @@ export const COMPLIANCE_TEMPLATE: ComplianceTemplateItem[] = [
     allowNa: false,
     basis: "Building Regulations 2010 reg 12(6A), Part P",
     guidance:
-      "A new circuit for the outdoor unit is notifiable electrical work. Agree the circuit, protective device, cable route and isolator with an electrician registered with a competent person scheme, who self-certifies it. Without one, a building notice goes to the council before work starts. Check the board: a spare way, the RCD type, earthing, and any asbestos flash guard in an old fuse box.",
+      "A new circuit for the outdoor unit is notifiable electrical work. Agree the circuit, protective device, cable route and isolator with an electrician registered with a competent person scheme, who self-certifies it. Without one, a building notice goes to the council before work starts. Check the board: a spare way, the RCD type the outdoor unit's manual asks for (Type A, F or B: inverters can need F or B), earthing, and any asbestos flash guard in an old fuse box. The cable is sized for its route (how it's run, insulation, the outside section, length), not from the breaker alone.",
     evidenceHint: "The electrician's scope note or quote, their scheme registration number, and a photo of the board.",
+  },
+  {
+    key: "supply-and-dno",
+    label: "Supply capacity and the network operator (DNO)",
+    category: "electrical",
+    statutory: false,
+    gate: "booking",
+    ownerRole: "electrician",
+    allowNa: false,
+    approvalNeeds: "note",
+    basis: "BS 7671 132.16 (existing equipment, including the distributor's, adequate for the addition); ENA connect-and-notify process. Verify the current criteria",
+    guidance:
+      "Before the booking, the electrician confirms the supply can take the new load: the cut-out (main fuse) rating, whether the service is looped, the earthing, the existing large loads (electric shower, EV charger, other heat pumps) and the maximum demand after diversity, using the outdoor unit's maximum running current. Then the network operator (UK Power Networks in London): under the ENA process a heat pump within the cut-out's capacity (60 A a phase or less, cut-out known, not looped, one device) is connected and notified within 28 days; otherwise the application goes in first and the install waits for the answer. Whether the DNO treats an air-to-air unit as a heat pump wasn't confirmed: if in doubt, notify. Write the outcome in the note.",
+    evidenceHint:
+      "A photo of the cut-out and its rating, the electrician's maximum demand note, and the DNO's notification or application reference (or why none is needed, in writing).",
   },
   {
     key: "heat-pump-building-regs",
@@ -245,10 +260,10 @@ export const COMPLIANCE_TEMPLATE: ComplianceTemplateItem[] = [
     gate: "booking",
     ownerRole: "admin",
     approvalNeeds: "note",
-    basis: "Building Regulations 2010 Part L, Sch 3 (competent person schemes), reg 12. Building control to confirm",
+    basis: "Building Regulations 2010 Part L, Sch 3 (competent person schemes), reg 12; Building Safety Act 2022 for higher-risk buildings. Building control to confirm",
     guidance:
-      "Installing a split heat pump or air conditioner is very likely building work under Part L, separate from the electrical circuit. Before the booking, record how this job is covered: the competent person scheme our installer is registered with for this work (scheme and registration number), who then self-certifies it; or, without one, the building notice reference given to the council before work starts. Once work has started, a missed notice can only be put right by regularisation. Mark it not applicable only on building control's written word that this install isn't building work.",
-    evidenceHint: "The scheme name and registration number, or the building notice reference and the date it went in (or building control's written confirmation that none is needed).",
+      "Installing a split heat pump or air conditioner is very likely building work under Part L, separate from the electrical circuit. Before the booking, record how this job is covered: the competent person scheme our installer is registered with for this work (scheme and registration number), who then self-certifies it; or, without one, the council's approval before work starts: a building notice for a house, but a full plans application for a flat in a block the Fire Safety Order covers (most blocks: a building notice isn't allowed there). In a higher-risk building (18 m or more, or 7 storeys or more, with two or more homes), work outside a competent person scheme needs the Building Safety Regulator's approval first. Once work has started, a missed notice can only be put right by regularisation. Mark it not applicable only on building control's written word that this install isn't building work.",
+    evidenceHint: "The scheme name and registration number, or the building notice or full plans reference and the date it went in (or the Building Safety Regulator's approval, or building control's written confirmation that none is needed).",
   },
   {
     key: "fgas-company",
@@ -326,8 +341,8 @@ export const COMPLIANCE_TEMPLATE: ComplianceTemplateItem[] = [
     ownerRole: "surveyor",
     basis: "Control of Asbestos Regulations 2012",
     guidance:
-      "Before drilling or disturbing anything in a home built before 2000, assess whether asbestos could be there: textured ceilings, old fuse-board flash guards, soffits, floor tiles. Suspected asbestos stops the work until it's tested or avoided. It's never \"probably fine\". Not applicable only for a home built in 2000 or later, with the reason written down.",
-    evidenceHint: "The survey's asbestos answer, photos of the drilling spots and the fuse board, and any test result.",
+      "Before drilling or disturbing anything in a home built before 2000, assess whether asbestos could be there: textured ceilings, old fuse-board flash guards, soffits, floor tiles. Suspected asbestos stops the work until it's tested or avoided. It's never \"probably fine\". When the survey says possible or suspected (or a flash guard may be asbestos), approving needs the test result or asbestos survey, or a photo of the route that avoids it, attached, and the note saying which. Not applicable only for a home built in 2000 or later, with the reason written down.",
+    evidenceHint: "The survey's asbestos answer, photos of the drilling spots and the fuse board, and any test result (required when the survey suspects asbestos).",
   },
   {
     key: "concealed-services",
@@ -350,7 +365,7 @@ export const COMPLIANCE_TEMPLATE: ComplianceTemplateItem[] = [
     ownerRole: "tech-lead",
     basis: "Work at Height Regulations 2005",
     guidance:
-      "Plan any work off the ground (a high bracket, first-floor holes from outside): avoid it where you can, otherwise the right access (a tower put up by someone PASMA trained, a podium or scaffold) and no long tasks off a ladder. Not applicable only when everything is done from the ground or from inside.",
+      "Plan any work off the ground (a high bracket, first-floor holes from outside): avoid it where you can, otherwise the right access (a tower put up by someone PASMA trained, a podium or scaffold) and no long tasks off a ladder: a ladder only for short, low-risk work, never for fixing a bracket and lifting a unit at first-floor height (HSE's ladder leaflet suggests other equipment for tasks over about 30 minutes in one position: confirm against the current issue). Outdoor units are a two-person lift. Not applicable only when everything is done from the ground or from inside.",
     evidenceHint: "The access method, who's trained (PASMA or IPAF), and a photo of the position.",
   },
   {
@@ -361,10 +376,10 @@ export const COMPLIANCE_TEMPLATE: ComplianceTemplateItem[] = [
     gate: "ready-to-install",
     ownerRole: "tech-lead",
     allowNa: false,
-    basis: "Management of Health and Safety at Work Regulations 1999",
+    basis: "Management of Health and Safety at Work Regulations 1999; CDM 2015 (domestic client duties pass to the contractor: construction phase plan, induction, welfare)",
     guidance:
-      "Write the risk assessment and method statement for this home: access, height, drilling, electrics, refrigerant, nitrogen and brazing, pets and children. The crew read it before day 1.",
-    evidenceHint: "The RAMS document, and the crew's acknowledgement.",
+      "Write the risk assessment and method statement for this home: access, height, drilling, electrics, refrigerant, nitrogen and brazing (hot work: fire precautions and a fire watch), pets and children. Under CDM 2015 the household's client duties pass to us, so it also serves as the construction phase plan: site rules, emergency arrangements, the welfare agreed with the household (toilet, washing, water), the induction for everyone on site, and how we coordinate with the electrician. With a subcontractor on the job we're principal contractor and principal designer, and the handover leaves a short health and safety file (where the pipes and cables run hidden, the R32 refrigerant, the isolators). The crew read it before day 1.",
+    evidenceHint: "The RAMS and construction phase plan, the crew's acknowledgement, and (with a subcontractor) the health and safety file notes.",
   },
   {
     key: "cancellation-and-consent",
@@ -641,6 +656,20 @@ export interface ComplianceReviewContext {
   listedBuilding?: "yes" | "no";
   /** For syncCompliance: the survey's and property record's word on listing (listedOnRecord reads it with the checklist). */
   listing?: ListingFacts;
+  /** The survey's tenure: a leaseholder or tenant needs the freeholder's or landlord's written consent attached. */
+  tenure?: "owner" | "leaseholder" | "tenant" | "unknown";
+  /** The survey says asbestos is possible or suspected, or a flash guard may be: approving the asbestos check needs the result. */
+  asbestosSuspected?: boolean;
+}
+
+/** Tenures whose authority to contract rests on someone else's written consent. */
+export const CONSENT_TENURES = ["leaseholder", "tenant"] as const;
+
+/** Does the survey's answer need a test result before the asbestos check can be approved? */
+export function asbestosSuspectedAtSurvey(m: { house?: { asbestosRisk?: string }; electrics?: { asbestosFlashGuard?: string } } | null | undefined): boolean {
+  const r = m?.house?.asbestosRisk;
+  const g = m?.electrics?.asbestosFlashGuard;
+  return r === "possible" || r === "suspected" || g === "possible" || g === "yes";
 }
 
 export function reviewCompliance(
@@ -694,6 +723,11 @@ export function reviewCompliance(
         if ((t?.approvalNeeds ?? "evidence-or-note") === "note" && !text) {
           return fail("Write what you checked in the note: the outcome alone can't approve this.");
         }
+        if (item.key === "asbestos" && context.asbestosSuspected && (item.mediaIds.length === 0 || !text)) {
+          return fail(
+            "The survey says asbestos is possible or suspected here: attach the test result or asbestos survey (or a photo of the route that avoids it) and say in the note how it's cleared or avoided.",
+          );
+        }
         if (t?.approvalNeeds === "evidence-and-note" && (item.mediaIds.length === 0 || !text)) {
           return fail("Attach the council's decision notice and write its reference, the date it was granted and its conditions: both are needed to approve this.");
         }
@@ -702,6 +736,12 @@ export function reviewCompliance(
         if (restsOnSettingsCert(item) && context.companyFgasProblem) {
           return fail(`${context.companyFgasProblem} Add the current certificate in settings, or attach the certified company's certificate here if they do the refrigerant work.`);
         }
+      } else if (t?.approvalNeeds === "note" && !text) {
+        return fail("Write the outcome in the note: what was checked and what was decided. Evidence alone (or an override) can't approve this.");
+      } else if (item.key === "ownership-authority" && context.tenure && (CONSENT_TENURES as readonly string[]).includes(context.tenure) && item.mediaIds.length === 0) {
+        return fail(
+          `The survey records a ${context.tenure}: attach the ${context.tenure === "tenant" ? "landlord's" : "freeholder's or managing agent's"} written consent to the work (holes in the outside wall, the outdoor unit). A note or an override can't stand in for it.`,
+        );
       } else if (!hasEvidence && !text) {
         if (!override) return fail("Attach evidence or write a note. To approve without either, an admin overrides with a reason.");
         if (!reviewer.roles.includes("admin")) return fail("Only an admin can approve without evidence (with a reason).");

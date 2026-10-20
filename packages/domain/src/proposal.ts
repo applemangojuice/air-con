@@ -212,9 +212,9 @@ export const DEFAULT_EXCLUSIONS: string[] = [
  */
 export const DEFAULT_PROPOSAL_ASSUMPTIONS: string[] = [
   "The unit positions and pipe routes are the ones agreed at your survey and shown on your photos",
-  "Your fuse board has room for the new circuit, as we found at the survey",
+  "Your fuse board has room for the new circuit, as we found at the survey, and our electrician confirms your supply can take it",
   "The walls we drill are ordinary brick or block",
-  "We can reach every unit position safely from a ladder, unless your proposal includes access equipment",
+  "We can reach every unit position safely with the access agreed at your survey: any tower or scaffold is listed in your proposal",
   "There's somewhere to park or unload within a short walk of your front door on the install days",
   "An adult is at home to let us in each day and for the handover",
   "If we find something we couldn't have seen at the survey that changes the job, we stop, explain it and give you the price in writing first. Nothing extra is charged unless you agree to it",
@@ -781,6 +781,29 @@ export function isProposalExpired(p: Pick<ProposalRecord, "validUntil">, todayIs
  * price and no costs) is still drafted, waiting for a manual price, which
  * proposalIssueErrors insists on before issue.
  */
+/**
+ * The fuse board assumption, in line with what the survey found: the
+ * default only when the board is modern with a spare way per new circuit
+ * and no flash guard is suspected; otherwise it says the board needs work
+ * first and how that's priced, never that it has room.
+ */
+export const BOARD_ROOM_ASSUMPTION = DEFAULT_PROPOSAL_ASSUMPTIONS[1]!;
+export function boardAssumption(design: Pick<DesignRecord, "site" | "variants">): string {
+  const e = design.site?.electrics;
+  const circuits = Math.max(1, ...design.variants.map((v) => v.systems.length));
+  const flash = e?.asbestosFlashGuard === "possible" || e?.asbestosFlashGuard === "yes";
+  const modern = e?.boardType === "modern-rcbo" || e?.boardType === "modern-rcd";
+  if (e && modern && !flash && typeof e.spareWays === "number" && e.spareWays >= circuits) return BOARD_ROOM_ASSUMPTION;
+  const found = !e || e.boardType === "unknown"
+    ? "we couldn't confirm your fuse board's type at the survey"
+    : flash
+      ? "your fuse board may have an asbestos flash guard, which a specialist checks before any electrical work"
+      : e.boardType === "older-fuse-box"
+        ? "you have an older fuse box, which may need upgrading before a new circuit"
+        : "your fuse board has no spare way recorded for the new circuit";
+  return `At the survey ${found}: any board work is listed and priced in your proposal, or priced in writing for you to agree before it's done. Nothing extra is charged unless you agree to it`;
+}
+
 export function draftProposal(
   ctx: OptionContext,
   input: { id: string; projectId: string; version: number; instantPriceGbp: number; today: string; now: string },
@@ -796,7 +819,7 @@ export function draftProposal(
     options,
     inclusions: [...DEFAULT_INCLUSIONS],
     exclusions: [...DEFAULT_EXCLUSIONS],
-    assumptions: [...DEFAULT_PROPOSAL_ASSUMPTIONS],
+    assumptions: DEFAULT_PROPOSAL_ASSUMPTIONS.map((a) => (a === BOARD_ROOM_ASSUMPTION ? boardAssumption(ctx.design) : a)),
     warranty: ctx.settings.warranty.manufacturerSummary?.trim() || null,
     guarantees: guaranteeLines(ctx.settings),
     validUntil: defaultValidUntil(ctx.settings, input.today),

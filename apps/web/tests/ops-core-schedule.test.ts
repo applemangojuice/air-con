@@ -276,3 +276,18 @@ test("a survey with nobody down to do it alerts the team once, on the working da
   assert.ok(DAILY_JOB_IDS.includes("survey-unassigned"));
 });
 
+
+test("round 9: the warranty registration date alerts the team 14 and 7 days ahead, on the day, then weekly while late", () => {
+  const due = (inDays: number, registered = false) =>
+    project((p) => {
+      p.handover = { ...p.handover, status: "commissioned", warrantyRegistered: registered, warrantyDueOn: addDays(TODAY, inDays) };
+    });
+  const at = (inDays: number) => jobsOf(due(inDays)).includes("warranty-due");
+  assert.deepEqual([20, 14, 10, 7, 3, 0, -3, -7, -14].map(at), [false, true, false, true, false, true, false, true, true]);
+  const late = dailyJobsFor(due(-7), TODAY, DEFAULT_SETTINGS).find((j) => j.job === "warranty-due")!;
+  assert.ok(late.kind === "notify" && late.event === "team-alert");
+  assert.match((late.data as { title: string }).title, /Overdue: the warranty registration/);
+  assert.equal((late.data as { urgent?: boolean }).urgent, true);
+  assert.ok(!jobsOf(due(0, true)).includes("warranty-due"), "registered: nothing");
+  assert.ok(DAILY_JOB_IDS.includes("warranty-due"));
+});

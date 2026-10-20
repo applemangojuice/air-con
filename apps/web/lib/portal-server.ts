@@ -48,6 +48,7 @@ import * as customersRepo from "./repo/customers";
 import * as documentsRepo from "./repo/documents";
 import * as installJobsRepo from "./repo/installJobs";
 import * as invoicesRepo from "./repo/invoices";
+import * as complianceRepo from "./repo/compliance";
 import * as issuesRepo from "./repo/issues";
 import * as mediaRepo from "./repo/media";
 import * as purchaseOrdersRepo from "./repo/purchaseOrders";
@@ -328,9 +329,13 @@ export async function loadHub(projectId: string, access: ProjectAccess): Promise
   const packDoc = documents.find((d) => d.kind === "handover-pack" && d.id === project.handover.packDocumentId) ??
     documents.find((d) => d.kind === "handover-pack");
   const packSnap = packDoc?.snapshot as Partial<HandoverPackSnapshot> | undefined;
+  const heatPumpCert = packDoc
+    ? await safe("heat pump certificate", () => complianceRepo.getByKey(projectId, "heat-pump-compliance-certificate"), null)
+    : null;
   const pack: HubPack | null =
     packDoc && packSnap?.electricalCert && packSnap.maintenanceInfo && packSnap.warranty
       ? {
+          heatPumpCertificate: heatPumpCert?.status === "approved" ? "done" : heatPumpCert?.status === "not-applicable" ? "na" : "pending",
           documentId: packDoc.id,
           completedOn: String(packSnap.completedOn ?? ""),
           electricalCert: { ...packSnap.electricalCert, status: project.handover.electricalCert },

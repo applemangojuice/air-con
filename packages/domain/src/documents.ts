@@ -296,6 +296,12 @@ export interface HandoverPackSnapshot extends DocumentHeader {
   documents: DocumentLink[];
   /** Warranty wording from settings (null: none stated), registered yet or due by. */
   warranty: { text: string | null; registered: boolean; dueOn?: string };
+  /**
+   * Our guarantee statements as the family agreed them (the accepted
+   * proposal's frozen lines, the workmanship guarantee and its length
+   * included), never today's settings. Absent on packs from before round 9.
+   */
+  guarantees?: string[];
   /** Building Regulations compliance certificate: due within 30 days of completion (reg 20(3)). */
   electricalCert: { status: Project["handover"]["electricalCert"]; dueBy: string };
   /** Operating and maintenance information: due within 5 days of completion (reg 40(2)). */

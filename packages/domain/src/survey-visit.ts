@@ -872,7 +872,7 @@ export function electricsFinding(m: MeasuredSurvey): { status: ElectricsPlanStat
   }
   return {
     status: "validated",
-    summary: `Your surveyor checked your fuse board: modern, with ${spare} spare way${spare === 1 ? "" : "s"}, so the new circuit is a straightforward addition.`,
+    summary: `Your surveyor checked your fuse board: modern, with ${spare} spare way${spare === 1 ? "" : "s"} for the new circuit. Our electrician confirms your supply can take it before anything is booked.`,
   };
 }
 

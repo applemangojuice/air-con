@@ -201,7 +201,12 @@ export function ProposalDoc({ snap, ctx }: { snap: ProposalSnapshot; ctx: DocCon
       )}
       <DocSection title="Guarantees and warranty">
         <p>{p.warranty ?? "No manufacturer warranty is stated in this proposal."}</p>
-        {ctx.company.workmanshipGuarantee && <p>{ctx.company.workmanshipGuarantee}</p>}
+        {p.guarantees?.length ? (
+          // The lines frozen on this proposal (the workmanship guarantee's length included), never today's settings.
+          p.guarantees.filter((g) => !g.startsWith("Manufacturer's warranty:")).map((g, i) => <p key={i}>{g}</p>)
+        ) : (
+          ctx.company.workmanshipGuarantee && <p>{ctx.company.workmanshipGuarantee}</p>
+        )}
       </DocSection>
       {p.acceptance && <AcceptanceBlock a={p.acceptance} />}
     </>
@@ -686,7 +691,7 @@ export function CertificateDoc({ snap, ctx }: { snap: CertificateSnapshot; ctx: 
         />
         <p>
           {c.kind === "electrical-installation"
-            ? "Keep it with your home's paperwork: you may be asked for it if you sell the house. The Building Regulations compliance certificate comes to you directly from the electrician's registration scheme."
+            ? "Keep it with your home's paperwork: you may be asked for it if you sell the house. The Building Regulations compliance certificate for the circuit comes to you directly from the electrician's registration scheme; the heat pump's own Building Regulations certificate comes separately, from the scheme or council that covers the installation."
             : "Keep it with your home's paperwork: you'll need it for any warranty claim."}
         </p>
       </DocSection>
@@ -721,7 +726,8 @@ export function CertificateDoc({ snap, ctx }: { snap: CertificateSnapshot; ctx: 
 /* Handover pack                                                       */
 /* ------------------------------------------------------------------ */
 
-const ELECTRICAL_STATUS: Record<string, string> = { pending: "To come", received: "Received", "not-required": "Not needed" };
+// "not-required" is no longer recorded (a new circuit always needs its certificate); an older pack that holds it says so honestly.
+const ELECTRICAL_STATUS: Record<string, string> = { pending: "To come", received: "Received", "not-required": "Not recorded: ask us" };
 
 export function HandoverPackDoc({ snap, ctx }: { snap: HandoverPackSnapshot; ctx: DocContext }) {
   const cert = snap.documents.find((d) => d.kind === "commissioning-certificate");
@@ -756,15 +762,15 @@ export function HandoverPackDoc({ snap, ctx }: { snap: HandoverPackSnapshot; ctx
         <p>The completed F-gas label is fixed to your outdoor unit.</p>
       </DocSection>
 
-      <DocSection title="3. Electrical certificates">
+      <DocSection title="3. Certificates">
         <Facts
           rows={[
             ["Electrical installation certificate (BS 7671)", ELECTRICAL_STATUS[snap.electricalCert.status] ?? plain(snap.electricalCert.status)],
+            // Never "not needed" from the electrical status: the circuit's certificate and the heat pump's are separate.
+            ["Building Regulations certificate for the new circuit", `Sent to you by the electrician's registration scheme, due by ${fmtDate(snap.electricalCert.dueBy)}. Tell us if it hasn't arrived.`],
             [
-              "Building Regulations compliance certificate",
-              (liveElectrical ?? snap.electricalCert.status) === "not-required"
-                ? "Not needed"
-                : `Sent to you by the electrician's registration scheme, due by ${fmtDate(snap.electricalCert.dueBy)}. Tell us if it hasn't arrived.`,
+              "Building Regulations certificate for the heat pump",
+              `Sent to you by the scheme that covers the installation (or the council's completion certificate), due by ${fmtDate(snap.electricalCert.dueBy)}. Tell us if it hasn't arrived.`,
             ],
             ["Now", liveElectrical && liveElectrical !== snap.electricalCert.status ? `${ELECTRICAL_STATUS[liveElectrical] ?? plain(liveElectrical)} (updated since this pack was issued)` : ""],
           ]}
@@ -774,7 +780,7 @@ export function HandoverPackDoc({ snap, ctx }: { snap: HandoverPackSnapshot; ctx
             Open your electrical installation certificate
           </Link>
         )}
-        <p>The new circuit is notifiable work. The electrician&apos;s scheme sends the compliance certificate within 30 days of completion; we chase it and add it to your documents.</p>
+        <p>The new circuit and the heat pump itself are notifiable building work. Each compliance certificate is due within 30 days of completion; we chase them and add them to your documents.</p>
       </DocSection>
 
       <DocSection title="4. Running and maintaining it">
@@ -794,7 +800,12 @@ export function HandoverPackDoc({ snap, ctx }: { snap: HandoverPackSnapshot; ctx
             ["Manufacturer registration", (liveWarranty ?? snap.warranty.registered) ? "Registered for you" : snap.warranty.dueOn ? `We register it for you by ${fmtDate(snap.warranty.dueOn)}` : "We register it for you"],
           ]}
         />
-        {ctx.company.workmanshipGuarantee && <p>{ctx.company.workmanshipGuarantee}</p>}
+        {snap.guarantees ? (
+          // As agreed in their contract (frozen on the accepted proposal), never today's settings.
+          snap.guarantees.map((g, i) => <p key={i}>{g}</p>)
+        ) : (
+          ctx.company.workmanshipGuarantee && <p>{ctx.company.workmanshipGuarantee}</p>
+        )}
       </DocSection>
 
       {ctx.asBuilt && ctx.asBuilt.length > 0 && (

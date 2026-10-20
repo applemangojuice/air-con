@@ -779,6 +779,19 @@ export async function submitSurvey(projectId: string, input: unknown, expectedUp
     );
     if ("error" in result) return fail(result.status, result.error, result.blockers);
     latest = result.project;
+    // Suspected asbestos is stop-work whether or not the surveyor pressed the button: raise the blocking
+    // safety issue now (raising the same topic again returns the open one).
+    const m = draft.record.data;
+    const raise: [SurveyIssueTopic, string][] = [];
+    if (m.house.asbestosRisk === "possible" || m.house.asbestosRisk === "suspected") raise.push(["asbestos", `Survey: asbestos ${m.house.asbestosRisk}${m.house.asbestosNote ? `: ${m.house.asbestosNote}` : ""}.`]);
+    if (m.electrics.asbestosFlashGuard === "possible" || m.electrics.asbestosFlashGuard === "yes") raise.push(["flash-guard", `Survey: flash guard ${m.electrics.asbestosFlashGuard}${m.electrics.notes ? `: ${m.electrics.notes}` : ""}.`]);
+    for (const [topic, note] of raise) {
+      try {
+        await raiseSurveyIssue(projectId, topic, note, staff);
+      } catch (err) {
+        console.error(`[survey] couldn't raise the ${topic} issue on ${projectId}:`, err);
+      }
+    }
     // What the crew needs on the day, from the survey to the project.
     const site = draft.record.data.site;
     const contact: { accessNotes?: string; parkingNotes?: string } = {};

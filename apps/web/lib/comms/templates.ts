@@ -1676,7 +1676,7 @@ const TEMPLATES: { [E in CommsEventId]: Renderer<E> } = {
     body: [
       { p: ["Your system at ", place(ctx), " is due its yearly service around ", { strong: dateLong(d.dueOn) }, "."] },
       {
-        p: "Manufacturer warranties often require a yearly service by an F-gas certified engineer, and it keeps the system running efficiently. Your handover pack has the details for your model.",
+        p: "Manufacturer warranties often require a yearly service by an F-gas certified engineer, and it keeps the system running efficiently. Your handover pack has the warranty wording from your contract: check it, or ask us, for what your model's warranty needs.",
       },
       ...(ctx.marketingConsent ? [{ p: `We can do it for you: to book, ${reach(ctx.settings, { us: false })}.` } as Block] : []),
     ],

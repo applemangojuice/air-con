@@ -1598,6 +1598,9 @@ function designRules(x: RuleInput): RuleResult[] {
     if (e?.earthing === "TT") {
       statuses.push("review");
       notes.push("TT earthing: check the earth electrode and RCD protection.");
+    } else if (e && (!e.earthing || e.earthing === "unknown")) {
+      statuses.push("review");
+      notes.push("Earthing arrangement not recorded: the electrician checks it before booking.");
     }
     if (e && (e.asbestosFlashGuard === "possible" || e.asbestosFlashGuard === "yes")) {
       statuses.push("review");
@@ -1614,11 +1617,15 @@ function designRules(x: RuleInput): RuleResult[] {
         statuses.push("review");
         notes.push(`${codeOf(o)}: ${s.electrical.breaker} is a rule of thumb (no manufacturer figure on record), confirm in the installation manual.`);
       } else {
-        notes.push(`${codeOf(o)}: ${s.electrical.breaker}, ${s.electrical.cableMm2} mm² cable, ${s.electrical.isolator}.`);
+        notes.push(`${codeOf(o)}: ${s.electrical.breaker} from the manufacturer, ${s.electrical.cableMm2} mm² cable as a starting point, ${s.electrical.isolator}.`);
       }
     }
-    notes.push("A new circuit is Part P notifiable: a registered electrician signs the certificate.");
-    add("electrics", "Electrical supply", worst(statuses), notes.join(" "));
+    // What this check can't see: never let a pass read as "the supply can take it" or "the cable is sized".
+    notes.push(
+      "Not assessed here: the supply's capacity (main fuse, existing large loads, a looped service) and the network operator, the RCD type the manual needs, and the cable size for its route (how it's run, insulation, the outside section, length). The electrician confirms these before booking (checklist: supply capacity and the DNO, electrical scope).",
+    );
+    notes.push("A new circuit is Part P notifiable: a registered electrician designs, tests and certifies it.");
+    add("electrics", "Board and circuit plan", worst(statuses), notes.join(" "));
   }
 
   // 7. Planning: never "no planning needed".

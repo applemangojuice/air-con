@@ -953,6 +953,8 @@ export interface ReadinessContext {
    */
   agreedPayments?: Pick<PilotSettings["payments"], "depositPct" | "depositTiming" | "balanceDueDays">;
   compliance: { key: string; label: string; status: ComplianceStatus; statutory: boolean; gate: GateId }[];
+  /** The survey records a leaseholder or tenant: the owner's authority item holds day 1 until its written consent is in. */
+  authorityConsentNeeded?: boolean;
   crew: StaffMember[]; // full records of booking.crew
   kit?: { requiredLines: number; deliveredLines: number; inspectedLines: number; damaged: number };
   openIssues: { id: string; title: string; kind: string; severity: string; blocking: boolean; gate?: GateId }[];
@@ -1059,6 +1061,15 @@ export function blockersFor(project: Project, ctx: ReadinessContext, gate: GateI
       const idx = gateIndex(item.gate);
       const applies = inclusiveOfEarlier ? idx <= gateIndex(gate) : item.gate === gate;
       if (!applies || item.status === "approved" || item.status === "not-applicable") continue;
+      if (item.key === "ownership-authority" && ctx.authorityConsentNeeded) {
+        block(
+          "compliance:ownership-authority",
+          "The survey records a leaseholder or tenant: no drilling until the freeholder's or landlord's written consent is attached to the checklist.",
+          "ops",
+          "Get the written consent and attach it to the checklist",
+        );
+        continue;
+      }
       if (item.key === "planning-consent") {
         // One clear line: while the planning outcome is still open, its own item says so.
         const pdOpen = ctx.compliance.some((i) => i.key === "planning-pd") && !settled("planning-pd");
@@ -1963,7 +1974,7 @@ export type ProjectAction =
   | { type: "install-completed" }
   // handover
   | { type: "commissioning-signed"; by: string }
-  | { type: "handover-pack-published"; documentId: string }
+  | { type: "handover-pack-published"; documentId: string; warrantyDueOn?: string }
   | { type: "handover-signed"; name: string; outcome: "all-good" | "snags"; snagCount: number }
   /** "received" needs the certificate document (the file is in the customer's documents before we say so). */
   | { type: "electrical-cert-updated"; status: Project["handover"]["electricalCert"]; documentId?: string }
@@ -2859,6 +2870,10 @@ export function applyProjectAction(project: Project, action: ProjectAction, now:
       if (!action.documentId) return err("Which document?");
       const republish = Boolean(p.handover.packDocumentId);
       p.handover.packDocumentId = action.documentId;
+      // The registration date the pack gives is the one date everywhere (the portal, the office, the alerts).
+      if (!p.handover.warrantyRegistered && !p.handover.warrantyDueOn && action.warrantyDueOn && /^\d{4}-\d{2}-\d{2}$/.test(action.warrantyDueOn)) {
+        p.handover.warrantyDueOn = action.warrantyDueOn;
+      }
       log(
         "handover-pack-published",
         republish ? "Your handover pack has been updated." : "Your handover pack is ready in your documents.",
@@ -2880,7 +2895,7 @@ export function applyProjectAction(project: Project, action: ProjectAction, now:
       p.handover.status = "handed-over";
       p.handover.handedOverAt = now;
       p.handover.signoff = { at: now, name, outcome: action.outcome, snagCount: action.snagCount };
-      if (!p.handover.warrantyRegistered) p.handover.warrantyDueOn = addDays(today, WARRANTY_REGISTRATION_DAYS);
+      if (!p.handover.warrantyRegistered && !p.handover.warrantyDueOn) p.handover.warrantyDueOn = addDays(today, WARRANTY_REGISTRATION_DAYS);
       p.aftercare.serviceDueOn = addMonths(today, SERVICE_INTERVAL_MONTHS);
       log(
         "handover-signed",
@@ -2896,6 +2911,11 @@ export function applyProjectAction(project: Project, action: ProjectAction, now:
     case "electrical-cert-updated": {
       if (!["pending", "received", "not-required"].includes(action.status)) return err("Unknown certificate status.");
       if (p.handover.electricalCert === action.status) return err(`The certificate is already marked ${action.status}.`);
+      // Every install here adds a new circuit (the design's, and the runsheet's electrical step): that's notifiable
+      // work with a BS 7671 certificate, so "not required" would never be true, and the family would be told so.
+      if (action.status === "not-required") {
+        return err("Every install adds a new circuit, which needs a BS 7671 Electrical Installation Certificate (a minor works certificate doesn't cover a new circuit): it can't be marked not required.");
+      }
       // Never tell the customer it's in their documents unless it is.
       if (action.status === "received" && !action.documentId?.trim()) return err("Add the certificate itself (its file and number) to mark it received.");
       p.handover.electricalCert = action.status;

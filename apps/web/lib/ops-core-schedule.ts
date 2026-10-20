@@ -42,6 +42,7 @@ export type DailyJobId =
   | "seasonal-check"
   | "service-reminder"
   | "paperwork-overdue"
+  | "warranty-due"
   | "proposal-late"
   | "survey-unassigned";
 
@@ -57,6 +58,7 @@ export const DAILY_JOB_IDS: DailyJobId[] = [
   "seasonal-check",
   "service-reminder",
   "paperwork-overdue",
+  "warranty-due",
   "proposal-late",
   "survey-unassigned",
 ];
@@ -73,12 +75,13 @@ export const DAILY_JOB_LABEL: Record<DailyJobId, string> = {
   "seasonal-check": "Change-of-season checks",
   "service-reminder": "Service reminders",
   "paperwork-overdue": "Overdue certificates (team alerts)",
+  "warranty-due": "Warranty registrations coming due (team alerts)",
   "proposal-late": "Proposals past the date we gave (team alerts)",
   "survey-unassigned": "Surveys with no surveyor, the working day before (team alerts)",
 };
 
 type NotifyJob = Exclude<DailyJobId, "proposal-expired">;
-type NotifyEvent = Exclude<NotifyJob, "paperwork-overdue" | "proposal-late" | "survey-unassigned"> | "team-alert";
+type NotifyEvent = Exclude<NotifyJob, "paperwork-overdue" | "warranty-due" | "proposal-late" | "survey-unassigned"> | "team-alert";
 
 export type DailyJob =
   | {
@@ -93,6 +96,8 @@ export type DailyJob =
     }
   | { kind: "dispatch"; job: "proposal-expired"; projectId: string; action: ProjectAction };
 
+/** The first warranty registration alert, this many days before the date we gave. */
+export const WARRANTY_ALERT_DAYS_BEFORE = 14;
 /** Days a reminder is sent ahead of its appointment. */
 export const SURVEY_REMINDER_DAYS_BEFORE = 1;
 export const INSTALL_PREP_DAYS_BEFORE = 3;
@@ -266,6 +271,30 @@ export function dailyJobsFor(project: Project, todayIso: string, settings: Pilot
           urgent: true,
         },
         discriminator: `paperwork-overdue:${due}:${late}`,
+      });
+    }
+  }
+  // The manufacturer warranty registration: the date is ours to keep (an extended warranty can be lost
+  // after it), so the team hears 14 and 7 days ahead, on the day, then weekly while it's late.
+  if (p.handover.status !== "pending" && !p.handover.warrantyRegistered && p.handover.warrantyDueOn) {
+    const due = dateOf(p.handover.warrantyDueOn);
+    const left = daysBetween(today, due);
+    const late = -left;
+    if (left === WARRANTY_ALERT_DAYS_BEFORE || left === 7 || left === 0 || (late > 0 && late % PAPERWORK_ALERT_EVERY_DAYS === 0)) {
+      jobs.push({
+        kind: "notify",
+        job: "warranty-due",
+        projectId: p.id,
+        event: "team-alert",
+        data: {
+          title: late > 0 ? `Overdue: the warranty registration for ${p.customer.name || "a customer"}` : `Warranty registration due ${left === 0 ? "today" : `in ${left} days`} for ${p.customer.name || "a customer"}`,
+          lines: [
+            `We told them we'd register the manufacturer's warranty by ${due}${late > 0 ? `, ${late} day${late === 1 ? "" : "s"} ago` : ""}.`,
+            "Register it with the manufacturer (check their own deadline, which counts from commissioning), then record it on the command centre's Handover box.",
+          ],
+          urgent: late > 0,
+        },
+        discriminator: `warranty-due:${due}:${left}`,
       });
     }
   }

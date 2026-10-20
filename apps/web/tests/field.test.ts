@@ -782,6 +782,18 @@ test("handover: the pack's warranty is the contract's wording, never the catalog
   assert.equal(field.packWarrantyText(null, { warranty: { workmanshipYears: null, manufacturerSummary: " DEMO summary " } }), "DEMO summary");
 });
 
+test("round 9: the pack's guarantees are the accepted proposal's frozen lines (with the workmanship guarantee's length), never today's settings", async () => {
+  const { DEFAULT_SETTINGS, mergeSettings } = await import("@aircon/domain");
+  const today = mergeSettings({ ...DEFAULT_SETTINGS, warranty: { workmanshipYears: 0, manufacturerSummary: "Changed since" }, company: { ...DEFAULT_SETTINGS.company, workmanshipGuarantee: "New wording (DEMO)" } });
+  const agreed = ["Manufacturer's warranty: DEMO parts", "Our workmanship guarantee: 2 years. Faults in our work put right free (DEMO).", "None of this affects your statutory rights (DEMO)."];
+  assert.deepEqual(field.packGuarantees({ guarantees: agreed }, today), agreed.slice(1), "the agreed lines, the manufacturer's stated on its own");
+  assert.ok(field.packGuarantees({ guarantees: agreed }, today).some((l) => /2 years/.test(l)), "the length is stated");
+  assert.ok(field.packGuarantees(null, today).some((l) => /don't offer a separate guarantee on our workmanship/.test(l)), "no proposal: today's settings, in the contract's words");
+  await seedHandover();
+  const draft = await field.handoverDraft(PROJECT, FGAS);
+  assert.ok(Array.isArray(draft.snapshot.guarantees) && draft.snapshot.guarantees.length > 0, "frozen into the pack");
+});
+
 test("handover: signing an already-signed handover answers with the sign-off on record, not an error", async () => {
   await seedHandover();
   await field.publishHandoverPack(PROJECT, INSTALLER, { requestId: "7c7c7c7c-2222-4222-8222-00000000f6e3" });

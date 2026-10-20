@@ -97,7 +97,7 @@ function faqsFor(s: PublicSettings): { q: string; a: string }[] {
     },
     {
       q: "Do I need my landlord's or freeholder's permission?",
-      a: "If you rent, yes: you'll need your landlord's written consent. If you own a leasehold flat, your lease usually needs the freeholder's consent for the outdoor unit. We flag this in your quote and can give you the technical details consent requests usually ask for.",
+      a: "If you rent, yes: you'll need your landlord's written consent. If you own a leasehold flat, your lease usually needs the freeholder's consent for the outdoor unit. Your surveyor asks who owns the home, and nothing is drilled until we have that written permission on file. We can give you the technical details consent requests usually ask for.",
     },
     {
       q: "Which areas do you cover?",

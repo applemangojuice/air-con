@@ -157,6 +157,8 @@ export interface HubPack {
   electricalCert: { status: "pending" | "received" | "not-required"; dueBy: string };
   maintenanceInfo: { dueBy: string; provided: boolean };
   warranty: { text: string | null; registered: boolean; dueOn?: string };
+  /** The heat pump's own Building Regulations certificate (the checklist item): given to them, not needed on building control's word, or to come. */
+  heatPumpCertificate?: "done" | "na" | "pending";
 }
 
 /** What the hub asks of its controller (the API for real projects, the reducer for the demo). */

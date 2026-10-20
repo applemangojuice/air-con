@@ -1,6 +1,7 @@
 import {
   COMPLIANCE_TEMPLATE,
   addComplianceEvidence,
+  asbestosSuspectedAtSurvey,
   companyFgasCertProblem,
   complianceTemplateFor,
   createIssue,
@@ -13,6 +14,7 @@ import {
   type ComplianceStatus,
   type Issue,
   type ListingFacts,
+  type MeasuredSurvey,
   type PlanningOutcome,
   type Project,
   type StaffMember,
@@ -32,13 +34,22 @@ import { getSettings } from "./settings-server";
  * (listedOnRecord reads them with the checklist's designations answer).
  */
 export async function listingFacts(projectId: string): Promise<ListingFacts> {
+  return (await surveyFacts(projectId)).listing;
+}
+
+/** What the survey says that a review needs: the listing facts, the tenure and whether asbestos is suspected. */
+async function surveyFacts(projectId: string): Promise<{ listing: ListingFacts; tenure?: MeasuredSurvey["site"]["tenure"]; asbestosSuspected: boolean }> {
   const [survey, design] = await Promise.all([
     surveysRepo.currentForProject(projectId).catch(() => null),
     designsRepo.latestForProject(projectId).catch(() => null),
   ]);
   return {
-    ...(survey?.data?.permissions?.pd ? { pd: survey.data.permissions.pd } : {}),
-    ...(design?.site?.planning?.intel?.listedBuilding ? { intelListed: true } : {}),
+    listing: {
+      ...(survey?.data?.permissions?.pd ? { pd: survey.data.permissions.pd } : {}),
+      ...(design?.site?.planning?.intel?.listedBuilding ? { intelListed: true } : {}),
+    },
+    ...(survey?.data?.site?.tenure ? { tenure: survey.data.site.tenure } : {}),
+    asbestosSuspected: asbestosSuspectedAtSurvey(survey?.data),
   };
 }
 
@@ -48,11 +59,13 @@ export async function listingFacts(projectId: string): Promise<ListingFacts> {
  * subcontractor's is attached), and whether a listed building is on record.
  */
 async function reviewContext(project: Project) {
-  const [settings, listing, items] = await Promise.all([getSettings(), listingFacts(project.id), complianceRepo.listForProject(project.id)]);
+  const [settings, facts, items] = await Promise.all([getSettings(), surveyFacts(project.id), complianceRepo.listForProject(project.id)]);
   return {
     companyFgasProblem: companyFgasCertProblem(settings.company.fgasCompanyCert, project, londonToday()),
-    listing,
-    listed: listedOnRecord(items, listing),
+    listing: facts.listing,
+    listed: listedOnRecord(items, facts.listing),
+    ...(facts.tenure ? { tenure: facts.tenure } : {}),
+    asbestosSuspected: facts.asbestosSuspected,
   };
 }
 

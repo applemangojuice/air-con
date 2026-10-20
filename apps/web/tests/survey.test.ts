@@ -391,3 +391,54 @@ test("the surveyor's list shows booked and in-progress surveys they can work on"
   const theirs = await survey.listSurveysFor(sub);
   assert.equal(theirs.some((s) => s.projectId === projectId), false, "a subcontractor sees only surveys assigned to them");
 });
+
+test("round 9: suspected asbestos at submit raises the stop-work issue by itself; a leaseholder's consent holds day 1", async () => {
+  const projectId = await newProject();
+  const started = await survey.startSurvey(projectId, surveyor);
+  assert.ok(started.ok);
+  if (!started.ok) return;
+  const photos = {
+    room: await addPhoto(projectId, "indoor-wall", started.draft.record.data.rooms[0]!.id),
+    outdoor: await addPhoto(projectId, "outdoor-location"),
+    board: await addPhoto(projectId, "fuse-board"),
+  };
+  const base = finish(started.draft.record.data, photos);
+  // The review's repro: suspected, with a note, and the surveyor never pressed "raise an issue".
+  const m: MeasuredSurvey = {
+    ...base,
+    site: { ...base.site, tenure: "leaseholder" },
+    house: { ...base.house, asbestosRisk: "suspected", asbestosNote: "Artex ceiling on the pipe route (DEMO)" },
+    electrics: { ...base.electrics, asbestosFlashGuard: "possible" },
+  };
+  const saved = await survey.saveDraft(projectId, m, started.draft.updatedAt, surveyor);
+  assert.ok(saved.ok && saved.completeness.pct === 100, "complete, as before");
+  if (!saved.ok) return;
+  const submitted = await survey.submitSurvey(projectId, saved.record.data, saved.updatedAt, surveyor);
+  assert.ok(submitted.ok, !submitted.ok ? submitted.error : "");
+  const open = await survey.openSurveyIssues(projectId);
+  assert.ok(open.asbestos, "the asbestos stop-work issue");
+  assert.ok(open["flash-guard"], "and the flash guard's");
+  const issuesRepo = await import("../lib/repo/issues.ts");
+  const issue = (await issuesRepo.listForProject(projectId)).find((i) => i.id === open.asbestos!.id)!;
+  assert.equal(issue.blocking, true);
+  assert.match(issue.detail ?? "", /Artex ceiling on the pipe route/);
+
+  // The day-1 gate: the leaseholder's consent is a block with its reason, not a warning.
+  const { buildReadinessContext } = await import("../lib/project-service.ts");
+  const { blockersFor } = await import("@aircon/domain");
+  const project = (await loadProject(projectId))!;
+  const ctx = await buildReadinessContext(project);
+  assert.equal(ctx.authorityConsentNeeded, true);
+  const own = blockersFor(project, ctx, "ready-to-install").find((b) => b.code === "compliance:ownership-authority");
+  assert.equal(own?.severity, "block");
+  // And the checklist won't approve it on a note.
+  const complianceRepo = await import("../lib/repo/compliance.ts");
+  const { reviewItem } = await import("../lib/compliance-server.ts");
+  const admin: StaffMember = { ...surveyor, id: "de300000-0000-4000-8000-0000000000a9", name: "DEMO Ada", roles: ["admin"] };
+  const item = (await complianceRepo.getByKey(projectId, "ownership-authority"))!;
+  const refused = await reviewItem(projectId, item.id, { to: "approved", note: "They say the freeholder agreed (DEMO)" }, admin);
+  assert.ok(!refused.ok && /written consent/.test(refused.error));
+  const asb = (await complianceRepo.getByKey(projectId, "asbestos"))!;
+  const noResult = await reviewItem(projectId, asb.id, { to: "approved", note: "Looked at the drilling spots (DEMO)" }, admin);
+  assert.ok(!noResult.ok && /test result/.test(noResult.error));
+});

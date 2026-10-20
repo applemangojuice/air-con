@@ -4,6 +4,7 @@ import {
   COMPLIANCE_GATE_GROUPS,
   COMPLIANCE_TEMPLATE,
   addComplianceEvidence,
+  asbestosSuspectedAtSurvey,
   companyFgasCertProblem,
   complianceProgress,
   complianceTemplateFor,
@@ -58,6 +59,7 @@ const CONTRACT_KEYS = [
   "asbestos",
   "concealed-services",
   "electrical-scope",
+  "supply-and-dno",
   "heat-pump-building-regs",
   "fgas-company",
   "fgas-engineer",
@@ -526,4 +528,45 @@ test("the design's planning and noise flags: planning constraints, unit count, s
   // The planning constraints rule (a listed building, a conservation area, a "no" PD answer) asks for the customer note too.
   assert.deepEqual(flags.map((r) => r.id), ["unit-count", "noise", "planning"]);
   assert.deepEqual(planningNoiseFlags(undefined), []);
+});
+
+test("round 9: a leaseholder's or tenant's authority needs the written consent attached, and holds day 1 until then", () => {
+  const own = item("ownership-authority", { status: "under-review" });
+  const noted = reviewCompliance(own, "approved", ADMIN, "Leaseholder says the freeholder is fine with it", undefined, NOW, { tenure: "leaseholder" });
+  assert.ok(!noted.ok && /attach the freeholder's or managing agent's written consent/.test(noted.error));
+  const overridden = reviewCompliance(own, "approved", ADMIN, undefined, "Will chase it", NOW, { tenure: "tenant" });
+  assert.ok(!overridden.ok && /landlord's written consent/.test(overridden.error), "an override can't stand in for it");
+  assert.ok(reviewCompliance({ ...own, mediaIds: ["licence-pdf"] }, "approved", ADMIN, "Licence for alterations from the freeholder, 2 Nov 2026 (DEMO)", undefined, NOW, { tenure: "leaseholder" }).ok);
+  assert.ok(reviewCompliance(own, "approved", ADMIN, "Owner-occupier, on the title register (DEMO)", undefined, NOW, { tenure: "owner" }).ok, "an owner: a note as before");
+
+  const items = allSettledBut(["ownership-authority"]);
+  const ctx = { ...gateCtx(items), authorityConsentNeeded: true };
+  const b = blockersFor(project(), ctx, "ready-to-install").find((x) => x.code === "compliance:ownership-authority");
+  assert.equal(b?.severity, "block");
+  assert.match(b?.message ?? "", /no drilling until the freeholder's or landlord's written consent is attached/);
+  assert.equal(blockersFor(project(), gateCtx(items), "ready-to-install").find((x) => x.code === "compliance:ownership-authority")?.severity, "warn", "an owner: flagged as before");
+});
+
+test("round 9: suspected asbestos at the survey: the check approves only on the test result (or the avoiding route) and a note", () => {
+  const asb = item("asbestos", { status: "under-review" });
+  const note = reviewCompliance(asb, "approved", TECH, "Looked at the drilling spots", undefined, NOW, { asbestosSuspected: true });
+  assert.ok(!note.ok && /attach the test result or asbestos survey/.test(note.error), "the review's repro");
+  assert.equal(reviewCompliance({ ...asb, mediaIds: ["lab-report"] }, "approved", TECH, undefined, undefined, NOW, { asbestosSuspected: true }).ok, false);
+  assert.ok(reviewCompliance({ ...asb, mediaIds: ["lab-report"] }, "approved", TECH, "Sample DEMO-123: no asbestos detected (DEMO)", undefined, NOW, { asbestosSuspected: true }).ok);
+  assert.ok(reviewCompliance(asb, "approved", TECH, "Post-2000 build, nothing suspected", undefined, NOW, {}).ok, "nothing suspected: as before");
+  assert.equal(asbestosSuspectedAtSurvey({ house: { asbestosRisk: "suspected" }, electrics: { asbestosFlashGuard: "no" } }), true);
+  assert.equal(asbestosSuspectedAtSurvey({ house: { asbestosRisk: "none-suspected" }, electrics: { asbestosFlashGuard: "possible" } }), true);
+  assert.equal(asbestosSuspectedAtSurvey({ house: { asbestosRisk: "not-assessed" }, electrics: { asbestosFlashGuard: "n/a" } }), false);
+});
+
+test("round 9: supply capacity and the DNO is on the checklist before booking, and needs the electrician's written outcome", () => {
+  const t = complianceTemplateFor("supply-and-dno")!;
+  assert.equal(t.gate, "booking");
+  assert.equal(t.ownerRole, "electrician");
+  assert.equal(t.allowNa, false);
+  assert.match(t.guidance, /cut-out \(main fuse\) rating[\s\S]*looped[\s\S]*maximum demand[\s\S]*28 days/);
+  const i = item("supply-and-dno", { mediaIds: ["cutout-photo"] });
+  assert.equal(reviewCompliance(i, "approved", TECH, undefined, undefined, NOW).ok, false, "a photo alone isn't the outcome");
+  assert.equal(reviewCompliance(i, "not-applicable", TECH, "Small unit", undefined, NOW).ok, false);
+  assert.ok(reviewCompliance(i, "approved", TECH, "60 A cut-out, not looped, max demand 38 A after diversity; connect and notify, UKPN ref DEMO-1 (DEMO)", undefined, NOW).ok);
 });

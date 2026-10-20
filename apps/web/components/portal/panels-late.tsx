@@ -406,6 +406,19 @@ export function HandoverPanel({ data, state, goTo }: PanelProps) {
                   : undefined
             }
           />
+          {data.pack && (
+            <PaperRow
+              label="Building Regulations certificate for the heat pump"
+              status={data.pack.heatPumpCertificate ?? "pending"}
+              detail={
+                data.pack.heatPumpCertificate === "done"
+                  ? "Sent to you"
+                  : data.pack.heatPumpCertificate === "na"
+                    ? "Not needed, on building control's written word"
+                    : `From the scheme or council that covers the installation${due ? `, due by ${fmtDate(due.electricalCertDueBy)}` : ""}`
+              }
+            />
+          )}
           <PaperRow
             label="How to run and maintain it"
             status={data.pack?.maintenanceInfo.provided ? "done" : "pending"}
@@ -713,14 +726,19 @@ export function AftercarePanel({ data, state }: PanelProps) {
           <div className="rounded-2xl border border-line bg-white p-4">
             <p className="text-sm text-ink-500">First service due</p>
             <p className="mt-0.5 font-semibold text-ink-900">{p.aftercare.serviceDueOn ? `Around ${fmtDate(p.aftercare.serviceDueOn)}` : "We'll let you know"}</p>
-            <p className="mt-1 text-sm text-ink-500">We&apos;ll remind you a few weeks before.</p>
+            <p className="mt-1 text-sm text-ink-500">
+              {p.aftercare.followUpsOptedOutAt ? "You've turned our follow-ups off, so we won't remind you: book it yourself around that date." : "We'll remind you a few weeks before."}
+            </p>
           </div>
           <div className="rounded-2xl border border-line bg-white p-4">
             <p className="text-sm text-ink-500">Manufacturer warranty</p>
             <p className="mt-0.5 font-semibold text-ink-900">
               {p.handover.warrantyRegistered ? "Registered" : p.handover.warrantyDueOn ? `We register it by ${fmtDate(p.handover.warrantyDueOn)}` : "We register it for you"}
             </p>
-            {data.warranty.manufacturerSummary && <p className="mt-1 text-sm text-ink-500">{data.warranty.manufacturerSummary}</p>}
+            {/* The wording frozen into their handover pack (from the contract), never today's settings once there's a pack. */}
+            {(data.pack ? data.pack.warranty.text : data.warranty.manufacturerSummary) && (
+              <p className="mt-1 text-sm text-ink-500">{data.pack ? data.pack.warranty.text : data.warranty.manufacturerSummary}</p>
+            )}
           </div>
         </div>
       )}

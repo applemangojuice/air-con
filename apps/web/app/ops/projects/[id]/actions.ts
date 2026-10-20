@@ -229,7 +229,7 @@ export async function earlyStartEvidenceAction(projectId: string, fd: FormData):
 
 export async function electricalCertAction(projectId: string, fd: FormData): Promise<ActionResult> {
   const status = field(fd, "status");
-  if (status !== "pending" && status !== "received" && status !== "not-required") return refused("Pick a status.");
+  if (status !== "pending" && status !== "received") return refused("Pick a status: a new circuit always needs its certificate.");
   if (status === "received") return certificateAction(projectId, "electrical-installation", fd);
   return run(projectId, { type: "electrical-cert-updated", status }, `Certificate marked ${status.replace("-", " ")}.`);
 }

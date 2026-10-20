@@ -12,12 +12,14 @@ import {
   can,
   cancellationStatus,
   complianceProgress,
+  asbestosSuspectedAtSurvey,
   complianceTemplateFor,
   meetsRequirement,
   planningNoiseFlags,
   type ComplianceItem,
   type DesignRecord,
   type ComplianceStatus,
+  type MeasuredSurvey,
   type Project,
   type StaffMember,
 } from "@aircon/domain";
@@ -77,7 +79,8 @@ export default async function CompliancePage({ params }: { params: Promise<{ id:
   const contributor = reviewer || can(staff, "projects.edit") || can(staff, "install.work");
   const today = londonToday();
 
-  const context = (item: ComplianceItem) => contextFor(item, { project: p, survey: survey?.data.permissions.pd, crew, settingsCert: settings.company.fgasCompanyCert, today, design, items });
+  const context = (item: ComplianceItem) =>
+    contextFor(item, { project: p, survey: survey?.data.permissions.pd, measured: survey?.data, crew, settingsCert: settings.company.fgasCompanyCert, today, design, items });
   const missingKeys = COMPLIANCE_TEMPLATE.filter((t) => !items.some((i) => i.key === t.key));
 
   return (
@@ -160,6 +163,8 @@ function contextFor(
     design?: DesignRecord | null;
     /** The whole checklist: the planning consent item reads the planning outcome and the listing answer. */
     items: ComplianceItem[];
+    /** The survey itself: tenure for the owner's authority, the asbestos answers for the asbestos check. */
+    measured?: MeasuredSurvey;
   },
 ): ContextRow[] {
   const p = facts.project;
@@ -198,6 +203,32 @@ function contextFor(
     }
     case "noise-assessment":
       return designChecks(facts.design, ["noise"]);
+    case "ownership-authority": {
+      const site = facts.measured?.site;
+      if (!site) return [{ label: "Survey", value: "Not recorded yet", tone: "warn" }];
+      const consent = site.tenure === "leaseholder" || site.tenure === "tenant";
+      return [
+        { label: "Tenure (survey)", value: site.tenure, tone: consent || site.tenure === "unknown" ? "warn" : "success", ...(consent ? { detail: "The written consent must be attached to approve this, and install day 1 waits for it." } : {}) },
+        { label: "Decision maker", value: site.decisionMaker?.trim() || "Not recorded", tone: site.decisionMaker?.trim() ? undefined : "warn" },
+        { label: "Authority to go ahead (survey tick)", value: site.ownerConfirmed ? "Confirmed" : "Not confirmed", tone: site.ownerConfirmed ? "success" : "warn" },
+      ];
+    }
+    case "asbestos": {
+      const m = facts.measured;
+      if (!m) return [{ label: "Survey", value: "Not recorded yet", tone: "warn" }];
+      const suspected = asbestosSuspectedAtSurvey(m);
+      return [
+        { label: "Built", value: m.house.era, tone: m.house.era === "2000+" ? "success" : "warn" },
+        {
+          label: "Survey: asbestos",
+          value: m.house.asbestosRisk,
+          tone: m.house.asbestosRisk === "none-suspected" ? "success" : m.house.asbestosRisk === "suspected" ? "danger" : "warn",
+          ...(m.house.asbestosNote ? { detail: m.house.asbestosNote } : {}),
+        },
+        { label: "Survey: fuse board flash guard", value: m.electrics.asbestosFlashGuard, tone: m.electrics.asbestosFlashGuard === "yes" ? "danger" : m.electrics.asbestosFlashGuard === "possible" ? "warn" : "success" },
+        ...(suspected ? [{ label: "To approve", value: "Test result or route change attached", tone: "warn" as const, detail: "The survey suspects asbestos: attach the test result or asbestos survey (or the route that avoids it) and say how it's cleared." }] : []),
+      ];
+    }
     case "fgas-company":
       return [
         facts.settingsCert?.number

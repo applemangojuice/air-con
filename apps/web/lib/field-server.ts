@@ -1,6 +1,7 @@
 import {
   isWrapUpDay,
   INSTALL_TEMPLATE_VERSION,
+  guaranteeLines,
   ISSUE_KIND_LABEL,
   LINK_PLACEHOLDER,
   LEARNING_PROMPTS,
@@ -1740,6 +1741,17 @@ export function packWarrantyText(accepted: Pick<ProposalRecord, "warranty"> | nu
   return settings.warranty.manufacturerSummary?.trim() || null;
 }
 
+/**
+ * The guarantee lines the pack states: the accepted proposal's, frozen when
+ * it was issued (so the workmanship guarantee's length and conditions are
+ * the ones agreed), else today's settings (no accepted proposal). The
+ * manufacturer's line is left out: the pack states that wording on its own.
+ */
+export function packGuarantees(accepted: Pick<ProposalRecord, "guarantees"> | null, settings: PilotSettings): string[] {
+  const lines = accepted?.guarantees?.length ? accepted.guarantees : guaranteeLines(settings);
+  return lines.filter((l) => !l.startsWith("Manufacturer's warranty:"));
+}
+
 /** How many as-built photos the pack carries (finished first, then progress). */
 export const AS_BUILT_MAX = 12;
 
@@ -1795,6 +1807,7 @@ export async function handoverDraft(projectId: string, staff: StaffMember, opts:
     commissioning: job?.commissioning ?? { signedBy: { staffId: "", name: "", qualificationRef: "" }, at: "", results: job ? commissioningFromJob(job) : [] },
     documents: links,
     warranty: { text: warrantyText, registered: project.handover.warrantyRegistered, ...(project.handover.warrantyRegistered ? {} : { dueOn }) },
+    guarantees: packGuarantees(accepted, settings),
     electricalCert: { status: project.handover.electricalCert, dueBy: deadlines.electricalCertDueBy },
     // Provided once the walkthrough (which includes handing over the manufacturer's manuals) is done,
     // never just because a pack exists.
@@ -1830,7 +1843,8 @@ export async function publishHandoverPack(projectId: string, staff: StaffMember,
     let project = await projectForStaff(projectId, staff);
     // Made but never recorded on the project (that try stopped part-way): record it now, once.
     if (finish && doc.status === "final" && project.handover.packDocumentId !== doc.id) {
-      project = throwDispatch(await dispatch(projectId, { type: "handover-pack-published", documentId: doc.id }, staff));
+      const due = (doc.snapshot as Partial<HandoverPackSnapshot> | undefined)?.warranty?.dueOn;
+      project = throwDispatch(await dispatch(projectId, { type: "handover-pack-published", documentId: doc.id, ...(due ? { warrantyDueOn: due } : {}) }, staff));
     }
     return { project, document: { id: doc.id, ref: doc.ref }, email: await messageStatus("handover-ready", projectId, doc.id, "email"), replayed: true };
   };
@@ -1848,7 +1862,8 @@ export async function publishHandoverPack(projectId: string, staff: StaffMember,
     if (raced) return raced;
     throw err;
   }
-  const project = throwDispatch(await dispatch(projectId, { type: "handover-pack-published", documentId: doc.id }, staff));
+  const due = draft.snapshot.warranty.dueOn;
+  const project = throwDispatch(await dispatch(projectId, { type: "handover-pack-published", documentId: doc.id, ...(due ? { warrantyDueOn: due } : {}) }, staff));
   const email = await messageStatus("handover-ready", projectId, doc.id, "email");
   return { project, document: { id: doc.id, ref: doc.ref }, email, replayed: false };
 }

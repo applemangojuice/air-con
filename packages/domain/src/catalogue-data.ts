@@ -6217,7 +6217,7 @@ export const RESEARCHED_CATALOGUE: CatalogueItem[] = [
     "status": "available",
     "confidence": "provisional",
     "sources": [],
-    "notes": "Spec: 16 A, B-curve, 30 mA, Type A RCD, 6 kA; must match the customer's consumer-unit make/range. Suppliers to check: Screwfix, Toolstation, CEF, City Electrical Factors, Edmundson Electrical, TLC Direct. NOT PRICED: materials.json observed 0 prices (no supplier access in the research run). costPence is null on purpose; fill from a trade quote or supplier page. When filling, store ex VAT (inc-VAT price / 1.2) and set source. Not observed in this run (no supplier access; see accessAttempts). priceGbp left null on purpose. Rating basis: Panasonic CU-Z25/Z35CKE recommended breaker 16 A (panasonic.json, source https://www.aircon.panasonic.eu/GB_en/model/kit-z35-cke-cs-z35ckew-cu-z35cke/). Price varies a lot by CU brand (Hager, Schneider, Wylex, MK, BG, Crabtree, Contactum); record brand.",
+    "notes": "Spec: 16 A, B-curve, 30 mA, 6 kA; RCD type (Type A, F or B) NOT confirmed: Type A was a research placeholder, the electrician picks it from the outdoor unit's manual (BS 7671 531.3.3); must match the customer's consumer-unit make/range. Suppliers to check: Screwfix, Toolstation, CEF, City Electrical Factors, Edmundson Electrical, TLC Direct. NOT PRICED: materials.json observed 0 prices (no supplier access in the research run). costPence is null on purpose; fill from a trade quote or supplier page. When filling, store ex VAT (inc-VAT price / 1.2) and set source. Not observed in this run (no supplier access; see accessAttempts). priceGbp left null on purpose. Rating basis: Panasonic CU-Z25/Z35CKE recommended breaker 16 A (panasonic.json, source https://www.aircon.panasonic.eu/GB_en/model/kit-z35-cke-cs-z35ckew-cu-z35cke/). Price varies a lot by CU brand (Hager, Schneider, Wylex, MK, BG, Crabtree, Contactum); record brand.",
     "active": true
   },
   {
@@ -6230,7 +6230,7 @@ export const RESEARCHED_CATALOGUE: CatalogueItem[] = [
     "status": "available",
     "confidence": "provisional",
     "sources": [],
-    "notes": "Spec: 20 A, B-curve, 30 mA, Type A RCD, 6 kA; match CU make/range. Suppliers to check: Screwfix, Toolstation, CEF, City Electrical Factors, Edmundson Electrical, TLC Direct. NOT PRICED: materials.json observed 0 prices (no supplier access in the research run). costPence is null on purpose; fill from a trade quote or supplier page. When filling, store ex VAT (inc-VAT price / 1.2) and set source. Not observed in this run (no supplier access; see accessAttempts). priceGbp left null on purpose. Rating basis: Panasonic CU-3Z68CBE recommended breaker 20 A (panasonic.json, source https://www.aircon.panasonic.eu/GB_en/model/cu-3z68cbe/).",
+    "notes": "Spec: 20 A, B-curve, 30 mA, 6 kA; RCD type (Type A, F or B) NOT confirmed: Type A was a research placeholder, the electrician picks it from the outdoor unit's manual (BS 7671 531.3.3); match CU make/range. Suppliers to check: Screwfix, Toolstation, CEF, City Electrical Factors, Edmundson Electrical, TLC Direct. NOT PRICED: materials.json observed 0 prices (no supplier access in the research run). costPence is null on purpose; fill from a trade quote or supplier page. When filling, store ex VAT (inc-VAT price / 1.2) and set source. Not observed in this run (no supplier access; see accessAttempts). priceGbp left null on purpose. Rating basis: Panasonic CU-3Z68CBE recommended breaker 20 A (panasonic.json, source https://www.aircon.panasonic.eu/GB_en/model/cu-3z68cbe/).",
     "active": true
   },
   {

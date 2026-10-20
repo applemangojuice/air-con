@@ -668,3 +668,16 @@ test("a listed building on the design's planning check: the proposal can't issue
   assert.match(caNote, /planning position \(listed building, conservation area, Article 4 and the permitted development checks\) still has to be confirmed/);
   assert.match(caNote, /may be needed/);
 });
+
+test("round 9: the fuse board assumption follows the survey, never 'has room' for a full board, an older box or a possible flash guard", async () => {
+  const { boardAssumption, BOARD_ROOM_ASSUMPTION } = await import("./proposal.ts");
+  const d = (e: Record<string, unknown> | undefined, systems = 1) =>
+    ({ site: e ? { electrics: e } : undefined, variants: [{ systems: Array.from({ length: systems }, () => ({})) }] }) as unknown as Pick<DesignRecord, "site" | "variants">;
+  assert.equal(boardAssumption(d({ boardType: "modern-rcbo", spareWays: 2, asbestosFlashGuard: "no" })), BOARD_ROOM_ASSUMPTION);
+  assert.match(BOARD_ROOM_ASSUMPTION, /electrician confirms your supply can take it/);
+  assert.match(boardAssumption(d({ boardType: "older-fuse-box", asbestosFlashGuard: "no" })), /older fuse box[\s\S]*listed and priced in your proposal, or priced in writing/);
+  assert.match(boardAssumption(d({ boardType: "modern-rcd", spareWays: 1, asbestosFlashGuard: "no" }, 2)), /no spare way recorded/);
+  assert.match(boardAssumption(d({ boardType: "modern-rcd", spareWays: 4, asbestosFlashGuard: "possible" })), /asbestos flash guard/);
+  assert.match(boardAssumption(d(undefined)), /couldn't confirm your fuse board's type/);
+  for (const e of [{ boardType: "older-fuse-box" }, { boardType: "modern-rcd", spareWays: 0 }]) assert.doesNotMatch(boardAssumption(d(e)), /has room/);
+});

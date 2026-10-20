@@ -1389,6 +1389,10 @@ test("handover: pack after commissioning, signature after the pack and the walkt
   assert.match(snags.events.at(-1)!.label, /2 snags to fix/);
   assert.equal(snags.handover.warrantyDueOn, "2026-12-19");
   assert.equal(snags.aftercare.serviceDueOn, "2027-11-19");
+  // Round 9: the pack's registration date (what the family was told) is the one date: sign-off keeps it.
+  const dated = step(walk("commissioning-signed"), { type: "handover-pack-published", documentId: "doc-hp-2", warrantyDueOn: "2027-01-18" }, T.handover, { actor: TECH_LEAD });
+  assert.equal(dated.handover.warrantyDueOn, "2027-01-18");
+  assert.equal(step(dated, sign, T.handover).handover.warrantyDueOn, "2027-01-18", "never replaced by sign-off + 30");
   refuses(snags, sign, T.handover, {}, /already signed/);
 });
 
@@ -1426,8 +1430,9 @@ test("closed gate: money, electrical certificate, warranty, serious issues", () 
   assert.match(blockersFor(ready, small, "closed")[0]!.message, /stays open after the project closes/);
   assert.ok(applyProjectAction(ready, { type: "project-closed" }, T.close, small).ok, "closing still goes ahead");
   assert.deepEqual(blockersFor(ready, small, "ready-to-install"), [], "and it doesn't show on the earlier gates");
-  const notRequired = step(walk("handover-signed"), { type: "electrical-cert-updated", status: "not-required" }, T.after, { actor: ADMIN });
-  assert.ok(!codes(blockersFor(notRequired, c({}), "closed")).includes("electrical-cert-pending"));
+  // Round 9: a new circuit always needs its certificate, so "not required" is refused (it lifted the alert and told the family "Not needed").
+  refuses(walk("handover-signed"), { type: "electrical-cert-updated", status: "not-required" }, T.after, { actor: ADMIN }, /can't be marked not required/);
+  assert.ok(codes(blockersFor(walk("handover-signed"), c({}), "closed")).includes("electrical-cert-pending"));
 });
 
 test("project-closed needs the closed gate, unless it's a cancellation", () => {

@@ -18,10 +18,8 @@ const LABEL = "mb-1 block text-xs font-semibold text-ink-700";
 
 export function ElectricalCertificateForms({ action, projectId, current }: { action: Action; projectId: string; current: string }) {
   const id = useId();
-  const others = [
-    { value: "pending", label: "Pending" },
-    { value: "not-required", label: "Not required" },
-  ].filter((o) => o.value !== current);
+  // No "not required": every install adds a new circuit, which always needs its certificate.
+  const others = [{ value: "pending", label: "Pending" }].filter((o) => o.value !== current);
   return (
     <div className="space-y-2">
       {current !== "received" && (
@@ -47,16 +45,18 @@ export function ElectricalCertificateForms({ action, projectId, current }: { act
           </ActionForm>
         </Disclosure>
       )}
-      <ActionForm action={action}>
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-semibold text-ink-700">Mark as</span>
-          {others.map((o) => (
-            <SubmitButton key={o.value} name="status" value={o.value} variant="secondary" busyLabel="…">
-              {o.label}
-            </SubmitButton>
-          ))}
-        </div>
-      </ActionForm>
+      {others.length > 0 && (
+        <ActionForm action={action}>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-semibold text-ink-700">Mark as</span>
+            {others.map((o) => (
+              <SubmitButton key={o.value} name="status" value={o.value} variant="secondary" busyLabel="…">
+                {o.label}
+              </SubmitButton>
+            ))}
+          </div>
+        </ActionForm>
+      )}
     </div>
   );
 }

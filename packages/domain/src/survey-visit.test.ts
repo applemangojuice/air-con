@@ -494,7 +494,9 @@ test("electricsConditionFound and electricsFinding: plain, honest statuses", () 
   const m = complete();
   assert.equal(electricsFinding(m)!.status, "validated");
   assert.match(electricsFinding(m)!.summary, /2 spare ways/);
-  assert.equal(electricsFinding({ ...m, electrics: { ...m.electrics, spareWays: 1 } })!.summary.includes("1 spare way,"), true);
+  assert.equal(electricsFinding({ ...m, electrics: { ...m.electrics, spareWays: 1 } })!.summary.includes("1 spare way for the new circuit"), true);
+  assert.doesNotMatch(electricsFinding(m)!.summary, /straightforward/, "spare ways alone don't say the supply can take it");
+  assert.match(electricsFinding(m)!.summary, /electrician confirms your supply can take it/);
   assert.equal(electricsFinding({ ...m, electrics: { ...m.electrics, spareWays: 0 } })!.status, "attention");
   assert.equal(electricsFinding({ ...m, electrics: { ...m.electrics, spareWays: undefined } })!.status, "provisional");
   assert.equal(electricsFinding({ ...m, electrics: { ...m.electrics, boardType: "older-fuse-box" } })!.status, "attention");
