@@ -10,6 +10,7 @@ import {
 } from "@aircon/domain";
 import { selectAllPages } from "./repo/base";
 import { getServiceClient } from "./supabase-server";
+import { demoModeAllowed } from "./auth/demo-guard";
 
 /**
  * Server-side access to the Property Intelligence Engine. The JSONB `intel`
@@ -89,13 +90,14 @@ export async function seedSampleBook(): Promise<{ inserted: number; error?: stri
 }
 
 export async function loadIntel(id: string): Promise<PropertyIntel | null> {
-  // "/a/demo" and friends: a rich sample property that always exists.
+  // "/a/demo" and friends: a rich sample property, only where demo mode is allowed (never on a live site).
   if (id === "demo") {
+    if (!(await demoModeAllowed())) return null;
     const sample = demoDataset();
     return sample.find((p) => p.audit && p.planning.loftConversion) ?? sample[0] ?? null;
   }
   const supabase = getServiceClient();
-  if (!supabase) return demoDataset().find((p) => p.id === id) ?? null;
+  if (!supabase) return (await demoModeAllowed()) ? (demoDataset().find((p) => p.id === id) ?? null) : null;
   const { data } = await supabase.from("properties").select("intel").eq("id", id).single();
   return (data?.intel as PropertyIntel) ?? null;
 }
@@ -287,6 +289,11 @@ const DEMO_STREETS: { name: string; outcode: "SW16" | "SW17"; kind: "victorian" 
 let demoCache: PropertyIntel[] | null = null;
 
 /** ~240 believable SW16/SW17 properties. Deterministic: same every time. */
+/** One of the made-up sample homes (the demo dataset, also what "Seed sample book" loads): shown labelled DEMO. */
+export function isSampleIntel(intel: Pick<PropertyIntel, "id">): boolean {
+  return demoDataset().some((p) => p.id === intel.id);
+}
+
 export function demoDataset(): PropertyIntel[] {
   if (demoCache) return demoCache;
   const rand = mulberry32(161717);

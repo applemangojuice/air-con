@@ -28,6 +28,7 @@ import {
 } from "./design-record.ts";
 import { emptyConstraints, emptyMarketing, emptyPlanning, type PropertyIntel } from "./intelligence.ts";
 import { runsheetFromDesign } from "./install.ts";
+import { premiumIsQuieter } from "./proposal.ts";
 import type { MeasuredRoom, MeasuredSurvey, OutdoorPosition } from "./survey-visit.ts";
 import type { Survey } from "./types.ts";
 
@@ -629,4 +630,20 @@ test("R32 room size: an unmeasured room on a big system, and a multi-split with 
   const single = pana(TERRACE.slice(3));
   assert.equal(rule(single, "standard", "refrigerant-room").status, "pass");
   assert.match(rule(single, "standard", "refrigerant-room").detail, /not over 1\.84 kg, so no minimum room size applies/);
+});
+
+test("the Quiet option may say 'quieter' only when every room's unit is quieter than Standard's", () => {
+  const one = (maker: string) =>
+    draftDesign({ projectId: "p1", id: "d1", version: 1, measured: survey([room("r1", "Bedroom", { lengthM: 3.5, widthM: 3 })]), baseSurvey: BASE, catalogue: RESEARCHED_CATALOGUE, compatibility: RESEARCHED_COMPATIBILITY, intel: INTEL, now: NOW, manufacturer: maker });
+  const units = (d: DesignRecord) => d.variants.map((v) => [v.tier, v.roomUnits[0]!.indoorItemId, RESEARCHED_CATALOGUE.find((i) => i.id === v.roomUnits[0]!.indoorItemId)?.specs?.soundPressureLowDb]);
+  // Mitsubishi at 2.5 kW: Standard MSZ-AY25VGK (18 dB) is quieter than Quiet MSZ-LN25VG2W (19 dB).
+  const mitsubishi = one("Mitsubishi Electric");
+  const quiet = mitsubishi.variants.find((v) => v.tier === "premium")!;
+  assert.deepEqual(units(mitsubishi), [["standard", "mitsubishi-electric-msz-ay25vgk", 18], ["premium", "mitsubishi-electric-msz-ln25vg2w", 19]]);
+  assert.equal(premiumIsQuieter({ design: mitsubishi, catalogue: RESEARCHED_CATALOGUE }, quiet), false);
+  // Panasonic: the premium unit is quieter, so the copy may say so.
+  const panasonic = one("Panasonic");
+  const [std, prem] = units(panasonic).map((u) => u[2] as number);
+  assert.ok(prem! < std!, JSON.stringify(units(panasonic)));
+  assert.equal(premiumIsQuieter({ design: panasonic, catalogue: RESEARCHED_CATALOGUE }, panasonic.variants.find((v) => v.tier === "premium")!), true);
 });

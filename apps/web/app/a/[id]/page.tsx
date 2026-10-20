@@ -10,7 +10,7 @@ import {
 import { Logo } from "@/components/site/logo";
 import { gbp } from "@/lib/format";
 import { indicativeQuoteFromIntel } from "@/lib/intel-quote";
-import { loadIntel } from "@/lib/intel-server";
+import { loadIntel, isSampleIntel } from "@/lib/intel-server";
 
 export const metadata: Metadata = {
   title: "Air conditioning for your home",
@@ -45,6 +45,8 @@ export default async function AddressPage({ params }: { params: Promise<{ id: st
   if (!/^[a-z0-9-]{1,80}$/i.test(id)) notFound();
   const intel = await loadIntel(id);
   if (!intel) notFound();
+  // The demo sample (and a sample book loaded into a demo database): made-up facts, labelled DEMO.
+  const sample = isSampleIntel(intel);
 
   const cls = classifyProperty(intel);
   const prefill = prefillFromIntel(intel);
@@ -80,18 +82,23 @@ export default async function AddressPage({ params }: { params: Promise<{ id: st
         <p className="text-sm font-semibold text-accent-700">
           {intel.address.line1}, {intel.address.postcode}
         </p>
+        {sample && (
+          <p role="note" className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">
+            DEMO: a sample page. This address and these facts are made up for the demo, not public records.
+          </p>
+        )}
         <h1 className="mt-2 text-3xl font-display sm:text-4xl">
-          Air conditioning, already designed for your home
+          Air conditioning for your home: an estimate from public records
         </h1>
         <p className="mt-3 text-ink-500">
-          We install street by street in {intel.address.outcode}, and we&apos;ve done our homework
-          on homes like yours before knocking. Here&apos;s what we know already. Thorough, not
-          creepy: it&apos;s all public records, explained at the bottom.
+          We install in {intel.address.outcode}. Here&apos;s what public records say about your home, and what
+          we&apos;d expect to fit. It&apos;s an estimate: a home survey and our engineer&apos;s design come next,
+          and the price is only fixed then. Where every fact comes from is explained at the bottom.
         </p>
 
         {/* What we know */}
         <section className="mt-8 rounded-3xl border border-line bg-white p-6">
-          <h2 className="font-bold">Your home, from public records</h2>
+          <h2 className="font-bold">{sample ? "Sample facts (DEMO)" : "Your home, from public records"}</h2>
           <ul className="mt-3 space-y-2">
             {knownFacts.map((fact) => (
               <li key={fact} className="flex gap-2.5 text-sm text-ink-700">
@@ -102,8 +109,8 @@ export default async function AddressPage({ params }: { params: Promise<{ id: st
           </ul>
           {cls.archetypeName && (
             <p className="mt-4 rounded-2xl bg-surface/60 px-4 py-3 text-sm text-ink-700">
-              Homes like yours match our <strong>{cls.archetypeName}</strong> install pattern. We
-              fit it week in, week out, so the design work is already done.
+              Homes like yours match our <strong>{cls.archetypeName}</strong> pattern: a starting point for
+              the estimate. Our engineer designs your system after the survey.
             </p>
           )}
           {cls.planningRisk === "check" && (

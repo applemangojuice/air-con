@@ -209,3 +209,17 @@ test("the saved quote never asks for details it has no way to add: gaps read as 
   assert.deepEqual(gapsAsSurveyChecks(["Something new the engine says"]), [], "an unknown gap isn't shown as an instruction");
   for (const band of Object.values(claims.BAND_COPY)) assert.doesNotMatch(band.body, /\bAdd them\b|photos would firm/i, band.body);
 });
+
+test("property pages and the mailing letter make no track-record or 'already designed' claims", async () => {
+  const { readFileSync } = await import("node:fs");
+  for (const file of ["../app/a/[id]/page.tsx", "../app/ops/collateral/letter/page.tsx"]) {
+    const src = readFileSync(new URL(file, import.meta.url), "utf8").replace(/&apos;/g, "'");
+    for (const banned of [/already designed/i, /week in,? week out/i, /three doors down/i, /before knocking/i, /design work is already done/i, /enough to design the system/i]) {
+      assert.doesNotMatch(src, banned, `${file}: ${banned}`);
+    }
+    assert.match(src, /estimate/i, `${file} says it's an estimate`);
+  }
+  // The /a sample says DEMO and never passes made-up facts off as public records.
+  const page = readFileSync(new URL("../app/a/[id]/page.tsx", import.meta.url), "utf8");
+  assert.match(page, /DEMO: a sample page\. This address and these facts are made up for the demo, not public records\./);
+});

@@ -11,6 +11,7 @@ import {
 } from "@/lib/intel-server";
 import { requireStaff } from "@/lib/auth/server";
 import { getServiceClient } from "@/lib/supabase-server";
+import { demoModeAllowed } from "@/lib/auth/demo-guard";
 
 /**
  * Server actions are reachable by id from any route, not just /ops, so each
@@ -89,6 +90,11 @@ export async function recomputeAction(): Promise<void> {
  */
 export async function seedSampleBookAction(): Promise<void> {
   await requireStaff(["projects.edit", "projects.view-all"]);
+  // ~240 made-up homes on real street names: never into a live property book (their pages and the mailing CSV would show them as public records).
+  if (!(await demoModeAllowed())) {
+    console.error("seed sample book refused: not a demo deployment");
+    return;
+  }
   const { inserted, error } = await seedSampleBook();
   if (error) console.error("seed sample book failed:", error);
   else console.info(`seeded ${inserted} sample properties`);

@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   buildDefaultConfig,
-  generateQuote,
   type KitchenLivingLayout,
   type Survey,
 } from "@aircon/domain";
@@ -203,21 +202,21 @@ export function QuoteWizard({
     if (normalised.draftId) {
       // Returning visitor: still counts as entering the funnel, and the sync
       // carries any corrected email.
-      track("quote_start", { postcode: normalised.survey.postcode, resumed: true });
+      track("quote_start", { resumed: true });
       syncServerDraft(normalised);
       setStep(1);
       return;
     }
     if (!normalised.contact.email) {
       // No email given (price before details): local draft only.
-      track("quote_start", { postcode: normalised.survey.postcode, draftSaved: false });
+      track("quote_start", { draftSaved: false });
       setStep(1);
       return;
     }
     setBusy(true);
     const id = await saveServerDraft(normalised);
     setBusy(false);
-    track("quote_start", { postcode: normalised.survey.postcode, draftSaved: Boolean(id) });
+    track("quote_start", { draftSaved: Boolean(id) });
     if (id) setDraft((d) => ({ ...d, draftId: id }));
     setStep(1);
   }
@@ -265,14 +264,8 @@ export function QuoteWizard({
     setBusy(true);
     setSaveError(null);
     const result = await submitQuote(draft, { marketing: consent.marketing });
-    const quote = generateQuote(draft.survey);
-    track("quote_submit", {
-      status: result.status,
-      totalGbp: quote.totalGbp,
-      rooms: draft.survey.rooms.length,
-      postcode: draft.survey.postcode,
-      marketing: consent.marketing,
-    });
+    // How far they got, never what they typed or what it cost (the privacy notice's analytics list).
+    track("quote_submit", { status: result.status, rooms: draft.survey.rooms.length });
     if (result.status === "saved") {
       // The quote now lives at its permanent link, which survives a refresh.
       finished.current = true;
@@ -294,7 +287,7 @@ export function QuoteWizard({
       setStep(0);
       return;
     }
-    track("quote_save_failed", { postcode: draft.survey.postcode });
+    track("quote_save_failed", {});
     setSaveError(
       result.message ??
         `We couldn't save your quote just now. Your answers are kept on this device, so check your signal and try again. If it keeps happening, email ${settings.company.email}.`,

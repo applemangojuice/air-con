@@ -68,3 +68,15 @@ test("the browser's Global Privacy Control signal counts as off", () => {
   assert.equal(beacons.length, before);
   (globalThis.navigator as unknown as { globalPrivacyControl?: boolean }).globalPrivacyControl = false;
 });
+
+test("analytics keep how far a visitor got, never the postcode they typed or the quote's price", async () => {
+  const { analyticsMeta } = await import("../lib/analytics-meta.ts");
+  assert.deepEqual(analyticsMeta({ status: "saved", rooms: 3, postcode: "SW16 2BE", totalGbp: 6123, marketing: true }), { status: "saved", rooms: 3 });
+  assert.equal(analyticsMeta({ postcode: "SW16 2BE" }), null);
+  assert.equal(analyticsMeta(undefined), null);
+  assert.deepEqual(analyticsMeta({ step: "house", to: "rooms" }), { step: "house", to: "rooms" });
+  // The quote form itself no longer sends them.
+  const { readFileSync } = await import("node:fs");
+  const wizard = readFileSync(new URL("../components/quote/wizard.tsx", import.meta.url), "utf8");
+  for (const call of wizard.match(/track\("[^"]+",\s*\{[^}]*\}/g) ?? []) assert.doesNotMatch(call, /postcode|totalGbp|marketing/, call);
+});

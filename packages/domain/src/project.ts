@@ -694,8 +694,8 @@ export const DEFAULT_PREP_ITEMS: Omit<PrepItem, "done">[] = [
   },
   {
     id: "parking",
-    label: "Sort parking for one van",
-    detail: "As close as you can get us. A permit or a coned space if you're in a controlled zone.",
+    label: "Tell us about parking for one van",
+    detail: "Where we can park as close as possible, and whether you're in a controlled parking zone. If we need a permit or a suspended bay, we arrange it, and the cost is ours unless your proposal lists it.",
     confirmable: true,
   },
   {

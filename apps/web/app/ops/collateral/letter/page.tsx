@@ -114,18 +114,17 @@ export default async function LetterPage({
         </p>
 
         <h1 className="mt-8 text-2xl font-display leading-snug">
-          We&apos;ve already designed the air conditioning for {m.addressLine}.
+          Air conditioning for {m.addressLine}: an estimate from public records.
         </h1>
 
         <div className="mt-6 space-y-4 text-[15px] leading-relaxed text-ink-900">
           <p>
-            We&apos;re {BRAND.name}, and we install proper air conditioning in {m.area} — cooling
-            in summer, efficient heating in winter — street by street, so every install benefits
-            from the last one three doors down.
+            We&apos;re {BRAND.name}, and we install air conditioning in {m.area}: cooling in summer,
+            efficient heating in winter. We&apos;re surveying and installing our first homes now.
           </p>
           <p>
-            Before writing to you, we did our homework from public records (all of it explained,
-            and correctable, at the link below). About your home, we already know:
+            Before writing to you, we looked at public records about your home (all of it explained,
+            and correctable, at the link below). They say:
           </p>
           <ul className="ml-5 list-disc space-y-1.5">
             {m.facts.map((f) => (
@@ -133,19 +132,20 @@ export default async function LetterPage({
             ))}
           </ul>
           <p>
-            That was enough to design the system and price it. For a home like yours, whole-home
+            From that we&apos;ve estimated a system and a price. For a home like yours, whole-home
             comfort installed is typically <strong>{m.price}</strong>. It&apos;s an estimate from
-            public records: it comes down if you want fewer rooms, and a home survey confirms it.
+            public records: it comes down if you want fewer rooms, and our engineer designs your
+            system and fixes the price only after a home survey.
           </p>
           <p>
-            Your home&apos;s page — what we know, what we&apos;d fit, and your price — is saved
-            here:
+            Your home&apos;s page (what the records say, what we&apos;d expect to fit, and the
+            estimate) is here:
           </p>
           <p className="rounded-xl bg-surface px-4 py-3 text-center font-semibold">{m.link}</p>
           <p>
-            Two minutes there checks the details and gives you your price. If you go ahead, a
-            surveyor visits once, at a time you pick, to confirm it. No salesperson, no pushy
-            phone calls.
+            Two minutes there checks the details and gives you an instant price. If you go ahead, a
+            surveyor visits once, at a time you pick, and our engineer designs the system from
+            what they find. No salesperson, no pushy phone calls.
           </p>
         </div>
 

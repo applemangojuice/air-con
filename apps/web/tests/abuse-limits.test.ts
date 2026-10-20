@@ -228,7 +228,7 @@ test("/api/track stores one small event: a 4 MB blob, nested or numerous facts a
   assert.equal(await count(), before + 1);
   const { data } = await requireDb().from("analytics_events").select("meta, user_agent").eq("type", "quote_submit");
   const row = (data ?? []).at(-1) as { meta: Record<string, unknown>; user_agent: string };
-  assert.deepEqual(row.meta, { status: "saved", totalGbp: 3450, rooms: 2, postcode: "SW16 2HB", marketing: false }, "what track() really sends still goes through");
+  assert.deepEqual(row.meta, { status: "saved", rooms: 2 }, "how far they got goes through; the postcode, the price and the consent never do (the privacy notice's list)");
   assert.equal(row.user_agent.length, 300);
 });
 

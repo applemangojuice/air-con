@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { CatalogueItem } from "./catalogue.ts";
+import { RESEARCHED_CATALOGUE } from "./catalogue-data.ts";
 import type { DesignRecord, DesignVariant } from "./design-record.ts";
 import {
   DEFAULT_EXCLUSIONS,
@@ -598,7 +599,7 @@ test("price lines: whole pounds for every system but the last, which takes the r
 });
 
 test("unitHighlights: spec facts the blurb already makes aren't repeated", () => {
-  const specs = { soundPressureLowDb: 19, heatingKw: 3.2, wifi: true } as unknown as CatalogueItem["specs"];
+  const specs = { soundPressureLowDb: 19, heatingKw: 3.2, wifi: "Built-in Wi-Fi (DEMO app)" } as unknown as CatalogueItem["specs"];
   assert.deepEqual(unitHighlights({ customerBlurb: "As quiet as 19 dB(A) on its lowest setting, with Wi-Fi app control built in.", specs }), [
     "As quiet as 19 dB(A) on its lowest setting, with Wi-Fi app control built in.",
     "Heats in winter as well as cooling in summer",
@@ -606,6 +607,17 @@ test("unitHighlights: spec facts the blurb already makes aren't repeated", () =>
   assert.deepEqual(unitHighlights({ customerBlurb: "", specs }), ["19 dB on its quietest setting", "Heats in winter as well as cooling in summer", "App control"]);
   assert.deepEqual(unitHighlights({ customerBlurb: "Heats and cools a big room.", specs: { wifi: false } as unknown as CatalogueItem["specs"] }), ["Heats and cools a big room."]);
   assert.deepEqual(unitHighlights(undefined), []);
+  // "App control" only when the spec says it's built in: never on "not built in", "optional" or a disagreement.
+  for (const wifi of ["Not built in on MSZ-HR..VF; optional MELCloud Wi-Fi interface", "No, optional adapter", "Onecta app Wi-Fi. UK retailers disagree: Wi-Fi optional on some", "Yes"]) {
+    assert.ok(!unitHighlights({ customerBlurb: "", specs: { wifi } as unknown as CatalogueItem["specs"] }).includes("App control"), wifi);
+  }
+  for (const wifi of ["Built-in Wi-Fi - Panasonic Comfort Cloud app", "Wi-Fi control as standard via Onecta app", "Built in (DEMO app)"]) {
+    assert.ok(unitHighlights({ customerBlurb: "", specs: { wifi } as unknown as CatalogueItem["specs"] }).includes("App control"), wifi);
+  }
+  // The researched seed: no unit whose Wi-Fi text says otherwise gets "App control".
+  for (const item of RESEARCHED_CATALOGUE.filter((i) => i.kind === "indoor")) {
+    if (/not built in|optional|disagree/i.test(String(item.specs?.wifi ?? ""))) assert.ok(!unitHighlights(item).includes("App control"), item.id);
+  }
 });
 
 test("contractTaxCode: the accepted option's own code; else settings as they must be charged", () => {

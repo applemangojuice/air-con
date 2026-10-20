@@ -1666,7 +1666,9 @@ function designRules(x: RuleInput): RuleResult[] {
         "Catalogue data",
         "review",
         [
-          unsure.length ? `${plural(unsure.length, "item")} provisional or stale (${unsure.map(codeOf).join(", ")}): fine to design with, labelled for the customer; spot-check the datasheet before ordering.` : "",
+          unsure.length
+            ? `${plural(unsure.length, "item")} provisional or stale (${unsure.map(codeOf).join(", ")}): fine to design with, but the proposal shows their figures (quietest dB, app control) as the catalogue has them, so check those against the datasheet before it goes out, and again before ordering.`
+            : "",
           uncertain.length ? `Availability uncertain: ${uncertain.map(codeOf).join(", ")}.` : "",
         ]
           .filter(Boolean)

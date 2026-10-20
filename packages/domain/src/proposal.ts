@@ -502,6 +502,18 @@ export function withPipeNotes(options: ProposalOption[], design: Pick<DesignReco
 }
 
 /**
+ * Wi-Fi app control is built in only when the spec says so plainly
+ * ("Built-in Wi-Fi…", "Built in…", "Wi-Fi control as standard"), and never
+ * when it says not, no, optional or that sources disagree. Any other text
+ * (an adapter, "check the datasheet") is no claim at all.
+ */
+export function wifiBuiltIn(wifi: string | null | undefined): boolean {
+  const t = typeof wifi === "string" ? wifi.trim() : "";
+  if (!t || /\bnot\b|\bno\b|optional|disagree/i.test(t)) return false;
+  return /^(built[- ]?in|wi-?fi (app )?control as standard|integrated wi-?fi)/i.test(t);
+}
+
+/**
  * The unit's points for its room card: the catalogue blurb, then the facts
  * from its specs that the blurb doesn't already make (a card that says
  * "As quiet as 19 dB(A)… with Wi-Fi app control" doesn't then say "19 dB on
@@ -515,7 +527,7 @@ export function unitHighlights(item: Pick<CatalogueItem, "customerBlurb" | "spec
   const db = item.specs?.soundPressureLowDb;
   if (typeof db === "number" && !/\bdB\b/i.test(blurb)) out.push(`${trimNum(db)} dB on its quietest setting`);
   if (typeof item.specs?.heatingKw === "number" && !/\bheat/i.test(blurb)) out.push("Heats in winter as well as cooling in summer");
-  if (item.specs?.wifi && !/\b(app|wi-?fi)\b/i.test(blurb)) out.push("App control");
+  if (wifiBuiltIn(item.specs?.wifi) && !/\b(app|wi-?fi)\b/i.test(blurb)) out.push("App control");
   return out;
 }
 
@@ -589,10 +601,36 @@ const OPTION_COPY: Record<"standard" | "premium", { summary: string; highlight: 
     highlight: "Heats and cools every room in the design",
   },
   premium: {
-    summary: "Our quietest units, for bedrooms and anyone who sleeps lightly, with the same heating and cooling.",
-    highlight: "Our quietest indoor units",
+    summary: "Quieter units than the Standard option in every room, for bedrooms and anyone who sleeps lightly, with the same heating and cooling.",
+    highlight: "Quieter indoor units in every room",
   },
 };
+
+/** The Quiet option's copy when its units aren't quieter in every room: the facts, never "quieter". */
+const PREMIUM_NEUTRAL = {
+  label: "Premium",
+  summary: "A different range of indoor units, with the same heating and cooling. Compare each room's figures below.",
+};
+
+/**
+ * Is every room's unit in this (Quiet) variant quieter on its lowest
+ * setting than the unit the Standard variant gives the same room? Only then
+ * may its copy say "quieter": a figure missing on either side is a no.
+ */
+export function premiumIsQuieter(ctx: Pick<OptionContext, "design" | "catalogue">, variant: DesignVariant): boolean {
+  const standard = ctx.design.variants.find((v) => v.tier === "standard" && v.id !== variant.id);
+  if (!standard) return false;
+  const byId = new Map(ctx.catalogue.map((i) => [i.id, i]));
+  const low = (v: DesignVariant, roomId: string) => byId.get(v.roomUnits.find((u) => u.roomId === roomId)?.indoorItemId ?? "")?.specs?.soundPressureLowDb;
+  return (
+    variant.roomUnits.length > 0 &&
+    variant.roomUnits.every((u) => {
+      const q = low(variant, u.roomId);
+      const s = low(standard, u.roomId);
+      return typeof q === "number" && typeof s === "number" && q < s;
+    })
+  );
+}
 
 /** The pricing inputs an option starts with: the engine price (cost-plus for install-only, which the engine can't price). */
 export function defaultPricingInputs(ctx: OptionContext): PricingInputs {
@@ -634,6 +672,7 @@ export function recomputeOption(ctx: OptionContext, option: ProposalOption): Pro
 
 /** A fresh option for a design variant, priced with the default inputs where it can be (never throws PricingError). */
 export function defaultOptionFor(ctx: OptionContext, variant: DesignVariant): ProposalOption {
+  const neutral = variant.tier === "premium" && !premiumIsQuieter(ctx, variant);
   const copy = OPTION_COPY[variant.tier];
   const cards = roomCardsFor(ctx, variant);
   const quietest = cards
@@ -642,17 +681,17 @@ export function defaultOptionFor(ctx: OptionContext, variant: DesignVariant): Pr
     .filter((v): v is string => Boolean(v))
     .map(Number);
   const highlights = [
-    variant.tier === "premium" && quietest.length ? `As quiet as ${trimNum(Math.min(...quietest))} dB on the lowest setting` : copy.highlight,
+    ...(neutral ? [] : [variant.tier === "premium" && quietest.length ? `As quiet as ${trimNum(Math.min(...quietest))} dB on the lowest setting` : copy.highlight]),
     `${variant.installDays || ctx.settings.scheduling.installBlockDays}-day installation`,
     "Designed on your own photos and signed off by our engineer",
   ];
   const outdoor = variant.systems.flatMap((s) => ctx.outdoorMediaBySystem?.[s.id] ?? []);
   const option: ProposalOption = {
     id: `${variant.id}-option`,
-    label: variant.label,
+    label: neutral ? PREMIUM_NEUTRAL.label : variant.label,
     tier: variant.tier,
     designVariantId: variant.id,
-    summary: copy.summary,
+    summary: neutral ? PREMIUM_NEUTRAL.summary : copy.summary,
     highlights,
     roomCards: cards,
     outdoorMediaIds: [...new Set(outdoor)],

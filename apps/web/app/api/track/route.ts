@@ -5,6 +5,7 @@ import { readTextCapped } from "@/lib/http-body";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { sharedRateLimit } from "@/lib/rate-limit-shared";
 import { getServiceClient } from "@/lib/supabase-server";
+import { analyticsMeta } from "@/lib/analytics-meta";
 
 /**
  * Sink for first-party usage analytics. The browser beacons a single event
@@ -38,7 +39,7 @@ const eventSchema = z.object({
   utmCampaign: z.string().max(200).optional(),
   utmTerm: z.string().max(200).optional(),
   utmContent: z.string().max(200).optional(),
-  // What track() sends: a few flat facts (a step, a count, a postcode). Never a blob.
+  // What track() sends: a few flat facts (a step, a count). Never a blob, and never personal or price data (dropped below).
   meta: z
     .record(z.string().max(MAX_META_KEY), z.union([z.string().max(MAX_META_STRING), z.number().finite(), z.boolean(), z.null()]))
     .refine((m) => Object.keys(m).length <= MAX_META_KEYS, "too many facts")
@@ -109,7 +110,7 @@ export async function POST(request: Request) {
     city: geo.city,
     device: e.device ?? null,
     user_agent: h.get("user-agent")?.slice(0, MAX_USER_AGENT) || null,
-    meta: e.meta ?? null,
+    meta: analyticsMeta(e.meta),
   });
 
   if (error) {
