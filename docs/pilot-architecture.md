@@ -2210,3 +2210,54 @@ changelog and the reasons, so nobody "fixes" a deliberate choice back.
       their refresh (`useLandedRefresh`): one not landed after 12 s holds
       the form's button and offers the same (`BehindNote`), so a payment is
       never recorded twice against a page that still shows it owed.
+42. **Pre-launch review, round 5 (two findings and six smaller fixes,
+    before the first real customers).**
+    - *A change waiting for the customer is their next step*:
+      `customerNextAction(project, issues)` takes the project's
+      customer-visible issues; a variation that's proposed and still open
+      (`variationsAwaitingCustomer`, the same rule the Install panel's "A
+      change needs your answer" uses) comes first, before money and prep,
+      as **Answer a change to your installation** (or "the changes", for
+      several), linking to `#install`; never on a closed project. The hub
+      (`hubNextAction` in `components/portal/view.ts`, with the change and
+      its price as the detail, `variationNextDetail`), the panels' quiet
+      echoes and `/portal` (`customerHomes` loads the issues) all use it;
+      the button scrolls to `#changes-waiting`. An answer the page made
+      itself (`withDecisions`) takes it away at once.
+    - *No paper route, and nothing promises one*: the consent hint (portal
+      wording `docs-by-email/portal-2`; portal-1 records keep their text),
+      the terms, the field screens and help, the ops builder and the
+      `documents-consent-missing` gate say the pilot sends documents by
+      email only and that we get in touch if they'd rather not. The
+      survey-complete email asks for the agreement when it's missing
+      (`needsDocumentsConsent`). A late proposal held by the agreement says
+      so on the hub (`proposalLateLine`), not sorry, and the daily
+      `proposal-late` alert says what it's waiting for, not to send it.
+      Declined paper is closed as "withdrew before any contract".
+    - *Email has a timeout* (`sendEmailResult`, `EMAIL_TIMEOUT_MS` 10 s):
+      no answer is a failed send with the reason, retried by the outbox;
+      Resend's id is kept as `providerRef`.
+    - *Appointment messages expire* (`lib/comms/expiry.ts`): the outbox
+      stamps `expiresAt` on on-my-way (45 minutes, or the arrival time it
+      gives), survey reminders (the slot), install prep and day-before (day
+      1's London midnight), survey-booked (its end) and install-booked (the
+      last day's end); `staleReason` skips any send after it, and any of
+      them on a closed or cancelled project, with the reason. Readdressed
+      copies keep the original's expiry; older on-my-way rows fall back to
+      45 minutes from creation.
+    - *Signed photo URLs are stable within the hour* (`stableSigning`,
+      `signedMediaUrls`): one expiry per hour window plus the life asked
+      for, and a per-instance cache of what was handed out, so polls and
+      reloads return the same URL (Supabase puts the signing time in its
+      token, so only reuse keeps it the same; locally the expiry alone
+      does).
+    - *The end-of-day picker* (`components/field/day-photos.ts`) draws the
+      newest 24 photos (picked ones always), with **Show more**, as 320 x
+      240 lazy, async-decoded thumbnails, and reuses the URLs it had for 45
+      minutes when opened again; `dayPhotos` sorts newest taken first.
+    - *Annotation chip text by contrast* (`chipTextColour`): WCAG 2
+      contrast against white and dark ink, the higher wins; every
+      `ANNOTATION_STYLE` colour clears 4.5:1 (dark on the orange indoor
+      unit, cyan and green).
+    - *Runbooks*: admin guide §11 (restore from backup) and §12
+      (data-protection requests), linked from START-HERE §13.

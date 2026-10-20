@@ -430,7 +430,11 @@ Every message, with its timing, is in
 issued until the family agrees to receive contract documents by email. The
 surveyor asks at the survey (the **Documents by email** screen), or you
 record it on the project (Proposal box → **The customer agreed to get
-documents by email**, and how).
+documents by email**, and how). The pilot has no paper route: if a family
+would rather have paper, call them and talk it through; if they still want
+paper, tell them honestly and close the project (see
+[guides/admin.md](guides/admin.md) §3.2). Their page never promises paper
+copies.
 
 ## 12. The day before the first survey or install
 
@@ -516,6 +520,17 @@ every email carries a fresh link.
 Closing a project can't be undone on screen: only **Close the project** once
 it's paid, the warranty is registered, the electrical certificate is in and
 no serious defect is open.
+
+**Data lost or broken, and it can't be fixed on screen?** Restoring a
+backup puts the whole database back to that day, losing everything since:
+follow [guides/admin.md §11 Restore from backup](guides/admin.md#11-restore-from-backup)
+step by step, and ask your developer first.
+
+**A family asks what we hold, to correct it, or to delete it** (a
+data-protection request): reply within a month, following
+[guides/admin.md §12](guides/admin.md#12-data-protection-requests-access-correction-deletion).
+Never delete a project row in Supabase to "remove" someone: it deletes its
+invoices and payments with it. Take legal advice first.
 
 ---
 

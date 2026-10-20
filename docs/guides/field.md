@@ -237,7 +237,8 @@ price change, £ before VAT** → **Send to the office**.
 2. Check the summary of what's done and what's next. It's written for the
    family.
 3. Pick 2 to 4 photos of finished work. Only the ones you pick are shown to
-   them (never photos from an issue).
+   them (never photos from an issue). The newest 24 show first, to spare
+   your data; **Show more photos** brings in older ones.
 4. **Preview the update**, then **End day 1 and send**. Nothing to tell
    them today? **End day 1 (no customer update)**.
 5. Two minutes of questions: what took longer, what was missing, what tool

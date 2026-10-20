@@ -61,6 +61,7 @@ export function rowToMessage(row: Row): StoredMessage {
     error: m.error,
     attempts: typeof m.attempts === "number" ? m.attempts : 0,
     scheduledFor: str(row.scheduled_for) ?? m.scheduledFor,
+    expiresAt: str(m.expiresAt),
     sentAt: str(row.sent_at) ?? m.sentAt,
     createdAt: str(row.created_at) ?? m.createdAt ?? "",
     updatedAt: str(row.updated_at) ?? str(row.created_at) ?? "",

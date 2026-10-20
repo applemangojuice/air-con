@@ -798,3 +798,48 @@ test("starting the day that's already under way answers with it, not 'already st
   assert.equal(state.currentDay, 1);
   assert.equal(state.version, before.version, "nothing recorded twice");
 });
+
+test("the end-of-day picker draws the newest 24 photos, keeps picked ones, and reuses its URLs when opened again", async () => {
+  const { PICKER_PAGE, URL_REUSE_MS, pickerShown, reuseUrls } = await import("../components/field/day-photos.ts");
+  assert.equal(PICKER_PAGE, 24);
+  // A long day: 40 work photos in two steps, 10 check photos; every one a 2048 px original.
+  const at = (i: number) => new Date(Date.UTC(2026, 10, 10, 8, i)).toISOString();
+  const photo = (i: number) => ({ id: `p${i}`, url: `/files/p${i}.jpg?sig=a`, takenAt: at(i) });
+  const groups = [
+    { key: "pipes", photos: Array.from({ length: 25 }, (_, i) => photo(i)) },
+    { key: "units", photos: Array.from({ length: 15 }, (_, i) => photo(25 + i)) },
+    { key: "checks", photos: Array.from({ length: 10 }, (_, i) => photo(40 + i)) },
+  ];
+  const first = pickerShown(groups, PICKER_PAGE, []);
+  const drawn = first.groups.flatMap((g) => g.photos.map((p) => p.id));
+  assert.equal(drawn.length, 24, "never all 50 at once");
+  assert.equal(first.hidden, 26);
+  assert.ok(drawn.includes("p49") && !drawn.includes("p25"), "the newest ones");
+  assert.deepEqual(first.groups.map((g) => g.key), ["units", "checks"], "groups with nothing drawn are left out, order kept");
+  // An older photo already picked stays in view; "Show more" brings in the rest.
+  assert.ok(pickerShown(groups, PICKER_PAGE, ["p0"]).groups.some((g) => g.photos.some((p) => p.id === "p0")));
+  assert.equal(pickerShown(groups, 2 * PICKER_PAGE, []).hidden, 2);
+  assert.equal(pickerShown(groups, 3 * PICKER_PAGE, []).hidden, 0);
+
+  // Opened again: the server's new URLs are swapped for the ones the phone already has, while they're young.
+  const t0 = Date.parse(at(0));
+  const opened = reuseUrls(groups, undefined, t0);
+  const resigned = groups.map((g) => ({ ...g, photos: g.photos.map((p) => ({ ...p, url: p.url.replace("sig=a", "sig=b") })) }));
+  const again = reuseUrls(resigned, opened.urls, t0 + 10 * 60_000);
+  assert.ok(again.groups.every((g) => g.photos.every((p) => p.url?.endsWith("sig=a"))), "same src: the browser's copy");
+  const late = reuseUrls(resigned, opened.urls, t0 + URL_REUSE_MS + 1);
+  assert.ok(late.groups.every((g) => g.photos.every((p) => p.url?.endsWith("sig=b"))), "old URLs are let go before they'd expire");
+  // A photo synced since the last open gets its own URL.
+  const withNew = reuseUrls([{ key: "units", photos: [...resigned[1]!.photos, { id: "p99", url: "/files/p99.jpg?sig=b", takenAt: at(59) }] }], opened.urls, t0 + 60_000);
+  assert.equal(withNew.groups[0]!.photos.find((p) => p.id === "p99")!.url, "/files/p99.jpg?sig=b");
+  assert.equal(withNew.urls.get("p99")?.at, t0 + 60_000);
+});
+
+test("the picker's thumbnails are small, lazy and fixed-size; the list is capped with Show more", async () => {
+  const { readFileSync } = await import("node:fs");
+  const src = readFileSync(new URL("../components/field/quick-actions.tsx", import.meta.url), "utf8");
+  assert.match(src, /<img src=\{p\.url\} alt="" width=\{320\} height=\{240\} loading="lazy" decoding="async"/);
+  assert.match(src, /pickerShown\(/);
+  assert.match(src, /Show more photos/);
+  assert.match(src, /reuseUrls\(groups, dayPhotoUrls\.get\(key\)/);
+});

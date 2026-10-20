@@ -1070,7 +1070,7 @@ try {
     // The top card says so too (the email and text said it needs their OK), never "nothing for you to do".
     check(
       "the next-step card names the change waiting for their OK",
-      (await has(customer, /Your next step\s*Answer a change to your installation\s*Change #\d+: DEMO: 2 m more trunking \(\+£[\d,.]+\)/i)) && !(await has(customer, /Nothing for you to do right now/)),
+      (await has(customer, /Your next step\s*Answer a change to your installation\s*Change #\d+: DEMO: 2 m more trunking[^(\n]*\(\+£[\d,.]+\)/i)) && !(await has(customer, /Nothing for you to do right now/)),
       (await text(customer)).slice(0, 400),
     );
     await customer.locator("#next-title").locator("xpath=..").getByRole("button", { name: "Answer a change to your installation" }).click();

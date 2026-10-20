@@ -21,6 +21,7 @@ import { BlockerList } from "@/components/kit/blocker-list";
 import { getFieldOutbox, newOpId, type SyncOp } from "@/lib/field-outbox";
 import { prepareImage } from "@/lib/media-client";
 import { locate, nowIso, parseReading } from "./capture";
+import { PICKER_PAGE, pickerShown, reuseUrls, type SignedUrls } from "./day-photos";
 import { editDraft, firstStep, followDefaults, isDirty, openDraft, reopenDraft, type EndDayDraft } from "./end-day-draft";
 import { londonDateOf, londonTime, telHref, fmtDay } from "./format";
 import { answerHeader, postAnswer, requestCatchUp } from "./server-answer";
@@ -760,6 +761,7 @@ function IssueSheet({ open, onClose, data, variation }: { open: boolean; onClose
 interface DayPhoto {
   id: string;
   url: string | null;
+  takenAt?: string;
   caption?: string;
   /** What it shows: its runsheet slot's label, or its own caption. */
   label?: string;
@@ -787,6 +789,9 @@ function uniqueTitles(titles: string[]): string[] {
   return out;
 }
 
+/** The URLs the picker was given, per job and day, so opening it again shows the photos the phone already has. */
+const dayPhotoUrls = new Map<string, SignedUrls>();
+
 function EndDaySheet({ open, onClose, data, merged, n: liveN, clockEntryId }: { open: boolean; onClose: () => void; data: FieldJob; merged: MergedJob | null; n: number; clockEntryId?: string }) {
   // The day this sheet is ending, fixed when it opens: the page refreshes underneath once it's closed.
   const [n, setN] = useState(liveN);
@@ -801,6 +806,8 @@ function EndDaySheet({ open, onClose, data, merged, n: liveN, clockEntryId }: { 
   const [photos, setPhotos] = useState<DayPhotoGroup[] | null>(null);
   // As-found and check photos (detector scans, serials, gauges) stay folded away unless asked for.
   const [allPhotos, setAllPhotos] = useState(false);
+  // The newest PICKER_PAGE photos are drawn; "Show more" adds the next lot (day-photos.ts).
+  const [photoLimit, setPhotoLimit] = useState(PICKER_PAGE);
   const [chosen, setChosen] = useState<string[]>([]);
   const [preview, setPreview] = useState<{ subject: string; text: string; mode: "live" | "demo"; to: string | null } | null>(null);
   const [previewing, setPreviewing] = useState(false);
@@ -876,6 +883,7 @@ function EndDaySheet({ open, onClose, data, merged, n: liveN, clockEntryId }: { 
       }
       setPhotos(null);
       setAllPhotos(false);
+      setPhotoLimit(PICKER_PAGE);
       setPreview(null);
       setError(null);
       setBlockers([]);
@@ -892,11 +900,14 @@ function EndDaySheet({ open, onClose, data, merged, n: liveN, clockEntryId }: { 
       .then(async (r) => {
         const body = await r.json();
         if (!r.ok) throw new Error(body.error);
-        setPhotos(
-          Array.isArray(body.groups)
-            ? body.groups
-            : [{ key: "all", title: "Today's photos", use: "work", photos: (body.items ?? []) as DayPhoto[] }],
-        );
+        const groups: DayPhotoGroup[] = Array.isArray(body.groups)
+          ? body.groups
+          : [{ key: "all", title: "Today's photos", use: "work", photos: (body.items ?? []) as DayPhoto[] }];
+        // Opened before: keep the URLs it had, so the browser shows the copies it already downloaded.
+        const key = `${id}:${n}`;
+        const kept = reuseUrls(groups, dayPhotoUrls.get(key), Date.now());
+        dayPhotoUrls.set(key, kept.urls);
+        setPhotos(kept.groups);
       })
       .catch(() => {
         setPhotos([]);
@@ -978,6 +989,14 @@ function EndDaySheet({ open, onClose, data, merged, n: liveN, clockEntryId }: { 
 
   // Nothing but as-found and check photos today: show those rather than an empty picker.
   const noWorkPhotos = Boolean(photos) && !photos!.some((g) => g.use === "work" && g.photos.length > 0);
+  // The groups in view (as-found and check ones only when asked, or when picked), then the newest PICKER_PAGE of them.
+  const shownPhotos = photos
+    ? pickerShown(
+        photos.filter((g) => g.photos.length > 0 && (allPhotos || noWorkPhotos || g.use === "work" || g.photos.some((p) => chosen.includes(p.id)))),
+        photoLimit,
+        chosen,
+      )
+    : null;
   const first = firstStep(draft);
   const footer =
     stage === "summary" ? (
@@ -1073,8 +1092,7 @@ function EndDaySheet({ open, onClose, data, merged, n: liveN, clockEntryId }: { 
               )}
               {photos && photos.some((g) => g.photos.length > 0) && (
                 <div className="space-y-4">
-                  {photos
-                    .filter((g) => g.photos.length > 0 && (allPhotos || noWorkPhotos || g.use === "work" || g.photos.some((p) => chosen.includes(p.id))))
+                  {shownPhotos!.groups
                     .map((g) => (
                       <section key={g.key} aria-label={`${g.title}${g.item ? `, ${g.item}` : ""}`}>
                         <h3 className="mb-1.5 text-sm font-semibold text-ink-900">
@@ -1099,8 +1117,9 @@ function EndDaySheet({ open, onClose, data, merged, n: liveN, clockEntryId }: { 
                                   aria-label={label}
                                 />
                                 {p.url ? (
+                                  // A small fixed-size thumbnail, fetched only once it scrolls near the screen.
                                   // eslint-disable-next-line @next/next/no-img-element
-                                  <img src={p.url} alt="" className="aspect-[4/3] w-full object-cover" />
+                                  <img src={p.url} alt="" width={320} height={240} loading="lazy" decoding="async" className="aspect-[4/3] w-full object-cover" />
                                 ) : (
                                   <span className="flex aspect-[4/3] items-center justify-center bg-surface text-xs text-ink-500">No preview</span>
                                 )}
@@ -1114,6 +1133,11 @@ function EndDaySheet({ open, onClose, data, merged, n: liveN, clockEntryId }: { 
                         </div>
                       </section>
                     ))}
+                  {shownPhotos!.hidden > 0 && (
+                    <button type="button" onClick={() => setPhotoLimit((l) => l + PICKER_PAGE)} className={`${SECONDARY} w-full`}>
+                      Show more photos ({shownPhotos!.hidden} older)
+                    </button>
+                  )}
                   {(() => {
                     const hidden = photos.filter((g) => g.use !== "work").reduce((n, g) => n + g.photos.length, 0);
                     if (!hidden || noWorkPhotos) return null;

@@ -146,7 +146,7 @@ export default async function TermsPage() {
                     ))}
                   </div>
                   <p className="mt-3 text-sm text-ink-500">
-                    Your contract confirmation email includes this form with your details, and we can post you a paper copy.
+                    Your contract confirmation email includes this form with your details.
                   </p>
                 </div>
               </>

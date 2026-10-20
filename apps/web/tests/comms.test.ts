@@ -60,6 +60,7 @@ type CommsData = import("../lib/comms/templates.ts").CommsData;
 const { cancellationForm, cancellationInstructions, CANCELLATION_NOTICE_VERSION } = await import("../lib/comms/legal-text.ts");
 const { commsForAction, followUpForDelivered, textHash } = await import("../lib/comms/action-map.ts");
 const { createOutbox, consentAllows, addressFor, headline, optedOut } = await import("../lib/comms/outbox-core.ts");
+const { messageExpiry, staleReason, expiryOf, ON_MY_WAY_TTL_MINUTES, TIME_SENSITIVE_EVENTS } = await import("../lib/comms/expiry.ts");
 type OutboxDeps = import("../lib/comms/outbox-core.ts").OutboxDeps;
 const { messageStore } = await import("../lib/repo/messages.ts");
 const { createLocalClient } = await import("../lib/db/local-client.ts");
@@ -887,7 +888,10 @@ async function harness(
   return { db, store, sent, minted, delivered, deps, outbox: createOutbox(deps) };
 }
 
-const surveyBooked = { scheduledFor: "2026-11-03T10:00:00.000Z" } as const;
+/** A survey slot `days` from now at 10:00 UK time, stored as the house does (UK wall clock as UTC). */
+const futureSlot = (days: number) => `${new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10)}T10:00:00.000Z`;
+/** Always ahead of the clock, so these tests never start failing once a fixed date has passed (bookings expire: expiry.ts). */
+const surveyBooked = { scheduledFor: futureSlot(30) } as const;
 
 test("demo mode stores the rendered message as demo and never as sent; the same occurrence is never stored twice", async () => {
   const h = await harness();
@@ -1520,4 +1524,99 @@ test("a removed address stays removed: a waiting message is never sent to it, an
   p.customer.phone = "07700 900456";
   await hs.outbox.dispatchDue(new Date(Date.now() + 2 * 86_400_000).toISOString());
   assert.deepEqual(hs.sent.map((x) => [x.channel, x.to]), [["sms", "+447700900456"]]);
+});
+
+/* ------------------------------------------------------------------ */
+/* Messages about an appointment are never sent late                    */
+/* ------------------------------------------------------------------ */
+
+test("messageExpiry: on my way 45 minutes (or the arrival it gives), reminders at the start, bookings once over, London time", () => {
+  const at = "2026-11-03T09:40:00.000Z";
+  assert.equal(ON_MY_WAY_TTL_MINUTES, 45);
+  assert.equal(messageExpiry("installer-on-my-way", { etaMinutes: 20, at }, at), "2026-11-03T10:25:00.000Z");
+  assert.equal(messageExpiry("surveyor-on-my-way", { etaMinutes: 60, at }, at), "2026-11-03T10:40:00.000Z", "a longer drive: until the arrival it promised");
+  // A survey slot is UK wall clock stored as UTC: 10:00 in November is 10:00 UTC, in July 09:00 UTC.
+  assert.equal(messageExpiry("survey-reminder", { scheduledFor: "2026-11-03T10:00:00.000Z" }, at), "2026-11-03T10:00:00.000Z");
+  assert.equal(messageExpiry("survey-reminder", { scheduledFor: "2027-07-06T10:00:00.000Z" }, at), "2027-07-06T09:00:00.000Z");
+  assert.equal(messageExpiry("survey-booked", { scheduledFor: "2026-11-03T10:00:00.000Z", durationMinutes: 90 }, at), "2026-11-03T11:30:00.000Z");
+  // Install reminders stop when day 1 begins (London midnight); the booking once the last day is over.
+  assert.equal(messageExpiry("install-prep", { startDate: "2026-11-10" }, at), "2026-11-10T00:00:00.000Z");
+  assert.equal(messageExpiry("install-day-before", { startDate: "2027-06-08" }, at), "2027-06-07T23:00:00.000Z");
+  assert.equal(messageExpiry("install-booked", { dates: ["2026-11-12", "2026-11-10", "2026-11-11"] }, at), "2026-11-13T00:00:00.000Z");
+  // Everything else never goes stale (a proposal, an invoice, a cancellation's confirmation).
+  for (const event of ["proposal-issued", "invoice-issued", "cancellation-confirmed", "install-day-update", "variation-approval"] as const) {
+    assert.equal(messageExpiry(event, FULL[event] as never, at), undefined, event);
+    assert.ok(!TIME_SENSITIVE_EVENTS.has(event), event);
+  }
+  // A row written before expiries existed: an on-my-way still stops 45 minutes after it was written.
+  assert.equal(expiryOf({ event: "installer-on-my-way", createdAt: at }), "2026-11-03T10:25:00.000Z");
+  assert.equal(expiryOf({ event: "proposal-issued", createdAt: at }), undefined);
+});
+
+test("staleReason: past its expiry, or about an appointment on a closed or cancelled project", () => {
+  const open = baseProject();
+  const m = { event: "survey-reminder" as const, createdAt: "2026-11-02T16:00:00.000Z", expiresAt: "2026-11-03T10:00:00.000Z" };
+  assert.equal(staleReason(m, "2026-11-03T09:59:00.000Z", open), null);
+  assert.match(staleReason(m, "2026-11-03T10:00:00.000Z", open) ?? "", /too late to be useful \(the survey it's about has already started\)/);
+  const closed = { ...open, closure: { closed: true, closedAt: "2026-11-01T09:00:00.000Z" } } as Project;
+  assert.match(staleReason(m, "2026-11-02T16:00:00.000Z", closed) ?? "", /project is closed/);
+  const cancelled = { ...open, closure: { closed: true, closedAt: "2026-11-01T09:00:00.000Z", reason: "cancelled" } } as Project;
+  assert.match(staleReason(m, "2026-11-02T16:00:00.000Z", cancelled) ?? "", /was cancelled/);
+  // A message that isn't about an appointment still goes on a closed project (an invoice, a cancellation's confirmation).
+  assert.equal(staleReason({ event: "cancellation-confirmed", createdAt: m.createdAt }, "2027-01-01T00:00:00.000Z", cancelled), null);
+});
+
+test("an on-my-way that failed is never retried after it would have been useful", async () => {
+  // Texts aren't set up, so it goes by email; the first send fails.
+  const h = await harness({ email: true, emailOk: [false, false] });
+  const at = new Date().toISOString();
+  const r = await h.outbox.notify("installer-on-my-way", { projectId: PROJECT_ID, data: { etaMinutes: 20, at, name: "DEMO Ivo" }, discriminator: "late:20" });
+  assert.equal(r.results[0]!.channel, "email");
+  assert.equal(r.results[0]!.status, "failed");
+  const id = r.results[0]!.messageId!;
+  const stored = (await h.store.get(id))!;
+  assert.equal(stored.expiresAt, new Date(Date.parse(stored.createdAt) + 45 * 60_000).toISOString());
+  // Ten minutes on, the cron tries again (and it fails again): still worth it.
+  assert.deepEqual(await h.outbox.dispatchDue(new Date(Date.now() + 10 * 60_000).toISOString()), { due: 1, sent: 0, demo: 0, failed: 1, skipped: 0, errors: 0 });
+  // An hour on: skipped, with the reason, and nothing sent; Retry from the log says the same.
+  const later = { ...h.deps, now: () => new Date(Date.now() + 60 * 60_000).toISOString() };
+  const lateOutbox = createOutbox(later);
+  assert.deepEqual(await lateOutbox.dispatchDue(new Date(Date.now() + 60 * 60_000).toISOString()), { due: 1, sent: 0, demo: 0, failed: 0, skipped: 1, errors: 0 });
+  const after = (await h.store.get(id))!;
+  assert.equal(after.status, "skipped");
+  assert.match(after.error ?? "", /too late to be useful \(it would arrive after the installer did\)/);
+  const retried = await lateOutbox.resend(id);
+  assert.equal(retried.status, "skipped");
+  assert.equal(h.sent.length, 0, "never sent late");
+});
+
+test("a reminder written after its appointment started, or for a closed or cancelled project, is skipped, never sent", async () => {
+  // The survey started an hour ago (UK wall clock as UTC: build the slot from London's clock).
+  const wall = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/London", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" })
+    .format(new Date(Date.now() - 60 * 60_000))
+    .replace(", ", "T");
+  const started = { scheduledFor: `${wall}:00.000Z` };
+  const h = await harness({ email: true, sms: true });
+  const r = await h.outbox.notify("survey-reminder", { projectId: PROJECT_ID, data: started, discriminator: "started" });
+  assert.deepEqual(r.results.map((x) => x.status), ["skipped", "skipped"]);
+  assert.match(r.results[0]!.error ?? "", /the survey it's about has already started/);
+  assert.equal(h.sent.length, 0);
+
+  const cancelled = baseProject();
+  cancelled.closure = { closed: true, closedAt: new Date().toISOString(), reason: "cancelled" };
+  const hc = await harness({ email: true, project: cancelled });
+  const reminder = await hc.outbox.notify("install-prep", { projectId: PROJECT_ID, data: { startDate: futureSlot(5).slice(0, 10) }, discriminator: "prep" });
+  assert.equal(reminder.status, "skipped");
+  assert.match(reminder.results[0]!.error ?? "", /was cancelled/);
+  // What isn't about an appointment still reaches them: the cancellation's own confirmation.
+  const confirm = await hc.outbox.notify("cancellation-confirmed", { projectId: PROJECT_ID, data: FULL["cancellation-confirmed"], discriminator: "c1" });
+  assert.equal(confirm.status, "sent");
+  assert.equal(hc.sent.length, 1);
+
+  const closed = baseProject();
+  closed.closure = { closed: true, closedAt: new Date().toISOString() };
+  const hx = await harness({ email: true, project: closed });
+  const booked = await hx.outbox.notify("survey-booked", { projectId: PROJECT_ID, data: surveyBooked, discriminator: "closed" });
+  assert.equal(booked.status, "skipped");
+  assert.match(booked.results[0]!.error ?? "", /project is closed/);
 });

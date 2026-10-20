@@ -29,29 +29,75 @@ export function replyToAddress(value: string | null | undefined): string | undef
   return v && /^[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]+$/.test(v) ? v : undefined;
 }
 
+/** How long Resend gets to answer before a send counts as failed (Twilio has 10 s, Stripe 15 s). */
+export const EMAIL_TIMEOUT_MS = 10_000;
+
+export interface EmailResult {
+  ok: boolean;
+  /** Resend's id for the message, when it accepted it. */
+  providerRef?: string;
+  error?: string;
+}
+
 /**
- * Send one email. `replyTo` is where the customer's reply goes: our company
- * address from settings, so a reply (an express early-start request, a
- * question about a proposal) reaches a monitored inbox even when EMAIL_FROM
- * is a sending-only or no-reply address.
+ * Send one email and say what happened. `replyTo` is where the customer's
+ * reply goes: our company address from settings, so a reply (an express
+ * early-start request, a question about a proposal) reaches a monitored
+ * inbox even when EMAIL_FROM is a sending-only or no-reply address.
+ *
+ * Resend gets EMAIL_TIMEOUT_MS to answer. No answer in time is a failed
+ * send (never a hung request): the outbox records it as failed and the cron
+ * or Retry tries again. Resend may still have taken a message it didn't
+ * answer for in time, so in that rare case the family can get it twice.
  */
-export async function sendEmail(to: string, subject: string, html: string, opts: { replyTo?: string } = {}): Promise<boolean> {
+export async function sendEmailResult(to: string, subject: string, html: string, opts: { replyTo?: string; timeoutMs?: number } = {}): Promise<EmailResult> {
   const apiKey = realEnv(process.env, "RESEND_API_KEY");
   const from = realEnv(process.env, "EMAIL_FROM");
-  if (!apiKey || !from) return false;
+  if (!apiKey || !from) return { ok: false, error: "Email isn't set up" };
   const replyTo = replyToAddress(opts.replyTo);
+  const timeoutMs = opts.timeoutMs ?? EMAIL_TIMEOUT_MS;
   try {
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
       body: JSON.stringify({ from, to: [to], subject, html, ...(replyTo ? { reply_to: replyTo } : {}) }),
+      signal: AbortSignal.timeout(timeoutMs),
     });
-    if (!res.ok) console.error("email send failed:", res.status, await res.text());
-    return res.ok;
+    const body = await res.text().catch(() => "");
+    if (!res.ok) {
+      console.error("email send failed:", res.status, body);
+      let detail = `HTTP ${res.status}`;
+      try {
+        const message = (JSON.parse(body) as { message?: unknown }).message;
+        if (typeof message === "string" && message) detail = `${message} (HTTP ${res.status})`;
+      } catch {
+        // not JSON: the status says enough
+      }
+      return { ok: false, error: `Resend didn't accept the message: ${detail.slice(0, 200)}` };
+    }
+    let providerRef: string | undefined;
+    try {
+      const id = (JSON.parse(body) as { id?: unknown }).id;
+      if (typeof id === "string" && id) providerRef = id;
+    } catch {
+      // accepted without a readable id: still sent
+    }
+    return providerRef ? { ok: true, providerRef } : { ok: true };
   } catch (err) {
-    console.error("email send failed:", err);
-    return false;
+    const timedOut = err instanceof Error && (err.name === "TimeoutError" || err.name === "AbortError");
+    console.error(timedOut ? `email send timed out after ${timeoutMs} ms` : "email send failed:", timedOut ? "" : err);
+    return {
+      ok: false,
+      error: timedOut
+        ? `Resend didn't answer within ${Math.round(timeoutMs / 1000)} seconds, so it counts as not sent (tried again later)`
+        : `Resend unreachable: ${err instanceof Error ? err.message : String(err)}`,
+    };
   }
+}
+
+/** Send one email: true only when Resend accepted it (see sendEmailResult; same timeout). */
+export async function sendEmail(to: string, subject: string, html: string, opts: { replyTo?: string } = {}): Promise<boolean> {
+  return (await sendEmailResult(to, subject, html, opts)).ok;
 }
 
 /** Team alert: no-op (false) when the inbox isn't configured. */

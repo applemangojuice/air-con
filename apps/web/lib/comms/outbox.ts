@@ -2,7 +2,7 @@ import type { CommsEventId } from "@aircon/domain";
 import { demoModeAllowed } from "@/lib/auth/demo-guard";
 import { customerLink } from "@/lib/auth/magic";
 import { appUrl } from "@/lib/brand";
-import { emailConfigured, sendEmail, teamInbox } from "@/lib/email";
+import { emailConfigured, sendEmailResult, teamInbox } from "@/lib/email";
 import { dispatch, loadProject } from "@/lib/project-service";
 import { sendSms, smsConfigured } from "@/lib/providers/sms";
 import * as customersRepo from "@/lib/repo/customers";
@@ -55,11 +55,8 @@ function realOutbox(): Outbox | null {
     email: {
       provider: "resend",
       configured: emailConfigured,
-      // sendEmail only reports accepted / not accepted (Resend's id isn't surfaced yet).
-      send: async (to, subject, html, opts) => {
-        const ok = await sendEmail(to, subject, html, opts);
-        return ok ? { ok } : { ok, error: "Resend didn't accept the message (see server logs)" };
-      },
+      // A refusal, an unreachable Resend and no answer within EMAIL_TIMEOUT_MS are all "failed": the cron retries.
+      send: (to, subject, html, opts) => sendEmailResult(to, subject, html, opts),
     },
     sms: { provider: "twilio", configured: smsConfigured, send: sendSms },
     // The issue and acceptance emails reaching the customer are contract

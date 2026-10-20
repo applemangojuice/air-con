@@ -382,6 +382,13 @@ export interface MessageRecord {
   error?: string;
   attempts: number;
   scheduledFor?: string;
+  /**
+   * After this it's never sent (first send, cron retry, Retry or Send
+   * again): a message about an appointment (on my way, a reminder, a
+   * booking) is worse than nothing once its moment has passed. Set by the
+   * outbox when it writes the message (web lib/comms/expiry.ts).
+   */
+  expiresAt?: string;
   sentAt?: string;
   createdAt: string;
 }

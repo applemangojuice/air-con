@@ -259,7 +259,7 @@ export function dailyJobsFor(project: Project, todayIso: string, settings: Pilot
             : [
                 `We told them it would be with them by ${by}, and it isn't issued yet (${late} day${late === 1 ? "" : "s"} late).`,
                 "They haven't agreed to get their documents by email, so it can't be issued: the pilot can't send them on paper. Their page asks them to agree.",
-                "Get in touch and talk it through. If they agree, record it in the project's Proposal box (how and when). If they'd still rather have paper, tell them honestly that the pilot can't do paper, and close the project with the reason.",
+                "Get in touch and talk it through. If they agree, record it in the project's Proposal box (how and when). If they'd still rather have paper, tell them honestly that the pilot can't do paper, and close the project (Close the project, tick 'The customer withdrew before any contract', with a note).",
               ],
           urgent: late > PROPOSAL_LATE_ALERT_EVERY_DAYS,
         },

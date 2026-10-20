@@ -15,15 +15,36 @@ export function annotationColour(a: Annotation): string {
   return ANNOTATION_STYLE[annotationStyleKey(a)]?.colour ?? "#ffffff";
 }
 
-/** Readable text on a chip of this colour: dark on light fills (yellow, white), white otherwise. */
-export function chipTextColour(hex: string): string {
+/** Dark chip text: the ink the rest of the app uses. */
+export const CHIP_DARK_TEXT = "#14171e";
+
+/** WCAG 2 relative luminance of a #rrggbb colour (sRGB, linearised). */
+export function relativeLuminance(hex: string): number {
   const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
-  if (!m) return "#ffffff";
+  if (!m) return 1;
   const n = parseInt(m[1]!, 16);
-  const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
-  // Relative luminance, sRGB approximation: enough to pick black or white.
-  const lum = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
-  return lum > 0.6 ? "#14171e" : "#ffffff";
+  const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => {
+    const c = v / 255;
+    return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r! + 0.7152 * g! + 0.0722 * b!;
+}
+
+/** WCAG 2 contrast ratio between two colours (1 to 21). */
+export function contrastRatio(a: string, b: string): number {
+  const [hi, lo] = [relativeLuminance(a), relativeLuminance(b)].sort((x, y) => y - x);
+  return (hi! + 0.05) / (lo! + 0.05);
+}
+
+/**
+ * Readable text on a chip of this colour: whichever of white and dark ink
+ * contrasts more (WCAG 2), so dark on the light and mid fills (yellow,
+ * orange, cyan, green, white) and white on the deep ones (blue, red,
+ * slate). Every ANNOTATION_STYLE colour clears AA (4.5:1) this way.
+ */
+export function chipTextColour(hex: string): string {
+  if (!/^#?[0-9a-f]{6}$/i.test(hex.trim())) return "#ffffff";
+  return contrastRatio(CHIP_DARK_TEXT, hex) > contrastRatio("#ffffff", hex) ? CHIP_DARK_TEXT : "#ffffff";
 }
 
 const ROUTE_WORDS: Record<"pipe" | "condensate" | "cable", string> = {

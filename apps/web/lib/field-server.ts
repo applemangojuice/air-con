@@ -1337,7 +1337,13 @@ async function issuePhotoIds(projectId: string): Promise<Set<string>> {
   return new Set((await issuesRepo.listForProject(projectId)).flatMap((i) => i.mediaIds ?? []));
 }
 
-/** Install media from one day, newest first, with URLs: the photos the end-of-day update can share. */
+/**
+ * Install media from one day, newest taken first, with URLs: the photos the
+ * end-of-day update can share. Signing is one batch call and the URLs are
+ * stable within the hour (signedMediaUrls); the picker draws only the newest
+ * few as lazy thumbnails (components/field/day-photos.ts), so nothing here
+ * makes the phone download every original.
+ */
 export async function dayPhotos(projectId: string, staff: StaffMember, n: number) {
   const project = await projectForStaff(projectId, staff);
   const day = project.install.days.find((d) => d.n === n);
@@ -1353,6 +1359,8 @@ export async function dayPhotos(projectId: string, staff: StaffMember, n: number
       !onIssues.has(m.id) &&
       (!date || londonDateOf(m.takenAt) === date),
   );
+  // Newest taken first (a photo captured offline arrives later than it was taken).
+  items.sort((a, b) => b.takenAt.localeCompare(a.takenAt));
   const urls = await signedMediaUrls(items);
   return items.map((m) => ({ id: m.id, url: urls.get(m.id) ?? null, caption: m.caption, tag: m.tag, customerVisible: m.customerVisible, takenAt: m.takenAt }));
 }

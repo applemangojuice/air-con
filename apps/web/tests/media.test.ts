@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import type { Annotation, StaffMember } from "@aircon/domain";
-import { annotatedAlt, chipTextColour, describeAnnotations, legendEntries } from "../components/annotate/annotation-summary.ts";
+import { ANNOTATION_STYLE, type Annotation, type StaffMember } from "@aircon/domain";
+import { annotatedAlt, chipTextColour, contrastRatio, describeAnnotations, legendEntries } from "../components/annotate/annotation-summary.ts";
 import { afterAwait, interceptTable, recordUpdates } from "./helpers/db-intercept.ts";
 import { registerAppResolver } from "./helpers/resolve-app.ts";
 import { ensureProjectRow } from "./helpers/rows.ts";
@@ -176,6 +176,17 @@ test("annotation summary: alt text, legend and chip contrast", () => {
   assert.equal(chipTextColour("#ffffff"), "#14171e");
   assert.equal(chipTextColour("#facc15"), "#14171e");
   assert.equal(chipTextColour("#2563eb"), "#ffffff");
+  // The indoor unit's orange (and the cyan and green): dark text, never white (2.9:1 and less).
+  assert.equal(chipTextColour(ANNOTATION_STYLE["indoor-unit"]!.colour), "#14171e");
+  assert.equal(chipTextColour(ANNOTATION_STYLE.condensate!.colour), "#14171e");
+  assert.equal(chipTextColour(ANNOTATION_STYLE.cable!.colour), "#14171e");
+  assert.ok(contrastRatio("#ffffff", ANNOTATION_STYLE["indoor-unit"]!.colour) < 3, "white on the orange fails AA");
+  // Every chip colour, with the text chosen for it, meets WCAG AA (4.5:1).
+  for (const [key, { colour }] of Object.entries(ANNOTATION_STYLE)) {
+    const ratio = contrastRatio(chipTextColour(colour), colour);
+    assert.ok(ratio >= 4.5, `${key} ${colour}: ${ratio.toFixed(2)}:1`);
+  }
+  assert.equal(contrastRatio("#000000", "#ffffff").toFixed(0), "21");
 });
 
 /* ------------------------------------------------------------------ */
@@ -233,6 +244,36 @@ test("upload flow: a row only once the file is there, everything from the signed
 
   const listed = await media.listProjectMedia(PROJECT, { customerVisibleOnly: true });
   assert.ok(listed.some((m) => m.id === first.item.id && m.url));
+
+  // The same photo keeps the same URL within the hour (the hub's poll, a reload): the browser's copy is reused.
+  const again1 = (await media.signedMediaUrls([first.item])).get(first.item.id);
+  const again2 = (await media.signedMediaUrls([first.item])).get(first.item.id);
+  assert.ok(again1 && again1 === again2, "one URL per photo per hour");
+  const exp = Number(new URL(again1!, "http://local").searchParams.get("exp"));
+  const now = Math.floor(Date.now() / 1000);
+  assert.equal(exp % 3600, 0, "the expiry is on the hour, the same for every signing in it");
+  assert.ok(exp - now >= 3600 && exp - now <= 7200, `lives 1 to 2 hours: ${exp - now}`);
+  // A longer life asked for is its own URL (the portal's four hours), stable too.
+  const long1 = (await media.signedMediaUrls([first.item], 4 * 3600)).get(first.item.id);
+  assert.notEqual(long1, again1);
+  assert.equal((await media.signedMediaUrls([first.item], 4 * 3600)).get(first.item.id), long1);
+});
+
+test("stableSigning: one expiry per hour, never less life than asked for", () => {
+  const hour = 3600;
+  const t0 = 1_790_000_000 - (1_790_000_000 % hour); // on the hour
+  assert.deepEqual(media.stableSigning(t0, hour), { exp: t0 + 2 * hour, reuseUntil: t0 + hour });
+  assert.deepEqual(media.stableSigning(t0 + hour - 1, hour), { exp: t0 + 2 * hour, reuseUntil: t0 + hour }, "same window, same expiry");
+  assert.deepEqual(media.stableSigning(t0 + hour, hour), { exp: t0 + 3 * hour, reuseUntil: t0 + 2 * hour }, "the next window moves on");
+  for (const now of [t0, t0 + 1, t0 + 1800, t0 + hour - 1]) {
+    for (const life of [300, hour, 4 * hour]) {
+      const { exp, reuseUntil } = media.stableSigning(now, life);
+      // Handed out any time up to reuseUntil, it still has `life` to run.
+      assert.ok(exp - reuseUntil >= life && exp - now <= life + Math.min(life, hour), `${now - t0} ${life}`);
+    }
+  }
+  // A short life gets a short window: a five-minute URL is reused for at most five minutes.
+  assert.deepEqual(media.stableSigning(t0 + 10, 300), { exp: t0 + 600, reuseUntil: t0 + 300 });
 });
 
 test("upload flow: forged, expired and mismatched uploads are refused", async () => {

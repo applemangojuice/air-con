@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useId, useRef, useState } from "react";
-import { VARIATIONS_ANSWER_LABEL, VARIATION_ANSWER_LABEL, handoverDeadlines, isFullName, variationAgreeWording } from "@aircon/domain";
+import { VARIATIONS_ANSWER_LABEL, VARIATION_ANSWER_LABEL, handoverDeadlines, isFullName, variationAgreeWording, variationsAwaitingCustomer } from "@aircon/domain";
 import { Input, Textarea } from "@/components/kit/form";
 import { fmtDate, fmtDay, fmtInstantDay, fmtInstantDayTime, money } from "@/lib/format";
 import {
@@ -193,7 +193,8 @@ export function InstallPanel({ data, state }: PanelProps) {
   const dateOf = (n: number) => dayOf(n)?.date ?? p.booking.dates[n - 1];
   const updates = p.install.days.filter((d) => d.customerUpdate).sort((a, b) => (b.customerUpdate!.sentAt > a.customerUpdate!.sentAt ? 1 : -1));
   const variations = data.issues.filter((i) => i.kind === "variation" && i.variation);
-  const waiting = variations.filter((i) => i.variation!.status === "proposed" && (i.status === "open" || i.status === "in-progress" || i.status === "awaiting-customer"));
+  // The same rule as the next-step card's "Answer a change to your installation".
+  const waiting = variationsAwaitingCustomer(variations);
   const decided = variations.filter((i) => i.variation!.status !== "proposed");
   // Fresh, and they haven't arrived yet (no day started since the message).
   const arrived = p.install.days.some((d) => d.startedAt && p.install.onMyWay && d.startedAt >= p.install.onMyWay.at);

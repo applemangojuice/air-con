@@ -71,7 +71,13 @@ think about where the units could go, someone 18 or over at home.
 
 During the survey the surveyor asks whether they're happy to get their
 proposal and contract documents by email. That agreement is needed before
-any proposal can be issued.
+any proposal can be issued. If they didn't agree, the survey email asks
+them to (tick the box under Proposal on their page, or reply if they'd
+rather not), and their next step says **Agree to get your documents by
+email**. The pilot can't send documents on paper, and nothing promises it:
+if they'd rather not use email, the office calls them to talk it through.
+If the promised date passes while it waits on their agreement, their page
+says it's waiting for that, not that we're late.
 
 ### 3. Proposal
 
@@ -133,7 +139,10 @@ delivery date.
 under each unit, parking for a van, someone 18+ at home), the plan day by
 day, the power-off warning (up to 30 minutes on day 2), **Your install
 team** with names, photos and the certificates they actually hold, and the
-end-of-day updates as they arrive.
+end-of-day updates as they arrive. When the office sends a change for
+their OK, their next step (on the page and on **Your homes**) becomes
+**Answer a change to your installation** with the change and its price,
+and its button opens the change to answer, until they've said yes or no.
 
 ![Install stage (DEMO)](../screenshots/guides/20-customer-install.png)
 
@@ -141,7 +150,7 @@ end-of-day updates as they arrive.
 | --- | --- | --- |
 | **Getting ready for your install on \<day\>** | Email | 3 days before day 1 (or the next day's run, if that was missed): the prep list still to tick and the power-off warning |
 | **Your install starts \<day\>** | Email and text | The day before day 1, at about 4pm (5pm in summer): arrival, who's coming, parking |
-| **Your installer is on the way** | Text (email if no mobile, or if texts aren't set up) | When the installer taps On my way, each morning they do |
+| **Your installer is on the way** | Text (email if no mobile, or if texts aren't set up) | When the installer taps On my way, each morning they do. One that can't go within 45 minutes (or by the arrival time it gives) is never sent late, and no reminder goes once the survey or install has started, or for a closed or cancelled project |
 | **Your install: day 1 of 3 done** | Email | When the installer ends the day with an update: what's done, what's next, and the 2 to 4 photos they picked |
 | **A change to your installation needs your OK** | Email and text | When the office sends a variation for their approval. They approve or decline on their page |
 | **You agreed a change to your installation** | Email | When they approve it: what changes, the price, the record of their yes |

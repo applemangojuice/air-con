@@ -10,6 +10,7 @@ import {
   type Project,
 } from "@aircon/domain";
 import { escapeHtml } from "../email.ts";
+import { expiryOf, messageExpiry, staleReason } from "./expiry.ts";
 import type { MessageStore, StoredMessage } from "../repo/messages.ts";
 import { isTextable, normaliseUkPhone } from "../providers/sms.ts";
 import { onTheWayChannel } from "./on-the-way.ts";
@@ -47,6 +48,10 @@ import { linkPathFor, renderMessage, templateContext, type CommsData, type Rende
  * each address gets it at most once) and the old one stops being retried;
  * when they remove it, nothing goes. A notify for an occurrence that went
  * to an old address sends it to the new one too.
+ *
+ * Messages about an appointment (on my way, reminders, bookings: see
+ * expiry.ts) carry an expiry and are never sent after it, nor for a project
+ * that's closed or cancelled: the row is marked skipped with the reason.
  */
 
 export type Channel = MessageRecord["channel"];
@@ -346,6 +351,9 @@ export function createOutbox(deps: OutboxDeps) {
     if (m.subject !== undefined) copy.subject = m.subject;
     if (m.bodyHtml !== undefined) copy.bodyHtml = m.bodyHtml;
     if (m.linkPath !== undefined) copy.linkPath = m.linkPath;
+    // The same moment, so the same expiry: a copy to the new address is no fresher than the original.
+    const expiresAt = expiryOf(m);
+    if (expiresAt) copy.expiresAt = expiresAt;
     const inserted = await deps.store.insert(copy);
     if (!inserted.ok) {
       return inserted.duplicate
@@ -369,6 +377,12 @@ export function createOutbox(deps: OutboxDeps) {
       if (FOLLOW_UP_EVENTS.has(m.event) && optedOut(m.event, project)) {
         await deps.store.update(m.id, { status: "skipped", error: OPTED_OUT });
         return { ...base, status: "skipped", error: OPTED_OUT };
+      }
+      // About an appointment that's passed, or on a closed or cancelled project: never sent late.
+      const stale = staleReason(m, deps.now(), project);
+      if (stale) {
+        await deps.store.update(m.id, { status: "skipped", error: stale });
+        return { ...base, status: "skipped", error: stale };
       }
       // Written to an address staff have since corrected or removed.
       if (follows && project) {
@@ -521,6 +535,8 @@ export function createOutbox(deps: OutboxDeps) {
         }
         if (link.linkPath) record.linkPath = link.linkPath;
         if (opts.scheduledFor) record.scheduledFor = opts.scheduledFor;
+        const expiresAt = messageExpiry(event, opts.data, now);
+        if (expiresAt) record.expiresAt = expiresAt;
 
         const inserted = await deps.store.insert(record);
         if (!inserted.ok) {

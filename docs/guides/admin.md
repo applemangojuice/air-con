@@ -21,6 +21,8 @@ is fictional DEMO data.
 8. [The team](#8-the-team)
 9. [Settings and the catalogue](#9-settings-and-the-catalogue)
 10. [Who can do what](#10-who-can-do-what)
+11. [Restore from backup](#11-restore-from-backup)
+12. [Data-protection requests (access, correction, deletion)](#12-data-protection-requests-access-correction-deletion)
 
 ---
 
@@ -125,6 +127,17 @@ share a number: the form says which household already has it.
   record it yourself in the **Proposal** box (**The customer agreed to get
   documents by email**, and how: in person, or by email with its date and
   subject). No proposal can be issued without it.
+- **They'd rather have paper.** The pilot can't send the proposal, contract
+  or cancellation form on paper, and the app doesn't pretend to: their page
+  and the survey email ask them to agree to email, and say we'll get in
+  touch if they'd rather not. Call them and talk it through. If they agree,
+  record it as above. If they still want paper, tell them honestly that the
+  pilot can't do paper, and close the project (**Close the project**, tick
+  **The customer withdrew before any contract**, with a note). Never tick
+  the agreement for someone who hasn't given it. Once the promised date has
+  passed, the daily late-proposal alert says it's waiting for their
+  agreement (not to send it), and their page says so too, without an
+  apology for a delay that isn't ours.
 
 ### 3.3 The design (technical lead)
 
@@ -359,8 +372,13 @@ status, channel and message type.
 
 - **Sent**: the provider (Resend or Twilio) accepted it. **Demo, not sent**:
   that channel isn't set up (texts, until Twilio is). **Failed**: open it to
-  see why. **Skipped**: deliberately not sent (for example, a family who
-  stopped follow-up emails).
+  see why (Resend not answering within 10 seconds counts as failed, and is
+  tried again). **Skipped**: deliberately not sent, with the reason: a
+  family who stopped follow-up emails, or a message about an appointment
+  that would have arrived too late (an on-my-way text more than 45 minutes
+  old, a reminder once the survey or install has started, a booking
+  confirmation once it's over) or for a closed or cancelled project. Those
+  are never sent late, by the daily retries or by **Retry**.
 - **Preview** shows exactly what went, except the sign-in link itself: it's
   added only as the email goes out and is never stored, so a preview can't
   open it. To see a family's page, use the project's **Customer view**; to
@@ -438,3 +456,116 @@ verified against the manufacturer's table.
 Refrigerant steps need a current F-gas Category I certificate; electrical
 steps need Part P; commissioning needs the technical lead role **and**
 F-gas. The app enforces this on the server, whatever the screen shows.
+
+## 11. Restore from backup
+
+Supabase Pro keeps a copy of the database every day for 7 days (the free
+plan keeps none). A restore puts the **whole** database back to that day:
+everything recorded since (payments, messages, survey answers, install
+evidence, new projects) is gone. So it's the last resort, for data that's
+lost or broken and can't be fixed on screen. A wrong entry is fixed on
+screen ([§5](#5-cancellations-problems-and-changes) and START-HERE §13).
+
+1. **Ask your developer first** if you can: often a single record can be
+   put back without a restore.
+2. **Stop the team using the app** (crew phones keep their waiting captures
+   until it's back; tell them not to clear the browser).
+3. **Write down what happened since the backup**: **Messages** (newest
+   first), each live project's **Money** box and timeline, and any project
+   created since. Print or save them as PDF (**Print → Save as PDF**). This
+   is what you re-enter afterwards.
+4. Supabase → your project → **Database** → **Backups** → **Scheduled
+   backups** → **Restore** next to the day you want → confirm. The site
+   shows errors until it finishes (minutes, sometimes longer).
+5. **Check it**: `/api/health` says `"status":"ok"`, `/ops/status` is all
+   present, and `supabase/check-schema.sql` in the SQL editor says **All
+   present** (START-HERE §3). If a migration came after the backup, run
+   `supabase/pilot-upgrade.sql` again (it's safe to repeat).
+6. **Put back what's missing** from your notes: payments (**Money** →
+   record it), survey and booking changes, and so on. In **Messages**, use
+   **Send again** only where the family really needs a message again.
+7. Ask the crew to open the field app with signal: anything still waiting
+   on their phones sends. Captures that had already reached the server
+   after the backup time are gone and need recording again.
+
+**Photos aren't in the backup.** Files stay in Supabase Storage (the app
+never deletes them), but a photo uploaded after the backup point has no
+record any more, so it doesn't appear on the project: upload it again from
+the phone or the project if it matters.
+
+## 12. Data-protection requests (access, correction, deletion)
+
+Anyone can ask what we hold about them, ask us to correct it, or ask us to
+delete it (UK GDPR). Reply within one month. Log each request (who, when,
+what, what you did) somewhere you keep. **Take legal advice before deleting
+anything** about a customer who has had a proposal, a contract, an invoice
+or a payment.
+
+**Access: what you can give them today.** The app has no one-click export.
+Gather it from these, print each to PDF (**Print → Save as PDF**) and send
+it securely:
+
+- **The project page** (the command centre: details, survey, design,
+  proposal, money, issues and the activity timeline).
+- **Their documents**: the project's **Customer view** → **Your documents**
+  → **See all** (proposals, contract confirmation, invoices, receipts,
+  credit notes, certificates, the handover pack). Each opens as a page.
+- **Messages**: **Messages**, filtered to the family: every email and text
+  we sent, with its wording.
+- **Their quote**: **Quotes** → their quote (the form answers and photos).
+  **Download CSV** on the Quotes list has everyone's quotes: send only
+  their row.
+- **Photos**: open each from the project and save it. There's no bulk
+  download.
+- Website analytics aren't linked to a name or email.
+
+**Correction.** Admin box → **Edit contact and access** (name, address,
+postcode, email, phone, access and parking notes). Documents already issued
+keep the details they went out with, because they're the record of what was
+sent; if one of them is materially wrong, issue a corrected one (a new
+proposal version, or a credit note and a new invoice) rather than editing
+the old.
+
+**Deletion: what must be kept.** Some records have to be kept even if
+they ask, and the law allows that:
+
+- invoices, payments, refunds and credit notes: HMRC expects business
+  records to be kept for at least **6 years**;
+- the proposal, contract confirmation, cancellation records, variations and
+  the evidence of their agreements (documents by email, an early start):
+  for as long as either side could bring a claim (6 years for a contract
+  claim in England and Wales);
+- commissioning and electrical certificates, F-gas records and warranty
+  registrations: for their own required periods (your F-gas and Part P
+  schemes say how long).
+
+Check the exact periods with your accountant and solicitor. Until they've
+passed, you can still **reduce** what's held: remove the mobile, access and
+parking notes (**Edit contact and access**), and remove the email once
+nothing more needs sending (that also ends their access). They can stop
+follow-up emails themselves on their page (Aftercare → **Stop follow-up
+emails**).
+
+**Deletion: the manual steps (only after legal advice).** There is no
+delete button, on purpose. Deleting a project row in Supabase **cascades**:
+it permanently deletes everything attached to it (survey, design,
+proposals, invoices, **payments**, documents, messages, issues, install
+evidence, time entries, purchase orders, compliance items and the media
+records), with no undo except a full restore (§11). So:
+
+1. Export what must be kept first (above), and keep it safely offline.
+2. For someone who never went beyond a quote: Supabase → **Table editor** →
+   `quote_requests` → their row → delete. Their quote's photos are files in
+   **Storage** → `survey-photos`, under the paths in the quote's record: ask
+   your developer to remove them with it. (A quote with a project can't be
+   deleted until the project is.)
+3. For a project, once your solicitor agrees the retention periods are
+   over: in the **SQL editor**, `delete from public.projects where id =
+   '<the project id>';` (the id is in the project page's address). Then
+   **Storage** → `project-media` → the folder named with that id → delete
+   (photo files aren't removed by the row). Then delete their
+   `quote_requests` row as in step 2 and, if they have no other project,
+   their `customers` row (by email).
+4. Record what you deleted and when in your request log. Backups age out
+   by themselves within 7 days.
+

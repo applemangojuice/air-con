@@ -535,24 +535,74 @@ export async function storeSystemMedia(input: {
 /* Read                                                                */
 /* ------------------------------------------------------------------ */
 
+/** Signed read URLs are reused within this window, so a photo keeps one URL (and the browser's copy) across loads and polls. */
+export const SIGNED_URL_WINDOW_SEC = 3600;
+
 /**
- * Short-lived read URLs, media id → URL, on whichever backend is live.
- * Items whose file is missing get no entry (callers show a placeholder).
+ * What to sign with at `nowSec`: everything signed in one window shares an
+ * expiry, the window's end plus the lifetime asked for, so each URL handed
+ * out still lives at least `expiresSec`, and one signed early in the window
+ * can be handed out again until the window ends (`reuseUntil`). Pure.
+ */
+export function stableSigning(nowSec: number, expiresSec: number, windowSec = SIGNED_URL_WINDOW_SEC): { exp: number; reuseUntil: number } {
+  const life = Math.max(1, Math.floor(expiresSec));
+  const window = Math.max(1, Math.min(Math.floor(windowSec), life));
+  const reuseUntil = (Math.floor(nowSec / window) + 1) * window;
+  return { exp: reuseUntil + life, reuseUntil };
+}
+
+/**
+ * Signed URLs already handed out, by bucket, path and lifetime. Supabase
+ * puts the signing time in its token, so only reusing the URL keeps it the
+ * same; locally the shared expiry alone would. Per server instance (a cold
+ * start, or another instance, signs afresh); never more than a few thousand.
+ */
+const signedCache = new Map<string, { url: string; reuseUntil: number }>();
+const SIGNED_CACHE_MAX = 5_000;
+
+function rememberSigned(key: string, url: string, reuseUntil: number, nowSec: number) {
+  if (signedCache.size >= SIGNED_CACHE_MAX) {
+    for (const [k, v] of signedCache) if (v.reuseUntil <= nowSec) signedCache.delete(k);
+    // Still full: drop the oldest quarter (a Map iterates in insertion order).
+    if (signedCache.size >= SIGNED_CACHE_MAX) for (const k of [...signedCache.keys()].slice(0, SIGNED_CACHE_MAX / 4)) signedCache.delete(k);
+  }
+  signedCache.set(key, { url, reuseUntil });
+}
+
+/**
+ * Read URLs, media id → URL, on whichever backend is live. Items whose file
+ * is missing get no entry (callers show a placeholder).
+ *
+ * Stable within the hour (`stableSigning`): the hub's poll, a reload or the
+ * picker opened again gets the very same URL for the same photo, so the
+ * browser shows its cached copy instead of downloading it again. Every URL
+ * still lives at least `expiresSec` from when it's returned (at most an hour
+ * more). Only callers that may show an item ask for it, so reuse never
+ * widens who sees what.
  */
 export async function signedMediaUrls(
   items: Pick<MediaItem, "id" | "bucket" | "storagePath">[],
   expiresSec = 3600,
 ): Promise<Map<string, string>> {
   const out = new Map<string, string>();
+  const nowSec = Math.floor(Date.now() / 1000);
+  const { exp, reuseUntil } = stableSigning(nowSec, expiresSec);
+  const life = Math.max(1, Math.floor(expiresSec));
+  const keyOf = (bucket: string, path: string) => `${bucket}\u0000${path}\u0000${life}`;
   const byBucket = new Map<string, Pick<MediaItem, "id" | "bucket" | "storagePath">[]>();
   for (const item of items) {
     if (!item.storagePath) continue;
     const bucket = item.bucket || MEDIA_BUCKET;
+    const cached = signedCache.get(keyOf(bucket, item.storagePath));
+    if (cached && cached.reuseUntil > nowSec) {
+      out.set(item.id, cached.url);
+      continue;
+    }
     byBucket.set(bucket, [...(byBucket.get(bucket) ?? []), item]);
   }
   for (const [bucket, group] of byBucket) {
     const paths = [...new Set(group.map((i) => i.storagePath))];
-    const { data, error } = await db().storage.from(bucket).createSignedUrls(paths, Math.max(1, Math.floor(expiresSec)));
+    const { data, error } = await db().storage.from(bucket).createSignedUrls(paths, Math.max(1, exp - nowSec));
     if (error || !data) {
       console.error(`[media] signing ${paths.length} URL(s) in ${bucket} failed:`, error?.message);
       continue;
@@ -562,6 +612,7 @@ export async function signedMediaUrls(
       const url = entry.signedUrl;
       if (!entry.error && url) urlByPath.set(entry.path ?? paths[i]!, url);
     });
+    for (const [path, url] of urlByPath) rememberSigned(keyOf(bucket, path), url, reuseUntil, nowSec);
     for (const item of group) {
       const url = urlByPath.get(item.storagePath);
       if (url) out.set(item.id, url);
