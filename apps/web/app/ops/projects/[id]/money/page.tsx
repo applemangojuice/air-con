@@ -266,6 +266,30 @@ function CancellationChargeSection({ project: p, invoices }: { project: Project;
               {chargeInvoice ? `Invoice ${chargeInvoice.number}. ` : ""}What they paid on the contract&apos;s invoices is credit against it; refund the rest the same way
               they paid (on the invoice they paid, below). The family has the same numbers on their page and by email.
             </p>
+            {chargeInvoice && (
+              <details className="mt-3 rounded-2xl border border-line bg-white px-4">
+                <summary className="flex min-h-12 cursor-pointer items-center text-sm font-semibold text-ink-900">Reduce the charge (a credit note against it)</summary>
+                <div className="pb-4">
+                  <p className="mb-2 text-sm text-ink-500">
+                    If the charge was too high, or you&apos;ve agreed less with them. The charge comes down, and so do the refund and what&apos;s left to pay, everywhere.
+                  </p>
+                  <ActionForm flash action={creditAction.bind(null, p.id)} submitLabel="Take it off the charge" variant="secondary" confirm={`Issue a credit note against ${chargeInvoice.number} and bring the charge down?`}>
+                    <input type="hidden" name="invoiceId" value={chargeInvoice.id} />
+                    <input type="hidden" name="purpose" value="reduction" />
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <label className={label}>
+                        Amount (£)
+                        <input name="amount" inputMode="decimal" required className={`${field} mt-1.5 font-normal`} />
+                      </label>
+                      <label className={label}>
+                        Why (printed on the credit note)
+                        <input name="reason" required maxLength={300} className={`${field} mt-1.5 font-normal`} />
+                      </label>
+                    </div>
+                  </ActionForm>
+                </div>
+              </details>
+            )}
             {!chargeInvoice && (
               <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
                 The charge is recorded but its invoice wasn&apos;t issued. Finishing never doubles anything.

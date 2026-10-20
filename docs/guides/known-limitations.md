@@ -156,7 +156,8 @@ says what to do instead. Approvals that need a professional are in
       what was done); nothing checks it beyond "more than zero and no more
       than the contract", so take advice if it's disputed (solicitor
       question 2 in `docs/research/uk-consumer-legal.md`). One charge per
-      cancellation: to change it, credit its invoice. Goods aren't part of
+      cancellation: to bring it down, **Reduce the charge** on the money
+      page (a credit note against it); there's no way to raise it. Goods aren't part of
       it: the app makes no deduction for the equipment (reg 34(9)-(10)
       would need advice first). The unpaid part of a part-paid invoice is
       credited when the cancellation is recorded.

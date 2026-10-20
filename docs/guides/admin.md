@@ -401,8 +401,9 @@ paid, by the cancellation's 14-day date. If what they paid doesn't cover
 it, the rest is on their pay page and is their next step. The section says
 why when it can't be charged: no evidenced early-start request (they owe
 nothing for the work), a cancellation after the period, no install day
-started before it reached us, or one already recorded (credit its invoice
-to change it). Take advice on the figure if it's disputed (solicitor
+started before it reached us, or one already recorded. Too high, or agreed less? **Reduce the charge** under it:
+a credit note against its invoice brings the charge, the refund and what's
+left to pay down everywhere. Take advice on the figure if it's disputed (solicitor
 question 2 in `docs/research/uk-consumer-legal.md`). The equipment we
 supplied is dealt with under their cancellation rights: we collect it, at
 our cost; nothing is deducted for it here.

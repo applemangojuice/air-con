@@ -2515,7 +2515,11 @@ changelog and the reasons, so nobody "fixes" a deliberate choice back.
       cancelled** while owed) use the settlement. The invoice document says
       what it's for and that the equipment isn't part of it. Pilot metrics:
       a cancelled contract with a charge earns the charge, net of VAT and of
-      credit against it. Goods: supply-and-install's equipment follows reg
+      credit against it. A credit note against the charge's invoice is
+      allowed up to the part not yet credited (it's covered by their
+      payments, so never "unpaid") and brings the charge itself down
+      (`cancellation-charge-credited`, once per credit note), so every
+      surface follows: the money page's **Reduce the charge**. Goods: supply-and-install's equipment follows reg
       34 (we collect it, at our cost); no deduction for goods is made or
       suggested.
     - *The accountant's export* (was known limitation 21's "print each money

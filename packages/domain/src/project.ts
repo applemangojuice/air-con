@@ -273,6 +273,9 @@ export interface CancellationCharge {
   recordedBy: string;
   /** The form's one-off id: recording it again (a double click, a retry) changes nothing. */
   requestId?: string;
+  /** Taken off since by credit notes against its invoice (`cancellation-charge-credited`): already out of `amountPence`. */
+  creditedPence?: number;
+  creditNoteIds?: string[];
 }
 
 export interface CrewMember {
@@ -1998,6 +2001,8 @@ export type ProjectAction =
   | { type: "refund-failed"; amountPence: number; paymentId: string }
   /** Ops: the charge for work done before a cancellation, after an evidenced early start (reg 36(4)). */
   | { type: "cancellation-charge-recorded"; amountPence: number; basis: string; requestId?: string }
+  /** Money: a credit note against the charge's invoice took this much off the charge. */
+  | { type: "cancellation-charge-credited"; amountPence: number; creditNoteId: string }
   | { type: "note"; text: string };
 
 export type ApplyResult = { ok: true; project: Project } | { ok: false; error: string; blockers?: Blocker[] };
@@ -2023,6 +2028,7 @@ const AFTER_CLOSE: ReadonlySet<ProjectAction["type"]> = new Set<ProjectAction["t
   "contract-confirmation-sent",
   "pre-contract-info-sent",
   "cancellation-charge-recorded",
+  "cancellation-charge-credited",
   "refund-failed",
 ]);
 
@@ -3193,6 +3199,36 @@ export function applyProjectAction(project: Project, action: ProjectAction, now:
       return ok();
     }
 
+    case "cancellation-charge-credited": {
+      const charge = p.cancellation?.charge;
+      if (!charge) return err("There's no charge for work done on this project.");
+      if (charge.creditNoteIds?.includes(action.creditNoteId)) return ok(); // counted already
+      if (!isWholePence(action.amountPence) || action.amountPence <= 0) return err("A credit needs a whole-pence amount.");
+      if (action.amountPence > charge.amountPence) return err(`That's more than the charge (${fmtPence(charge.amountPence)}).`);
+      p.cancellation = {
+        ...p.cancellation!,
+        charge: {
+          ...charge,
+          amountPence: charge.amountPence - action.amountPence,
+          creditedPence: (charge.creditedPence ?? 0) + action.amountPence,
+          creditNoteIds: [...(charge.creditNoteIds ?? []), action.creditNoteId],
+        },
+      };
+      const s = cancellationSettlement(p)!;
+      log(
+        "cancellation-charge-credited",
+        `We've taken ${fmtPence(action.amountPence)} off the charge for the work done: it's now ${fmtPence(s.chargePence)}. ${
+          s.refundDuePence > 0
+            ? `You've paid ${fmtPence(s.paidPence)}, so we'll refund ${fmtPence(s.refundDuePence)}.`
+            : s.owedPence > 0
+              ? `${fmtPence(s.owedPence)} is left to pay.`
+              : "There's nothing more to pay or refund."
+        }`,
+        "ops",
+      );
+      return ok();
+    }
+
     case "note": {
       const text = action.text.trim();
       if (!text) return err("Write something first.");
@@ -3321,7 +3357,7 @@ export function cancellationChargeProblem(
 ): string | null {
   const c = p.cancellation;
   if (!c) return "There's no cancellation recorded on this project.";
-  if (c.charge) return `A charge for the work done is already recorded (${fmtPence(c.charge.amountPence)}). To change it, credit its invoice and explain why in writing.`;
+  if (c.charge) return `A charge for the work done is already recorded (${fmtPence(c.charge.amountPence)}). To bring it down, credit its invoice (Reduce the charge) and explain why in writing.`;
   if (!c.withinPeriod) {
     return "The cancellation reached us after the cancellation period ended, so this isn't a charge for work done under the cancellation rules: the contract's own terms apply. Take advice (see the late-cancellation task).";
   }

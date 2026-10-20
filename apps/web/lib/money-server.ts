@@ -421,8 +421,10 @@ export async function issueInvoice(projectId: string, input: IssueInput, staff: 
     if (input.creditsInvoiceId) {
       const target = invoices.find((i) => i.id === input.creditsInvoiceId);
       if (!target || !live(target) || target.kind === "credit-note") return fail("That invoice can't be credited.");
-      // Normally only what's unpaid; releasing a cancelled contract's paid money, the part not yet credited.
-      const left = input.releasePaid ? target.totalPence + creditedAgainst(target, invoices) : invoiceOutstanding(target, invoices);
+      // Normally only what's unpaid; releasing a cancelled contract's paid money, or taking money off the charge
+      // for work done (covered by what they paid, so never "unpaid"), the part not yet credited.
+      const left =
+        input.releasePaid || target.kind === "cancellation-charge" ? target.totalPence + creditedAgainst(target, invoices) : invoiceOutstanding(target, invoices);
       if (amount > left) {
         return fail(`${left > 0 ? `Only ${money(left)} is` : "Nothing is"} left unpaid on ${target.number}. For money already paid, record a refund instead.`);
       }
@@ -533,7 +535,16 @@ export async function issueInvoice(projectId: string, input: IssueInput, staff: 
     entityId: invoice.id,
     detail: { projectId, number: invoice.number, kind: invoice.kind, totalPence: invoice.totalPence, ...(input.earlyReason?.trim() && input.kind === "balance" ? { earlyReason: input.earlyReason.trim() } : {}) },
   });
+  // Money off the charge for work done before a cancellation: the charge itself comes down, so the
+  // family's page, the pay page and the refund say the new figure (cancellationSettlement).
+  let chargeWarning: string | undefined;
+  const target = invoice.creditsInvoiceId ? invoices.find((i) => i.id === invoice.creditsInvoiceId) : undefined;
+  if (kind === "credit-note" && target?.kind === "cancellation-charge") {
+    const r = await dispatch(projectId, { type: "cancellation-charge-credited", amountPence: -invoice.totalPence, creditNoteId: invoice.id }, staff);
+    if ("error" in r) chargeWarning = `the charge on their page didn't come down (${r.error})`;
+  }
   const finished = await finishIssue(invoice, staff);
+  if (chargeWarning) finished.warning = finished.warning ? `${finished.warning} Also: ${chargeWarning}.` : `Issued, but ${chargeWarning}.`;
   return {
     ok: true,
     value: finished.invoice,

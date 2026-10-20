@@ -133,10 +133,18 @@ test("a charge below what they paid: their payments become credit against it, th
   const direct = await issueInvoice(DEMO3, { kind: "cancellation-charge" }, DEMO_STAFF.admin);
   assert.ok(!direct.ok && /already invoiced/.test(direct.error));
 
+  // Too high: a credit note against the charge brings it down, and the refund up, everywhere.
+  const cut = await issueInvoice(DEMO3, { kind: "credit-note", amountPence: 1_000, reason: "DEMO: agreed £10 less", creditsInvoiceId: charge.id, creditPurpose: "reduction", requestId: crypto.randomUUID() }, DEMO_STAFF.admin);
+  assert.ok(cut.ok, JSON.stringify(cut));
+  const lower = (await loadProject(DEMO3))!;
+  assert.equal(domain.cancellationSettlement(lower)!.chargePence, chargePence - 1_000);
+  assert.equal(domain.outstandingPence(await invoicesRepo.listForProject(DEMO3)), -(paid - chargePence + 1_000), "the books agree with the page");
+  const chargeAfter = chargePence - 1_000;
+
   // The refund of the rest, against what they paid: no extra credit note, and nothing left either way.
   const refund = await recordRefund(
     DEMO3,
-    { invoiceId: deposit.id, amountPence: paid - chargePence, method: "bank-transfer", refundedOn: londonToday(), reason: "DEMO: the rest after the charge", requestId: crypto.randomUUID() },
+    { invoiceId: deposit.id, amountPence: paid - chargeAfter, method: "bank-transfer", refundedOn: londonToday(), reason: "DEMO: the rest after the charge", requestId: crypto.randomUUID() },
     DEMO_STAFF.admin,
   );
   assert.ok(refund.ok, JSON.stringify(refund));
@@ -153,7 +161,8 @@ test("a charge below what they paid: their payments become credit against it, th
 
   // The pilot's revenue is the charge, net of VAT: never the contract.
   const metrics = domain.pilotMetrics({ project: settled, purchaseOrders: [], time: [], issues: [], messagesSent: 0, invoices: after });
-  assert.equal(metrics.revenuePence, charge.netPence);
+  const cutNet = (await invoicesRepo.get(cut.value.id))!.netPence;
+  assert.equal(metrics.revenuePence, charge.netPence + cutNet, "the charge less its credit, net of VAT");
   assert.equal(metrics.cancelled, true);
 });
 

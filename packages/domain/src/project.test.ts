@@ -2286,3 +2286,15 @@ test("refund-failed: a counted refund that failed at the card provider comes bac
   const cancelled = step(p, { type: "cancellation-received", receivedAt: "2026-11-18T07:30:00.000Z", channel: "email", evidenceRef: "DEMO email" }, "2026-11-18T09:00:00.000Z", { actor: ADMIN });
   assert.equal(step(cancelled, { type: "refund-failed", amountPence: 60_000, paymentId: "pay-ref" }, "2026-11-20T10:00:00.000Z").money.paidPence, 180_000);
 });
+
+test("cancellation charge credited: the charge comes down by the credit note, once, and the refund goes up", () => {
+  const charged = step(cancelledAfterDay1(180_000), charge(90_000), "2026-11-19T10:00:00.000Z", { actor: ADMIN });
+  refuses(charged, { type: "cancellation-charge-credited", amountPence: 90_001, creditNoteId: "cn-1" }, "2026-11-20T10:00:00.000Z", {}, /more than the charge \(£900\)/);
+  const less = step(charged, { type: "cancellation-charge-credited", amountPence: 30_000, creditNoteId: "cn-1" }, "2026-11-20T10:00:00.000Z");
+  assert.equal(less.cancellation?.charge?.amountPence, 60_000);
+  assert.equal(less.cancellation?.charge?.creditedPence, 30_000);
+  assert.equal(cancellationSettlement(less)!.refundDuePence, 120_000);
+  assert.match(less.events.at(-1)!.label, /taken £300 off the charge for the work done: it's now £600\. You've paid £1,800, so we'll refund £1,200/);
+  assert.equal(step(less, { type: "cancellation-charge-credited", amountPence: 30_000, creditNoteId: "cn-1" }, "2026-11-20T10:05:00.000Z").cancellation?.charge?.amountPence, 60_000, "the same credit note twice: once");
+  refuses(cancelledAfterDay1(), { type: "cancellation-charge-credited", amountPence: 100, creditNoteId: "cn-x" }, "2026-11-20T10:00:00.000Z", {}, /no charge/);
+});
