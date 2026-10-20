@@ -1,51 +1,53 @@
 # Test results
 
-The latest real results of every automatic check, run on the night of
-**19 to 20 October 2026** on branch `claude/pilot-ops` at commit `454c8d1`:
-the fix for the handover flake [below](#the-handover-flake-fixed), on top of
+The latest real results of every automatic check, run on the morning of
+**20 October 2026** on branch `claude/pilot-ops` at commit `a04cc53`: the
+fixes from round 5 of the pre-launch review [below](#what-round-5-found),
+on top of the handover fix (`454c8d1`, [below](#the-handover-flake-fixed)),
 the go-live pack, the Supabase compatibility work and the fixes from the
-final pre-launch review and rounds 3 and 4 (`4d9c16b`, [below](#what-round-4-found)).
-Everything was run **twice, start to finish, and passed both times**, on
-both databases, and in each round the handover was repeated **30 times in a
-row on each database**, the Supabase-shaped one slowed down on purpose, and
-passed every time. Every person, home and price the browser walks use is
-fictional and labelled DEMO.
+final pre-launch review and rounds 3 and 4. Everything was run **twice,
+start to finish, and passed both times**, on both databases. Every person,
+home and price the browser walks use is fictional and labelled DEMO.
 
-**Summary: everything passed, on both databases.** 920 unit tests, the type
+**Summary: everything passed, on both databases.** 935 unit tests, the type
 check, the production build (Next.js 15.5.28), every database migration
 check (110 assertions) and the upgrade file check; then the browser walks on
-**both** backends: on the local file database, 193 end-to-end pilot checks,
-23 quote-form checks and 30 of 30 handovers; on a Supabase-shaped stack
-(Postgres 16, PostgREST and the Storage API, as a real Supabase project
-serves them, with the database's default grants as a project created today
-has them), the same 193 and 23, the property book importers over 3,000
-homes, 439 checks across 284 screens with no statement refused by the
-database, and 30 of 30 handovers with every database and storage request
-held 60 ms plus up to 240 ms more.
+**both** backends: on the local file database, 197 end-to-end pilot checks
+and 23 quote-form checks; on a Supabase-shaped stack (Postgres 16,
+PostgREST and the Storage API, as a real Supabase project serves them, with
+the database's default grants as a project created today has them), the
+same 197 and 23, the property book importers over 3,000 homes, and 439
+checks across 284 screens with no statement refused by the database.
 
 | Check | Command | Result | Round 1 (UTC, 20 Oct) | Round 2 (UTC, 20 Oct) |
 | --- | --- | --- | --- | --- |
-| Type check (domain, web, mobile) | `pnpm -r typecheck` | **Pass** (3 of 3 projects) | 01:50 | 02:26 |
-| Domain unit tests | `pnpm test` | **460 of 460 pass**, 0 fail (29 test files) | 01:50 | 02:26 to 02:27 |
-| Web unit tests | `pnpm test` | **460 of 460 pass**, 0 fail (51 test files) | 01:50 | 02:26 to 02:27 |
-| Production build | `pnpm --filter @aircon/web build` | **Pass**: Next.js 15.5.28, compiled, 34 of 34 static pages generated | 01:50 to 01:52 | 02:27 to 02:28 |
-| Database migrations | `bash supabase/tests/run-migrations.sh` | **Pass**: 15 migrations and the pilot upgrade bundle; the local backend's schema matches; 110 sanity assertions | 01:52 | 02:28 |
-| Upgrade file is current | `bash supabase/build-pilot-upgrade.sh --check` | **Pass**: `pilot-upgrade.sql` is current (0010 to 0014) | 01:52 | 02:28 |
-| Pilot walk, **local file database** | `node scripts/e2e-pilot.mjs` | **193 of 193 pass** | 01:52 to 01:56 | 02:28 to 02:33 |
-| Quote form walk, **local file database** | `node scripts/e2e-funnel.mjs` | **23 of 23 pass** | 01:56 to 01:57 | 02:33 |
-| Handover, 30 times, **local file database** | `node scripts/e2e-handover-loop.mjs` (after the pilot walk to phase I) | **30 of 30 rounds pass**; the sign-off opens a median 121 and 114 ms after the tap (rounds 1 and 2) | 01:57 to 02:02 | 02:33 to 02:39 |
-| Pilot walk, **Supabase-shaped** | `bash supabase/tests/compat/run-compat-e2e.sh` | **193 of 193 pass** | 02:02 to 02:11 | 02:39 to 02:48 |
+| Type check (domain, web, mobile) | `pnpm -r typecheck` | **Pass** (3 of 3 projects) | 04:12 | 04:27 |
+| Domain unit tests | `pnpm test` | **461 of 461 pass**, 0 fail (29 test files) | 04:12 | 04:27 |
+| Web unit tests | `pnpm test` | **474 of 474 pass**, 0 fail (52 test files) | 04:12 | 04:27 |
+| Production build | `pnpm --filter @aircon/web build` | **Pass**: Next.js 15.5.28, compiled, 34 of 34 static pages generated | 04:12 to 04:13 | 04:27 to 04:28 |
+| Database migrations | `bash supabase/tests/run-migrations.sh` | **Pass**: 15 migrations and the pilot upgrade bundle; the local backend's schema matches; 110 sanity assertions | 04:13 | 04:28 |
+| Upgrade file is current | `bash supabase/build-pilot-upgrade.sh --check` | **Pass**: `pilot-upgrade.sql` is current (0010 to 0014) | 04:13 | 04:28 |
+| Pilot walk, **local file database** | `node scripts/e2e-pilot.mjs` | **197 of 197 pass** | 04:13 to 04:18 | 04:28 to 04:33 |
+| Quote form walk, **local file database** | `node scripts/e2e-funnel.mjs` | **23 of 23 pass** | 04:18 | 04:33 |
+| Pilot walk, **Supabase-shaped** | `bash supabase/tests/compat/run-compat-e2e.sh` | **197 of 197 pass** | 04:18 to 04:26 | 04:33 to 04:41 |
 | Quote form walk, **Supabase-shaped** | (same run) | **23 of 23 pass** | (same run) | (same run) |
 | Property book import, **Supabase-shaped** | (same run) | **Pass**: 3,000 homes, 900 in a conservation area, 3,000 classified (three times Max Rows) | (same run) | (same run) |
 | Every screen, **Supabase-shaped** | (same run) | **439 of 439 pass**: 284 pages over 212 routes, 141 requests with ids that aren't there, a NUL in the quote form, 4 CSV exports, 4 daily jobs | (same run) | (same run) |
 | Database and app logs, **Supabase-shaped** | (same run) | **Clean**: no statement refused by Postgres, no PostgREST or Storage error in the app's log | (same run) | (same run) |
-| Handover, 30 times, **Supabase-shaped, slowed down** | `bash supabase/tests/compat/run-handover-loop.sh` (60 ms + up to 240 ms on every database and storage request) | **30 of 30 rounds pass**; the sign-off opens a median 5,246 and 5,342 ms after the tap (the publish itself, at that latency) | 02:12 to 02:26 | 02:48 to 03:02 |
 
-Both rounds ran on commit `454c8d1` itself (only this document changed
-after it), each from a fresh build and fresh, empty data. In round 1 the
-slowed-down handover loop's first start (02:11) found its database port
-taken by another stack on this machine and stopped before anything ran; it
-was started again on free ports at 02:12. Round 2 ran straight through.
+Both rounds ran on commit `a04cc53` itself (only this document changed
+after it), each from a fresh build and fresh, empty data, straight through.
+The pilot walk has four more checks than before (phase H: the next-step card
+names the change waiting for the family's OK, its button opens the change,
+**Your homes** says the same, and it's gone once they've answered). Round 5
+changes nothing in the handover, so the 30-handover loops were not repeated:
+their results (30 of 30 on each database, the Supabase-shaped one slowed
+down) are with the handover fix [below](#the-handover-flake-fixed).
+
+Separately, the web unit tests were run with the clock moved 60 and 400
+days ahead (a preloaded stand-in for `Date`): all 474 still passed, so no
+test depends on a fixed date in the next year that the new message expiries
+would pass.
 
 Set-up for the local walks: a production build (`next start`) on the local
 file database (which enforces the same schema Postgres does), a fresh
@@ -58,6 +60,70 @@ supabase-js with the service-role key, as a demo deployment
 (commissioning signed) at full speed, then put the job back to that point
 before each round (the project row only, written directly: test-only).
 Node 22.22.0, pnpm 10.12.1, PostgreSQL 16.15, PostgREST 12.2.3.
+
+## What round 5 found
+
+A fifth pass of the pre-launch review found two problems, and the reviewers
+evidenced six smaller ones worth fixing before real families. All eight are
+fixed in `a04cc53` (on top of the interrupted work in `b93b36f`), each with
+unit tests that fail without the fix (architecture §K42):
+
+- **While a change waited for the family's OK, their page said "Nothing for
+  you to do right now"**, at the top of the page and on **Your homes**,
+  while the email and text said the change needed their OK before we went
+  ahead. The next step now knows about the changes the office has sent:
+  **Answer a change to your installation**, with which change and its price
+  ("Change #2: … (+£120). We need your yes or no: nothing extra is done
+  without your yes."), and its button opens the change to answer; **Your
+  homes** says the same. It comes before anything else they could do,
+  never on a closed project, and goes as soon as they've answered. (New
+  tests in the domain and the hub; the pilot walk checks the card, the
+  button, **Your homes** and the card once answered, at phase H.)
+- **The consent box promised "otherwise we'll arrange paper copies"**, and
+  so did the terms and the field screens, but no paper route exists: a
+  family who left the box unticked waited for ever and was told the delay
+  was ours. The pilot sends documents by email only, and now says so
+  everywhere it's asked (the box, the terms, the survey screens and help,
+  the proposal builder, the readiness gate), with what happens if they'd
+  rather not: we get in touch. The survey email asks for the agreement when
+  it's missing; a proposal past its date because it waits on their
+  agreement says that, not sorry; and the daily late-proposal alert tells
+  the office what it's waiting for and how to close it honestly, instead of
+  "Send it". Their recorded wording is versioned (`docs-by-email/portal-2`;
+  earlier agreements keep theirs). The gap is a known limitation (22).
+  (New tests.)
+- **Sending an email had no time limit**: a slow Resend could hold a
+  request (a proposal issue, a booking) indefinitely. Resend now gets 10
+  seconds, as Twilio does; no answer is a failed send, with the reason, that
+  the daily jobs or **Retry** try again. (New tests with a Resend that never
+  answers.)
+- **A message about an appointment could arrive late**: a failed on-my-way
+  text retried at the next daily run, or a reminder after the survey had
+  started. On-my-way messages now expire 45 minutes after they're written
+  (or at the arrival time they give, if later); survey and install
+  reminders when the appointment starts; booking confirmations once it's
+  over; and none goes for a closed or cancelled project. After that it's
+  **Skipped** with the reason, never sent, by the daily retries or
+  **Retry**. (New tests, including the clocks: a 10:00 survey in July is
+  09:00 UTC.)
+- **The end-of-day photo picker downloaded every photo of the day** at
+  full size each time it opened. It now draws the newest 24 (any already
+  picked stay), with **Show more photos**, as small fixed-size thumbnails
+  that load only as they scroll into view, and reuses the links it had when
+  it's opened again. (New tests.)
+- **The family's page fetched every photo again every two minutes**,
+  because each refresh signed new links. A photo's link is now the same
+  for up to an hour (one expiry per hour, and the server reuses the links
+  it handed out), so the browser shows its copy. (New tests: the same link
+  twice, its expiry on the hour, at least an hour of life left.)
+- **White text on the orange indoor-unit label failed contrast** (2.9:1).
+  The label text is now whichever of white and dark ink contrasts more:
+  every label colour reaches 4.5:1. (New test over every colour.)
+- **No runbook for restoring a backup or answering a data-protection
+  request.** The admin guide now has both (§11 and §12: what can be
+  exported today, how to correct details, what must be kept, and why
+  deleting a project row in Supabase is a last step after legal advice),
+  linked from START-HERE's "If something goes wrong".
 
 ## The handover flake (fixed)
 
@@ -184,7 +250,7 @@ are fixed in `4d9c16b`, each with unit tests that fail without the fix
   after which proposal, contract and sign-in emails failed until the next
   day. The emails anyone can trigger from the website now come from a
   shared daily budget, per London day and per hour, well under the email
-  plan's 100 a day (known limitation 26); the office's own emails are
+  plan's 100 a day (known limitation 29); the office's own emails are
   never held back. (New tests, including the budget's day across the
   25-hour day the clocks go back.)
 - **The website's analytics beacon stored anything it was sent**: one IP
@@ -309,7 +375,7 @@ are fixed in `069775e`, each with tests that fail without the fix
   here uses. It's now 15.5.28, with the hydration patch carried over
   unchanged. `pnpm audit` lists nothing against Next itself for the web app
   any more (two warnings remain inside Next's bundled PostCSS and `sharp`,
-  neither reachable here: known limitation 35).
+  neither reachable here: known limitation 40).
 
 The earlier final pass (on `e21f042`) had found two problems where the
 go-live pack met the Supabase compatibility work: a demo site switching
@@ -320,7 +386,7 @@ fixed.
 
 One new pilot household taken from set-up to closed, in a real browser, by
 each person on their own device: the admin at a desk (1280 × 800), the
-family, the surveyor and the crew on phones (390 × 844). The same 193 checks
+family, the surveyor and the crew on phones (390 × 844). The same 197 checks
 passed four times on the final commit: twice on the local file database and
 twice on the Supabase-shaped stack. Any page error in the browser (including the
 hydration warning below) or any server error fails the walk.
@@ -334,12 +400,12 @@ hydration warning below) or any server error fails the walk.
 | E | Proposal with two options and PILOT15; issuing is refused until the Schedule 2 settings are filled in, then it issues | 12 | 12 |
 | F | The family views it and accepts option 1 with an early start and their typed name; the contract renders | 10 | 10 |
 | G | Office: early-start email on file (one from the wrong address is refused), dates, crew certificates, deposit invoice paid by bank transfer, booking confirmed, purchase order ordered, delivered and checked, compliance approved | 19 | 19 |
-| H | Install days 1 to 3 on phones: on my way, every step's evidence, an issue, a variation the family approves on their page, end-of-day updates with photos, F-gas steps by the technical lead and electrical steps by the electrician | 31 | 31 |
+| H | Install days 1 to 3 on phones: on my way, every step's evidence, an issue, a variation the family approves on their page (their next step names it, on the page and on **Your homes**, until they answer), end-of-day updates with photos, F-gas steps by the technical lead and electrical steps by the electrician | 35 | 35 |
 | I | Technical lead sets the job's targets and signs commissioning; the certificate renders | 5 | 5 |
 | J | Handover pack published, the family signs "All good", balance invoice paid (DEMO card simulator), electrical certificate and warranty in, issues resolved, project closed, all documents present | 30 | 30 |
 | K | Every customer message logged; the Pilots page shows the pilot; the CSV downloads | 9 | 9 |
 | L | Security: a duplicate pilot number, another family (pages, documents, invoices, photos), a subcontractor (office pages, other jobs, photos, margins, and on their own job the family's project, pay, proposal and documents pages and every document, while the office sees the prices there), signed-out visitors, a forged sign-in cookie, a bad Stripe signature, the demo-data button | 31 | 31 |
-| | **Total** | **193** | **193** |
+| | **Total** | **197** | **197** |
 
 ## The founder's walk (START-HERE, followed literally)
 
@@ -443,7 +509,7 @@ service-role key. Then:
 
 | Walk | What it does | Round 1 | Round 2 |
 | --- | --- | --- | --- |
-| Pilot walk | The 193 checks above | **193 of 193** | **193 of 193** |
+| Pilot walk | The 197 checks above | **197 of 197** | **197 of 197** |
 | Quote form | The 23 checks below | **23 of 23** | **23 of 23** |
 | Property book | 3,000 sample homes imported, enriched and classified, three times what one database read returns | **3,000 / 900 / 3,000** | **3,000 / 900 / 3,000** |
 | Every screen | Break-glass sign-in, the 5 DEMO pilots loaded, 284 pages over 212 routes (every ops, field, customer and public screen, help pages included), 141 requests with ids that don't exist or aren't ids (a 404, never a crash), a NUL character in the quote form (saved without it), 4 CSV exports, 4 daily jobs | **439 of 439** | **439 of 439** |
