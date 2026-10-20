@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import {
+  PHOTO_TAG_LABEL,
   SURVEY_SECTIONS,
   diffSelfSurvey,
   sectionProgress,
@@ -13,7 +14,7 @@ import {
   type SurveySectionId,
 } from "@aircon/domain";
 import { MediaAnnotator, mediaDraftKey, saveAnnotations } from "@/components/annotate/media-annotator";
-import { Annotator, drawingWaitingToSave, markAnnotationToSave, readAnnotationDraft, writeAnnotationDraft, type ToolId } from "@/components/annotate/annotator";
+import { ANNOTATION_DRAFT_EVENT, Annotator, drawingWaitingToSave, markAnnotationToSave, readAnnotationDraft, writeAnnotationDraft, type ToolId } from "@/components/annotate/annotator";
 import type { UploadedMedia } from "@/lib/media-client";
 import { SurveyContext, type SurveyCtx } from "./context";
 import { clearLocalDraft } from "./draft-store";
@@ -505,21 +506,68 @@ function SurveyFlow({
   );
   const queue = usePhotoQueue({ projectId, onUploaded: attach });
 
-  // Drawings kept on this phone to be saved (Save with no signal, or kept and closed): saved once there's signal.
+  // Drawings kept on this phone to be saved (Save with no signal, or kept and closed): saved once
+  // there's signal. "Online" alone isn't enough (one bar, weak Wi-Fi or a server error never fire
+  // it), so they're also tried every 30 seconds while any wait, when the page comes back into
+  // view, and before a submit; and the submit waits for them, like photos still uploading.
   const annotatingId = annotating?.id;
+  const annotatingRef = useRef(annotatingId);
+  annotatingRef.current = annotatingId;
+  const [keptIds, setKeptIds] = useState<string[]>([]);
+  const recountKept = useCallback(() => {
+    const ids = Object.values(mediaRef.current)
+      .filter((m) => !m.locked && drawingWaitingToSave(mediaDraftKey(m)) && readAnnotationDraft(mediaDraftKey(m)) !== null)
+      .map((m) => m.id);
+    setKeptIds((prev) => (prev.join("|") === ids.join("|") ? prev : ids));
+    return ids;
+  }, []);
+  const pushing = useRef(new Set<string>());
+  /** Try every kept drawing once (never two saves of one at a time); resolves to how many still wait. */
+  const saveKeptDrawings = useCallback(async (): Promise<number> => {
+    const tries: Promise<unknown>[] = [];
+    for (const m of Object.values(mediaRef.current)) {
+      const key = mediaDraftKey(m);
+      if (m.locked || m.id === annotatingRef.current || pushing.current.has(key) || !drawingWaitingToSave(key)) continue;
+      const kept = readAnnotationDraft(key);
+      if (!kept) continue;
+      pushing.current.add(key);
+      tries.push(pushDrawing(m, kept).finally(() => pushing.current.delete(key)));
+    }
+    await Promise.all(tries);
+    return recountKept().length;
+  }, [pushDrawing, recountKept]);
   useEffect(() => {
     const resync = () => {
       if (typeof navigator !== "undefined" && navigator.onLine === false) return;
-      for (const m of Object.values(mediaRef.current)) {
-        if (m.locked || m.id === annotatingId || !drawingWaitingToSave(mediaDraftKey(m))) continue;
-        const kept = readAnnotationDraft(mediaDraftKey(m));
-        if (kept) void pushDrawing(m, kept);
-      }
+      void saveKeptDrawings();
+    };
+    const onVisible = () => {
+      if (document.visibilityState === "visible") resync();
     };
     resync();
     window.addEventListener("online", resync);
-    return () => window.removeEventListener("online", resync);
-  }, [pushDrawing, annotatingId]);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.removeEventListener("online", resync);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [saveKeptDrawings, annotatingId]);
+  useEffect(() => {
+    if (keptIds.length === 0) return;
+    const t = window.setInterval(() => {
+      if (typeof navigator === "undefined" || navigator.onLine !== false) void saveKeptDrawings();
+    }, 30_000);
+    return () => window.clearInterval(t);
+  }, [keptIds.length, saveKeptDrawings]);
+  useEffect(() => {
+    recountKept();
+    window.addEventListener(ANNOTATION_DRAFT_EVENT, recountKept);
+    window.addEventListener("storage", recountKept);
+    return () => {
+      window.removeEventListener(ANNOTATION_DRAFT_EVENT, recountKept);
+      window.removeEventListener("storage", recountKept);
+    };
+  }, [recountKept, media, annotatingId]);
   const uploading = queue.items.filter((p) => p.status !== "failed").length;
 
   const detachPhoto = useCallback(
@@ -592,6 +640,13 @@ function SurveyFlow({
     try {
       // A start made with no signal goes first, so the visit is under way (and timed) before it's submitted.
       if ((await replayPendingStart(projectId)) === "kept") throw new Error("Failed to fetch");
+      // Drawings kept on this phone go before the survey does: after a submit nothing here sends them.
+      const unsaved = await saveKeptDrawings();
+      if (unsaved > 0) {
+        throw new Error(
+          `${unsaved} drawing${unsaved === 1 ? " isn't" : "s aren't"} saved yet, so the survey wasn't submitted. Try again when you have signal, or open the photo to save or discard it.`,
+        );
+      }
       const saved = await draft.flush();
       if (!saved && draft.state.kind === "conflict") throw new Error("Decide which copy to keep first (see the top of the screen).");
       const res = await fetch(`/api/field/survey/${projectId}/submit`, {
@@ -710,7 +765,18 @@ function SurveyFlow({
       );
       break;
     case "submit":
-      screen = <SubmitSection pendingPhotos={queue.items.length} consent={project.documentsConsent} onSubmit={submit} submitting={submitting} submitError={submitError} />;
+      screen = (
+        <SubmitSection
+          pendingPhotos={queue.items.length}
+          keptDrawings={keptIds.filter((id) => media[id]).map((id) => ({ id, title: keptTitle(media[id]!, draft.data) }))}
+          onSaveDrawings={saveKeptDrawings}
+          onOpenDrawing={(id, title) => setAnnotating({ id, title })}
+          consent={project.documentsConsent}
+          onSubmit={submit}
+          submitting={submitting}
+          submitError={submitError}
+        />
+      );
       break;
   }
 
@@ -819,6 +885,13 @@ function SurveyFlow({
       )}
     </SurveyContext.Provider>
   );
+}
+
+/** What a kept drawing's photo is, for the submit screen: its room, else where it was taken. */
+function keptTitle(m: SurveyMediaItem, data: MeasuredSurvey): string {
+  const room = m.roomId ? data.rooms.find((r) => r.id === m.roomId)?.name : undefined;
+  if (room) return `${room} photo`;
+  return m.caption?.trim() || `${PHOTO_TAG_LABEL[m.tag] ?? "Photo"} photo`;
 }
 
 /**

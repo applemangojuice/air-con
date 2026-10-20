@@ -195,6 +195,8 @@ export interface CommsData {
     /** We supplied equipment that's with them, or with us for them. */
     collectEquipment?: boolean;
     withinPeriod?: boolean;
+    /** Work began at their request before the period ended: an amount may be due for it (CCR reg 36(4)). */
+    workStartedEarly?: boolean;
   };
   "issue-update": { title: string; update: string; nextStep?: string; dueOn?: string; issueNumber?: number };
   "handover-ready": { electricalCertPending?: boolean };
@@ -1067,7 +1069,11 @@ const TEMPLATES: { [E in CommsEventId]: Renderer<E> } = {
       ["For", `${INVOICE_KIND[d.kind]}, ${place(ctx)}`],
       ["Amount", money(d.totalPence)],
     ];
-    if (d.outstandingPence !== undefined && d.outstandingPence !== d.totalPence) facts.push(["Left to pay", money(d.outstandingPence)]);
+    if (d.outstandingPence !== undefined && d.outstandingPence !== d.totalPence) {
+      // Credit already on their account (a credit note, money overpaid) comes off: say so, so the two figures add up.
+      if (d.outstandingPence < d.totalPence) facts.push(["Less: credit on your account", `−${money(d.totalPence - d.outstandingPence)}`]);
+      facts.push(["Left to pay", money(d.outstandingPence)]);
+    }
     if (d.dueOn) facts.push(["Due", dateLong(d.dueOn)]);
     facts.push(["VAT", vatLine(ctx.settings)]);
 
@@ -1323,7 +1329,9 @@ const TEMPLATES: { [E in CommsEventId]: Renderer<E> } = {
         {
           p: d.paidPence > 0
             ? `We'll refund the ${money(d.paidPence)} you've paid by ${dayLong(d.refundDueBy)} at the latest, the same way you paid. If you'd asked us to start early and work was done, we'll explain any deduction for that work in writing first.`
-            : "You haven't paid us anything, so there's nothing to refund, and nothing more is due.",
+            : d.workStartedEarly
+              ? "You haven't paid us anything, so there's nothing to refund. You asked us to start before your cancellation period ended and work was done, so we'll write to you about any amount for that work."
+              : "You haven't paid us anything, so there's nothing to refund, and nothing more is due.",
         },
         ...(d.collectEquipment ? [{ p: "We'll collect the equipment we supplied, at our cost. We'll be in touch to agree a time." } as Block] : []),
         { p: `Any questions, ${reach(ctx.settings)}.` },

@@ -1,7 +1,8 @@
-import { advancePo, createIssue, type CancellationChannel, type Issue, type Project, type StaffMember } from "@aircon/domain";
+import { advancePo, createIssue, invoiceOutstanding, type CancellationChannel, type Issue, type Project, type StaffMember } from "@aircon/domain";
 import { audit } from "./audit";
 import { notify } from "./comms/outbox";
 import { money } from "./format";
+import { issueInvoice } from "./money-server";
 import { dispatch, loadProject } from "./project-service";
 import { isUuid } from "./repo/base";
 import * as invoicesRepo from "./repo/invoices";
@@ -70,11 +71,33 @@ export async function recordCancellation(projectId: string, input: CancellationI
   const warnings: string[] = [];
   const now = new Date().toISOString();
 
-  // 2. No more money is asked for.
+  // 2. No more money is asked for: unpaid invoices are voided, and what's left unpaid on a
+  // part-paid one is credited (a credit note against it), so neither their page, the
+  // console nor an overdue flag counts it as owed. What they paid stays on it, to refund.
   const voided: string[] = [];
+  const credited: string[] = [];
   try {
     for (const inv of await invoicesRepo.listForProject(projectId)) {
-      if (inv.kind === "credit-note" || inv.status === "void" || inv.status === "draft" || inv.paidPence > 0) continue;
+      if (inv.kind === "credit-note" || inv.status === "void" || inv.status === "draft") continue;
+      if (inv.paidPence > 0) {
+        const left = invoiceOutstanding(inv, await invoicesRepo.listForProject(projectId));
+        if (left <= 0) continue;
+        const cn = await issueInvoice(
+          projectId,
+          {
+            kind: "credit-note",
+            amountPence: left,
+            reason: "The contract was cancelled: the unpaid part isn't asked for",
+            creditsInvoiceId: inv.id,
+            creditPurpose: "reduction",
+            requestId: `cancel-credit:${inv.id}:${c.receivedAt}`,
+          },
+          staff,
+        );
+        if (cn.ok) credited.push(`${inv.number} (${money(left)}, credit note ${cn.value.number})`);
+        else warnings.push(`${inv.number} still shows ${money(left)} unpaid: credit it on the money page (${cn.error}).`);
+        continue;
+      }
       await invoicesRepo.update({ ...inv, status: "void" });
       voided.push(inv.number);
     }
@@ -151,7 +174,15 @@ export async function recordCancellation(projectId: string, input: CancellationI
   try {
     await notify("cancellation-confirmed", {
       projectId,
-      data: { receivedAt: c.receivedAt, channel: c.channel, refundDueBy: c.refundDueBy, paidPence: paid, collectEquipment: collect, withinPeriod: c.withinPeriod },
+      data: {
+        receivedAt: c.receivedAt,
+        channel: c.channel,
+        refundDueBy: c.refundDueBy,
+        paidPence: paid,
+        collectEquipment: collect,
+        withinPeriod: c.withinPeriod,
+        workStartedEarly: Boolean(project.proposal.earlyStart) && project.install.status !== "not-started",
+      },
       discriminator: c.receivedAt,
     });
   } catch (err) {
@@ -169,6 +200,7 @@ export async function recordCancellation(projectId: string, input: CancellationI
             ? [`The customer was told we'd be in touch: no refund or collection was promised.${paid > 0 ? ` They've paid ${money(paid)}.` : ""}`]
             : [paid > 0 ? `Refund ${money(paid)} by ${c.refundDueBy}.` : "Nothing was paid, so there's nothing to refund."]),
           ...(voided.length ? [`Voided: ${voided.join(", ")}.`] : []),
+          ...(credited.length ? [`Unpaid part credited: ${credited.join("; ")}.`] : []),
           ...(collect && c.withinPeriod ? ["Collect the equipment we supplied, at our cost."] : []),
           ...(placed.length ? [`Orders already placed with ${[...new Set(placed)].join(", ")}: call the supplier to cancel or return them.`] : []),
         ],
@@ -185,7 +217,7 @@ export async function recordCancellation(projectId: string, input: CancellationI
     action: "project.cancellation",
     entity: "project",
     entityId: projectId,
-    detail: { receivedAt: c.receivedAt, channel: c.channel, evidenceRef: c.evidenceRef, refundDueBy: c.refundDueBy, voided, tasks: tasks.map((t) => t.id) },
+    detail: { receivedAt: c.receivedAt, channel: c.channel, evidenceRef: c.evidenceRef, refundDueBy: c.refundDueBy, voided, credited, tasks: tasks.map((t) => t.id) },
   });
   const reloaded = (await loadProject(projectId)) ?? project;
   return { ok: true, project: reloaded, voided, tasks, warnings };

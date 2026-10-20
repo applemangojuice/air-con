@@ -377,6 +377,25 @@ test("payHeadline: 'all paid up' only once something has been paid", async () =>
   assert.equal(payHeadline({ first: "Alex", cancelled: false, payableCount: 0, paidSomething: true }).title, "You're all paid up, Alex");
   assert.equal(payHeadline({ first: "Alex", cancelled: false, payableCount: 2, paidSomething: true }).title, "Hi Alex, here's what's due");
   assert.equal(payHeadline({ first: "Alex", cancelled: true, payableCount: 0, paidSomething: true }).title, "Your contract is cancelled, Alex");
+  // The pay page on a cancelled contract follows the hub and the email: the refund promise only inside the period.
+  const c = { receivedAt: "2026-10-20T10:00:00.000Z", refundDueBy: "2026-11-03", withinPeriod: true };
+  const inside = payHeadline({ first: "Morgan", cancelled: true, payableCount: 0, paidSomething: true, cancellation: c });
+  assert.match(inside.nothingDue, /refunded by 3 Nov 2026, the same way you paid/);
+  assert.match(inside.nothingDue, /explain any deduction for that work in writing first/);
+  const late = payHeadline({ first: "Morgan", cancelled: true, payableCount: 0, paidSomething: true, cancellation: { ...c, withinPeriod: false } });
+  assert.equal(late.title, "We've received your cancellation, Morgan");
+  assert.match(late.nothingDue, /after your cancellation period had ended\. We'll be in touch in writing/);
+  assert.doesNotMatch(late.nothingDue, /refunded|refund by|3 Nov/, "no dated refund promise after the period");
+  // Nothing paid, but early-start work was done: never "nothing is due".
+  const early = payHeadline({ first: "Morgan", cancelled: true, payableCount: 0, paidSomething: false, cancellation: c, workedEarly: true });
+  assert.doesNotMatch(early.nothingDue, /Nothing is due/);
+  assert.match(early.nothingDue, /we'll write to you about any amount for that work/);
+  assert.match(payHeadline({ first: "Morgan", cancelled: true, payableCount: 0, paidSomething: false, cancellation: c }).nothingDue, /nothing to refund/);
+  // The page itself takes its words from payHeadline (no refund sentence of its own).
+  const { readFileSync } = await import("node:fs");
+  const page = readFileSync(new URL("../app/p/[id]/pay/page.tsx", import.meta.url), "utf8");
+  assert.doesNotMatch(page, /is refunded by/);
+  assert.match(page, /cancellation: project\.cancellation/);
 });
 
 test("a cancelled contract on the hub: it says cancelled, with the refund and collection inside the period and nothing promised after it", () => {
@@ -413,6 +432,23 @@ test("a cancelled contract on the hub: it says cancelled, with the refund and co
   const installOnly = structuredClone(p);
   installOnly.proposal.contractType = "install-only";
   assert.doesNotMatch(view.cancelledCopy(installOnly)!.body, /collect/);
+
+  // Early-start work done before they cancelled: the email's deduction caveat, and never "nothing more is due".
+  const early = structuredClone(p);
+  early.proposal.earlyStart = { requestedAt: "2026-10-12T10:00:00.000Z" } as never;
+  early.install.status = "in-progress";
+  assert.match(view.cancelledCopy(early)!.body, /explain any deduction for that work in writing first/);
+  const earlyUnpaid = structuredClone(early);
+  earlyUnpaid.money.paidPence = 0;
+  assert.doesNotMatch(view.cancelledCopy(earlyUnpaid)!.body, /Nothing more is due/);
+  assert.match(view.cancelledCopy(earlyUnpaid)!.body, /we'll write to you about any amount for that work/);
+  // A refund recorded since, keeping part: never "we'll refund" the amount that was kept.
+  const kept = structuredClone(p);
+  kept.money.paidPence = 50_000;
+  kept.events.push({ at: "2026-10-28T10:00:00.000Z", type: "payment-recorded", label: "Refund of £1,028.30 sent.", actor: "system" } as never);
+  const keptCopy = view.cancelledCopy(kept)!.body;
+  assert.match(keptCopy, /We've sent a refund, the same way you paid\. £500 of what you paid hasn't been refunded: we'll explain why in writing/);
+  assert.doesNotMatch(keptCopy, /We'll refund the £500/);
 
   // After the period: only that it reached us, and that we'll be in touch.
   const late = structuredClone(p);

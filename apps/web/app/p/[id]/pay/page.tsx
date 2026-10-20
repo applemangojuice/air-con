@@ -21,6 +21,7 @@ import { CopyButton } from "./copy-button";
 import { payHeadline } from "./headline";
 import { sentTransferAction, simulatePaymentAction } from "./actions";
 import { reachUs, realPhone } from "@/components/site/claims";
+import { cancelledAfterEarlyWork } from "@/components/portal/view";
 
 export const metadata: Metadata = { title: "Your payments", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -99,7 +100,14 @@ export default async function PayPage({
   const first = (project.customer.name || "").replace(/^DEMO\s+/, "").split(/\s+/)[0] || "there";
   const notice = typeof sp.card === "string" ? CARD_NOTICE[sp.card] : undefined;
   const totalOwed = payable.reduce((s, i) => s + i.owedPence, 0);
-  const headline = payHeadline({ first, cancelled, payableCount: payable.length, paidSomething: invoices.some((i) => i.paidPence > 0) });
+  const headline = payHeadline({
+    first,
+    cancelled,
+    payableCount: payable.length,
+    paidSomething: invoices.some((i) => i.paidPence > 0),
+    ...(project.cancellation ? { cancellation: project.cancellation } : {}),
+    workedEarly: cancelledAfterEarlyWork(project),
+  });
 
   return (
     <div className="min-h-dvh bg-cream">
@@ -139,11 +147,8 @@ export default async function PayPage({
 
         {payable.length === 0 ? (
           <section className="mt-6 rounded-2xl border border-line bg-white p-5">
-            <p className="text-ink-900">
-              {cancelled
-                ? `${headline.nothingDue}${project.cancellation ? ` We received your cancellation on ${fmtDate(project.cancellation.receivedAt)}; anything you've paid is refunded by ${fmtDate(project.cancellation.refundDueBy)}, the same way you paid.` : ""}`
-                : headline.nothingDue}
-            </p>
+            {/* A cancellation's wording (inside the period or after it) is payHeadline's: one rule with the hub and the email. */}
+            <p className="text-ink-900">{headline.nothingDue}</p>
             <LinkButton href={`/p/${id}`} variant="secondary" className="mt-4">
               Back to your project
             </LinkButton>

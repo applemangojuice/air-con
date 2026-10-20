@@ -383,8 +383,13 @@ export function VariationDoc({ snap }: { snap: VariationSnapshot }) {
           head={["", "Amount"]}
           align={["left", "right"]}
           rows={[
-            ["Price change before VAT", money(v.priceDeltaNetPence)],
-            ["VAT", money(v.taxPence)],
+            // VAT rows only for a business that charges VAT (the variation's own tax code).
+            ...((v.taxCode ?? (v.taxPence ? "standard-20" : "outside-scope")) === "outside-scope"
+              ? []
+              : ([
+                  ["Price change before VAT", money(v.priceDeltaNetPence)],
+                  ["VAT", money(v.taxPence)],
+                ] as ReactNode[][])),
             [<strong key="t">Total price change</strong>, <strong key="v">{`${v.totalDeltaPence >= 0 ? "+" : ""}${money(v.totalDeltaPence)}`}</strong>],
           ]}
         />
@@ -436,16 +441,22 @@ const INVOICE_KIND: Record<string, string> = {
 
 export function InvoiceDoc({ snap }: { snap: InvoiceSnapshot }) {
   const inv = snap.invoice;
-  const due = Math.max(0, inv.totalPence - inv.paidPence);
-  const anyTax = inv.lines.some((l) => l.taxPence !== 0);
+  const creditNote = inv.kind === "credit-note";
+  // What it asks for: after credit already on the account, as worked out at issue (the pay page's figure).
+  const due = creditNote ? 0 : Math.max(0, snap.toPayPence ?? inv.totalPence - inv.paidPence);
+  // VAT columns follow the tax code, never the amounts: a VAT-registered business's 0% (energy-saving
+  // materials) invoice still shows its rate and VAT summary, and only "not registered" says so.
+  const anyTax = inv.lines.some((l) => l.taxCode !== "outside-scope" || l.taxPence !== 0);
+  const credit = snap.accountCredit && snap.accountCredit.pence > 0 ? snap.accountCredit : null;
   return (
     <>
-      <DocSection title={`${INVOICE_KIND[inv.kind] ?? plain(inv.kind)} invoice ${inv.number}`}>
+      <DocSection title={creditNote ? `Credit note ${inv.number}` : `${INVOICE_KIND[inv.kind] ?? plain(inv.kind)} invoice ${inv.number}`}>
         <Facts
           rows={[
-            ["Invoice number", inv.number],
+            [creditNote ? "Credit note number" : "Invoice number", inv.number],
             ["Issued", inv.issuedAt ? fmtDate(inv.issuedAt) : ""],
-            ["Due", inv.dueOn ? fmtDate(inv.dueOn) : ""],
+            ["Due", inv.dueOn && !creditNote ? fmtDate(inv.dueOn) : ""],
+            ...(creditNote && inv.reason ? ([["Reason", inv.reason]] as [string, ReactNode][]) : []),
           ]}
         />
         <Table
@@ -469,8 +480,20 @@ export function InvoiceDoc({ snap }: { snap: InvoiceSnapshot }) {
           rows={[
             ...(anyTax ? ([["Net", money(inv.netPence)], ["VAT", money(inv.taxPence)]] as [string, ReactNode][]) : []),
             ["Total", <strong key="t">{money(inv.totalPence)}</strong>],
-            ["Paid", money(inv.paidPence)],
-            ["To pay", <strong key="d">{money(due)}</strong>],
+            ...(creditNote
+              ? []
+              : ([
+                  ["Paid", money(inv.paidPence)],
+                  ...(credit
+                    ? ([
+                        [
+                          `Less: credit on your account${credit.creditNotes.length ? ` (credit note ${credit.creditNotes.join(", ")})` : ""}`,
+                          `−${money(credit.pence)}`,
+                        ],
+                      ] as [string, ReactNode][])
+                    : []),
+                  ["To pay", <strong key="d">{money(due)}</strong>],
+                ] as [string, ReactNode][])),
           ]}
         />
         {!anyTax && <p className="text-xs text-ink-500">{TAX_CODES["outside-scope"].note}</p>}
@@ -518,10 +541,14 @@ export function ReceiptDoc({ snap }: { snap: ReceiptSnapshot }) {
           ["Amount", money(p.amountPence)],
           ["Received", fmtInstant(p.receivedAt)],
           ["Method", p.method === "bank-transfer" ? "Bank transfer" : plain(p.method)],
-          ["Payment reference", p.providerRef],
+          // The reference they used (a bank transfer's), never our own bookkeeping id.
+          [p.method === "bank-transfer" ? "Your reference" : "Payment reference", p.reference ?? (p.provider === "manual" ? "" : p.providerRef)],
           ["For invoice", snap.invoice?.number ?? ""],
           ["Invoice total", snap.invoice ? money(snap.invoice.totalPence) : ""],
-          ["Still to pay on that invoice", snap.invoice ? money(Math.max(0, snap.invoice.totalPence - snap.invoice.paidPence)) : ""],
+          [
+            "Still to pay on that invoice",
+            snap.invoice ? money(Math.max(0, snap.stillToPayPence ?? snap.invoice.totalPence - snap.invoice.paidPence)) : "",
+          ],
         ]}
       />
       {p.provider === "demo" && <p className="font-semibold text-amber-800">DEMO record: no real money moved.</p>}

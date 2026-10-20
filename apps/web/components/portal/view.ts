@@ -374,6 +374,15 @@ export function isCancelledProject(p: Pick<Project, "cancellation" | "closure">)
 const KIT_AT_HOME = new Set<Project["kit"]["status"]>(["dispatched", "delivered", "inspected"]);
 
 /**
+ * Cancelled after work began at the customer's request inside the period
+ * (an early start, then the install under way): they may owe a proportionate
+ * amount (CCR reg 36(4)), which someone works out and explains in writing.
+ */
+export function cancelledAfterEarlyWork(p: Pick<Project, "proposal" | "install">): boolean {
+  return Boolean(p.proposal.earlyStart) && p.install.status !== "not-started";
+}
+
+/**
  * What the hub says about a cancelled project, or null when it isn't one:
  * when the cancellation reached us and what happens now, as the
  * acknowledgement email put it. Inside the period, the refund (with its
@@ -393,11 +402,25 @@ export function cancelledCopy(p: Project): { title: string; body: string } | nul
   }
   const paid = Math.max(0, p.money.paidPence);
   const collect = p.proposal.contractType !== "install-only" && (KIT_AT_HOME.has(p.kit.status) || p.install.status !== "not-started");
+  // Work done before the period ended, at their request: a proportionate amount may be due (CCR reg 36(4)),
+  // so the page never says "nothing more is due" or promises the whole refund without the email's caveat.
+  const workedEarly = cancelledAfterEarlyWork(p);
+  // A refund recorded since the cancellation: what they've paid is now what we've kept, never "we'll refund it".
+  const refundSent = p.events.some((e) => e.type === "payment-recorded" && e.at >= c.recordedAt && e.label.startsWith("Refund of"));
+  const moneyLine = refundSent
+    ? `We've sent a refund, the same way you paid.${paid > 0 ? ` ${money(paid)} of what you paid hasn't been refunded: we'll explain why in writing.` : ""}`
+    : paid > 0
+      ? `We'll refund the ${money(paid)} you've paid by ${fmtDay(c.refundDueBy)} at the latest, the same way you paid.${
+          workedEarly ? " You asked us to start before your cancellation period ended and work was done, so we'll explain any deduction for that work in writing first." : ""
+        }`
+      : workedEarly
+        ? "You haven't paid us anything. You asked us to start before your cancellation period ended and work was done, so we'll write to you about any amount for that work."
+        : "Nothing more is due from you.";
   return {
     title: "Your contract is cancelled",
     body: [
       `We received your cancellation on ${on}.`,
-      paid > 0 ? `We'll refund the ${money(paid)} you've paid by ${fmtDay(c.refundDueBy)} at the latest, the same way you paid.` : "Nothing more is due from you.",
+      moneyLine,
       collect ? "We'll collect the equipment we supplied, at our cost, at a time that suits you." : "",
       "Your contract and any invoices stay in your documents.",
     ]

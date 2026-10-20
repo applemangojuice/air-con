@@ -476,18 +476,20 @@ function InvoiceRow({
           </ActionForm>
         </div>
       )}
-      {!credit && (owed > 0 || inv.paidPence > 0) && (
+      {!credit && inv.status !== "void" && (owed > 0 || inv.paidPence > 0) && (
         <div className="space-y-2 border-t border-line bg-surface/40 px-5 py-3 sm:px-6">
-          {owed > 0 && (
-            <details className="rounded-2xl border border-line bg-white px-4" open={false}>
-              <summary className="flex min-h-12 cursor-pointer items-center text-sm font-semibold text-ink-900">Record a payment you&apos;ve seen</summary>
+          {/* Also once it's paid: a second transfer that arrives anyway is recorded (as credit), so the records match the bank. */}
+          <details className="rounded-2xl border border-line bg-white px-4" open={false}>
+              <summary className="flex min-h-12 cursor-pointer items-center text-sm font-semibold text-ink-900">
+                {owed > 0 ? "Record a payment you've seen" : "Record more money that arrived for this invoice"}
+              </summary>
               <div className="pb-4">
                 <ActionForm flash action={paymentAction.bind(null, projectId)} submitLabel="Record the payment" busyLabel="Recording…" resetOnSuccess>
                   <input type="hidden" name="invoiceId" value={inv.id} />
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div>
                       <label className={label} htmlFor={`amt-${inv.id}`}>Amount (£)</label>
-                      <input id={`amt-${inv.id}`} name="amount" inputMode="decimal" required defaultValue={(owed / 100).toFixed(2)} className={field} />
+                      <input id={`amt-${inv.id}`} name="amount" inputMode="decimal" required defaultValue={owed > 0 ? (owed / 100).toFixed(2) : ""} className={field} />
                     </div>
                     <div>
                       <label className={label} htmlFor={`on-${inv.id}`}>Date it arrived</label>
@@ -511,11 +513,16 @@ function InvoiceRow({
                       <input id={`pn-${inv.id}`} name="note" maxLength={500} className={field} />
                     </div>
                   </div>
+                  <label className="mt-3 flex min-h-11 items-start gap-2 text-sm text-ink-700">
+                    <input type="checkbox" name="overpaid" className="mt-1 size-4" />
+                    <span>
+                      More than is owed arrived ({owed > 0 ? <Money pence={owed} /> : "nothing"} is left on {inv.number}): record it all. The extra is credit on their account, to refund or take off their next invoice.
+                    </span>
+                  </label>
                   <p className="mt-2 text-xs text-ink-500">Only record money you&apos;ve seen arrive. The customer gets a receipt by email.</p>
                 </ActionForm>
               </div>
             </details>
-          )}
           {owed > 0 && (
             <details className="rounded-2xl border border-line bg-white px-4">
               <summary className="flex min-h-12 cursor-pointer items-center text-sm font-semibold text-ink-900">Credit it (cancel what&apos;s unpaid)</summary>

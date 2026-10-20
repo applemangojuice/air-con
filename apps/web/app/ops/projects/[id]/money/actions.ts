@@ -101,6 +101,7 @@ export async function paymentAction(projectId: string, _prev: ActionState, form:
       requestId: requestId.data,
       ...(text(form, "reference", 120) ? { reference: text(form, "reference", 120) } : {}),
       ...(text(form, "note", 500) ? { note: text(form, "note", 500) } : {}),
+      ...(form.get("overpaid") === "on" ? { overpaid: true } : {}),
     },
     staff,
   );

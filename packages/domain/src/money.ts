@@ -414,6 +414,19 @@ export function accountCreditUsedOn(invoice: Invoice, all: Invoice[]): number {
 }
 
 /**
+ * The credit notes making up the account's credit: live ones not set against
+ * an invoice that asks for money, with credit still left on them. An
+ * invoice's "Less: credit on your account" line names them.
+ */
+export function accountCreditNotes(all: Invoice[]): Invoice[] {
+  return all.filter((i) => {
+    if (!counts(i) || i.kind !== "credit-note" || i.totalPence - i.paidPence >= 0) return false;
+    const target = i.creditsInvoiceId ? all.find((t) => t.id === i.creditsInvoiceId) : undefined;
+    return !target || !asksForMoney(target);
+  });
+}
+
+/**
  * How much of an account credit note can be refunded: what's left on it,
  * and never more than the customer is in credit overall (credit that's
  * covering an unpaid invoice isn't theirs to take back as money).

@@ -154,3 +154,56 @@ test("a variation that takes money off, accepted after the balance went out, com
   assert.equal(await askedInTotal(id), contract - 4_050);
   assert.deepEqual((await loadMoney(id))!.plans.variation.variations, []);
 });
+
+test("with credit on the account, the invoice document and email ask for what's left, the receipt says nothing's owed, and an overpayment can be recorded", async () => {
+  const { listDocuments } = await import("../lib/documents-server.ts");
+  const messagesRepo = await import("../lib/repo/messages.ts");
+  const { recordManualPayment } = await import("../lib/money-server.ts");
+  const id = await demo3();
+  const goodwill = await issueInvoice(id, { kind: "credit-note", amountPence: 20_000, reason: "Goodwill: install moved twice (DEMO)", requestId: rid() }, OFFICE);
+  assert.ok(goodwill.ok);
+  const plan = (await loadMoney(id))!.plans.balance;
+  const balance = await issueInvoice(id, { kind: "balance", earlyReason: "DEMO", requestId: rid(), expectedTotalPence: plan.totalPence }, OFFICE);
+  assert.ok(balance.ok, !balance.ok ? balance.error : "");
+  const owed = payableInvoices(await invoicesRepo.listForProject(id)).find((i) => i.id === balance.value.id)!.owedPence;
+  assert.equal(owed, plan.totalPence - 20_000, "the pay page takes the credit off");
+
+  // The frozen document asks for the same figure, with the credit shown.
+  const doc = (await listDocuments(id, { kind: "invoice" })).find((d) => d.id === balance.value.documentId)!;
+  const snap = doc.snapshot as { toPayPence?: number; accountCredit?: { pence: number; creditNotes: string[] } };
+  assert.equal(snap.toPayPence, owed);
+  assert.deepEqual(snap.accountCredit, { pence: 20_000, creditNotes: [goodwill.value.number] });
+  // And the email's subject.
+  const mail = (await messagesRepo.listForProject(id)).find((m) => m.event === "invoice-issued" && m.channel === "email" && m.subject?.includes(balance.value.number));
+  assert.ok(mail, "the invoice email was written");
+  assert.match(mail!.subject ?? "", new RegExp(`£${(owed / 100).toLocaleString("en-GB", { minimumFractionDigits: 2 }).replace(/[.,]/g, "\\$&")}`));
+  assert.match(mail!.bodyText ?? "", /Less: credit on your account/);
+
+  // More than is owed: a likely typo, refused unless they say it really arrived.
+  const gross = await recordManualPayment(id, { invoiceId: balance.value.id, amountPence: plan.totalPence, method: "bank-transfer", reference: "OKAFOR BAL", receivedOn: today(), requestId: rid() }, OFFICE);
+  assert.ok(!gross.ok && /More than is owed arrived/.test(gross.error), !gross.ok ? gross.error : "");
+
+  // The right figure: the receipt says nothing's left, with the customer's own reference.
+  const paid = await recordManualPayment(id, { invoiceId: balance.value.id, amountPence: owed, method: "bank-transfer", reference: "OKAFOR BAL", receivedOn: today(), requestId: rid() }, OFFICE);
+  assert.ok(paid.ok, !paid.ok ? paid.error : "");
+  const receipt = (await listDocuments(id, { kind: "receipt" })).find((d) => (d.snapshot as { payment: { id: string } }).payment.id === paid.value.payment.id)!;
+  const rs = receipt.snapshot as { stillToPayPence?: number; payment: { reference?: string } };
+  assert.equal(rs.stillToPayPence, 0, "nothing is owed on it");
+  assert.equal(rs.payment.reference, "OKAFOR BAL");
+
+  // A second transfer that arrives anyway is recorded in full, as credit, and the team hears.
+  const again = await recordManualPayment(
+    id,
+    { invoiceId: balance.value.id, amountPence: 5_000, method: "bank-transfer", reference: "OKAFOR BAL", receivedOn: today(), requestId: rid(), overpaid: true },
+    OFFICE,
+  );
+  assert.ok(again.ok, !again.ok ? again.error : "");
+  assert.match(again.message ?? "", /credit on their account/);
+  const all = await invoicesRepo.listForProject(id);
+  assert.equal(outstandingPence(all), -5_000 - 20_000 + 20_000, "the extra £50 is theirs");
+  assert.ok((await messagesRepo.listForProject(id)).some((m) => m.event === "team-alert" && /Overpaid: £50 more/.test(m.subject ?? "")));
+  // And it can go back with no credit note (it was overpaid, not off the price).
+  const back = await recordRefund(id, { invoiceId: balance.value.id, amountPence: 5_000, method: "bank-transfer", refundedOn: today(), reason: "Paid twice (DEMO)", requestId: rid() }, OFFICE);
+  assert.ok(back.ok && !back.value.creditNote, back.ok ? "" : back.error);
+  assert.equal(outstandingPence(await invoicesRepo.listForProject(id)), 0);
+});

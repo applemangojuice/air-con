@@ -254,11 +254,29 @@ export interface InvoiceSnapshot extends DocumentHeader {
     /** What to quote on a bank transfer: the invoice number. */
     reference: string;
   };
+  /**
+   * Credit already on the customer's account that this invoice uses (credit
+   * notes on their own, money overpaid), as it stood at issue
+   * (accountCreditUsedOn), with the credit notes it came from.
+   */
+  accountCredit?: { pence: number; creditNotes: string[] };
+  /**
+   * What's left to pay on it at issue, after any account credit
+   * (invoiceOutstanding): the figure the pay page and card payments ask for.
+   * Absent on older invoices, where it's the total less what's paid.
+   */
+  toPayPence?: number;
 }
 
 export interface ReceiptSnapshot extends DocumentHeader {
   payment: Payment;
   invoice?: Invoice;
+  /**
+   * What was still to pay on that invoice once this payment arrived, after
+   * credit notes and account credit (invoiceOutstanding). Absent on older
+   * receipts, where it's the invoice's total less what's paid.
+   */
+  stillToPayPence?: number;
 }
 
 export interface CommissioningCertificateSnapshot extends DocumentHeader {

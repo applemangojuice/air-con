@@ -182,12 +182,19 @@ export function MissingList({ missing, limit, headings = true }: { missing: Surv
 
 export function SubmitSection({
   pendingPhotos,
+  keptDrawings = [],
+  onSaveDrawings,
+  onOpenDrawing,
   consent,
   onSubmit,
   submitting,
   submitError,
 }: {
   pendingPhotos: number;
+  /** Drawings kept on this phone, still to be saved onto their photos: the survey waits for them like photos. */
+  keptDrawings?: { id: string; title: string }[];
+  onSaveDrawings?: () => Promise<number>;
+  onOpenDrawing?: (id: string, title: string) => void;
   consent: VisitProject["documentsConsent"];
   onSubmit: () => void;
   submitting: boolean;
@@ -195,7 +202,11 @@ export function SubmitSection({
 }) {
   const { completeness, go, data, project } = useSurvey();
   const [confirm, setConfirm] = useState(false);
+  const [savingDrawings, setSavingDrawings] = useState(false);
+  const [drawingNote, setDrawingNote] = useState<string | null>(null);
   const ready = completeness.missing.length === 0;
+  const drawings = keptDrawings.length;
+  const waiting = pendingPhotos > 0 || drawings > 0;
   const rooms = data.rooms.filter((r) => r.include).length;
   const chosen = data.outdoor.positions.filter((p) => p.chosen).length;
   return (
@@ -224,6 +235,44 @@ export function SubmitSection({
           Wait for them to finish (or remove them) before you submit, so nothing is left behind on this phone.
         </Callout>
       )}
+      {drawings > 0 && (
+        <Callout tone="warn" title={`${drawings} drawing${drawings === 1 ? "" : "s"} not saved yet`}>
+          <p>
+            {drawings === 1 ? "It's" : "They're"} only on this phone. Save {drawings === 1 ? "it" : "them"} before you submit, so the technical lead designs from your unit
+            position and pipe route.
+          </p>
+          <ul className="mt-2 space-y-1">
+            {keptDrawings.map((d) => (
+              <li key={d.id}>
+                {onOpenDrawing ? (
+                  <button type="button" className="font-semibold underline" onClick={() => onOpenDrawing(d.id, d.title)}>
+                    {d.title}
+                  </button>
+                ) : (
+                  d.title
+                )}
+              </li>
+            ))}
+          </ul>
+          {onSaveDrawings && (
+            <button
+              type="button"
+              disabled={savingDrawings}
+              onClick={async () => {
+                setSavingDrawings(true);
+                setDrawingNote(null);
+                const left = await onSaveDrawings().catch(() => drawings);
+                setSavingDrawings(false);
+                setDrawingNote(left > 0 ? "Still not saved: no signal, or the server refused it. Try again when you have signal, or open the photo to save or discard it." : null);
+              }}
+              className="mt-3 inline-flex min-h-12 items-center justify-center rounded-full border border-line bg-white px-5 font-semibold text-ink-900 disabled:opacity-50"
+            >
+              {savingDrawings ? "Saving…" : drawings === 1 ? "Save it now" : "Save them now"}
+            </button>
+          )}
+          {drawingNote && <p className="mt-2 text-sm">{drawingNote}</p>}
+        </Callout>
+      )}
       {!consent && !project.proposalAccepted && (
         <Callout tone="info">
           Documents by email isn&apos;t recorded yet.{" "}
@@ -240,7 +289,7 @@ export function SubmitSection({
         </p>
       )}
 
-      {confirm && ready && pendingPhotos === 0 ? (
+      {confirm && ready && !waiting ? (
         <FieldCard tone="warn">
           <p className="text-base font-semibold text-ink-900">Submit the survey?</p>
           <p className="text-sm text-ink-700">It goes to the technical lead for the design, and {project.customer.name || "the customer"} is told the survey&apos;s done. You can&apos;t edit it afterwards.</p>
@@ -262,7 +311,7 @@ export function SubmitSection({
         <button
           type="button"
           onClick={() => setConfirm(true)}
-          disabled={!ready || pendingPhotos > 0 || submitting}
+          disabled={!ready || waiting || submitting}
           className="inline-flex min-h-14 w-full items-center justify-center rounded-full bg-accent-700 px-6 text-lg font-semibold text-white shadow-sm hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {ready ? "Submit survey" : `Submit survey (${completeness.missing.length} to do)`}

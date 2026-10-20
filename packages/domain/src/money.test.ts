@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  accountCreditNotes,
   accountCreditPence,
   accountCreditUsedOn,
   applyPayment,
@@ -287,6 +288,10 @@ test("account credit is used oldest invoice first, and per-invoice figures add u
   // An overpayment on one invoice counts towards the next.
   const over = { ...a, paidPence: 12_000, status: "paid" as const };
   assert.equal(invoiceOutstanding(b, [over, b]), 38_000);
+  // The credit notes an invoice's "Less: credit on your account" line names: on the account, with credit left.
+  const against = credit({ id: "cn3", number: "DIH-0005", totalPence: -2_000, creditsInvoiceId: "b" });
+  const spent = credit({ id: "cn4", number: "DIH-0006", totalPence: -3_000, paidPence: -3_000, status: "paid" });
+  assert.deepEqual(accountCreditNotes([a, b, c, orphan, against, spent]).map((i) => i.id), [c.id, "cn2"]);
 });
 
 test("owedInvoices: what's still due across projects, net of credit notes and account credit", () => {

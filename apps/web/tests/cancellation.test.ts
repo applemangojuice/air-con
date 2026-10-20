@@ -166,3 +166,42 @@ test("a cancellation that arrives after the period: an acknowledgement only, no 
   const line = r.project.events.find((e) => e.type === "cancellation-received")!;
   assert.doesNotMatch(line.label, /refund/i);
 });
+
+test("an invoice part-paid when the contract is cancelled: the unpaid part is credited, so nothing reads as owed anywhere", async () => {
+  await resetDemoData({ now: new Date().toISOString() });
+  const { owedInvoices, isInvoiceOverdue, invoiceOutstanding } = await import("@aircon/domain");
+  const deposit = (await invoicesRepo.listForProject(DEMO3)).find((i) => i.kind === "deposit" && i.paidPence > 0)!;
+  // The family paid 56p short: the deposit is part-paid at the moment they cancel.
+  const paymentsRepo = await import("../lib/repo/payments.ts");
+  const pay = (await paymentsRepo.listForInvoice(deposit.id)).find((x) => x.amountPence > 0)!;
+  await paymentsRepo.update({ ...pay, amountPence: pay.amountPence - 56 });
+  const short = { ...deposit, paidPence: deposit.paidPence - 56, status: "part-paid" as const };
+  await invoicesRepo.update(short);
+  assert.equal(invoiceOutstanding(short, await invoicesRepo.listForProject(DEMO3)), 56);
+  const r = await recordCancellation(DEMO3, { receivedAt: new Date(Date.now() - 3600_000).toISOString(), channel: "phone", evidenceRef: "DEMO call note" }, DEMO_STAFF.admin);
+  assert.ok(r.ok, JSON.stringify(r));
+  assert.deepEqual(r.voided, [], "it was part-paid, so it isn't voided: what was paid stays on it to refund");
+  const all = await invoicesRepo.listForProject(DEMO3);
+  const cn = all.find((i) => i.kind === "credit-note" && i.creditsInvoiceId === deposit.id)!;
+  assert.ok(cn, "a credit note for the unpaid part");
+  assert.equal(cn.totalPence, -56);
+  assert.equal(invoiceOutstanding(all.find((i) => i.id === deposit.id)!, all), 0);
+  assert.deepEqual(owedInvoices(all), [], "the console's owed-to-us drops it");
+  assert.equal(isInvoiceOverdue(all.find((i) => i.id === deposit.id)!, all, "2099-01-01"), false);
+  const hub = (await loadHub(DEMO3, { kind: "customer", customerId: DEMO3_CUSTOMER }))!;
+  assert.equal(hub.money.outstandingPence, 0, "their page has nothing to pay");
+  const alert = (await messagesRepo.listForProject(DEMO3)).find((m) => m.event === "team-alert" && /Cancelled:/.test(m.subject ?? ""))!;
+  assert.match(alert.bodyText, /Unpaid part credited/);
+  // Then the refund of what they did pay: its own credit note, and nothing owed.
+  const refund = await recordRefund(
+    DEMO3,
+    { invoiceId: deposit.id, amountPence: short.paidPence, method: "bank-transfer", refundedOn: (await import("../lib/project-service.ts")).londonToday(), reason: "DEMO cancelled", requestId: crypto.randomUUID() },
+    DEMO_STAFF.admin,
+  );
+  assert.ok(refund.ok, JSON.stringify(refund));
+  const after = await invoicesRepo.listForProject(DEMO3);
+  assert.equal(invoiceOutstanding(after.find((i) => i.id === deposit.id)!, after), 0);
+  // One credit note for the unpaid part, one with the refund.
+  const credits = after.filter((i) => i.kind === "credit-note" && i.creditsInvoiceId === deposit.id).length;
+  assert.equal(credits, 2);
+});

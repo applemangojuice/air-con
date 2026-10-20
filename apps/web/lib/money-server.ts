@@ -1,5 +1,6 @@
 import {
   INVOICE_KIND_LABEL,
+  accountCreditNotes,
   accountCreditUsedOn,
   acceptedVariationsPence,
   balanceLinesFor,
@@ -529,6 +530,14 @@ export async function finishIssue(invoice: Invoice, actor: Issuer): Promise<{ in
   const project = await loadProject(inv.projectId);
   if (!project) return { invoice: inv, warning: "The project couldn't be read." };
   const card = await cardAvailability();
+  // What it asks for once credit already on the account comes off (a goodwill credit note, a
+  // variation that took money off, an overpayment): the figure the pay page and Checkout take,
+  // so the document and the email ask for exactly that, never the gross total.
+  const asIssued = async () => {
+    const all = await invoicesRepo.listForProject(inv.projectId);
+    const listed = all.some((i) => i.id === inv.id) ? all : [...all, inv];
+    return { toPayPence: invoiceOutstanding(inv, listed), creditPence: accountCreditUsedOn(inv, listed), creditNotes: accountCreditNotes(listed).map((c) => c.number) };
+  };
 
   if (!inv.documentId) {
     try {
@@ -536,6 +545,7 @@ export async function finishIssue(invoice: Invoice, actor: Issuer): Promise<{ in
       // (unreadable settings leave it to "finish issuing").
       const settings = await getSettingsStrict();
       const payments = await paymentsRepo.listForInvoice(inv.id);
+      const owing = inv.kind === "credit-note" ? null : await asIssued();
       const doc = await createDocument(
         inv.projectId,
         "invoice",
@@ -550,6 +560,12 @@ export async function finishIssue(invoice: Invoice, actor: Issuer): Promise<{ in
             ...(settings.company.bank ? { bank: settings.company.bank } : {}),
             reference: inv.number,
           },
+          ...(owing
+            ? {
+                toPayPence: owing.toPayPence,
+                ...(owing.creditPence > 0 ? { accountCredit: { pence: owing.creditPence, creditNotes: owing.creditNotes } } : {}),
+              }
+            : {}),
         },
         {
           title: `${inv.kind === "credit-note" ? "Credit note" : "Invoice"} ${inv.number} (${KIND_TITLE[inv.kind]})`,
@@ -583,12 +599,15 @@ export async function finishIssue(invoice: Invoice, actor: Issuer): Promise<{ in
   }
 
   if (inv.kind !== "credit-note" && inv.totalPence > 0) {
+    const owing = await asIssued();
     const sent = await notify("invoice-issued", {
       projectId: inv.projectId,
       data: {
         invoiceNumber: inv.number,
         kind: inv.kind,
         totalPence: inv.totalPence,
+        // Left to pay after account credit: the subject and "Left to pay" say it (templates).
+        outstandingPence: owing.toPayPence,
         ...(inv.dueOn ? { dueOn: inv.dueOn } : {}),
         cardPayments: card.available || card.simulate,
       },
@@ -783,6 +802,7 @@ async function applyNow(paymentId: string, actor: ActorInput): Promise<{ warning
 
   if (receipt && settings) {
     const project = await loadProject(payment.projectId);
+    const invoices = await invoicesRepo.listForProject(payment.projectId);
     try {
       const existing = await listDocuments(payment.projectId, { kind: "receipt", includeSuperseded: true });
       const already = existing.some((d) => (d.snapshot as { payment?: { id?: string } } | null)?.payment?.id === payment.id);
@@ -795,7 +815,13 @@ async function applyNow(paymentId: string, actor: ActorInput): Promise<{ warning
             customer: documentCustomer(project),
             issuedAt: new Date().toISOString(),
             payment: customerPayment(payment),
-            ...(invoice ? { invoice: customerInvoice(invoice) } : {}),
+            ...(invoice
+              ? {
+                  invoice: customerInvoice(invoice),
+                  // After credit notes and account credit, as the pay page counts it.
+                  stillToPayPence: invoiceOutstanding(invoices.find((i) => i.id === invoice!.id) ?? invoice, invoices),
+                }
+              : {}),
           },
           {
             title: `Receipt${invoice ? ` for ${invoice.number}` : ""}`,
@@ -808,7 +834,6 @@ async function applyNow(paymentId: string, actor: ActorInput): Promise<{ warning
       console.error(`[money] receipt for payment ${payment.id} failed:`, err);
       warnings.push("the receipt document wasn't created");
     }
-    const invoices = await invoicesRepo.listForProject(payment.projectId);
     const owed = invoices.filter(live).reduce((s, i) => s + invoiceOutstanding(i, invoices), 0);
     const sent = await notify("payment-received", {
       projectId: payment.projectId,
@@ -836,10 +861,27 @@ async function applyNow(paymentId: string, actor: ActorInput): Promise<{ warning
   return warnings.length ? { warning: `Recorded, but ${warnings.join("; ")}.` } : {};
 }
 
-/** A bank transfer, cash or a card payment taken elsewhere, recorded by the person who saw it. */
+/**
+ * A bank transfer, cash or a card payment taken elsewhere, recorded by the
+ * person who saw it. More than is owed is refused as a likely typo unless
+ * they say that much really arrived (`overpaid`): then it's all recorded, the
+ * extra is credit on the customer's account (refund it from this invoice, or
+ * it comes off their next one), and the team is told, as for a card
+ * overpayment, so the records always match the bank.
+ */
 export async function recordManualPayment(
   projectId: string,
-  input: { invoiceId: string; amountPence: number; method: Payment["method"]; reference?: string; receivedOn: string; note?: string; requestId: string },
+  input: {
+    invoiceId: string;
+    amountPence: number;
+    method: Payment["method"];
+    reference?: string;
+    receivedOn: string;
+    note?: string;
+    requestId: string;
+    /** More than is owed really arrived: record it all, the extra as account credit. */
+    overpaid?: boolean;
+  },
   staff: StaffMember,
 ): Promise<Outcome<{ payment: Payment; duplicate: boolean }>> {
   const invoice = await invoicesRepo.get(input.invoiceId);
@@ -850,10 +892,13 @@ export async function recordManualPayment(
   if (input.method === "bank-transfer" && !input.reference?.trim()) return fail("Add the bank reference the customer used, so it can be matched.");
   const all = await invoicesRepo.listForProject(projectId);
   const owed = invoiceOutstanding(invoice, all);
-  if (input.amountPence > owed) {
-    return fail(`That's more than is left on ${invoice.number} (${money(owed)}). Check the amount, or record the extra against another invoice.`);
+  const extra = input.amountPence - owed;
+  if (extra > 0 && !input.overpaid) {
+    return fail(
+      `That's more than is left on ${invoice.number} (${money(owed)}). Check the amount. If that much really arrived, tick "More than is owed arrived" and record it all: the extra ${money(extra)} stays as credit on their account.`,
+    );
   }
-  return recordPayment(
+  const recorded = await recordPayment(
     {
       projectId,
       invoiceId: invoice.id,
@@ -870,6 +915,22 @@ export async function recordManualPayment(
     staff,
     { refuseVoid: true },
   );
+  if (recorded.ok && !recorded.value.duplicate && extra > 0) {
+    await notify("team-alert", {
+      projectId,
+      data: {
+        title: `Overpaid: ${money(extra)} more than was owed on ${invoice.number}`,
+        lines: [
+          `${staff.name} recorded ${money(input.amountPence)} by ${input.method === "bank-transfer" ? "bank transfer" : input.method}${input.reference?.trim() ? ` (reference ${input.reference.trim()})` : ""}; ${owed > 0 ? `${money(owed)} was owed` : "nothing was owed"}. The extra is credit on their account.`,
+          "Refund the extra (Money, this invoice, Record a refund: no credit note goes with it), or leave it to come off their next invoice, and tell them which.",
+        ],
+        urgent: true,
+      },
+      discriminator: `overpaid:${recorded.value.payment.id}`,
+    });
+    return { ...recorded, message: `Recorded. ${money(extra)} of it is more than was owed: it's credit on their account, and the team has been told.` };
+  }
+  return recorded;
 }
 
 /**
