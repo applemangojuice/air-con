@@ -329,6 +329,25 @@ export function crewDay(events: CalEvent[], date: string, team: { id: string; na
   return rows.sort((a, b) => Number(b.jobs.length > 0) - Number(a.jobs.length > 0) || a.name.localeCompare(b.name));
 }
 
+/**
+ * Who's on it, for every calendar entry: the surveyor for a survey, the
+ * crew for an install day. A survey or install day still to happen with
+ * nobody on it says so ("No surveyor", "No crew"), so a slot a family
+ * booked themselves never looks covered. Null for deliveries and for
+ * what's done.
+ */
+export function whoLine(e: Pick<CalEvent, "kind" | "crew" | "state">): { text: string; missing: boolean } | null {
+  if (e.kind !== "survey" && e.kind !== "install") return null;
+  if (e.crew.length) return { text: e.crew.map((c) => c.name).join(", "), missing: false };
+  if (e.state === "done") return null;
+  return { text: e.kind === "survey" ? "No surveyor" : "No crew", missing: true };
+}
+
+/** Surveys and install days on one day that nobody is down for: the day view lists them. */
+export function unassignedOn(events: CalEvent[], date: string): CalEvent[] {
+  return sortEvents(events.filter((e) => e.date === date && whoLine(e)?.missing));
+}
+
 /** Events inside [from, to], inclusive. */
 export function inRange(events: CalEvent[], from: string, to: string): CalEvent[] {
   return events.filter((e) => e.date >= from && e.date <= to);

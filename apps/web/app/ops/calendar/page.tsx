@@ -13,6 +13,8 @@ import {
   calendarRange,
   crewConflicts,
   crewDay,
+  unassignedOn,
+  whoLine,
   eventsForProject,
   inRange,
   monthGrid,
@@ -167,10 +169,11 @@ function shortTitle(e: CalEvent): string {
 
 function EventChip({ e, clash, compact = false }: { e: CalEvent; clash: boolean; compact?: boolean }) {
   const note = STATE_NOTE[e.state];
+  const who = whoLine(e);
   return (
     <Link
       href={e.href}
-      className={`block rounded-xl border px-2 py-1 text-xs leading-snug transition hover:brightness-95 ${KIND[e.kind].chip} ${clash ? "ring-2 ring-red-500" : ""} ${e.state === "tentative" || e.state === "planned" ? "border-dashed" : ""}`}
+      className={`block rounded-xl border px-2 py-1 text-xs leading-snug transition hover:brightness-95 ${KIND[e.kind].chip} ${clash ? "ring-2 ring-red-500" : ""} ${who?.missing ? "ring-2 ring-amber-500" : ""} ${e.state === "tentative" || e.state === "planned" ? "border-dashed" : ""}`}
     >
       <span className="block truncate font-semibold">
         {e.time ? `${e.time} ` : ""}
@@ -183,6 +186,12 @@ function EventChip({ e, clash, compact = false }: { e: CalEvent; clash: boolean;
         </span>
       )}
       {compact && <span className="block truncate">{shortTitle(e)}</span>}
+      {who &&
+        (who.missing ? (
+          <span className="mt-0.5 block truncate rounded bg-amber-100 px-1 font-semibold text-amber-900">{who.text}</span>
+        ) : (
+          <span className="block truncate text-ink-700">{who.text}</span>
+        ))}
       {clash && <span className="block font-semibold text-red-700">Crew clash</span>}
     </Link>
   );
@@ -303,14 +312,34 @@ function DayView({ date, events, team }: { date: string; events: CalEvent[]; tea
   const busy = rows.filter((r) => r.jobs.length > 0);
   const free = rows.filter((r) => r.jobs.length === 0);
   const deliveries = events.filter((e) => e.date === date && e.kind === "delivery");
+  const unassigned = unassignedOn(events, date);
   return (
     <div className="space-y-6">
+      {unassigned.length > 0 && (
+        <section aria-labelledby="unassigned-heading" className="rounded-2xl border border-amber-300 bg-amber-50 p-4">
+          <h3 id="unassigned-heading" className="mb-1 text-sm font-semibold uppercase tracking-wide text-amber-900">
+            Nobody is down for {unassigned.length === 1 ? "this" : `these ${unassigned.length}`}
+          </h3>
+          <p className="mb-2 text-sm text-amber-950">Booked, with no surveyor or crew assigned (a family can book their own survey slot). Open it and assign someone.</p>
+          <ul className="space-y-1.5">
+            {unassigned.map((e) => (
+              <li key={e.id}>
+                <EventChip e={e} clash={false} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       <section aria-labelledby="crew-heading">
         <h3 id="crew-heading" className="mb-2 text-sm font-semibold uppercase tracking-wide text-ink-500">
           Who is where
         </h3>
         {busy.length === 0 ? (
-          <EmptyState title="Nobody's booked on a job this day" body="Surveys and install days with a crew assigned show up here." />
+          unassigned.length > 0 ? (
+            <p className="text-sm text-ink-500">Nobody from the team is booked on a job this day yet: the visits above need someone.</p>
+          ) : (
+            <EmptyState title="Nobody's booked on a job this day" body="Surveys and install days with a crew assigned show up here." />
+          )
         ) : (
           <ul className="space-y-3">
             {busy.map((r) => (

@@ -16,7 +16,9 @@ import {
   shiftMonth,
   sortEvents,
   stepDate,
+  unassignedOn,
   weekDates,
+  whoLine,
   workingDatesFrom,
   type CalEvent,
 } from "../app/ops/calendar/calendar-model.ts";
@@ -221,3 +223,27 @@ test("London wall-clock times convert both ways across BST and GMT", () => {
   assert.equal(fmtLondon("2026-10-18T13:30:00.000Z"), "18 Oct 2026, 14:30");
   assert.equal(fmtLondon("not a date"), "not a date");
 });
+
+test("every survey and install day says who's on it, or 'No surveyor' / 'No crew', and the day view lists the ones nobody's down for", () => {
+  const selfBooked = project("p1", "Sam (DEMO)", (x) => {
+    x.survey.status = "booked";
+    x.survey.scheduledFor = "2026-10-26T10:00:00.000Z";
+  });
+  const assigned = project("p2", "Ash (DEMO)", (x) => {
+    x.survey.status = "booked";
+    x.survey.scheduledFor = "2026-10-26T14:00:00.000Z";
+    x.survey.surveyor = { staffId: "s1", name: "DEMO Sam" };
+  });
+  const events = [...eventsForProject(selfBooked, []), ...eventsForProject(assigned, []), ...eventsForProject(booked("p3", "Kit (DEMO)", ["2026-10-26"]), [])];
+  const survey = (id: string) => events.find((e) => e.projectId === id && e.kind === "survey")!;
+  assert.deepEqual(whoLine(survey("p1")), { text: "No surveyor", missing: true });
+  assert.deepEqual(whoLine(survey("p2")), { text: "DEMO Sam", missing: false });
+  assert.equal(whoLine(events.find((e) => e.kind === "install")!)?.missing, false, "an install day names its crew");
+  assert.deepEqual(unassignedOn(events, "2026-10-26").map((e) => e.projectId), ["p1"]);
+  // The crew-day view's rows only hold people: the unassigned visit is listed separately, not "Nobody's booked".
+  assert.ok(crewDay(events, "2026-10-26", []).every((r) => r.jobs.every((j) => j.projectId !== "p1")));
+  // Done is done: a submitted survey doesn't nag.
+  const done = { ...survey("p1"), state: "done" as const };
+  assert.equal(whoLine(done), null);
+});
+

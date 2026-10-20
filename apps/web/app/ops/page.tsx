@@ -146,6 +146,27 @@ export default async function ConsolePage() {
             <Tile label="Open issues" value={String(pulse.openIssues)} href="/ops/projects" tone={pulse.openIssues ? "warn" : "neutral"} />
           </div>
 
+          {pulse.surveysUnassigned.length > 0 && (
+            <div role="status" className="mt-4 rounded-2xl border border-amber-300 bg-amber-50 p-4">
+              <h3 className="text-sm font-semibold text-amber-950">
+                Surveys with no surveyor ({pulse.surveysUnassigned.length})
+              </h3>
+              <p className="mt-1 text-sm text-amber-950">Booked (often by the family, from their page) with nobody down to go. Open each and assign a surveyor.</p>
+              <ul className="mt-2 space-y-1.5 text-sm">
+                {pulse.surveysUnassigned.map((c) => (
+                  <li key={`u-${c.id}`}>
+                    <Link href={`/ops/projects/${c.id}`} className="font-semibold text-accent-700 hover:underline">
+                      {c.customer}
+                    </Link>{" "}
+                    <span className="text-amber-950">
+                      · survey {c.surveyAt ? fmtDayTime(c.surveyAt) : ""} · {c.outcode} · no surveyor
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           <div className="mt-4 grid gap-4 lg:grid-cols-2">
             <div className="rounded-2xl border border-line bg-white p-4">
               <h3 className="text-sm font-semibold text-ink-900">On today</h3>
@@ -159,6 +180,7 @@ export default async function ConsolePage() {
                         {c.customer}
                       </Link>{" "}
                       <span className="text-ink-500">· survey {c.surveyAt ? fmtDayTime(c.surveyAt).split(", ")[1] : ""} · {c.outcode}</span>
+                      {c.surveyUnassigned && <span className="ml-1 font-semibold text-amber-800">· no surveyor</span>}
                     </li>
                   ))}
                   {pulse.installsToday.map((c) => (

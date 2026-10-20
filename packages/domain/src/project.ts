@@ -1061,6 +1061,10 @@ export function blockersFor(project: Project, ctx: ReadinessContext, gate: GateI
       if (p.survey.status === "not-booked") {
         block("survey-not-booked", "The home survey isn't booked yet.", "customer", "Book your home survey");
       }
+      // A family can book their own slot from their page: nobody is on it until the office says so.
+      if (p.survey.status === "booked" && !p.survey.surveyor) {
+        block("survey-no-surveyor", "The home survey is booked but nobody is down to do it.", "ops", "Assign a surveyor");
+      }
       if (!ctx.surveyCompleteness) {
         block("survey-not-started", "There's no survey record yet.", "surveyor", "Start the survey");
       } else {

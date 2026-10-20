@@ -252,3 +252,26 @@ test("a late proposal held by the customer's email agreement tells the team what
   assert.doesNotMatch(held, /Send it, or email them a new date|apology/);
   assert.match(held, /haven't agreed to get their documents by email[\s\S]*can't send them on paper[\s\S]*Get in touch/);
 });
+
+test("a survey with nobody down to do it alerts the team once, on the working day before (or the day, if that run was missed)", () => {
+  // Booked by the family for Monday 26 Oct at 10:00: the working day before is Friday 23.
+  const p = project((x) => {
+    x.survey = { ...x.survey, status: "booked", scheduledFor: "2026-10-26T10:00:00.000Z" };
+  });
+  const alert = (today: string) => dailyJobsFor(p, today, DEFAULT_SETTINGS).find((j) => j.job === "survey-unassigned");
+  assert.equal(alert("2026-10-22"), undefined, "two working days out: not yet");
+  const fri = alert("2026-10-23");
+  assert.ok(fri && fri.kind === "notify" && fri.event === "team-alert");
+  assert.equal(fri.kind === "notify" && fri.discriminator, "survey-unassigned:2026-10-26T10:00:00.000Z", "one alert per slot, whichever day sends it");
+  assert.match(fri.kind === "notify" ? (fri.data as { title: string }).title : "", /No surveyor for Demo Person \(DEMO\)'s survey on 2026-10-26 at 10:00/);
+  assert.ok(alert("2026-10-24"), "the weekend run catches up (same key: sent once)");
+  assert.match(alert("2026-10-26")!.kind === "notify" ? (alert("2026-10-26")!.data as { title: string }).title : "", /survey today at 10:00/);
+  assert.equal(alert("2026-10-27"), undefined, "after the slot: nothing");
+  // Someone assigned: no alert, and the day-before reminder names them.
+  const assigned = project((x) => {
+    x.survey = { ...x.survey, status: "booked", scheduledFor: "2026-10-26T10:00:00.000Z", surveyor: { staffId: "s1", name: "DEMO Sam" } };
+  });
+  assert.equal(dailyJobsFor(assigned, "2026-10-23", DEFAULT_SETTINGS).find((j) => j.job === "survey-unassigned"), undefined);
+  assert.ok(DAILY_JOB_IDS.includes("survey-unassigned"));
+});
+

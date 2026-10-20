@@ -394,7 +394,11 @@ Then, on the project page:
    to someone else, pick them → **Set**.
 9. **Survey** box → **Book it for the customer**: day, time, In person, the
    surveyor → **Book the survey**. (Or leave it: the family can pick a slot
-   themselves from their link.)
+   themselves from their link, then assign a surveyor: **Survey** box →
+   **Assign a surveyor**. Until you do, the project says **Assign a surveyor**
+   under What's blocking and on the Board, Today and the morning email list
+   it under **Surveys with no surveyor**, the calendar shows **No surveyor**
+   on it, and the team gets one alert the working day before.)
 
 ![A new pilot's command centre](screenshots/guides/08-ops-command-centre-new.png)
 

@@ -78,7 +78,7 @@ export async function GET(request: Request) {
 
   const quiet = newQuotes + newDrafts + newBookings === 0;
   const today = pulse
-    ? `${pulse.surveysToday.length} survey${pulse.surveysToday.length === 1 ? "" : "s"}, ${pulse.installsToday.length} install${pulse.installsToday.length === 1 ? "" : "s"} today${pulse.blocked.length ? `, ${pulse.blocked.length} blocked` : ""}; `
+    ? `${pulse.surveysToday.length} survey${pulse.surveysToday.length === 1 ? "" : "s"}, ${pulse.installsToday.length} install${pulse.installsToday.length === 1 ? "" : "s"} today${pulse.surveysUnassigned.length ? `, ${pulse.surveysUnassigned.length} survey${pulse.surveysUnassigned.length === 1 ? "" : "s"} with no surveyor` : ""}${pulse.blocked.length ? `, ${pulse.blocked.length} blocked` : ""}; `
     : "";
   const subject = quiet
     ? `Daily digest: ${today}quiet day (${views24h} page views)`
@@ -132,7 +132,10 @@ function pilotSection(p: Pulse, base: string): string {
   const list = (items: string[], empty: string) =>
     items.length ? `<ul>${items.map((i) => `<li>${i}</li>`).join("")}</ul>` : `<p style="color:#5d6371">${empty}</p>`;
   const on = [
-    ...p.surveysToday.map((c) => `Survey: ${link(c.id, c.customer)} at ${escapeHtml(c.surveyAt ? (fmtDayTime(c.surveyAt).split(", ")[1] ?? "") : "")} (${escapeHtml(c.outcode)})`),
+    ...p.surveysToday.map(
+      (c) =>
+        `Survey: ${link(c.id, c.customer)} at ${escapeHtml(c.surveyAt ? (fmtDayTime(c.surveyAt).split(", ")[1] ?? "") : "")} (${escapeHtml(c.outcode)})${c.surveyUnassigned ? ' <strong style="color:#b45309">no surveyor</strong>' : ""}`,
+    ),
     ...p.installsToday.map((c) => `Install day ${c.installDates.indexOf(p.today) + 1} of ${c.installDates.length}: ${link(c.id, c.customer)} (${escapeHtml(c.outcode)})`),
   ];
   const blocked = p.blocked.slice(0, 10).map((c) => `${link(c.id, c.customer)}: ${escapeHtml(c.topBlocker ?? c.nextAction.text)}`);
@@ -142,8 +145,12 @@ function pilotSection(p: Pulse, base: string): string {
   const owed = p.outstanding.invoices
     .slice(0, 10)
     .map((i) => `${link(i.projectId, i.customer)}: ${escapeHtml(i.number)}, ${escapeHtml(money(i.duePence))}${i.dueOn ? ` due ${escapeHtml(fmtDate(i.dueOn))}` : ""}`);
+  const unassigned = p.surveysUnassigned.map(
+    (c) => `${link(c.id, c.customer)}: survey ${escapeHtml(c.surveyAt ? fmtDayTime(c.surveyAt) : "")} (${escapeHtml(c.outcode)}). Assign a surveyor.`,
+  );
   return `<p><strong>Today (${escapeHtml(fmtDate(p.today))})</strong></p>
 ${list(on, "No surveys or install days today.")}
+${unassigned.length ? `<p><strong style="color:#b45309">Surveys with no surveyor (${unassigned.length})</strong></p>${list(unassigned, "")}` : ""}
 <p><strong>Blocked (${p.blocked.length})</strong></p>
 ${list(blocked, "Nothing blocked.")}
 <p><strong>Overdue next actions (${p.overdue.length})</strong></p>

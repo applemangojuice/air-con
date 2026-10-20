@@ -122,6 +122,12 @@ share a number: the form says which household already has it.
   **Book it for the customer** → day, time, **In person** or **Video call**,
   surveyor → **Book the survey**. They get a confirmation email straight
   away and a reminder the day before.
+- A slot the family picks has nobody on it: then assign a surveyor
+  (**Survey** box → **Assign a surveyor**). Until you do it shows as **No
+  surveyor** on the calendar (month, week and day), **Assign a surveyor**
+  under What's blocking and on the Board, under **Surveys with no surveyor**
+  on Today and in the morning email, and the team gets one urgent alert on
+  the working day before the visit.
 - To change it: **Move the survey** or **Change surveyor** (the family is
   told).
 - The surveyor works on their phone (see [field.md](field.md)) and submits.

@@ -1,4 +1,5 @@
 import {
+  addWorkingDays,
   daysBetween,
   handoverDeadlines,
   documentsConsentCovers,
@@ -41,7 +42,8 @@ export type DailyJobId =
   | "seasonal-check"
   | "service-reminder"
   | "paperwork-overdue"
-  | "proposal-late";
+  | "proposal-late"
+  | "survey-unassigned";
 
 export const DAILY_JOB_IDS: DailyJobId[] = [
   "survey-reminder",
@@ -56,6 +58,7 @@ export const DAILY_JOB_IDS: DailyJobId[] = [
   "service-reminder",
   "paperwork-overdue",
   "proposal-late",
+  "survey-unassigned",
 ];
 
 export const DAILY_JOB_LABEL: Record<DailyJobId, string> = {
@@ -71,10 +74,11 @@ export const DAILY_JOB_LABEL: Record<DailyJobId, string> = {
   "service-reminder": "Service reminders",
   "paperwork-overdue": "Overdue certificates (team alerts)",
   "proposal-late": "Proposals past the date we gave (team alerts)",
+  "survey-unassigned": "Surveys with no surveyor, the working day before (team alerts)",
 };
 
 type NotifyJob = Exclude<DailyJobId, "proposal-expired">;
-type NotifyEvent = Exclude<NotifyJob, "paperwork-overdue" | "proposal-late"> | "team-alert";
+type NotifyEvent = Exclude<NotifyJob, "paperwork-overdue" | "proposal-late" | "survey-unassigned"> | "team-alert";
 
 export type DailyJob =
   | {
@@ -153,6 +157,31 @@ export function dailyJobsFor(project: Project, todayIso: string, settings: Pilot
         },
         p.survey.scheduledFor,
       );
+    }
+  }
+
+  // A survey nobody is down to do (the family booked the slot from their page): the team hears
+  // once, on the working day before (or on the day, if that run was missed).
+  if (live && p.survey.status === "booked" && p.survey.scheduledFor && !p.survey.surveyor) {
+    const on = dateOf(p.survey.scheduledFor);
+    const dayBefore = addWorkingDays(on, -1, settings.scheduling.workingDays);
+    if (today >= dayBefore && today <= on) {
+      const at = p.survey.scheduledFor.slice(11, 16);
+      jobs.push({
+        kind: "notify",
+        job: "survey-unassigned",
+        projectId: p.id,
+        event: "team-alert",
+        data: {
+          title: `No surveyor for ${p.customer.name || "a customer"}'s survey ${today === on ? "today" : `on ${on}`}${at ? ` at ${at}` : ""}`,
+          lines: [
+            "The home survey is booked (often by the family, from their page) and nobody is down to do it.",
+            "Open the project and assign a surveyor (Survey, Assign), or call the family to move it.",
+          ],
+          urgent: true,
+        },
+        discriminator: `survey-unassigned:${p.survey.scheduledFor}`,
+      });
     }
   }
 

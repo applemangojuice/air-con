@@ -1632,6 +1632,15 @@ test("survey-complete gate tells the customer to book first", () => {
   const bs = blockersFor(fresh(), ctx(T.create, { surveyCompleteness: undefined }), "survey-complete");
   assert.deepEqual(codes(bs), ["survey-not-booked", "survey-not-started"]);
   assert.equal(bs[0]!.owner, "customer");
+  // Booked (the family picked a slot from their page) with nobody on it: the office's to assign.
+  const selfBooked = fresh();
+  selfBooked.survey = { ...selfBooked.survey, status: "booked", scheduledFor: "2026-10-26T10:00:00.000Z" };
+  const nobody = blockersFor(selfBooked, ctx(T.create, { surveyCompleteness: undefined }), "survey-complete");
+  assert.deepEqual(codes(nobody), ["survey-no-surveyor", "survey-not-started"]);
+  assert.equal(nobody[0]!.action, "Assign a surveyor");
+  assert.equal(nobody[0]!.owner, "ops");
+  selfBooked.survey.surveyor = { staffId: "s1", name: "DEMO Sam" };
+  assert.deepEqual(codes(blockersFor(selfBooked, ctx(T.create, { surveyCompleteness: undefined }), "survey-complete")), ["survey-not-started"]);
 });
 
 /* ------------------------------------------------------------------ */

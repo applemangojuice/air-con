@@ -386,6 +386,8 @@ export interface Pulse {
   today: string;
   installsToday: BoardCard[];
   surveysToday: BoardCard[];
+  /** Surveys booked with nobody down to do them, soonest first. */
+  surveysUnassigned: BoardCard[];
   blocked: BoardCard[];
   overdue: BoardCard[];
   openIssues: number;
@@ -413,6 +415,7 @@ export async function loadPulse(board?: BoardData): Promise<Pulse> {
     today,
     installsToday: live.filter((c) => c.installDates.includes(today)),
     surveysToday: live.filter((c) => c.surveyAt?.slice(0, 10) === today),
+    surveysUnassigned: live.filter((c) => c.surveyUnassigned).sort((a, b) => (a.surveyAt ?? "").localeCompare(b.surveyAt ?? "")),
     blocked: live.filter((c) => c.blockers > 0),
     overdue: live.filter((c) => c.nextAction.dueOn && c.nextAction.dueOn < today),
     openIssues: openIssues.length,

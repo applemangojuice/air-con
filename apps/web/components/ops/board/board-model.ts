@@ -54,6 +54,8 @@ export interface BoardCard {
   invoiceNumbers: string[];
   /** The survey slot (UK wall-clock as UTC) while one is booked. */
   surveyAt?: string;
+  /** Booked, and nobody is down to do it (a slot the family picked themselves, say). */
+  surveyUnassigned?: boolean;
   installDates: string[];
   closedReason?: string;
   createdAt: string;
@@ -128,6 +130,7 @@ export function cardFromProject(
     ...(blocks[0] ? { topBlocker: blocks[0].message } : {}),
     invoiceNumbers: extras.invoiceNumbers ?? [],
     ...(p.survey.status === "booked" && p.survey.scheduledFor ? { surveyAt: p.survey.scheduledFor } : {}),
+    ...(!p.closure.closed && p.survey.status === "booked" && !p.survey.surveyor ? { surveyUnassigned: true } : {}),
     installDates,
     ...(p.closure.reason ? { closedReason: p.closure.reason } : {}),
     createdAt: p.createdAt,
