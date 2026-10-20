@@ -1600,6 +1600,16 @@ function normaliseV2(raw: Rec): Project {
  * v1 → v2. The mapping is literal: nothing becomes "paid", "approved" or
  * "designed" that v1 didn't record. Reschedule fees (including v1 delivery
  * fees) carry over so the balance doesn't change.
+ *
+ * v1's "final quote" was the instant price, issued automatically and accepted
+ * with a click, and the old site told customers accepting it didn't tie them
+ * in: no proposal, Schedule 2 information or cancellation form was ever sent.
+ * So it becomes a v2 contract only once work really went ahead on it (the kit
+ * dispatched or delivered, or the installation finished: `committed`).
+ * Before that, the project starts again at the price stage's v2 steps: the
+ * proposal is not issued, a v1 install date isn't a booking, and a v1 site
+ * visit (which left no survey record to design from) isn't a survey; an
+ * internal note says what the old system had, for the office (§K43).
  */
 function fromV1(raw: Rec): Project {
   const customer = rec(raw.customer);
@@ -1612,6 +1622,10 @@ function fromV1(raw: Rec): Project {
   const inst = rec(raw.installation);
   const events = validEvents(raw.events);
   const lastEvent = (type: string) => [...events].reverse().find((e) => e.type === type)?.at;
+  const notes: Array<[type: string, label: string]> = [];
+  const instStatus = oneOf(inst.status, ["not-booked", "booked", "completed"], "not-booked");
+  const dlStatus = oneOf(dl.status, ["pending", "scheduled", "dispatched", "delivered"], "pending");
+  const committed = dlStatus === "dispatched" || dlStatus === "delivered" || instStatus === "completed";
 
   const p = blankProject(str(raw.id), str(raw.quoteId), str(raw.createdAt));
   p.customer = { name: str(customer.name), postcode: str(customer.postcode), addressLine: str(customer.addressLine) };
@@ -1640,19 +1654,20 @@ function fromV1(raw: Rec): Project {
   const feeGbp = agreed ? num(sv.feeGbp, 0) : 0;
   const scheduledFor = optStr(sv.scheduledFor);
   const v1Paid = agreed && sv.paymentStatus === "paid";
+  const visitedAt = svStatus === "completed" ? (lastEvent("site-visit-completed") ?? scheduledFor) : undefined;
+  // A v1 site visit left no survey record, so before any work went ahead the
+  // home survey is still to do (its fee and payment stay, as agreed).
+  const resurvey = svStatus === "completed" && !committed;
   p.survey = {
-    status: svStatus === "completed" ? "submitted" : svStatus === "booked" && scheduledFor ? "booked" : "not-booked",
-    mode: agreed ? oneOf(sv.mode, ["video", "in-person"], "video") : "in-person",
-    durationMinutes: agreed ? 60 : p.survey.durationMinutes,
+    status: svStatus === "completed" && !resurvey ? "submitted" : svStatus === "booked" && scheduledFor ? "booked" : "not-booked",
+    mode: agreed && !resurvey ? oneOf(sv.mode, ["video", "in-person"], "video") : "in-person",
+    durationMinutes: agreed && !resurvey ? 60 : p.survey.durationMinutes,
     feeGbp,
     paymentStatus: v1Paid ? "paid" : feeGbp > 0 ? "unpaid" : "not-required",
     rescheduleFeesGbp: num(sv.rescheduleFeesGbp, 0),
-    ...(scheduledFor ? { scheduledFor } : {}),
+    ...(scheduledFor && !resurvey ? { scheduledFor } : {}),
   };
-  if (svStatus === "completed") {
-    const at = lastEvent("site-visit-completed") ?? scheduledFor;
-    if (at) p.survey.submittedAt = at;
-  }
+  if (svStatus === "completed" && !resurvey && visitedAt) p.survey.submittedAt = visitedAt;
 
   const condition = oneOf(el.surveyCondition, ELECTRICS_CONDITIONS, "unsure");
   p.electrics = {
@@ -1669,10 +1684,21 @@ function fromV1(raw: Rec): Project {
   // its cancellation period runs from delivery (set below with the kit), and
   // v1 never sent pre-contract information on a durable medium, so
   // cancellationStatus applies reg 31 to it.
-  if (fqStatus === "issued") {
+  const finalTotalPence = Math.round(num(fq.totalGbp, p.quoteSummary.totalGbp) * 100);
+  if (fqStatus !== "pending" && !committed) {
+    // Not a proposal and not a contract here (see above): the office surveys,
+    // designs and issues a real proposal, so the proposal stays not issued.
+    const when = fqStatus === "accepted" ? acceptedAt : issuedAt;
+    notes.push([
+      "migrated-final-quote",
+      fqStatus === "accepted"
+        ? `Moved from the old system: the customer accepted its instant final quote (${fmtPence(finalTotalPence)})${when ? ` on ${fmtDateFull(when)}` : ""}. The old site told them that didn't tie them in, and no proposal, contract or cancellation information was ever sent, so it isn't a contract here. Survey, design and send a proposal as usual.`
+        : `Moved from the old system: its instant final quote (${fmtPence(finalTotalPence)}) was issued${when ? ` on ${fmtDateFull(when)}` : ""}. It was never a proposal, so nothing is issued here. Survey, design and send a proposal as usual.`,
+    ]);
+  } else if (fqStatus === "issued") {
     p.proposal = { status: "issued", contractType: "supply-and-install", ...(issuedAt ? { issuedAt } : {}) };
   } else if (fqStatus === "accepted") {
-    const contractTotalPence = Math.round(num(fq.totalGbp, p.quoteSummary.totalGbp) * 100);
+    const contractTotalPence = finalTotalPence;
     p.proposal = {
       status: "accepted",
       contractType: "supply-and-install",
@@ -1683,8 +1709,14 @@ function fromV1(raw: Rec): Project {
     p.money.contractTotalPence = contractTotalPence;
   }
 
+  if (resurvey) {
+    notes.push([
+      "migrated-site-visit",
+      `Moved from the old system: the site visit${visitedAt ? ` on ${fmtDateFull(visitedAt)}` : ""} was done there, but it left no survey record to design from. Book a home survey.`,
+    ]);
+  }
+
   // Installation → booking + install.
-  const instStatus = oneOf(inst.status, ["not-booked", "booked", "completed"], "not-booked");
   const installDays = Math.max(1, Math.round(num(inst.installDays, p.quoteSummary.installDays)));
   const startDate = optStr(inst.date)?.slice(0, 10);
   const installer = rec(inst.installer);
@@ -1694,27 +1726,33 @@ function fromV1(raw: Rec): Project {
     installDays,
     rescheduleFeesGbp: num(inst.rescheduleFeesGbp, 0) + num(dl.rescheduleFeesGbp, 0),
     prep: prep.length ? prep : p.booking.prep,
-    crew: optStr(installer.name)
+    crew: optStr(installer.name) && committed
       ? [{ staffId: "legacy", name: str(installer.name), role: "installer", external: false }]
       : [],
   };
-  if (instStatus !== "not-booked" && startDate) {
+  if (instStatus !== "not-booked" && startDate && committed) {
     p.booking.status = "booked";
     p.booking.startDate = startDate;
     p.booking.dates = consecutiveWorkingDays(startDate, installDays);
+  } else if (instStatus === "booked" && startDate) {
+    // Booked on a click with no contract behind it: not a booking here.
+    notes.push([
+      "migrated-install-booking",
+      `Moved from the old system: the install was booked there for ${fmtDateFull(startDate)}, but nothing is booked here until the customer accepts a proposal. Call them about the date.`,
+    ]);
   }
   if (instStatus === "completed") {
     p.install = { status: "complete", days: [], ...(optStr(inst.completedAt) ? { completedAt: str(inst.completedAt) } : {}) };
   }
 
-  // Delivery → kit.
-  const dlStatus = oneOf(dl.status, ["pending", "scheduled", "dispatched", "delivered"], "pending");
+  // Delivery → kit. A "scheduled" v1 delivery was only the target date its
+  // install booking set, so it's an order only once work went ahead.
   const courier = optStr(dl.courier);
   const trackingRef = optStr(dl.trackingRef);
   p.kit = {
-    status: dlStatus === "pending" ? "not-ordered" : dlStatus === "scheduled" ? "ordered" : dlStatus,
+    status: dlStatus === "pending" || !committed ? "not-ordered" : dlStatus === "scheduled" ? "ordered" : dlStatus,
     shortages: 0,
-    ...(optStr(dl.expectedDate) ? { expectedDate: str(dl.expectedDate) } : {}),
+    ...(optStr(dl.expectedDate) && committed ? { expectedDate: str(dl.expectedDate) } : {}),
     ...(optStr(dl.deliveredAt) ? { deliveredAt: str(dl.deliveredAt) } : {}),
     ...(courier ? { summary: trackingRef ? `${courier}, tracking ${trackingRef}` : courier } : {}),
   };
@@ -1726,6 +1764,9 @@ function fromV1(raw: Rec): Project {
 
   p.money.changeFeesPence = (p.survey.rescheduleFeesGbp + p.booking.rescheduleFeesGbp) * 100;
   p.events = events;
+  for (const [type, label] of notes) {
+    p.events.push({ at: events[events.length - 1]?.at ?? str(raw.createdAt), type, label, actor: "system", internal: true });
+  }
   // v1's "paid" was the customer's own button press, not a verified payment,
   // so no money moves here. v1 promised the fee comes off the install
   // balance (SITE_VISIT.creditedAgainstInstall), so say so where ops will see

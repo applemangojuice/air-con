@@ -17,6 +17,12 @@ export interface QuoteDraft {
   layout: KitchenLivingLayout;
   /** Server row id once the address+email step has saved the draft. */
   draftId?: string;
+  /**
+   * "Email me one reminder if I don't finish", under the step-1 email:
+   * undefined until they've passed that step with an email typed (then
+   * true unless they unticked it). Sent with the draft (lib/follow-up-notice).
+   */
+  reminder?: boolean;
   /** Property Intelligence id when the customer picked a known address. */
   intelId?: string;
   /** True when the house answers were pre-filled from public records. */
@@ -130,7 +136,7 @@ export function normaliseDraft(raw: unknown): QuoteDraft | null {
     outdoor: { ...base.survey.outdoor, ...(s.outdoor ?? {}) },
     electrics: { ...base.survey.electrics, ...(s.electrics ?? {}) },
   });
-  const { step, ...rest } = stored;
+  const { step, reminder, ...rest } = stored;
   return {
     ...base,
     ...rest,
@@ -138,6 +144,7 @@ export function normaliseDraft(raw: unknown): QuoteDraft | null {
     contact: { ...base.contact, ...(stored.contact ?? {}) },
     configured: stored.configured === true,
     ...(typeof step === "number" && Number.isInteger(step) && step >= 0 ? { step } : {}),
+    ...(typeof reminder === "boolean" ? { reminder } : {}),
   };
 }
 

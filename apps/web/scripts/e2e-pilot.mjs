@@ -207,6 +207,13 @@ async function hydrated(page) {
     .catch(() => {});
 }
 
+/** Today's date in London (yyyy-mm-dd), as the date inputs take it. */
+function londonToday() {
+  const parts = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/London", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
+  const get = (t) => parts.find((x) => x.type === t)?.value ?? "";
+  return `${get("year")}-${get("month")}-${get("day")}`;
+}
+
 /** Open a page and wait until it's usable. */
 async function go(page, path) {
   const r = await page.goto(path.startsWith("http") ? path : `${BASE}${path}`, { waitUntil: "load" });
@@ -521,6 +528,22 @@ try {
     // Tokens are never stored: the outbox keeps a placeholder where the link goes.
     await go(admin, `/ops/messages?event=magic-link`);
     check("the sign-in email is logged as Demo, not sent, to the customer", await has(admin, new RegExp(`Magic link · Email to ${CUSTOMER.email.replace(/\./g, "\\.")}`)) && (await has(admin, /Demo, not sent/)));
+
+    // A follow-up scheduled on the household's quote surfaces on the console's chase list and in the inbox.
+    await go(admin, `/ops/quotes`);
+    await admin.locator("main a", { hasText: CUSTOMER.name }).first().click();
+    await admin.waitForURL(/\/ops\/quotes\/[0-9a-f-]{36}/);
+    await hydrated(admin);
+    const nextAction = admin.locator("form").filter({ has: admin.locator('input[name="due"]') });
+    await nextAction.locator('input[name="action"]').fill("DEMO: call back about the loft room");
+    await nextAction.locator('input[name="due"]').fill(londonToday());
+    await nextAction.getByRole("button", { name: "Set" }).click();
+    check("a next action is scheduled on the quote", await waitFor(admin, /DEMO: call back about the loft room/));
+    await go(admin, `/ops`);
+    const reName = CUSTOMER.name.replace(/[()]/g, "\\$&");
+    check("the console lists it under Website leads due today", await has(admin, new RegExp(`Website leads due today \\(\\d+\\)[\\s\\S]*${reName}[\\s\\S]*DEMO: call back about the loft room`)));
+    await go(admin, `/ops/quotes?sort=next`);
+    check("the inbox shows it as due today, sorted by next action", await has(admin, /DEMO: call back about the loft room\s*Due today/));
   });
 
   const customer = await person("customer", "phone");

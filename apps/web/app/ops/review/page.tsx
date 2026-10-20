@@ -269,7 +269,7 @@ export default async function ReviewPage() {
                 motivation conversation.
               </li>
               <li>
-                Then walk the <Link href="/ops" className="text-accent-700 hover:underline">Due today</Link>{" "}
+                Then walk the <Link href="/ops" className="text-accent-700 hover:underline">Website leads due today</Link>{" "}
                 list — the review is worthless if the follow-ups don&apos;t happen.
               </li>
             </ol>

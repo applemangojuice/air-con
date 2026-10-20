@@ -92,6 +92,11 @@ Click any card on the Board. One page has everything about that home:
 6. Any issue or variation the crew raised yesterday: the project →
    **Issues**. Answer questions; check the price of a variation before it
    goes to the family.
+7. **Today** (`/ops`) → **Website leads due today**: the follow-ups you
+   scheduled on quotes (a quote's **Next action**), due today or overdue,
+   also in the morning email. Open each, do it, then **Done / clear** or
+   set the next one. **Quote requests** sorts by next action too (click
+   the **Next action** column).
 
 ## 3. A job, start to finish
 

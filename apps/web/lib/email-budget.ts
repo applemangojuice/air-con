@@ -10,12 +10,16 @@ import { sharedRateLimits } from "./rate-limit-shared";
  * link each) used up the day's quota in about a minute, and every email
  * after that failed until the next day.
  *
- * Two pools, so neither can starve the other:
+ * Three pools, so none can starve another:
  *  - `public`: the quote form's emails (the customer's price and the team's
  *    lead alert) and the sign-in link /api/projects sends to a quote's
  *    address;
  *  - `sign-in`: sign-in links a visitor asks for (/api/portal/link), which
- *    only ever go to an address that's already a customer's.
+ *    only ever go to an address that's already a customer's;
+ *  - `follow-up`: the one reminder the daily job sends an unfinished quote
+ *    (api/cron/follow-up), whose address nobody has checked.
+ * Together they stay well under the plan's 100 a day (65), leaving the rest
+ * for the office.
  * Each pool has a cap per London day (the key carries the date, so the
  * count starts again at midnight London time, including on the 25-hour day
  * the clocks go back) and a smaller one per hour, counted across every
@@ -28,11 +32,12 @@ import { sharedRateLimits } from "./rate-limit-shared";
  * deployment) nothing goes anyway, so nothing is spent.
  */
 
-export type EmailPool = "public" | "sign-in";
+export type EmailPool = "public" | "sign-in" | "follow-up";
 
 export const EMAIL_BUDGET: Record<EmailPool, { perDay: number; perHour: number }> = {
   public: { perDay: 30, perHour: 12 },
   "sign-in": { perDay: 25, perHour: 10 },
+  "follow-up": { perDay: 10, perHour: 10 },
 };
 
 const londonDate = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/London", year: "numeric", month: "2-digit", day: "2-digit" });
@@ -58,6 +63,12 @@ export function emailBudgetChecks(pool: EmailPool, now: Date): { key: string; li
   ];
 }
 
+const POOL_WHAT: Record<EmailPool, string> = {
+  public: "quote emails and project links",
+  "sign-in": "sign-in links asked for from the website",
+  "follow-up": "unfinished-quote reminders",
+};
+
 const warned = new Set<string>();
 
 /**
@@ -72,7 +83,7 @@ export async function spendEmailBudget(pool: EmailPool, now: Date = new Date()):
     if (!warned.has(day)) {
       warned.add(day);
       console.warn(
-        `[email] the ${pool} email budget (${EMAIL_BUDGET[pool].perDay} a day, ${EMAIL_BUDGET[pool].perHour} an hour) is used up: further ${pool === "public" ? "quote emails and project links" : "sign-in links asked for from the website"} are held back for now`,
+        `[email] the ${pool} email budget (${EMAIL_BUDGET[pool].perDay} a day, ${EMAIL_BUDGET[pool].perHour} an hour) is used up: further ${POOL_WHAT[pool]} are held back for now`,
       );
     }
   }

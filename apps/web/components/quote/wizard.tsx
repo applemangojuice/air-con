@@ -18,6 +18,7 @@ import {
   type QuoteDraft,
 } from "@/lib/quote-draft";
 import { submitQuote } from "@/lib/submit-quote";
+import { REMINDER_NOTICE_VERSION } from "@/lib/follow-up-notice";
 import { track } from "@/lib/analytics-client";
 import { normalisePostcode } from "@/lib/format";
 import { coverageFor, type PublicSettings } from "@/components/site/claims";
@@ -165,7 +166,7 @@ export function QuoteWizard({
       const res = await fetch("/api/quotes/draft", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email: current.contact.email, survey: current.survey }),
+        body: JSON.stringify({ email: current.contact.email, survey: current.survey, ...reminderFields(current) }),
       });
       if (!res.ok) return undefined;
       const data = (await res.json()) as { demo: boolean; id?: string };
@@ -182,7 +183,7 @@ export function QuoteWizard({
       headers: { "content-type": "application/json" },
       // Email travels too: a corrected address must reach the server draft,
       // or the follow-up email goes to the typo.
-      body: JSON.stringify({ survey: current.survey, email: current.contact.email || undefined }),
+      body: JSON.stringify({ survey: current.survey, email: current.contact.email || undefined, ...reminderFields(current) }),
     }).catch(() => undefined);
   }
 
@@ -192,6 +193,9 @@ export function QuoteWizard({
     const normalised: QuoteDraft = {
       ...draft,
       survey: { ...draft.survey, postcode: normalisePostcode(draft.survey.postcode) },
+      // The reminder box sits under the email on this step: leaving it with an
+      // email typed is their answer (ticked unless they unticked it).
+      ...(draft.contact.email ? { reminder: draft.reminder !== false } : {}),
     };
     if (!coverageFor(settings.serviceArea, normalised.survey.postcode).covered) return;
     setDraft(normalised);
@@ -330,7 +334,7 @@ export function QuoteWizard({
   const stepView = (() => {
     switch (step) {
       case 0:
-        return <AddressStep {...common} onNext={nextFromAddress} notice={notice} />;
+        return <AddressStep {...common} onNext={nextFromAddress} notice={notice} setReminder={(reminder) => setDraft((d) => ({ ...d, reminder }))} />;
       case 1:
         return <HouseStep {...common} onNext={nextFromHouse} />;
       case 2:
@@ -368,4 +372,13 @@ export function QuoteWizard({
       {stepView}
     </>
   );
+}
+
+/**
+ * The reminder choice for a draft save, only once they've answered it on
+ * the address step (a draft restored from before the box existed has no
+ * answer, so it's never reminded).
+ */
+function reminderFields(d: QuoteDraft): { reminder?: boolean; reminderNotice?: string } {
+  return d.reminder === undefined ? {} : { reminder: d.reminder, reminderNotice: REMINDER_NOTICE_VERSION };
 }

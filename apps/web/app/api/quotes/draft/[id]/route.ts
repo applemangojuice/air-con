@@ -3,6 +3,7 @@ import { z } from "zod";
 import { QUOTE_BODY_MAX_BYTES, readJsonCapped } from "@/lib/http-body";
 import { generateQuote, type Survey } from "@aircon/domain";
 import { coverageFor } from "@/components/site/claims";
+import { reminderRecord } from "@/lib/follow-up";
 import { getPublicSettings } from "@/lib/public-settings";
 import { withUploadedPhotosOnly } from "@/lib/quote-draft";
 import { enforceRateLimit } from "@/lib/rate-limit";
@@ -13,6 +14,9 @@ const bodySchema = z.object({
   survey: surveySchema,
   /** A corrected email must reach the draft, or follow-ups go to the typo. */
   email: z.string().trim().toLowerCase().email().max(200).optional(),
+  /** The reminder box at step 1 (and its wording version): unticking it later still counts. */
+  reminder: z.boolean().optional(),
+  reminderNotice: z.string().max(40).optional(),
 });
 
 /** Update a draft in place as the customer moves through the funnel. */
@@ -39,6 +43,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     return NextResponse.json({ error: "out-of-area", outcode: coverage.outcode }, { status: 422 });
   }
   const quote = generateQuote(survey);
+  // A draft's attribution holds only its reminder choice (the finished
+  // quote writes its own), so a newer choice replaces it.
+  const reminder = reminderRecord(parsed.data, new Date().toISOString());
 
   const supabase = getServiceClient();
   if (!supabase) return NextResponse.json({ ok: true, demo: true });
@@ -47,6 +54,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     .from("quote_requests")
     .update({
       ...(parsed.data.email ? { email: parsed.data.email } : {}),
+      ...(reminder ? { attribution: { reminder } } : {}),
       postcode: survey.postcode,
       address_line: survey.addressLine,
       engine_version: quote.engineVersion,

@@ -5,7 +5,8 @@ import { Badge } from "@/components/kit/badge";
 import { LinkButton } from "@/components/kit/button";
 import { PageHeader } from "@/components/kit/layout";
 import { requireStaff } from "@/lib/auth/server";
-import { fmtDay, fmtDayTime, money } from "@/lib/format";
+import { fmtDay, fmtDayTime, londonDateOf, money } from "@/lib/format";
+import { DUE_LEADS_SHOWN, loadDueLeads } from "@/lib/lead-follow-ups";
 import { loadPulse, type Pulse } from "@/lib/ops-core-server";
 import { getServiceClient } from "@/lib/supabase-server";
 import { tabByKey } from "./quotes/tabs";
@@ -13,8 +14,12 @@ import { tabByKey } from "./quotes/tabs";
 export const metadata: Metadata = { title: "Console · ops", robots: { index: false } };
 export const dynamic = "force-dynamic";
 
-/** New leads from the website: the funnel's side of the pulse. Nulls when a count can't be read. */
-async function leads() {
+/**
+ * New leads from the website: the funnel's side of the pulse, and the chase
+ * list of follow-ups scheduled on quotes (due today or overdue). Nulls when
+ * a count or the list can't be read.
+ */
+async function leads(today: string) {
   const db = getServiceClient();
   if (!db) return null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -22,12 +27,13 @@ async function leads() {
     const { count: n, error } = await filter(db.from("quote_requests").select("*", { count: "exact", head: true }));
     return error ? null : (n ?? 0);
   };
-  const [inbox, drafts, unworked] = await Promise.all([
+  const [inbox, drafts, unworked, due] = await Promise.all([
     count((q) => q.in("status", tabByKey("inbox")!.statuses!)),
     count((q) => q.in("status", tabByKey("drafts")!.statuses!)),
     count((q) => q.in("status", tabByKey("inbox")!.statuses!).is("next_action_at", null)),
+    loadDueLeads(db, today).catch(() => null),
   ]);
-  return { inbox, drafts, unworked };
+  return { inbox, drafts, unworked, due };
 }
 
 type Module = { title: string; href: string; body: string; status: "Live" | "Demo" | "Older view" };
@@ -100,7 +106,7 @@ export default async function ConsolePage() {
       pulseFailed = true;
     }
   }
-  const lead = await leads().catch(() => null);
+  const lead = await leads(pulse?.today ?? londonDateOf(new Date().toISOString())).catch(() => null);
   const canCreate = can(staff, "projects.edit");
 
   return (
@@ -188,6 +194,46 @@ export default async function ConsolePage() {
               )}
             </div>
           </div>
+        </section>
+      )}
+
+      {lead && (
+        <section aria-labelledby="leads-due" className="mt-4 rounded-2xl border border-line bg-white p-4">
+          <h2 id="leads-due" className="text-sm font-semibold text-ink-900">
+            Website leads due today{lead.due ? ` (${lead.due.total})` : ""}
+          </h2>
+          {!lead.due ? (
+            <p role="alert" className="mt-2 text-sm text-red-700">
+              The leads&apos; follow-ups couldn&apos;t load. Check them under{" "}
+              <Link href="/ops/quotes?sort=next" className="font-semibold underline">
+                Quote requests
+              </Link>
+              .
+            </p>
+          ) : lead.due.leads.length === 0 ? (
+            <p className="mt-2 text-sm text-ink-500">No lead follow-ups due.</p>
+          ) : (
+            <ul className="mt-2 space-y-1.5 text-sm">
+              {lead.due.leads.map((d) => (
+                <li key={d.id}>
+                  <Link href={`/ops/quotes/${d.id}`} className="font-semibold text-accent-700 hover:underline">
+                    {d.name}
+                  </Link>{" "}
+                  <span className="text-ink-500">
+                    · {d.action} · {d.postcode}
+                  </span>{" "}
+                  {d.overdue && <span className="text-xs font-semibold text-red-700">overdue since {fmtDay(d.dueOn)}</span>}
+                </li>
+              ))}
+              {lead.due.total > DUE_LEADS_SHOWN && (
+                <li>
+                  <Link href="/ops/quotes?tab=all&sort=next" className="text-accent-700 hover:underline">
+                    and {lead.due.total - DUE_LEADS_SHOWN} more
+                  </Link>
+                </li>
+              )}
+            </ul>
+          )}
         </section>
       )}
 

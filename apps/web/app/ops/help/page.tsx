@@ -54,6 +54,9 @@ const ROUTINES: Routine[] = [
         <P href="/ops/messages">Messages</P>: anything that failed to send (red). Open it, fix the address or number, send it again.
       </>,
       <>Any issue or variation the crew raised yesterday: open the project → Issues. Answer questions, and price-check variations before they go to the customer.</>,
+      <>
+        <P href="/ops">Today</P>: the website leads whose follow-up is due today or overdue (each quote&apos;s next action). Do it, then mark it done or set the next one.
+      </>,
     ],
   },
   {

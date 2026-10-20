@@ -145,7 +145,9 @@ test("the public email budget's day is the London day, across the clocks going b
   assert.ok(day!.windowMs >= 25 * 3600_000, "the day's window outlasts the longest London day");
   assert.notEqual(hour!.key, emailBudgetChecks("public", new Date("2026-10-25T01:30:00Z"))[1]!.key, "01:00-02:00 BST and GMT are two hours");
   assert.equal(day!.key, emailBudgetChecks("public", new Date("2026-10-25T23:30:00Z"))[0]!.key, "one budget for the whole of Sunday");
-  assert.ok(EMAIL_BUDGET.public.perDay + EMAIL_BUDGET["sign-in"].perDay <= 60, "well under Resend Free's 100 a day, leaving the office's own");
+  const allPools = Object.values(EMAIL_BUDGET).reduce((n, b) => n + b.perDay, 0);
+  assert.ok(allPools <= 65, `every email the website can trigger, ${allPools} a day, stays well under Resend Free's 100, leaving the office's own`);
+  assert.ok(EMAIL_BUDGET["follow-up"].perDay <= 10, "the unfinished-quote reminders have their own small pool");
 });
 
 test("the public email budget holds across a day, per hour and per London day, and starts again at London midnight", async () => {

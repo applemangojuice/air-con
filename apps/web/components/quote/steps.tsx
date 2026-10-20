@@ -6,6 +6,7 @@ import type { KitchenLivingLayout, Survey, SurveyGeo } from "@aircon/domain";
 import { isValidUkPostcode, normalisePostcode } from "@/lib/format";
 import type { Contact, QuoteDraft } from "@/lib/quote-draft";
 import { personNameProblem } from "@/lib/person-name";
+import { REMINDER_NOTICE } from "@/lib/follow-up-notice";
 import { MARKETING_CONSENT, OPERATIONAL_CONSENT, coverageFor, type PublicSettings } from "@/components/site/claims";
 import { OutOfArea } from "./out-of-area";
 import { postcodeOutcome } from "./postcode-outcome";
@@ -162,7 +163,8 @@ export function AddressStep({
   onNext,
   busy,
   notice,
-}: StepProps & { notice?: string | null }) {
+  setReminder,
+}: StepProps & { notice?: string | null; setReminder: (reminder: boolean) => void }) {
   const { postcode, addressLine } = draft.survey;
   const email = draft.contact.email;
   const check = usePostcodeCheck(postcode, (geo) => setSurvey({ geo }));
@@ -355,6 +357,10 @@ export function AddressStep({
               />
             )}
           </TextField>
+          {email !== "" && (
+            // Told here, where they give the address, and free to refuse (lib/follow-up-notice).
+            <ReminderBox checked={draft.reminder !== false} onChange={setReminder} />
+          )}
         </>
       )}
     </StepShell>
@@ -647,6 +653,29 @@ export function DetailsStep({
         </p>
       </fieldset>
     </StepShell>
+  );
+}
+
+/** "Email me one reminder if I don't finish", under the step-1 email: ticked unless they untick it. */
+function ReminderBox({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+  const id = useId();
+  return (
+    <label htmlFor={id} className="-mt-1 flex min-h-12 cursor-pointer items-start gap-3 py-1">
+      <input
+        id={id}
+        type="checkbox"
+        checked={checked}
+        aria-describedby={`${id}-hint`}
+        onChange={(e) => onChange(e.target.checked)}
+        className="mt-0.5 h-5 w-5 shrink-0 accent-accent-700"
+      />
+      <span className="text-sm">
+        <span className="font-semibold text-ink-900">{REMINDER_NOTICE.label}</span>
+        <span id={`${id}-hint`} className="mt-0.5 block text-xs leading-relaxed text-ink-500">
+          {REMINDER_NOTICE.hint}
+        </span>
+      </span>
+    </label>
   );
 }
 

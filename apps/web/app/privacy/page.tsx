@@ -59,8 +59,8 @@ export default async function PrivacyPage() {
               <Basis>taking steps at your request before a contract.</Basis>
             </Item>
             <Item name="Saved progress">
-              If you give your email early in the quote, we save your answers so you can come back, and we may send
-              one reminder if you don&apos;t finish. <Basis>legitimate interests: finishing the quote you started.</Basis>
+              If you give your email early in the quote, we save your answers so you can come back, and, if you leave
+              &ldquo;Email me one reminder&rdquo; ticked, we send one reminder if you don&apos;t finish (never more). <Basis>legitimate interests: finishing the quote you started.</Basis>
             </Item>
             <Item name="Your consents">
               We record what you agreed to, when, and the exact words you saw: keeping you posted about your quote,

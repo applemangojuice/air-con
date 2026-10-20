@@ -30,7 +30,7 @@ export async function GET(request: Request) {
     let query = supabase
       .from("quote_requests")
       .select(
-        "id, created_at, status, customer_name, email, phone, timeframe, postcode, address_line, total_gbp, room_count, confidence_score, confidence_band, source, utm_source, referrer, booked_at, follow_up_sent_at",
+        "id, created_at, status, customer_name, email, phone, timeframe, postcode, address_line, total_gbp, room_count, confidence_score, confidence_band, source, utm_source, referrer, booked_at, follow_up_sent_at, next_action, next_action_at",
       )
       .order("created_at", { ascending: false })
       .range(from, from + PAGE - 1);
@@ -52,7 +52,7 @@ export async function GET(request: Request) {
     return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   const header =
-    "created_at,status,name,email,phone,timeframe,postcode,address,total_gbp,rooms,confidence,confidence_band,source,utm_source,referrer,booked_at,followed_up_at,quote_url";
+    "created_at,status,name,email,phone,timeframe,postcode,address,total_gbp,rooms,confidence,confidence_band,source,utm_source,referrer,booked_at,followed_up_at,quote_url,next_action,next_action_due";
   const base = (process.env.NEXT_PUBLIC_APP_URL ?? url.origin).replace(/\/$/, "");
   const lines = (data ?? []).map((r) =>
     [
@@ -74,6 +74,8 @@ export async function GET(request: Request) {
       esc(r.booked_at),
       esc(r.follow_up_sent_at),
       esc(`${base}/q/${r.id}`),
+      esc(r.next_action),
+      esc(r.next_action_at),
     ].join(","),
   );
 

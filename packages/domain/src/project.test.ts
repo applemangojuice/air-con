@@ -1884,38 +1884,64 @@ test("migrateProject: a fresh v1 project", () => {
   assert.equal(old.siteVisit.feeGbp, 150);
   assert.equal(p.survey.feeGbp, 0); // never booked, so never agreed: the v2 (free) terms
   assert.equal(p.survey.paymentStatus, "not-required");
-  // v1 auto-issued the final quote on a high-confidence survey.
-  assert.equal(p.proposal.status, "issued");
+  // v1 auto-issued the final quote on a high-confidence survey: the instant
+  // price, never a proposal, so nothing is issued here (the note says what was).
+  assert.equal(old.finalQuote.status, "issued");
+  assert.equal(p.proposal.status, "not-issued");
   assert.equal(p.proposal.proposalId, undefined);
   assert.equal(p.booking.status, "not-booked");
   assert.equal(p.kit.status, "not-ordered");
   assert.equal(p.design.status, "not-started");
-  assert.deepEqual(p.events, old.events);
+  assert.deepEqual(p.events.slice(0, old.events.length), old.events);
+  const note = p.events.at(-1)!;
+  assert.equal(note.type, "migrated-final-quote");
+  assert.equal(note.internal, true);
+  assert.equal(note.label, `Moved from the old system: its instant final quote (£${old.finalQuote.totalGbp!.toLocaleString("en-GB")}) was issued on Wednesday 1 July 2026. It was never a proposal, so nothing is issued here. Survey, design and send a proposal as usual.`);
   assert.equal(currentStage(p), "price");
+  assert.deepEqual(customerNextAction(p), { label: "Book your home survey", href: "/p/v1-1#survey" }, "never 'Review your proposal' with no proposal behind it");
 });
 
-test("migrateProject: accepted, and site visit completed", () => {
+test("migrateProject: a v1 acceptance isn't a contract, and a v1 site visit isn't a survey", () => {
+  // The old site's two clicks (approve the plan, accept the instant final
+  // quote) told the customer it didn't tie them in, and no proposal,
+  // Schedule 2 information or cancellation form was ever sent.
   const accepted = migrateProject(v1(V1_ACCEPTED));
-  assert.equal(accepted.proposal.status, "accepted");
-  assert.equal(accepted.proposal.contractTotalPence, accepted.quoteSummary.totalGbp * 100);
-  assert.equal(accepted.money.contractTotalPence, accepted.quoteSummary.totalGbp * 100);
-  // v1 always supplied the kit: supply-and-install, so no end date before delivery,
-  // and no pre-contract information was ever sent (reg 31 applies once it is).
+  assert.equal(accepted.proposal.status, "not-issued");
+  assert.equal(accepted.proposal.contractTotalPence, undefined);
+  assert.equal(accepted.proposal.acceptedAt, undefined);
+  assert.equal(accepted.money.contractTotalPence, undefined);
   assert.equal(accepted.proposal.contractType, "supply-and-install");
-  assert.equal(accepted.proposal.cancellationEndsOn, undefined);
-  assert.equal(cancellationStatus(accepted, "2026-08-01").basis, "goods-delivery");
+  assert.equal(currentStage(accepted), "price");
+  assert.deepEqual(customerNextAction(accepted), { label: "Book your home survey", href: "/p/v1-1#survey" });
+  const note = accepted.events.at(-1)!;
+  assert.equal(note.type, "migrated-final-quote");
+  assert.equal(note.internal, true, "for the office only");
+  assert.equal(note.actor, "system");
+  assert.match(note.label, /^Moved from the old system: the customer accepted its instant final quote \(£[\d,]+\) on Wednesday 1 July 2026\. The old site told them that didn't tie them in, .*so it isn't a contract here\. Survey, design and send a proposal as usual\.$/);
+  assert.equal(accepted.events.filter((e) => e.type.startsWith("migrated-")).length, 1);
 
+  // The site visit was done there, but there's no survey record to design from:
+  // the home survey is still to do. Its fee and payment stay as agreed.
   const visited = migrateProject(v1(V1_VISITED));
-  assert.equal(visited.survey.status, "submitted");
-  assert.equal(visited.survey.mode, "video");
-  assert.equal(visited.survey.scheduledFor, "2026-07-08T14:00:00.000Z");
+  assert.equal(visited.proposal.status, "not-issued");
+  assert.equal(visited.survey.status, "not-booked");
+  assert.equal(visited.survey.mode, "in-person");
+  assert.equal(visited.survey.scheduledFor, undefined);
+  assert.equal(visited.survey.submittedAt, undefined);
   assert.equal(visited.survey.paymentStatus, "paid"); // paid stays paid
   assert.equal(visited.survey.feeGbp, 150);
   assert.equal(projectFees(visited).surveyPaidGbp, 150); // what the balance invoice credits
-  assert.equal(visited.survey.submittedAt, V1_NOW); // from the site-visit-completed event
   assert.equal(visited.electrics.status, "validated");
-  assert.equal(currentStage(visited), "booking");
+  assert.equal(currentStage(visited), "price");
   assert.equal(visited.money.paidPence, 0); // a v1 button press isn't a verified payment
+  assert.deepEqual(
+    visited.events.filter((e) => e.type.startsWith("migrated-")).map((e) => [e.type, e.internal]),
+    [["migrated-final-quote", true], ["migrated-site-visit", true], ["migrated-survey-fee", true]],
+  );
+  assert.equal(
+    visited.events.find((e) => e.type === "migrated-site-visit")!.label,
+    "Moved from the old system: the site visit on Wednesday 1 July 2026 was done there, but it left no survey record to design from. Book a home survey.",
+  );
   const flag = visited.events.at(-1)!;
   assert.equal(flag.type, "migrated-survey-fee");
   assert.equal(flag.internal, true); // ops only: check it, then credit it
@@ -1924,8 +1950,60 @@ test("migrateProject: accepted, and site visit completed", () => {
 
   // Booked but unpaid: the fee was agreed at booking, so it stays.
   const booked = migrateProject(v1([...V1_ACCEPTED, { type: "book-site-visit", scheduledFor: "2026-07-08T14:00:00.000Z", mode: "video" }]));
-  assert.deepEqual([booked.survey.feeGbp, booked.survey.paymentStatus], [150, "unpaid"]);
+  assert.deepEqual([booked.survey.status, booked.survey.feeGbp, booked.survey.paymentStatus], ["booked", 150, "unpaid"]);
+  assert.equal(booked.proposal.status, "not-issued");
   assert.ok(!booked.events.some((e) => e.type === "migrated-survey-fee"));
+
+  // An install booked on a click, kit not yet moving: no booking, no order, no crew here.
+  const installBooked = migrateProject(v1([...V1_VISITED, { type: "book-installation", date: "2026-07-20" }, { type: "ops-assign-installer", installer: { name: "Dana Demo", role: "Installer", bio: "", yearsExperience: 3 } }]));
+  assert.equal(installBooked.proposal.status, "not-issued");
+  assert.equal(installBooked.money.contractTotalPence, undefined);
+  assert.equal(installBooked.booking.status, "not-booked");
+  assert.deepEqual(installBooked.booking.dates, []);
+  assert.deepEqual(installBooked.booking.crew, []);
+  assert.equal(installBooked.kit.status, "not-ordered");
+  assert.equal(installBooked.kit.expectedDate, undefined);
+  assert.equal(currentStage(installBooked), "price");
+  assert.equal(
+    installBooked.events.find((e) => e.type === "migrated-install-booking")?.label,
+    "Moved from the old system: the install was booked there for Monday 20 July 2026, but nothing is booked here until the customer accepts a proposal. Call them about the date.",
+  );
+});
+
+/** Every v1 state a customer (or the office) could leave a project in before work went ahead. */
+const V1_UNCOMMITTED: [name: string, actions: ProjectActionV1[]][] = [
+  ["created (final quote issued)", []],
+  ["final quote accepted", V1_ACCEPTED],
+  ["site visit booked", [...V1_ACCEPTED, { type: "book-site-visit", scheduledFor: "2026-07-08T14:00:00.000Z", mode: "video" }]],
+  ["site visit done", V1_VISITED],
+  ["install booked", [...V1_VISITED, { type: "book-installation", date: "2026-07-20" }]],
+];
+
+test("a migrated v1 project before any work went ahead goes through survey, design and a real proposal", () => {
+  for (const [name, actions] of V1_UNCOMMITTED) {
+    // withLegacyContact fills a v1 snapshot's email from its quote.
+    const migrated = migrateProject(v1(actions));
+    let p: Project = { ...migrated, customer: { ...migrated.customer, email: "jo@example.test" } };
+    const go = (action: ProjectAction, now: string, over: Partial<ReadinessContext> = {}) => {
+      const r = apply(p, action, now, over);
+      assert.ok(r.ok, `${name}: ${action.type} failed: ${r.ok ? "" : r.error}`);
+      p = r.project;
+    };
+    go({ type: "ops-book-survey", scheduledFor: T.slot, mode: "in-person", surveyor: { staffId: "s-sv", name: "Sam Survey" } }, T.book, { actor: ADMIN });
+    go({ type: "survey-started", by: "Sam Survey" }, "2026-10-22T10:05:00.000Z", { actor: SURVEYOR });
+    go({ type: "survey-submitted", surveyRecordId: "sr-1" }, T.surveyDone, { actor: SURVEYOR });
+    assert.equal(currentStage(p), "proposal", name);
+    go({ type: "design-updated", designId: "d-1", version: 1, status: "in-review" }, T.design, { actor: SURVEYOR });
+    go({ type: "design-approved", designId: "d-1", version: 1, by: "Tess Lead" }, T.design, { actor: TECH_LEAD });
+    go({ type: "documents-consent-recorded", channel: "portal" }, "2026-10-24T10:00:00.000Z");
+    go({ type: "proposal-issued", proposalId: "pr-1", version: 1, validUntil: "2026-11-25", optionCount: 1 }, T.issue, { actor: ADMIN });
+    assert.equal(p.proposal.status, "issued", name);
+    assert.equal(p.money.contractTotalPence, undefined, `${name}: no contract until they accept the real proposal`);
+    go({ type: "pre-contract-info-sent", proposalId: "pr-1", messageId: "msg-0" }, "2026-10-26T09:01:00.000Z");
+    go(ACCEPT, T.accept);
+    assert.equal(p.proposal.status, "accepted", name);
+    assert.equal(p.money.contractTotalPence, 645_000, name);
+  }
 });
 
 test("isLegacySnapshot matches migrateProject's own v1 test", () => {
@@ -1959,7 +2037,7 @@ test("migrateProject: installed", () => {
 test("migrateProject: v1 fees carry over, multi-day bookings span working days", () => {
   const old = v1(V1_VISITED);
   old.installation = { ...old.installation, status: "booked", date: "2026-07-24", installDays: 2, rescheduleFeesGbp: 150 };
-  old.delivery = { ...old.delivery, rescheduleFeesGbp: 60 };
+  old.delivery = { ...old.delivery, status: "dispatched", rescheduleFeesGbp: 60 }; // work went ahead: a v1 booking stands
   old.siteVisit = { ...old.siteVisit, rescheduleFeesGbp: 25 };
   const p = migrateProject(old);
   assert.deepEqual(p.booking.dates, ["2026-07-24", "2026-07-27"]); // Fri, then Mon
@@ -1997,8 +2075,30 @@ test("migrateProject is idempotent on v2 and tolerant of missing fields", () => 
   assert.throws(() => migrateProject([1, 2]), /not a project/);
 });
 
+test("migrateProject: once work went ahead, a v1 acceptance stands as the contract", () => {
+  const dispatched = migrateProject(v1([...V1_VISITED, { type: "book-installation", date: "2026-07-20" }, { type: "ops-mark-dispatched", courier: "DPD", trackingRef: "DPD-123" }]));
+  assert.equal(dispatched.proposal.status, "accepted");
+  assert.equal(dispatched.proposal.contractTotalPence, dispatched.quoteSummary.totalGbp * 100);
+  assert.equal(dispatched.money.contractTotalPence, dispatched.quoteSummary.totalGbp * 100);
+  // v1 always supplied the kit: supply-and-install, so no end date before delivery,
+  // and no pre-contract information was ever sent (reg 31 applies once it is).
+  assert.equal(dispatched.proposal.contractType, "supply-and-install");
+  assert.equal(dispatched.proposal.cancellationEndsOn, undefined);
+  assert.equal(cancellationStatus(dispatched, "2026-08-01").basis, "goods-delivery");
+  assert.equal(dispatched.survey.status, "submitted");
+  assert.equal(dispatched.survey.mode, "video");
+  assert.equal(dispatched.survey.scheduledFor, "2026-07-08T14:00:00.000Z");
+  assert.equal(dispatched.survey.submittedAt, V1_NOW); // from the site-visit-completed event
+  assert.equal(dispatched.booking.status, "booked");
+  assert.equal(dispatched.kit.status, "dispatched");
+  assert.equal(currentStage(dispatched), "kit");
+  assert.deepEqual(dispatched.events.filter((e) => e.type.startsWith("migrated-")).map((e) => e.type), ["migrated-survey-fee"]);
+});
+
 test("a migrated project keeps moving through the v2 reducer", () => {
-  const p = migrateProject(v1(V1_VISITED));
+  // Work went ahead there (the kit is on its way): the booking can still move.
+  const p = migrateProject(v1([...V1_VISITED, { type: "book-installation", date: "2026-07-20" }, { type: "ops-mark-dispatched", courier: "DPD", trackingRef: "DPD-123" }]));
+  assert.equal(p.proposal.status, "accepted");
   // Supply-and-install with no early start: 14 days after a delivery tomorrow at the earliest.
   const r = applyProjectAction(p, { type: "install-dates-set", startDate: "2026-07-31", dates: ["2026-07-31", "2026-08-03", "2026-08-04"].slice(0, p.booking.installDays) }, "2026-07-15T10:00:00.000Z", ctx("2026-07-15"));
   assert.ok(r.ok, r.ok ? "" : r.error);

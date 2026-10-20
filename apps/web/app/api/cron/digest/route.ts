@@ -3,7 +3,8 @@ import { cronSecret } from "@/lib/env-placeholders";
 import { constantTimeEqual } from "@/lib/auth/session";
 import { appUrl } from "@/lib/brand";
 import { escapeHtml, sendTeamEmail } from "@/lib/email";
-import { fmtDate, fmtDayTime, money } from "@/lib/format";
+import { fmtDate, fmtDayTime, londonDateOf, money } from "@/lib/format";
+import { DUE_LEADS_SHOWN, loadDueLeads, type DueLead } from "@/lib/lead-follow-ups";
 import { loadPulse, type Pulse } from "@/lib/ops-core-server";
 import { getServiceClient } from "@/lib/supabase-server";
 
@@ -15,7 +16,9 @@ import { getServiceClient } from "@/lib/supabase-server";
  *
  * Since the pilots (F7) it leads with today: surveys and install days,
  * blocked projects with what's blocking them, overdue next actions and
- * money owed. Names are escaped; nothing here goes to a customer.
+ * money owed; then the website leads whose follow-up is due today or
+ * overdue (lib/lead-follow-ups). Names are escaped; nothing here goes to a
+ * customer.
  */
 export const dynamic = "force-dynamic";
 
@@ -71,6 +74,8 @@ export async function GET(request: Request) {
     console.error("[digest] pilot pulse failed:", err);
   }
 
+  const due = await loadDueLeads(supabase, pulse?.today ?? londonDateOf(new Date().toISOString())).catch(() => null);
+
   const quiet = newQuotes + newDrafts + newBookings === 0;
   const today = pulse
     ? `${pulse.surveysToday.length} survey${pulse.surveysToday.length === 1 ? "" : "s"}, ${pulse.installsToday.length} install${pulse.installsToday.length === 1 ? "" : "s"} today${pulse.blocked.length ? `, ${pulse.blocked.length} blocked` : ""}; `
@@ -97,6 +102,7 @@ export async function GET(request: Request) {
   <li>Page views: ${views24h}</li>
 </ul>
 ${rows ? `<p><strong>Yesterday's quotes</strong></p><ul>${rows}</ul>` : ""}
+${leadsDueSection(due, base)}
 <p><strong>Standing pipeline</strong>: ${totalInbox} in the inbox, ${totalDrafts} unfinished worth a nudge.</p>
 <p>
   <a href="${base}/ops/quotes">Inbox</a> ·
@@ -107,6 +113,17 @@ ${rows ? `<p><strong>Yesterday's quotes</strong></p><ul>${rows}</ul>` : ""}
   );
 
   return NextResponse.json({ ok: true, sent, newQuotes, newBookings, newDrafts, views24h });
+}
+
+/** Website leads whose follow-up is due today or overdue. */
+function leadsDueSection(due: { leads: DueLead[]; total: number } | null, base: string): string {
+  if (!due) return `<p><strong>Website leads due today</strong>: couldn't be read. Check <a href="${base}/ops/quotes?sort=next">Quote requests</a>.</p>`;
+  if (due.leads.length === 0) return `<p><strong>Website leads due today</strong>: none.</p>`;
+  const items = due.leads
+    .map((d) => `<li><a href="${base}/ops/quotes/${encodeURIComponent(d.id)}">${escapeHtml(d.name)}</a> · ${escapeHtml(d.action)} · ${escapeHtml(d.postcode)}${d.overdue ? ` <strong style="color:#b91c1c">overdue since ${escapeHtml(fmtDate(d.dueOn))}</strong>` : ""}</li>`)
+    .join("");
+  const more = due.total > DUE_LEADS_SHOWN ? `<li><a href="${base}/ops/quotes?tab=all&amp;sort=next">and ${due.total - DUE_LEADS_SHOWN} more</a></li>` : "";
+  return `<p><strong>Website leads due today (${due.total})</strong></p><ul>${items}${more}</ul>`;
 }
 
 /** Today's pilot work, for the top of the digest. */

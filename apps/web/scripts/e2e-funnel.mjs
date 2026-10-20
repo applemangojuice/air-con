@@ -77,6 +77,13 @@ try {
     await page.locator("select").first().selectOption({ index: 1 });
   }
   await page.fill('input[type="email"]', "e2e@example.com");
+  // Told at collection, free to refuse: one reminder, ticked unless they untick it.
+  const reminder = page.getByLabel(/Email me one reminder if I don't finish/);
+  const offered = (await reminder.count()) === 1 && (await reminder.isChecked());
+  if (offered) await reminder.uncheck();
+  const unticks = offered && !(await reminder.isChecked());
+  if (offered) await reminder.check();
+  check("a reminder email is offered under the email, ticked, and can be unticked", unticks && /Untick and we won't/.test((await page.locator("main").textContent()) ?? ""));
   await page.click('button[type="submit"]');
 
   // 3–5. House, rooms (price), firm-up (skipped).
