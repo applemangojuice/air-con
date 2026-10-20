@@ -2170,3 +2170,43 @@ changelog and the reasons, so nobody "fixes" a deliberate choice back.
       stores at most 20,000 events a London day (shared count); quote and
       draft bodies are capped at 256 KB, and photo lists keep 40 each with
       bounded ids, paths and file names (`lib/schemas.ts`).
+41. **The handover flake: screens move on from the server's answer, never
+    from a refresh landing.** Seen twice on the Supabase-shaped stack (phase
+    J: the pack published, the sign-off stayed greyed out) and reproduced
+    with the compat gateway slowed down (`GATEWAY_LATENCY_MS`,
+    `GATEWAY_JITTER_MS`, or `POST /__compat/latency` while it runs; test
+    only) and the handover repeated on one job
+    (`scripts/e2e-handover-loop.mjs`, `supabase/tests/compat/run-handover-loop.sh`).
+    Root cause: the screen enabled the next step only when `router.refresh()`
+    had re-rendered it, and on Next 15.5 an in-place refresh can stall for
+    good when its RSC payload streams in pieces, more often when a second one
+    overlaps it (a double tap, a sync's refresh): the payload arrived
+    complete, with the pack in it, and was never committed. Navigation still
+    works afterwards. Same family as `components/ops/proposal/reload.ts`.
+    - *Field steps answer with the header* (`headerStateOf`, a
+      `FieldHeaderState` versioned by the project's event count): publish
+      and sign at handover, commissioning sign-off, day start and end, on my
+      way. The phone records it (`answerHeader`) and every field screen
+      reads `useFieldJob(data)`: the newer of the page and the answer
+      (`withHeaderState`), so a refresh that set off before the step can't
+      take the screen back, and a later one takes over.
+    - *Commissioning* lays the answered target (`setJobTarget`, the same
+      input/by/at), review (`withExceptionReview`) and record over its job
+      (`withAnswers`); the certificate link comes from the answer.
+    - *Safe to send twice*: a publish carries its tap's id, used as the
+      pack's document id, so a retry or a concurrent duplicate answers with
+      the same pack (`replayed`; a pack made but not recorded is recorded
+      once); signing a signed handover, signing signed commissioning and
+      starting the day under way answer with the record instead of a
+      refusal; the same variation answer again is `ok`. The handover screen
+      guards double taps with refs, and field POSTs time out after 30 s
+      (`postAnswer`) and say the step may not have happened.
+    - *Catch-ups run one at a time* (`CatchUpRunner` in the field shell,
+      `requestCatchUp`, used by `useRefreshOnSync` too), never waited on;
+      one still pending after 15 s doesn't hold the next.
+    - *The portal* drops an answered variation from "needs your answer" at
+      once (`withDecisions`) and says when its refresh hasn't landed in 8 s
+      ("Show the latest" loads the page afresh). *Ops action forms* watch
+      their refresh (`useLandedRefresh`): one not landed after 12 s holds
+      the form's button and offers the same (`BehindNote`), so a payment is
+      never recorded twice against a page that still shows it owed.

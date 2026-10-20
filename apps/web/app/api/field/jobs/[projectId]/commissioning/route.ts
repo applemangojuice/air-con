@@ -1,13 +1,16 @@
 import { z } from "zod";
 import { requireProjectAccess, requireStaffApi } from "@/lib/auth/server";
-import { signCommissioning } from "@/lib/field-server";
+import { headerStateOf, signCommissioning } from "@/lib/field-server";
 import { answer, json, notFound, projectIdSchema, readJson } from "../../../_lib/http";
 
 /**
  * POST /api/field/jobs/<projectId>/commissioning { notes?, seen? }
  * The tech lead signs: the record goes on the job, the install completes,
  * commissioning is signed on the project and the certificate is issued.
- * Refusals come back with the reason (and the gate's blockers).
+ * Answers with the record, the certificate and the job's header as it now
+ * stands, so the screen shows them at once (`already` when it was signed
+ * before: a retry is safe). Refusals
+ * come back with the reason (and the gate's blockers).
  */
 
 export const runtime = "nodejs";
@@ -30,7 +33,7 @@ export async function POST(request: Request, { params }: Params): Promise<Respon
     .safeParse(await readJson(request));
   if (!body.success) return json({ error: "Invalid request" }, 400);
   return answer(async () => {
-    const { certificate } = await signCommissioning(projectId, staff, body.data.notes, body.data.seen);
-    return { ok: true, certificate };
+    const { certificate, record, already, project } = await signCommissioning(projectId, staff, body.data.notes, body.data.seen);
+    return { ok: true, certificate, record, already, header: headerStateOf(project) };
   });
 }

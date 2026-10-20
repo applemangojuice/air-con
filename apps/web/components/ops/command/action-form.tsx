@@ -1,9 +1,9 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { createContext, useContext, useEffect, useRef, useState, useTransition, type FormEvent, type ReactNode } from "react";
 import { BlockerList } from "@/components/kit/blocker-list";
 import { Button, type ButtonProps } from "@/components/kit/button";
+import { BehindNote, useLandedRefresh } from "@/components/kit/landed-refresh";
 import type { ActionResult } from "./types";
 
 /**
@@ -18,6 +18,10 @@ import type { ActionResult } from "./types";
  * connection. Until the page's script has loaded the submit button stays
  * disabled, so a tap on a slow connection can't fall through to a plain
  * browser submit (which would put the form's contents in the URL).
+ *
+ * The page refresh after a success is watched (components/kit/landed-refresh.tsx):
+ * one that never lands holds the form and offers to load the page afresh,
+ * rather than leave it acting on a page that still shows the step undone.
  */
 
 const PendingContext = createContext(false);
@@ -54,7 +58,7 @@ export function ActionForm({
   const [result, setResult] = useState<ActionResult | null>(null);
   useEffect(() => setReady(true), []);
   const formRef = useRef<HTMLFormElement>(null);
-  const router = useRouter();
+  const landed = useLandedRefresh();
 
   function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -75,7 +79,7 @@ export function ActionForm({
       onResult?.(r);
       if (r.ok) {
         if (resetOnSuccess) formRef.current?.reset();
-        if (refreshOnSuccess) router.refresh();
+        if (refreshOnSuccess) landed.refresh();
       }
     });
   }
@@ -84,10 +88,11 @@ export function ActionForm({
     <PendingContext.Provider value={pending}>
       <ReadyContext.Provider value={ready}>
       <form ref={formRef} id={id} method="post" onSubmit={onSubmit} className={className} aria-busy={pending || undefined}>
-        <fieldset disabled={pending} className="m-0 min-w-0 border-0 p-0">
+        <fieldset disabled={pending || landed.behind} className="m-0 min-w-0 border-0 p-0">
           {children}
         </fieldset>
         <ResultNote result={result} quietSuccess={quietSuccess} />
+        <BehindNote show={landed.behind} />
       </form>
       </ReadyContext.Provider>
     </PendingContext.Provider>

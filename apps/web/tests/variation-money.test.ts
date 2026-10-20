@@ -56,6 +56,12 @@ test("a variation the customer accepts on the portal is billed by the balance in
   // A no stays one tap.
   assert.equal((await decideVariation(demo3.id, actor, no.id, "decline")).ok, true);
   assert.equal((await decideVariation(demo3.id, actor, yes.id, "decline")).ok, false, "decided once");
+  // The same answer again (a retry after a lost reply, or a page that hadn't caught up): saved, said so, nothing twice.
+  const yesAgain = await decideVariation(demo3.id, actor, yes.id, "accept", { name: "Jordan Okafor", agreed: true });
+  assert.ok(yesAgain.ok && /already said yes/.test(yesAgain.message ?? ""), JSON.stringify(yesAgain));
+  const noAgain = await decideVariation(demo3.id, actor, no.id, "decline");
+  assert.ok(noAgain.ok && /already said no/.test(noAgain.message ?? ""));
+  assert.equal((await decideVariation(demo3.id, actor, no.id, "accept", { name: "Jordan Okafor", agreed: true })).ok, false, "a different answer is still refused");
 
   const accepted = (await issuesRepo.get(yes.id))!;
   assert.equal(accepted.variation?.status, "accepted");

@@ -23,9 +23,10 @@ import { prepareImage } from "@/lib/media-client";
 import { locate, nowIso, parseReading } from "./capture";
 import { editDraft, firstStep, followDefaults, isDirty, openDraft, reopenDraft, type EndDayDraft } from "./end-day-draft";
 import { londonDateOf, londonTime, telHref, fmtDay } from "./format";
+import { answerHeader, postAnswer, requestCatchUp } from "./server-answer";
 import { Sheet } from "./sheet";
 import { useOnline } from "./use-online";
-import type { FieldJob } from "./types";
+import type { FieldHeaderState, FieldJob } from "./types";
 import { useOutboxState, type MergedJob } from "./use-outbox";
 
 /**
@@ -43,15 +44,9 @@ const PRIMARY = `${BTN} bg-accent-700 text-white shadow-sm hover:bg-accent-800`;
 const SECONDARY = `${BTN} border border-line bg-white text-ink-900 hover:bg-surface`;
 const INPUT = "w-full rounded-2xl border border-line bg-white px-4 py-3 text-base text-ink-900 placeholder:text-ink-500 focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-100";
 
-async function post<T>(url: string, body: unknown): Promise<{ ok: true; data: T } | { ok: false; error: string; blockers?: Blocker[]; offline?: boolean }> {
-  try {
-    const res = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), cache: "no-store" });
-    const data = (await res.json().catch(() => ({}))) as T & { error?: string; blockers?: Blocker[] };
-    if (!res.ok) return { ok: false, error: data.error ?? `That didn't work (${res.status}).`, ...(data.blockers ? { blockers: data.blockers } : {}) };
-    return { ok: true, data };
-  } catch {
-    return { ok: false, error: "No connection. Try again when you have signal.", offline: true };
-  }
+/** A field POST that never hangs (server-answer.ts): no signal or no reply is `offline`. */
+function post<T>(url: string, body: unknown): Promise<{ ok: true; data: T } | { ok: false; error: string; blockers?: Blocker[]; offline?: boolean }> {
+  return postAnswer<T>(url, body, "No connection (or no reply). Try again when you have signal.");
 }
 
 /**
@@ -347,9 +342,10 @@ function OnMyWaySheet({ open, onClose, data }: { open: boolean; onClose: () => v
     if (!eta) return;
     setBusy(true);
     setError(null);
-    const r = await post<{ status: string; channel?: "sms" | "email"; hasPhone: boolean; error?: string }>(`/api/field/jobs/${id}/on-my-way`, { etaMinutes: eta });
+    const r = await post<{ status: string; channel?: "sms" | "email"; hasPhone: boolean; error?: string; header?: FieldHeaderState }>(`/api/field/jobs/${id}/on-my-way`, { etaMinutes: eta });
     setBusy(false);
     if (!r.ok) return setError(r.error);
+    answerHeader(id, r.data.header);
     const s = r.data.status;
     const emailed = r.data.channel === "email";
     const what = emailed ? "email" : "text";
@@ -487,10 +483,12 @@ function ArriveSheet({ open, onClose, data, running }: { open: boolean; onClose:
       setPhase("offline");
       return;
     }
-    const r = await post(`/api/field/jobs/${data.header.projectId}/day`, { action: "start", n, ...(fix ? { gps: { lat: fix.lat, lng: fix.lng } } : {}) });
+    const r = await post<{ header?: FieldHeaderState }>(`/api/field/jobs/${data.header.projectId}/day`, { action: "start", n, ...(fix ? { gps: { lat: fix.lat, lng: fix.lng } } : {}) });
     if (r.ok) {
       setPhase("started");
-      router.refresh();
+      // The runsheet opens for capture from this answer, not from a refresh landing (server-answer.ts).
+      answerHeader(data.header.projectId, r.data.header);
+      requestCatchUp();
     } else if (r.offline) {
       setPhase("offline");
     } else {
@@ -790,7 +788,6 @@ function uniqueTitles(titles: string[]): string[] {
 }
 
 function EndDaySheet({ open, onClose, data, merged, n: liveN, clockEntryId }: { open: boolean; onClose: () => void; data: FieldJob; merged: MergedJob | null; n: number; clockEntryId?: string }) {
-  const router = useRouter();
   // The day this sheet is ending, fixed when it opens: the page refreshes underneath once it's closed.
   const [n, setN] = useState(liveN);
   useEffect(() => {
@@ -933,7 +930,7 @@ function EndDaySheet({ open, onClose, data, merged, n: liveN, clockEntryId }: { 
   async function send() {
     setBusy(true);
     setError(null);
-    const r = await post<{ email: { status: string }; alreadyEnded?: boolean; clockStopped?: boolean }>(`/api/field/jobs/${id}/day`, {
+    const r = await post<{ email: { status: string }; alreadyEnded?: boolean; clockStopped?: boolean; header?: FieldHeaderState }>(`/api/field/jobs/${id}/day`, {
       action: "end",
       n,
       summary,
@@ -948,16 +945,17 @@ function EndDaySheet({ open, onClose, data, merged, n: liveN, clockEntryId }: { 
       setError(r.error);
       setBlockers(r.blockers ?? []);
       // This page may be out of date (a colleague ended the day, the job moved on): show it as it is now.
-      router.refresh();
+      requestCatchUp();
       return;
     }
+    answerHeader(id, r.data.header);
     // The clock may still be on the phone (not yet synced): stop it there too.
     if (clockEntryId) await getFieldOutbox().enqueue({ type: "time-stop", id: newOpId(), projectId: id, entryId: clockEntryId, at: nowIso() }, "End of day: clock stopped");
     if (r.data.alreadyEnded) {
       // A colleague's phone ended it first: no second update, but this person's clock still stops.
       setEmailStatus(`Day ${n} was already ended by someone else on the crew, so no update went from you. Your clock is stopped.`);
       setStage("sent");
-      router.refresh();
+      requestCatchUp();
       return;
     }
     const s = r.data.email.status;
@@ -965,7 +963,7 @@ function EndDaySheet({ open, onClose, data, merged, n: liveN, clockEntryId }: { 
       s === "sent" ? "Update emailed to the customer." : s === "demo" ? "Update recorded in demo mode: no email was actually sent." : s === "queued" ? "Update queued to send." : message.trim() ? "The update is on their portal; the email didn't go (check Messages in ops)." : "No update went to the customer.",
     );
     setStage("sent");
-    router.refresh();
+    requestCatchUp();
   }
 
   async function saveLearnings() {

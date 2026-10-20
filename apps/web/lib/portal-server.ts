@@ -739,6 +739,9 @@ export async function decideVariation(
     return { ok: false, error: "Not found", status: 404 };
   }
   if (issue.variation.status !== "proposed") {
+    // The same answer again (a retry after a lost reply, or a page that hadn't caught up): it's saved, say so.
+    const same = (decision === "accept" && issue.variation.status === "accepted") || (decision === "decline" && issue.variation.status === "declined");
+    if (same) return { ok: true, message: decision === "accept" ? "You've already said yes to this change: it's saved." : "You've already said no to this change: it's saved." };
     return { ok: false, error: `You already ${issue.variation.status} this change.`, status: 409 };
   }
   if (!isOpen(issue)) return { ok: false, error: "This change has been withdrawn.", status: 409 };

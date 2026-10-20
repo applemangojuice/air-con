@@ -3,6 +3,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { OfflineGuard } from "@/components/field/offline-guard";
 import { OutboxKick } from "@/components/field/outbox-kick";
+import { CatchUpRunner } from "@/components/field/server-answer";
 import { ModeBanner } from "@/components/kit/mode-banner";
 import { NavLink } from "@/components/kit/nav-link";
 import { Mark } from "@/components/site/logo";
@@ -73,6 +74,7 @@ export default function FieldLayout({ children }: { children: ReactNode }) {
       <main className="mx-auto w-full max-w-xl flex-1 px-4 pb-28 pt-5">{children}</main>
       <OfflineGuard />
       <OutboxKick />
+      <CatchUpRunner />
 
       <nav aria-label="Field" className="no-print fixed inset-x-0 bottom-0 z-40 border-t border-line bg-white pb-[env(safe-area-inset-bottom)]">
         <ul className="mx-auto grid max-w-xl grid-cols-4">

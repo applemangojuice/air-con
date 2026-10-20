@@ -1,7 +1,7 @@
 import { LEARNING_PROMPTS } from "@aircon/domain";
 import { z } from "zod";
 import { requireProjectAccess, requireStaffApi } from "@/lib/auth/server";
-import { dayUpdatePreview, endDay, saveLearnings, startDay } from "@/lib/field-server";
+import { dayUpdatePreview, endDay, headerStateOf, saveLearnings, startDay } from "@/lib/field-server";
 import { answer, json, notFound, projectIdSchema, readJson } from "../../../_lib/http";
 
 /**
@@ -52,13 +52,13 @@ export async function POST(request: Request, { params }: Params): Promise<Respon
   if (b.action === "start") {
     return answer(async () => {
       const project = await startDay(projectId, staff, b.n, b.gps);
-      return { ok: true, day: project.install.days.find((d) => d.n === b.n) ?? null };
+      return { ok: true, day: project.install.days.find((d) => d.n === b.n) ?? null, header: headerStateOf(project) };
     });
   }
   if (b.action === "preview") return answer(() => dayUpdatePreview(projectId, staff, b.n, b.text, b.photoCount));
   if (b.action === "learnings") return answer(() => saveLearnings(projectId, staff, b.n, b.answers));
   return answer(async () => {
     const result = await endDay(projectId, staff, b);
-    return { ok: true, email: result.email, learningsSaved: result.learningsSaved, alreadyEnded: result.alreadyEnded, clockStopped: result.clockStopped };
+    return { ok: true, email: result.email, learningsSaved: result.learningsSaved, alreadyEnded: result.alreadyEnded, clockStopped: result.clockStopped, header: headerStateOf(result.project) };
   });
 }

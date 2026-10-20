@@ -63,6 +63,7 @@ import {
 import type {
   FieldClock,
   FieldHeader,
+  FieldHeaderState,
   FieldIssue,
   FieldJob,
   FieldMe,
@@ -80,7 +81,7 @@ import { appUrl } from "./brand";
 import { crewLead } from "./comms/action-map";
 import { notify } from "./comms/outbox";
 import { renderMessage, templateContext } from "./comms/templates";
-import { createDocument, currentDocument, listDocuments } from "./documents-server";
+import { createDocument, currentDocument, getDocument, listDocuments } from "./documents-server";
 import { appMode } from "./env-mode";
 import type { SyncOp, SyncResult } from "./field-outbox";
 import { fmtDate, londonDateOf, money } from "./format";
@@ -245,13 +246,37 @@ function dayState(p: Project): { currentDay: number | null; nextDay: number | nu
   return { currentDay: current, nextDay: next, totalDays };
 }
 
-function headerOf(p: Project, risks: RiskFlag[], today: string): FieldHeader {
+/**
+ * What a step on the phone changes in the job's header, as the project now
+ * stands: every field route that changes it answers with this, so the
+ * screen moves on without waiting for a page refresh
+ * (components/field/server-answer.ts).
+ */
+export function headerStateOf(p: Project): FieldHeaderState {
   const { currentDay, nextDay, totalDays } = dayState(p);
-  const kit = kitBadge(p);
   const days = p.install.days.length
     ? p.install.days
     : p.booking.dates.map((date, i) => ({ n: i + 1, date, status: "planned" as const }));
   return {
+    version: p.events.length,
+    days,
+    totalDays,
+    currentDay,
+    nextDay,
+    installStatus: p.install.status,
+    handoverStatus: p.handover.status,
+    bookingStatus: p.booking.status,
+    ...(p.install.onMyWay ? { onMyWay: p.install.onMyWay } : {}),
+    ...(p.handover.packDocumentId ? { packDocumentId: p.handover.packDocumentId } : {}),
+    ...(p.handover.signoff ? { signoff: p.handover.signoff } : {}),
+    electricalCert: p.handover.electricalCert,
+  };
+}
+
+function headerOf(p: Project, risks: RiskFlag[], today: string): FieldHeader {
+  const kit = kitBadge(p);
+  return {
+    ...headerStateOf(p),
     projectId: p.id,
     customerName: p.customer.name || "Customer",
     address: p.customer.addressLine,
@@ -262,21 +287,10 @@ function headerOf(p: Project, risks: RiskFlag[], today: string): FieldHeader {
     ...(p.customer.parkingNotes ? { parkingNotes: p.customer.parkingNotes } : {}),
     ...(p.pilot ? { pilotLabel: p.pilot.label } : {}),
     dates: p.booking.dates,
-    days,
-    totalDays,
-    currentDay,
-    nextDay,
     crew: p.booking.crew,
-    installStatus: p.install.status,
-    handoverStatus: p.handover.status,
-    bookingStatus: p.booking.status,
     kitLabel: kit.label,
     kitTone: kit.tone,
     risks,
-    ...(p.install.onMyWay ? { onMyWay: p.install.onMyWay } : {}),
-    ...(p.handover.packDocumentId ? { packDocumentId: p.handover.packDocumentId } : {}),
-    ...(p.handover.signoff ? { signoff: p.handover.signoff } : {}),
-    electricalCert: p.handover.electricalCert,
     today,
   };
 }
@@ -1292,13 +1306,20 @@ export async function sendOnMyWay(projectId: string, staff: StaffMember, etaMinu
   const hasPhone = Boolean(project.customer.phone?.trim());
   if (sms.status !== "not-sent") return { ...sms, channel: "sms" as const, hasPhone };
   const email = await messageStatus("installer-on-my-way", projectId, discriminator, "email");
-  return email.status === "not-sent" ? { ...sms, channel: "sms" as const, hasPhone } : { ...email, channel: "email" as const, hasPhone };
+  const header = headerStateOf(project);
+  return email.status === "not-sent" ? { ...sms, channel: "sms" as const, hasPhone, header } : { ...email, channel: "email" as const, hasPhone, header };
 }
 
-/** Start install day n (day 1 runs the ready-to-install gate in the reducer). */
+/**
+ * Start install day n (day 1 runs the ready-to-install gate in the reducer).
+ * Starting the day that's already under way answers with it as it stands
+ * (a retry after a lost reply, or a colleague's phone first), not a refusal.
+ */
 export async function startDay(projectId: string, staff: StaffMember, n: number, gps?: { lat: number; lng: number }): Promise<Project> {
   if (!can(staff, "install.work")) throw new FieldError("You don't have install permissions.", 403);
-  await projectForStaff(projectId, staff);
+  const before = await projectForStaff(projectId, staff);
+  const open = before.install.days.find((d) => d.n === n);
+  if (open?.startedAt && open.status === "in-progress") return before;
   const project = throwDispatch(await dispatch(projectId, { type: "install-day-started", n, by: staff.name }, staff));
   if (n === 1 && gps) {
     // The arrival fix, on the runsheet's arrival slot.
@@ -1474,7 +1495,7 @@ export async function reviewException(
   projectId: string,
   staff: StaffMember,
   input: { specId: string; evidenceId?: string; resolution: ExceptionReview["resolution"]; reason: string },
-): Promise<InstallJobV2> {
+): Promise<{ job: InstallJobV2; review: ExceptionReview }> {
   const project = await projectForStaff(projectId, staff);
   const today = londonToday();
   const gate = canReviewExceptions(staff, today);
@@ -1501,14 +1522,15 @@ export async function reviewException(
   };
   const saved = await mutateJob(projectId, (parts) => ({ ...parts, exceptionReviews: [...parts.exceptionReviews, review] }));
   await audit({ actor: staff, action: "install.exception-review", entity: "project", entityId: projectId, detail: { specId: spec.id, resolution: input.resolution } });
-  return asV2(saved, withExceptionReview(job, review));
+  // The review as recorded: the screen lays it over its own copy of the job at once (components/field/commissioning.tsx).
+  return { job: asV2(saved, withExceptionReview(job, review)), review };
 }
 
 export async function setTarget(
   projectId: string,
   staff: StaffMember,
   input: { key: TargetKey; min?: number; max?: number; note?: string },
-): Promise<InstallJobV2> {
+): Promise<{ job: InstallJobV2; applied: { input: typeof input; by: string; at: string } }> {
   const project = await projectForStaff(projectId, staff);
   const today = londonToday();
   const gate = canReviewExceptions(staff, today);
@@ -1518,9 +1540,11 @@ export async function setTarget(
   if (job.commissioning) throw new FieldError("Commissioning is signed: the targets are closed.", 409);
   const problem = targetError(input.key, input.min, input.max);
   if (problem) throw new FieldError(problem, 400);
-  const saved = await mutateJob(projectId, (parts) => ({ ...parts, runsheet: setJobTarget(parts.runsheet, input, staff.name, nowIso()) }));
+  const at = nowIso();
+  const saved = await mutateJob(projectId, (parts) => ({ ...parts, runsheet: setJobTarget(parts.runsheet, input, staff.name, at) }));
   await audit({ actor: staff, action: "install.target", entity: "project", entityId: projectId, detail: input });
-  return asV2(saved, job);
+  // What was applied, exactly: the screen applies the same setJobTarget to its own copy at once.
+  return { job: asV2(saved, job), applied: { input, by: staff.name, at } };
 }
 
 function header(settings: Awaited<ReturnType<typeof getSettings>>, project: Project, at: string) {
@@ -1590,6 +1614,11 @@ export async function signCommissioning(projectId: string, staff: StaffMember, n
   if (!can(staff, "commissioning.sign")) throw new FieldError("You don't have permission to sign commissioning.", 403);
   const job = await installJobsRepo.loadForProject(projectId, project);
   if (!job) throw new FieldError("There's no runsheet for this job yet.", 409);
+  // Already signed (a retry after a lost reply, or a second tap): the record on file and its certificate.
+  if (job.commissioning && project.handover.status !== "pending") {
+    const cert = await currentDocument(projectId, "commissioning-certificate").catch(() => null);
+    return { project, record: job.commissioning, certificate: cert ? { id: cert.id, ref: cert.ref } : null, already: true };
+  }
   const errors = commissioningSignErrors(job, staff, today);
   if (errors.length) throw new FieldError(errors.join(" "), 409);
   // The signature is for what the signer saw: never over a reading that arrived since.
@@ -1642,7 +1671,7 @@ export async function signCommissioning(projectId: string, staff: StaffMember, n
   } catch (err) {
     console.error("[field] commissioning certificate failed:", err);
   }
-  return { project: p, record, certificate };
+  return { project: p, record, certificate, already: false };
 }
 
 /* ---------------- handover ---------------- */
@@ -1727,16 +1756,45 @@ export async function handoverDraft(projectId: string, staff: StaffMember, opts:
   return { snapshot, missing, certificate: cert ? { kind: "commissioning-certificate", ref: cert.ref, id: cert.id, title: cert.title } : null };
 }
 
-/** Publish the handover pack (a new version supersedes the old) and record it on the project, which emails the customer. */
-export async function publishHandoverPack(projectId: string, staff: StaffMember) {
+/**
+ * Publish the handover pack (a new version supersedes the old) and record it on the project, which emails the customer.
+ *
+ * `requestId` (the phone's id for this one tap, kept for its retries) becomes the document's id, so a
+ * retry of a publish that already went through (the reply was lost, the tap bounced) answers with that
+ * same pack: never a second version, never a second email (`replayed`).
+ */
+export async function publishHandoverPack(projectId: string, staff: StaffMember, opts: { requestId?: string } = {}) {
   if (!can(staff, "install.work")) throw new FieldError("You don't have install permissions.", 403);
+  const requestId = opts.requestId && isUuid(opts.requestId) ? opts.requestId : undefined;
+  const replay = async (finish: boolean) => {
+    if (!requestId) return null;
+    const doc = await getDocument(requestId);
+    if (!doc) return null;
+    if (doc.projectId !== projectId || doc.kind !== "handover-pack") throw new FieldError("Not found", 404);
+    let project = await projectForStaff(projectId, staff);
+    // Made but never recorded on the project (that try stopped part-way): record it now, once.
+    if (finish && doc.status === "final" && project.handover.packDocumentId !== doc.id) {
+      project = throwDispatch(await dispatch(projectId, { type: "handover-pack-published", documentId: doc.id }, staff));
+    }
+    return { project, document: { id: doc.id, ref: doc.ref }, email: await messageStatus("handover-ready", projectId, doc.id, "email"), replayed: true };
+  };
+  const again = await replay(true);
+  if (again) return again;
   const draft = await handoverDraft(projectId, staff, { forPublish: true });
   const blocking = draft.missing.filter((m) => /Commissioning|runsheet/.test(m));
   if (blocking.length) throw new FieldError(blocking.join(" "), 409);
-  const doc = await createDocument(projectId, "handover-pack", draft.snapshot, { title: "Your handover pack", customerVisible: true, createdBy: staff.name });
+  let doc;
+  try {
+    doc = await createDocument(projectId, "handover-pack", draft.snapshot, { title: "Your handover pack", customerVisible: true, createdBy: staff.name, ...(requestId ? { id: requestId } : {}) });
+  } catch (err) {
+    // The same tap, arriving twice at once: the other request made the pack and records it.
+    const raced = await replay(false).catch(() => null);
+    if (raced) return raced;
+    throw err;
+  }
   const project = throwDispatch(await dispatch(projectId, { type: "handover-pack-published", documentId: doc.id }, staff));
   const email = await messageStatus("handover-ready", projectId, doc.id, "email");
-  return { project, document: { id: doc.id, ref: doc.ref }, email };
+  return { project, document: { id: doc.id, ref: doc.ref }, email, replayed: false };
 }
 
 /**
@@ -1751,6 +1809,10 @@ export async function signHandover(
 ) {
   if (!can(staff, "install.work")) throw new FieldError("You don't have install permissions.", 403);
   const project = await projectForStaff(projectId, staff);
+  // Already signed (this phone's retry after a lost reply, or another phone first): the sign-off on record.
+  if (project.handover.status === "handed-over" && project.handover.signoff) {
+    return { project, snagCount: project.handover.signoff.snagCount, signoff: project.handover.signoff, already: true };
+  }
   if (input.signatureMediaId) {
     const sig = await mediaRepo.get(input.signatureMediaId);
     if (!sig || sig.projectId !== projectId) throw new FieldError("The signature didn't upload. Ask them to sign again.", 400);
@@ -1777,7 +1839,7 @@ export async function signHandover(
   if (input.signatureMediaId) {
     await audit({ actor: staff, action: "handover.signature", entity: "project", entityId: projectId, detail: { mediaId: input.signatureMediaId, name: input.name.trim() } });
   }
-  return { project: signed, snagCount: snags.length };
+  return { project: signed, snagCount: snags.length, signoff: signed.handover.signoff!, already: false };
 }
 
 /* ------------------------------------------------------------------ */

@@ -709,3 +709,92 @@ test("a clock stopped on the night the clocks go back (25 October 2026) counts t
   // A stop before its start (a phone's clock wrong) is never negative.
   assert.equal(field.clockMinutes("2026-10-25T09:00:00.000Z", "2026-10-25T08:00:00.000Z"), 0);
 });
+
+/* ------------------------------------------------------------------ */
+/* Steps that answer with the result: safe to send twice              */
+/* ------------------------------------------------------------------ */
+
+/** The seeded job at handover: install complete, commissioning signed, the walkthrough marked done (N/A). */
+async function seedHandover(): Promise<void> {
+  await seed("complete");
+  const db = requireDb();
+  const row = await db.from("projects").select("project").eq("id", PROJECT).single();
+  const p = (row.data as { project: Project }).project;
+  p.handover = { ...p.handover, status: "commissioned", commissionedAt: AT, commissionedBy: FGAS.name };
+  assert.equal((await db.from("projects").update({ project: p }).eq("id", PROJECT)).error, null);
+  const job = (await installJobsRepo.getForProject(PROJECT))!;
+  const { handoverSteps } = await import("@aircon/domain");
+  const walk = handoverSteps(job.runsheet);
+  assert.ok(walk.length > 0, "the runsheet has a walkthrough");
+  await installJobsRepo.save({
+    ...job,
+    stepStatuses: walk.map((s, i) => ({ id: `st-walk-${i}`, stepId: s.id, outcome: "na" as const, reason: "DEMO: shown at handover", at: AT, by: INSTALLER.name, byStaffId: INSTALLER.id })),
+  });
+}
+
+const handoverMessages = async () => (((await requireDb().from("messages").select("event")).data ?? []) as { event: string }[]).filter((m) => m.event === "handover-ready").length;
+
+test("handover: the same tap published twice is one pack and one email; the answer carries the header the screen needs", async () => {
+  await seedHandover();
+  const tap = "7c7c7c7c-1111-4111-8111-00000000f6e1";
+  const first = await field.publishHandoverPack(PROJECT, INSTALLER, { requestId: tap });
+  assert.equal(first.document.id, tap, "the tap's id is the pack's id");
+  assert.equal(first.replayed, false);
+  const header = field.headerStateOf(first.project);
+  assert.equal(header.packDocumentId, tap, "the sign-off can open from the answer alone");
+  assert.equal(header.handoverStatus, "commissioned");
+  // The reply was lost (or the tap bounced): the phone sends the same id again.
+  const again = await field.publishHandoverPack(PROJECT, INSTALLER, { requestId: tap });
+  assert.equal(again.replayed, true);
+  assert.equal(again.document.id, tap);
+  assert.equal(field.headerStateOf(again.project).version, header.version, "nothing new happened");
+  const { listDocuments } = await import("../lib/documents-server.ts");
+  const packs = (await listDocuments(PROJECT, { includeSuperseded: true })).filter((d) => d.kind === "handover-pack");
+  assert.equal(packs.length, 1, "one version");
+  assert.equal(again.project.events.filter((e) => e.type === "handover-pack-published").length, 1, "recorded once (so emailed once)");
+  assert.ok((await handoverMessages()) <= 1, "never a second email");
+  // A new tap is a new version (Publish an updated pack), and a newer header.
+  const update = await field.publishHandoverPack(PROJECT, INSTALLER, { requestId: "7c7c7c7c-1111-4111-8111-00000000f6e2" });
+  assert.equal(update.replayed, false);
+  assert.ok(field.headerStateOf(update.project).version > header.version);
+  assert.equal((await listDocuments(PROJECT, { includeSuperseded: true })).filter((d) => d.kind === "handover-pack").length, 2);
+  // Someone else's document id is never taken as a replay.
+  await assert.rejects(field.publishHandoverPack(OTHER, INSTALLER, { requestId: tap }), /Not found|isn't one of yours|not found/i);
+});
+
+test("handover: signing an already-signed handover answers with the sign-off on record, not an error", async () => {
+  await seedHandover();
+  await field.publishHandoverPack(PROJECT, INSTALLER, { requestId: "7c7c7c7c-2222-4222-8222-00000000f6e3" });
+  const signed = await field.signHandover(PROJECT, INSTALLER, { name: "Pat Example", outcome: "all-good", snags: [] });
+  assert.equal(signed.already, false);
+  assert.equal(signed.signoff.name, "Pat Example");
+  assert.equal(field.headerStateOf(signed.project).handoverStatus, "handed-over");
+  // The reply was lost; the phone (or another one) signs again, even with other words.
+  const twice = await field.signHandover(PROJECT, INSTALLER, { name: "Someone Else", outcome: "snags", snags: [{ id: "7c7c7c7c-3333-4333-8333-00000000f6e4", text: "DEMO: a mark" }] });
+  assert.equal(twice.already, true);
+  assert.deepEqual(twice.signoff, signed.signoff, "the sign-off on record");
+  assert.equal((await issuesRepo.listForProject(PROJECT)).filter((i) => i.kind === "snag").length, 0, "no snag raised by the second try");
+  assert.equal(field.headerStateOf(twice.project).version, field.headerStateOf(signed.project).version);
+});
+
+test("commissioning: signing a job that's already signed answers with the record and its certificate", async () => {
+  await seedHandover();
+  const tech = staffMember("aa000000-0000-4000-8000-0000000000f4", { roles: ["tech-lead"], qualifications: FGAS.qualifications });
+  const job = (await installJobsRepo.getForProject(PROJECT))!;
+  const record = { signedBy: { staffId: tech.id, name: tech.name, qualificationRef: "DEMO-F" }, at: AT, results: [] };
+  await installJobsRepo.save({ ...job, commissioning: record });
+  const r = await field.signCommissioning(PROJECT, tech, "again", []);
+  assert.equal(r.already, true);
+  assert.equal(r.record.at, AT);
+  assert.equal(field.headerStateOf(r.project).handoverStatus, "commissioned");
+});
+
+test("starting the day that's already under way answers with it, not 'already started'", async () => {
+  await seed("in-progress", "2026-11-10T08:00:00.000Z");
+  const before = (await field.loadFieldJob(PROJECT, INSTALLER)).header;
+  assert.equal(before.currentDay, 1);
+  const p = await field.startDay(PROJECT, INSTALLER, 1);
+  const state = field.headerStateOf(p);
+  assert.equal(state.currentDay, 1);
+  assert.equal(state.version, before.version, "nothing recorded twice");
+});

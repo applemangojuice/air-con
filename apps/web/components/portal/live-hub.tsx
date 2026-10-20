@@ -1,8 +1,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import type { Blocker } from "@aircon/domain";
+import { withDecisions, type Decided } from "./answers";
 import { HubControllerProvider, type HubController } from "./controller";
 import { Hub } from "./hub";
 import type { HubData, PortalRequest, PortalResult } from "./types";
@@ -14,6 +15,12 @@ import { uploadPortalPhoto } from "./upload";
  * busy until the fresh data is on screen, so nothing can be pressed twice
  * against a stale view. A dropped connection says so and re-reads, so the
  * screen never claims something happened that didn't.
+ *
+ * The re-read is never the only way the screen moves on: Next 15.5's
+ * in-place refresh can stall for good (components/field/server-answer.ts).
+ * A change the family has just answered leaves the waiting list from the
+ * answer itself (answers.ts), and a re-read that hasn't landed by the time
+ * the button lets go says so, with a button to load the page afresh.
  *
  * While the page is open it re-reads every couple of minutes (and when the
  * phone comes back to it), so an "on my way" or an end-of-day update shows
@@ -35,10 +42,14 @@ function endpoint(projectId: string, req: PortalRequest): { url: string; body: u
   return { url: `${base}/actions`, body: req };
 }
 
-export function LiveHub({ data, staffOpsHref }: { data: HubData; staffOpsHref?: string }) {
+export function LiveHub({ data: page, staffOpsHref }: { data: HubData; staffOpsHref?: string }) {
   const router = useRouter();
   const [, startTransition] = useTransition();
-  const projectId = data.project.id;
+  const projectId = page.project.id;
+  // The family's answers to changes, shown at once; and whether the last re-read never came.
+  const [decided, setDecided] = useState<Decided>({});
+  const [behind, setBehind] = useState(false);
+  const data = useMemo(() => withDecisions(page, decided), [page, decided]);
 
   // Resolve waiting requests once the refreshed server data arrives.
   const waiters = useRef<(() => void)[]>([]);
@@ -46,15 +57,17 @@ export function LiveHub({ data, staffOpsHref }: { data: HubData; staffOpsHref?: 
     const ready = waiters.current;
     waiters.current = [];
     ready.forEach((resolve) => resolve());
-  }, [data]);
+    setBehind(false);
+  }, [page]);
 
+  /** Re-read the page: true once the fresh data is on screen, false if it hasn't come within 8 seconds. */
   const refresh = useCallback(
     () =>
-      new Promise<void>((resolve) => {
-        const timer = setTimeout(resolve, 8_000);
+      new Promise<boolean>((resolve) => {
+        const timer = setTimeout(() => resolve(false), 8_000);
         waiters.current.push(() => {
           clearTimeout(timer);
-          resolve();
+          resolve(true);
         });
         startTransition(() => router.refresh());
       }),
@@ -106,7 +119,11 @@ export function LiveHub({ data, staffOpsHref }: { data: HubData; staffOpsHref?: 
           ...(json?.blockers ? { blockers: json.blockers } : {}),
         };
       }
-      await refresh();
+      if (req.kind === "variation") {
+        const at = new Date().toISOString();
+        setDecided((d) => ({ ...d, [req.issueId]: { status: req.decision === "accept" ? "accepted" : "declined", at } }));
+      }
+      if (!(await refresh())) setBehind(true);
       return { ok: true, ...(json.message ? { message: json.message } : {}) };
     },
     [projectId, refresh],
@@ -144,6 +161,14 @@ export function LiveHub({ data, staffOpsHref }: { data: HubData; staffOpsHref?: 
   return (
     <HubControllerProvider value={controller}>
       <Hub data={data} refLabel={`Ref ${projectId.slice(0, 8).toUpperCase()}`} />
+      {behind && (
+        <div role="status" className="fixed inset-x-4 bottom-4 z-50 mx-auto flex max-w-md flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900 shadow-lg">
+          <span>That&apos;s saved, but this page hasn&apos;t caught up with it yet.</span>
+          <button type="button" onClick={() => window.location.reload()} className="min-h-11 rounded-full bg-ink-900 px-4 font-semibold text-white">
+            Show the latest
+          </button>
+        </div>
+      )}
     </HubControllerProvider>
   );
 }

@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ISSUE_KIND_LABEL, ISSUE_STATUS_LABEL, SEVERITY_LABEL } from "@aircon/domain";
 import type { FieldIssue } from "./types";
 import { money } from "./format";
+import { requestCatchUp } from "./server-answer";
 
 /** One issue in the field: what, how bad, whether it holds the job, and the installer's two moves (on it / fixed). */
 
@@ -24,7 +24,6 @@ const VARIATION: Record<string, { text: string; tone: string }> = {
 };
 
 export function IssueCard({ issue, showJob = false, canUpdate = true }: { issue: FieldIssue; showJob?: boolean; canUpdate?: boolean }) {
-  const router = useRouter();
   const [mode, setMode] = useState<null | "in-progress" | "resolved">(null);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
@@ -49,7 +48,7 @@ export function IssueCard({ issue, showJob = false, canUpdate = true }: { issue:
       setSaved(mode);
       setMode(null);
       setNote("");
-      router.refresh();
+      requestCatchUp();
     } catch (err) {
       setError(err instanceof Error && err.message !== "Failed to fetch" ? err.message : "No connection: try again when you have signal.");
     } finally {

@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
   JOB_TARGETS,
   commissioningFromJob,
@@ -14,11 +13,14 @@ import {
   runsheetProgress,
   windowText,
   type Blocker,
+  type ExceptionReview,
   type JobTarget,
 } from "@aircon/domain";
 import { BlockerList } from "@/components/kit/blocker-list";
+import { withAnswers, type SignAnswer, type TargetAnswer } from "./answers";
 import { parseReading } from "./capture";
 import { londonTime, personName, whenLabel } from "./format";
+import { answerHeader, postAnswer, useCatchUp, useFieldJob } from "./server-answer";
 import { HeaderTitle, SyncBadge } from "./sync-badge";
 import type { FieldJob } from "./types";
 import { getFieldOutbox } from "@/lib/field-outbox";
@@ -30,6 +32,12 @@ import { useMergedJob, useOutboxState, useRefreshOnSync } from "./use-outbox";
  * exceptions to review, and the signature. Signing completes the install,
  * signs commissioning on the project and issues the certificate. Everyone
  * else on the job sees the same results, read-only.
+ *
+ * A target set, a reading reviewed and the signature all show from the
+ * server's answer at once, laid over the page's copy of the job (the same
+ * domain functions the server applied), never from a page refresh landing
+ * (server-answer.ts says why). Signing again answers with the record on
+ * file, so a retry after a lost reply is safe.
  */
 
 const BTN = "min-h-12 rounded-full px-5 font-semibold disabled:opacity-40";
@@ -37,16 +45,7 @@ const PRIMARY = `${BTN} bg-accent-700 text-white shadow-sm hover:bg-accent-800`;
 const SECONDARY = `${BTN} border border-line bg-white text-ink-900 hover:bg-surface`;
 const INPUT = "min-h-12 w-full rounded-full border border-line bg-white px-4 text-lg text-ink-900 placeholder:text-ink-500 focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-100";
 
-async function post(url: string, body: unknown): Promise<{ ok: true; data: Record<string, unknown> } | { ok: false; error: string; blockers?: Blocker[] }> {
-  try {
-    const res = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), cache: "no-store" });
-    const data = (await res.json().catch(() => ({}))) as Record<string, unknown> & { error?: string; blockers?: Blocker[] };
-    if (!res.ok) return { ok: false, error: data.error ?? `That didn't work (${res.status}).`, ...(data.blockers ? { blockers: data.blockers } : {}) };
-    return { ok: true, data };
-  } catch {
-    return { ok: false, error: "No connection. Sign-off needs signal: try again outside or in a minute." };
-  }
-}
+const NO_REPLY = "No reply (no signal?), so it may not have saved. Try again outside or in a minute: it's safe to send twice.";
 
 const BASIS: Record<JobTarget["basis"], { text: string; tone: string }> = {
   record: { text: "No target yet", tone: "bg-amber-50 text-amber-900" },
@@ -54,8 +53,7 @@ const BASIS: Record<JobTarget["basis"], { text: string; tone: string }> = {
   "tech-lead": { text: "Set", tone: "bg-emerald-50 text-emerald-800" },
 };
 
-function TargetRow({ projectId, target, canEdit, locked }: { projectId: string; target: JobTarget; canEdit: boolean; locked: boolean }) {
-  const router = useRouter();
+function TargetRow({ projectId, target, canEdit, locked, onAnswer }: { projectId: string; target: JobTarget; canEdit: boolean; locked: boolean; onAnswer: (a: TargetAnswer) => void }) {
   const def = JOB_TARGETS[target.key];
   const [min, setMin] = useState(target.min !== undefined ? String(target.min) : "");
   const [max, setMax] = useState(target.max !== undefined ? String(target.max) : "");
@@ -72,10 +70,14 @@ function TargetRow({ projectId, target, canEdit, locked }: { projectId: string; 
     const hi = recordOnly || !showMax || !max.trim() ? undefined : parseReading(max);
     if (lo === null || hi === null) return setError("Numbers only.");
     setBusy(true);
-    const r = await post(`/api/field/jobs/${projectId}/targets`, { key: target.key, ...(lo !== undefined ? { min: lo } : {}), ...(hi !== undefined ? { max: hi } : {}), ...(note.trim() ? { note: note.trim() } : {}) });
+    const r = await postAnswer<{ applied: TargetAnswer }>(
+      `/api/field/jobs/${projectId}/targets`,
+      { key: target.key, ...(lo !== undefined ? { min: lo } : {}), ...(hi !== undefined ? { max: hi } : {}), ...(note.trim() ? { note: note.trim() } : {}) },
+      NO_REPLY,
+    );
     setBusy(false);
     if (!r.ok) return setError(r.error);
-    router.refresh();
+    onAnswer(r.data.applied);
   }
 
   return (
@@ -139,8 +141,7 @@ function TargetRow({ projectId, target, canEdit, locked }: { projectId: string; 
   );
 }
 
-function ExceptionRow({ projectId, item, canReview }: { projectId: string; item: ReturnType<typeof openExceptions>[number]; canReview: boolean }) {
-  const router = useRouter();
+function ExceptionRow({ projectId, item, canReview, onAnswer }: { projectId: string; item: ReturnType<typeof openExceptions>[number]; canReview: boolean; onAnswer: (r: ExceptionReview) => void }) {
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -149,11 +150,15 @@ function ExceptionRow({ projectId, item, canReview }: { projectId: string; item:
     if (reason.trim().length < 3) return setError("Give the reason: it goes on the record.");
     setBusy(true);
     setError(null);
-    const r = await post(`/api/field/jobs/${projectId}/exceptions`, { specId: slot.spec.id, ...(slot.record?.id ? { evidenceId: slot.record.id } : {}), resolution, reason });
+    const r = await postAnswer<{ review: ExceptionReview }>(
+      `/api/field/jobs/${projectId}/exceptions`,
+      { specId: slot.spec.id, ...(slot.record?.id ? { evidenceId: slot.record.id } : {}), resolution, reason },
+      NO_REPLY,
+    );
     setBusy(false);
     if (!r.ok) return setError(r.error);
     setReason("");
-    router.refresh();
+    onAnswer(r.data.review);
   }
   return (
     <li className="rounded-2xl border border-red-300 bg-red-50/60 p-4">
@@ -199,9 +204,10 @@ const onPhoneText = (n: number) =>
 
 const fmtNum = (v: number | undefined, unit: string) => (v === undefined ? "Not recorded" : `${v} ${unit}`);
 
-export function Commissioning({ data, certificateHref, holds = [] }: { data: FieldJob; certificateHref?: string; holds?: Blocker[] }) {
+export function Commissioning({ data: page, certificateHref, holds = [] }: { data: FieldJob; certificateHref?: string; holds?: Blocker[] }) {
   useRefreshOnSync();
-  const router = useRouter();
+  const catchUp = useCatchUp();
+  const data = useFieldJob(page);
   const { header, me } = data;
   const merged = useMergedJob(data.job, me);
   const outboxState = useOutboxState();
@@ -211,8 +217,24 @@ export function Commissioning({ data, certificateHref, holds = [] }: { data: Fie
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [blockers, setBlockers] = useState<Blocker[]>([]);
-  const job = merged?.job ?? null;
+  // The server's answers to this screen, laid over the page's job until the page's own data has them.
+  const [targetsNow, setTargetsNow] = useState<TargetAnswer[]>([]);
+  const [reviewsNow, setReviewsNow] = useState<ExceptionReview[]>([]);
+  const [signedNow, setSignedNow] = useState<SignAnswer | null>(null);
+  const job = useMemo(
+    () => (merged ? withAnswers(merged.job, { targets: targetsNow, reviews: reviewsNow, signed: signedNow }) : null),
+    [merged, targetsNow, reviewsNow, signedNow],
+  );
   const signed = job?.commissioning ?? null;
+  const certHref = certificateHref ?? (signedNow?.certificate ? `/d/${signedNow.certificate.id}` : undefined);
+  const onTarget = (a: TargetAnswer) => {
+    setTargetsNow((list) => [...list, a]);
+    catchUp();
+  };
+  const onReview = (r: ExceptionReview) => {
+    setReviewsNow((list) => [...list, r]);
+    catchUp();
+  };
 
   const derived = useMemo(() => {
     if (!job) return null;
@@ -242,14 +264,16 @@ export function Commissioning({ data, certificateHref, holds = [] }: { data: Fie
     }
     // Every capture this screen showed: the server refuses if a newer one has arrived (another crew phone).
     const seen = (merged?.job.evidence ?? []).map((e) => e.id).filter((x): x is string => Boolean(x));
-    const r = await post(`/api/field/jobs/${header.projectId}/commissioning`, { notes, seen });
+    const r = await postAnswer<SignAnswer>(`/api/field/jobs/${header.projectId}/commissioning`, { notes, seen }, NO_REPLY);
     setBusy(false);
     if (!r.ok) {
       setError(r.error);
       setBlockers(r.blockers ?? []);
       return;
     }
-    router.refresh();
+    setSignedNow(r.data);
+    answerHeader(header.projectId, r.data.header);
+    catchUp();
   }
 
   return (
@@ -280,8 +304,8 @@ export function Commissioning({ data, certificateHref, holds = [] }: { data: Fie
             <div role="status" className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
               <p className="text-lg font-semibold text-emerald-800">Commissioning is signed.</p>
               <div className="mt-3 flex flex-wrap gap-2">
-                {certificateHref && (
-                  <a href={certificateHref} className={SECONDARY + " flex items-center"}>
+                {certHref && (
+                  <a href={certHref} className={SECONDARY + " flex items-center"}>
                     Commissioning certificate
                   </a>
                 )}
@@ -333,7 +357,7 @@ export function Commissioning({ data, certificateHref, holds = [] }: { data: Fie
               <p className="mb-3 mt-0.5 text-sm text-ink-500">Outside the job's window. Accept with a reason, or ask for it to be captured again.</p>
               <ul className="space-y-3">
                 {derived.exceptions.map((x) => (
-                  <ExceptionRow key={x.slot.spec.id} projectId={header.projectId} item={x} canReview={me.canReview} />
+                  <ExceptionRow key={x.slot.spec.id} projectId={header.projectId} item={x} canReview={me.canReview} onAnswer={onReview} />
                 ))}
               </ul>
             </section>
@@ -348,7 +372,7 @@ export function Commissioning({ data, certificateHref, holds = [] }: { data: Fie
             </p>
             <ul className="space-y-3">
               {derived.targets.map((t) => (
-                <TargetRow key={t.key} projectId={header.projectId} target={t} canEdit={me.canReview} locked={Boolean(signed)} />
+                <TargetRow key={t.key} projectId={header.projectId} target={t} canEdit={me.canReview} locked={Boolean(signed)} onAnswer={onTarget} />
               ))}
             </ul>
           </section>

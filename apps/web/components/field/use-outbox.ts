@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import type { EvidenceRecord, InstallJobV2, StepStatusRecord } from "@aircon/domain";
 import { getFieldOutbox, LOCAL_MEDIA_PREFIX, type OutboxState, type QueueItem, type SyncOp } from "@/lib/field-outbox";
 import { useFieldIdentity } from "./field-identity";
+import { requestCatchUp } from "./server-answer";
 
 /**
  * React glue for the outbox: the live queue state, and the runsheet as the
@@ -22,17 +22,20 @@ export function useOutboxState(): OutboxState {
   return state;
 }
 
-/** Re-read the page's server data shortly after the outbox lands something, so "saved" is the server's word. */
+/**
+ * Re-read the page's server data shortly after the outbox lands something, so "saved" is the server's word.
+ * A catch-up (server-answer.ts): the screen already shows the capture (useMergedJob), and the re-reads
+ * run one at a time, never on top of a step's own.
+ */
 export function useRefreshOnSync(): void {
-  const router = useRouter();
   const state = useOutboxState();
   const seen = useRef(0);
   useEffect(() => {
     if (state.acked.length <= seen.current) return;
     seen.current = state.acked.length;
-    const t = window.setTimeout(() => router.refresh(), 600);
+    const t = window.setTimeout(requestCatchUp, 600);
     return () => window.clearTimeout(t);
-  }, [state.acked.length, router]);
+  }, [state.acked.length]);
 }
 
 /** Object URLs for photos still on the phone, by local id; made once, revoked when the page goes. */

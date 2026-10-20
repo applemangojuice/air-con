@@ -2,16 +2,16 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { handoverSteps, stepView, type Blocker, type HandoverPackSnapshot } from "@aircon/domain";
 import { BlockerList } from "@/components/kit/blocker-list";
 import { newOpId } from "@/lib/field-outbox";
 import { MediaUploadError, uploadMedia } from "@/lib/media-client";
 import { fmtDate, whenLabel } from "./format";
+import { answerHeader, postAnswer, useCatchUp, useFieldJob } from "./server-answer";
 import { SignaturePad, type SignaturePadHandle } from "./signature-pad";
 import { StepCard } from "./step-card";
 import { HeaderTitle, SyncBadge } from "./sync-badge";
-import type { FieldJob } from "./types";
+import type { FieldHeader, FieldHeaderState, FieldJob } from "./types";
 import { useOnline } from "./use-online";
 import { useMergedJob, useRefreshOnSync } from "./use-outbox";
 
@@ -21,26 +21,29 @@ import { useMergedJob, useRefreshOnSync } from "./use-outbox";
  *  2. the handover pack, published once commissioning is signed,
  *  3. the customer's sign-off: "All good" or "There's a snag" (each snag
  *     becomes an issue they can see), with their name and signature.
+ *
+ * Publishing and signing show their result from the server's answer at
+ * once (the sign-off opens the moment the pack is published), never from a
+ * page refresh landing (server-answer.ts says why). Both are safe to send
+ * again: a publish carries its tap's id, so a retry or a bounced double tap
+ * answers with the same pack; signing an already-signed handover answers
+ * with the sign-off on record.
  */
 
 const BTN = "min-h-12 rounded-full px-5 font-semibold disabled:opacity-40";
 const PRIMARY = `${BTN} bg-accent-700 text-white shadow-sm hover:bg-accent-800`;
 const SECONDARY = `${BTN} border border-line bg-white text-ink-900 hover:bg-surface`;
 
-async function post(url: string, body: unknown): Promise<{ ok: true; data: Record<string, unknown> } | { ok: false; error: string; blockers?: Blocker[]; offline?: true }> {
-  try {
-    const res = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), cache: "no-store" });
-    const data = (await res.json().catch(() => ({}))) as Record<string, unknown> & { error?: string; blockers?: Blocker[] };
-    if (!res.ok) return { ok: false, error: data.error ?? `That didn't work (${res.status}).`, ...(data.blockers ? { blockers: data.blockers } : {}) };
-    return { ok: true, data };
-  } catch {
-    return { ok: false, error: "No connection. This step needs signal: try again in a minute.", offline: true };
-  }
-}
+type Signoff = NonNullable<FieldHeader["signoff"]>;
+type Published = { document: { id: string; ref: string }; email?: { status?: string }; replayed?: boolean; header: FieldHeaderState };
+type Signed = { signoff: Signoff; already?: boolean; header: FieldHeaderState };
 
 /** Said when the sign-off couldn't reach us: honest about what happened, and what happens next. */
 const NOT_SAVED_OFFLINE =
   "Not saved: there's no signal. Keep this screen open: it saves by itself as soon as signal is back, or tap Sign off again. Their signature is kept.";
+
+/** No answer to a publish: it may or may not have gone, and tapping again is safe either way. */
+const PUBLISH_NO_REPLY = "No reply (no signal?), so it may not have gone. Tap Publish again when you have signal: it never publishes twice.";
 
 function StepHeading({ n, title, done, children }: { n: number; title: string; done: boolean; children?: React.ReactNode }) {
   return (
@@ -127,19 +130,31 @@ function PackPreview({ pack, missing }: { pack: HandoverPackSnapshot; missing: s
   );
 }
 
-export function Handover({ data, pack, missing }: { data: FieldJob; pack: HandoverPackSnapshot | null; missing: string[] }) {
+export function Handover({ data: page, pack, missing }: { data: FieldJob; pack: HandoverPackSnapshot | null; missing: string[] }) {
   useRefreshOnSync();
-  const router = useRouter();
+  const catchUp = useCatchUp();
+  // The header as the newest of the page and the server's answers to this phone (publish, sign-off).
+  const data = useFieldJob(page);
   const { header, me } = data;
   const merged = useMergedJob(data.job, me);
+  const packDocumentId = header.packDocumentId;
+  const signoff = header.signoff;
   const commissioned = header.handoverStatus !== "pending";
   const handedOver = header.handoverStatus === "handed-over";
-  const published = Boolean(header.packDocumentId);
+  const published = Boolean(packDocumentId);
+  // Signed already when this phone asked (a retry, or another phone first): said, with the sign-off on record.
+  const [signedAlready, setSignedAlready] = useState(false);
   const walk = merged ? handoverSteps(merged.job.runsheet).map((s) => stepView(merged.job, s)) : [];
   const walkDone = walk.length > 0 && walk.every((v) => v.state === "done" || v.state === "na");
 
   const [publishing, setPublishing] = useState(false);
   const [publishMsg, setPublishMsg] = useState<string | null>(null);
+  const [publishError, setPublishError] = useState<string | null>(null);
+  const [publishBlockers, setPublishBlockers] = useState<Blocker[]>([]);
+  // One publish at a time (a bounced second tap lands before the button can grey out), and the id of this
+  // tap, kept for its retries until the server has answered it: the server publishes each id once.
+  const publishInFlight = useRef(false);
+  const publishRequest = useRef<string | null>(null);
   const [name, setName] = useState("");
   const [outcome, setOutcome] = useState<"all-good" | "snags" | null>(null);
   const [snags, setSnags] = useState<{ id: string; text: string }[]>([]);
@@ -158,21 +173,33 @@ export function Handover({ data, pack, missing }: { data: FieldJob; pack: Handov
   const refusal = header.installStatus === "not-started" ? "The install hasn't started." : null;
 
   async function publish() {
+    if (publishInFlight.current) return;
+    publishInFlight.current = true;
     setPublishing(true);
-    setError(null);
-    const r = await post(`/api/field/jobs/${header.projectId}/handover`, { action: "publish" });
+    setPublishError(null);
+    setPublishBlockers([]);
+    setPublishMsg(null);
+    publishRequest.current ??= newOpId();
+    const r = await postAnswer<Published>(`/api/field/jobs/${header.projectId}/handover`, { action: "publish", requestId: publishRequest.current }, PUBLISH_NO_REPLY);
+    publishInFlight.current = false;
     setPublishing(false);
     if (!r.ok) {
-      setError(r.error);
-      setBlockers(r.blockers ?? []);
+      // The same id goes with the next tap: if this one did go through, that answers with the same pack.
+      setPublishError(r.error);
+      setPublishBlockers(r.blockers ?? []);
       return;
     }
-    const email = (r.data.email as { status?: string } | undefined)?.status;
+    // Answered: the next tap publishes an updated pack.
+    publishRequest.current = null;
+    answerHeader(header.projectId, r.data.header);
+    const email = r.data.email?.status;
     setPublishMsg(email === "sent" ? "Published and emailed to the customer." : email === "demo" ? "Published. Demo mode: the email was recorded, not sent." : "Published: it's on their project page.");
-    router.refresh();
+    catchUp();
   }
 
+  const signInFlight = useRef(false);
   async function sign() {
+    if (signInFlight.current) return;
     setError(null);
     setBlockers([]);
     if (name.trim().length < 2) return setError("Their full name, please.");
@@ -184,6 +211,7 @@ export function Handover({ data, pack, missing }: { data: FieldJob; pack: Handov
       return setError(NOT_SAVED_OFFLINE);
     }
     setSigning(true);
+    signInFlight.current = true;
     try {
       let signatureMediaId = uploaded.current ?? undefined;
       if (!signatureMediaId) {
@@ -196,20 +224,27 @@ export function Handover({ data, pack, missing }: { data: FieldJob; pack: Handov
         signatureMediaId = item.id;
         uploaded.current = item.id;
       }
-      const r = await post(`/api/field/jobs/${header.projectId}/handover`, { action: "sign", name: name.trim(), outcome, snags: outcome === "snags" ? list : [], signatureMediaId });
+      const r = await postAnswer<Signed>(
+        `/api/field/jobs/${header.projectId}/handover`,
+        { action: "sign", name: name.trim(), outcome, snags: outcome === "snags" ? list : [], signatureMediaId },
+        NOT_SAVED_OFFLINE,
+      );
       if (!r.ok) {
         setWaitingForSignal(Boolean(r.offline));
-        setError(r.offline ? NOT_SAVED_OFFLINE : r.error);
+        setError(r.error);
         setBlockers(r.blockers ?? []);
         return;
       }
       setWaitingForSignal(false);
-      router.refresh();
+      setSignedAlready(Boolean(r.data.already));
+      answerHeader(header.projectId, r.data.header);
+      catchUp();
     } catch (err) {
       const offline = (err instanceof MediaUploadError && err.status === null) || (typeof navigator !== "undefined" && navigator.onLine === false);
       setWaitingForSignal(offline);
       setError(offline ? NOT_SAVED_OFFLINE : err instanceof Error ? `Not saved: ${err.message}` : "Not saved: the signature didn't upload. Tap Sign off again.");
     } finally {
+      signInFlight.current = false;
       setSigning(false);
     }
   }
@@ -234,8 +269,8 @@ export function Handover({ data, pack, missing }: { data: FieldJob; pack: Handov
         <p className="text-sm font-semibold uppercase tracking-wide text-accent-700">Handover</p>
         <h1 className="font-display text-3xl leading-tight text-ink-900">{handedOver ? "Handed over" : "With the customer"}</h1>
         <p className="mt-1 text-base text-ink-700">
-          {handedOver && header.signoff
-            ? `Signed by ${header.signoff.name}, ${whenLabel(header.signoff.at, header.today)}${header.signoff.outcome === "snags" ? `, with ${header.signoff.snagCount} snag${header.signoff.snagCount === 1 ? "" : "s"} to fix` : ": all good"}.`
+          {handedOver && signoff
+            ? `Signed by ${signoff.name}, ${whenLabel(signoff.at, header.today)}${signoff.outcome === "snags" ? `, with ${signoff.snagCount} snag${signoff.snagCount === 1 ? "" : "s"} to fix` : ": all good"}.`
             : "Walk them through it, publish their pack, and ask them to sign."}
         </p>
       </header>
@@ -243,7 +278,7 @@ export function Handover({ data, pack, missing }: { data: FieldJob; pack: Handov
       {handedOver ? (
         <div className="space-y-4">
           <p role="status" className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-lg font-semibold text-emerald-800">
-            Done. Thank them, and leave it tidy.
+            {signedAlready && signoff && signoff.name !== name.trim() ? "Someone had already signed it off: this is the sign-off on record. " : ""}Done. Thank them, and leave it tidy.
           </p>
           <section aria-labelledby="after" className="rounded-2xl border border-line bg-white p-4">
             <h2 id="after" className="font-semibold text-ink-900">
@@ -258,21 +293,21 @@ export function Handover({ data, pack, missing }: { data: FieldJob; pack: Handov
                     ? "The electrical certificate is in."
                     : "No electrical certificate needed."}
               </li>
-              {header.signoff?.outcome === "snags" && <li>Each snag has an owner and a date. The customer can see them.</li>}
+              {signoff?.outcome === "snags" && <li>Each snag has an owner and a date. The customer can see them.</li>}
             </ul>
             <div className="mt-4 grid gap-2">
-              {header.signoff?.outcome === "snags" && (
+              {signoff?.outcome === "snags" && (
                 <Link href="/field/issues" className={`${PRIMARY} flex items-center justify-center`}>
                   See the snags
                 </Link>
               )}
               {published && (
                 // /d/[id] is the customer document viewer (F1).
-                <Link href={`/d/${header.packDocumentId}`} className={`${SECONDARY} flex items-center justify-center`}>
+                <Link href={`/d/${packDocumentId}`} className={`${SECONDARY} flex items-center justify-center`}>
                   Open their handover pack
                 </Link>
               )}
-              <Link href="/field" className={`${header.signoff?.outcome === "snags" ? SECONDARY : PRIMARY} flex items-center justify-center`}>
+              <Link href="/field" className={`${signoff?.outcome === "snags" ? SECONDARY : PRIMARY} flex items-center justify-center`}>
                 Back to today
               </Link>
             </div>
@@ -311,8 +346,14 @@ export function Handover({ data, pack, missing }: { data: FieldJob; pack: Handov
             {commissioned && (
               <div className="mt-3 space-y-2" aria-live="polite">
                 {publishMsg && <p className="rounded-2xl bg-emerald-50 px-4 py-3 font-semibold text-emerald-800">{publishMsg}</p>}
+                {publishError && (
+                  <p role="alert" className="rounded-2xl bg-red-50 px-4 py-3 text-base font-semibold text-red-800">
+                    {publishError}
+                  </p>
+                )}
+                {publishBlockers.length > 0 && <BlockerList blockers={publishBlockers} />}
                 <button type="button" disabled={publishing} onClick={publish} className={`${published ? SECONDARY : PRIMARY} w-full`}>
-                  {publishing ? "Publishing…" : published ? "Publish an updated pack" : "Publish the handover pack"}
+                  {publishing ? "Publishing…" : publishError ? "Publish again" : published ? "Publish an updated pack" : "Publish the handover pack"}
                 </button>
               </div>
             )}

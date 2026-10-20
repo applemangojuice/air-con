@@ -10,6 +10,7 @@ import { HeaderTitle, SyncBadge } from "./sync-badge";
 import type { FieldJob } from "./types";
 import { useMergedJob, useRefreshOnSync } from "./use-outbox";
 import { fmtDay, londonTime } from "./format";
+import { useFieldJob } from "./server-answer";
 
 /**
  * The day runsheet: the day's steps, phase by phase, each with its
@@ -32,8 +33,11 @@ function dayFromPath(pathname: string | null): number {
   return Number.isInteger(n) && n > 0 ? n : 1;
 }
 
-export function Runsheet({ data }: { data: FieldJob }) {
+export function Runsheet({ data: page }: { data: FieldJob }) {
   useRefreshOnSync();
+  // The header as the newest of the page and this phone's answered steps: starting the day opens
+  // the runsheet from the server's answer, not from a refresh landing (server-answer.ts).
+  const data = useFieldJob(page);
   const { header, me } = data;
   const merged = useMergedJob(data.job, me);
   const days = merged ? runsheetDays(merged.job.runsheet) : [1, 2, 3];

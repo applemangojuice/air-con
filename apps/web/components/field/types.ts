@@ -136,7 +136,20 @@ export interface FieldHeader {
   signoff?: Project["handover"]["signoff"];
   electricalCert: Project["handover"]["electricalCert"];
   today: string;
+  /**
+   * How far along the project's record this was read (its event count,
+   * which only grows): a step's own answer with a higher version is newer
+   * than this page data, a refresh with a higher one is newer than the
+   * answer (components/field/answers.ts, withHeaderState).
+   */
+  version: number;
 }
+
+/** The parts of the header a step on the phone changes, as the server answers it (version included). */
+export type FieldHeaderState = Pick<
+  FieldHeader,
+  "version" | "days" | "totalDays" | "currentDay" | "nextDay" | "installStatus" | "handoverStatus" | "bookingStatus" | "onMyWay" | "packDocumentId" | "signoff" | "electricalCert"
+>;
 
 export interface FieldClock {
   entryId: string;

@@ -48,6 +48,12 @@ The coloured strip at the very top says if anything is in demo mode
 ("EMAIL DEMO: emails are recorded, not sent"). On the live site with
 everything set up, it shouldn't be there.
 
+After you save something, the page updates itself. If it ever says
+**"Saved, but this page hasn't caught up with it yet"**, the save worked:
+tap **Show the latest** before doing anything else on that page (its
+button waits until you do, so a payment can't be recorded twice against a
+page that still shows it owed).
+
 ![The Board (DEMO data)](../screenshots/guides/09-ops-board.png)
 
 ### The project page ("command centre")

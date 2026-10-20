@@ -8,6 +8,8 @@ import { answer, json, notFound, projectIdSchema, readJson } from "../../../_lib
  * POST /api/field/jobs/<projectId>/targets { key, min?, max?, note? }
  * The tech lead sets (or confirms as record-only) one of the job's
  * manufacturer targets; readings already taken are judged against it.
+ * Answers with what was applied (`applied`: the input, who, when), which
+ * the screen applies to its own copy of the runsheet at once.
  */
 
 export const runtime = "nodejs";
@@ -33,12 +35,12 @@ export async function POST(request: Request, { params }: Params): Promise<Respon
   if (!body.success) return json({ error: "Invalid target" }, 400);
   const b = body.data;
   return answer(async () => {
-    await setTarget(projectId, staff, {
+    const { applied } = await setTarget(projectId, staff, {
       key: b.key as (typeof TARGET_KEYS)[number],
       ...(b.min !== undefined ? { min: b.min } : {}),
       ...(b.max !== undefined ? { max: b.max } : {}),
       ...(b.note ? { note: b.note } : {}),
     });
-    return { ok: true };
+    return { ok: true, applied };
   });
 }

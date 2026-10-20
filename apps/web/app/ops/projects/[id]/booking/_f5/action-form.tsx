@@ -1,8 +1,8 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { startTransition, useActionState, useEffect, useRef, useState, type ReactNode } from "react";
 import { BlockerList, Button, type ButtonSize, type ButtonVariant } from "@/components/kit";
+import { BehindNote, useLandedRefresh } from "@/components/kit/landed-refresh";
 import type { ActionState } from "./action-state";
 import { flash } from "./flash";
 
@@ -13,6 +13,10 @@ import { flash } from "./flash";
  * values survive an error (the form only resets after a success, and only
  * when asked). Each render carries a one-off `requestId`, so a double tap
  * or a retry after a dropped connection can't do the same thing twice.
+ * The page refresh after a success is watched: if it never lands (Next
+ * 15.5 can stall one, components/kit/landed-refresh.tsx), the button waits
+ * and the form offers to load the page afresh, so nothing is done twice
+ * against a page that still shows it undone.
  */
 
 const OFFLINE: ActionState = {
@@ -55,7 +59,7 @@ export function ActionForm({
   /** Also announce a success in the page's FlashRegion (for forms that disappear once they've worked). */
   flash?: boolean;
 }) {
-  const router = useRouter();
+  const landed = useLandedRefresh();
   const formRef = useRef<HTMLFormElement>(null);
   // Minted after hydration (a random value in the server HTML wouldn't match the browser's).
   const [requestId, setRequestId] = useState("");
@@ -73,8 +77,8 @@ export function ActionForm({
     setRequestId(newId());
     if (resetOnSuccess) formRef.current?.reset();
     if (announce) flash({ ...(state.message ? { message: state.message } : {}), ...(state.warning ? { warning: state.warning } : {}) });
-    if (refresh) router.refresh();
-  }, [state, refresh, resetOnSuccess, router, announce]);
+    if (refresh) landed.refresh();
+  }, [state, refresh, resetOnSuccess, landed.refresh, announce]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <form
@@ -91,7 +95,7 @@ export function ActionForm({
       <input type="hidden" name="requestId" value={requestId} />
       {children}
       <div className={`flex flex-wrap items-center gap-3 ${children ? "mt-4" : ""}`.trim()}>
-        <Button type="submit" variant={variant} size={size} block={block} busy={pending} busyLabel={busyLabel} disabled={disabled || !requestId} className={submitClassName}>
+        <Button type="submit" variant={variant} size={size} block={block} busy={pending} busyLabel={busyLabel} disabled={disabled || !requestId || landed.behind} className={submitClassName}>
           {submitLabel}
         </Button>
         {footer}
@@ -113,6 +117,7 @@ export function ActionForm({
         {!pending && !announce && state.warning && (
           <p className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">{state.warning}</p>
         )}
+        <BehindNote show={landed.behind} />
       </div>
     </form>
   );

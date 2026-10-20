@@ -316,7 +316,9 @@ The job's **Handover** tab, with the family beside you.
    manuals handed over.
 2. **Publish the handover pack** (once commissioning is signed): their
    equipment and serial numbers, certificates, manuals, care guide and
-   contacts appear in their documents.
+   contacts appear in their documents. The sign-off opens as soon as it
+   says **Published**. If it says there was no reply, tap **Publish
+   again** when you have signal: it never publishes (or emails) twice.
 3. They pick **All good** or **There's a snag** (write each snag down), type
    their name and sign → **Sign off the handover**. Each snag becomes an
    issue with an owner and a date, and they can see it.

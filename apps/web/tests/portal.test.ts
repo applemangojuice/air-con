@@ -414,3 +414,18 @@ test("a cancelled contract on the hub: it says cancelled, with the refund and co
   assert.equal(view.cancelledCopy(accepted("2026-10-10T10:00:00.000Z")), null);
   assert.equal(view.stageCancelled(accepted("2026-10-10T10:00:00.000Z"), "install"), false);
 });
+
+test("a change the family just answered leaves the waiting list at once, as the server moved it, until the page catches up", async () => {
+  const { withDecisions } = await import("../components/portal/answers.ts");
+  const waiting = { id: "v1", number: 3, kind: "variation" as const, title: "DEMO: 2 m more trunking", status: "awaiting-customer" as const, raisedAt: "2026-11-10T10:00:00.000Z", raisedBy: "us" as const, variation: { description: "DEMO", priceDeltaNetPence: 12_000, taxPence: 0, totalDeltaPence: 12_000, status: "proposed" as const } };
+  const other = { ...waiting, id: "v2", number: 4 };
+  const data = { issues: [waiting, other] } as unknown as Parameters<typeof withDecisions>[0];
+  assert.equal(withDecisions(data, {}), data, "nothing answered: the page as it is");
+  const shown = withDecisions(data, { v1: { status: "accepted", at: "2026-11-10T11:00:00.000Z" } });
+  assert.deepEqual([shown.issues[0]!.variation!.status, shown.issues[0]!.status, shown.issues[0]!.variation!.decidedAt], ["accepted", "in-progress", "2026-11-10T11:00:00.000Z"]);
+  assert.equal(shown.issues[1], other, "the other change still waits");
+  assert.equal(withDecisions(data, { v2: { status: "declined", at: "x" } }).issues[1]!.status, "resolved", "a no is settled");
+  // The page has caught up (whatever it says now, it's the server's): the answer steps aside.
+  const caughtUp = { issues: [{ ...waiting, status: "resolved" as const, variation: { ...waiting.variation, status: "declined" as const } }] } as unknown as Parameters<typeof withDecisions>[0];
+  assert.equal(withDecisions(caughtUp, { v1: { status: "accepted", at: "x" } }), caughtUp);
+});

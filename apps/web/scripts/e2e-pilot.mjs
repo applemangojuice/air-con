@@ -46,7 +46,9 @@
  * Env: BASE_URL (default http://localhost:3330), CHROMIUM_PATH (else found
  * under PLAYWRIGHT_BROWSERS_PATH or /opt/pw-browsers), SHOTS_DIR (screenshots;
  * default a new temp dir, printed at the end), E2E_UNTIL (a phase letter: stop
- * after it, to set up data for poking at by hand).
+ * after it, to set up data for poking at by hand), E2E_IDS_FILE (write the
+ * walk's ids there as JSON at the end: e2e-handover-loop.mjs starts from
+ * E2E_UNTIL=I).
  *
  * Phones are 390x844 (customer, surveyor, crew); ops is a 1280x800 desk.
  * Exit code 0 only if every check passed; on a failure each person's last
@@ -1477,6 +1479,7 @@ function parseCsv(input) {
 }
 
 await browser.close();
+if (process.env.E2E_IDS_FILE) writeFileSync(process.env.E2E_IDS_FILE, `${JSON.stringify({ ...ids, customer: CUSTOMER }, null, 2)}\n`);
 if (serverErrors.length) {
   console.error(`\nServer or page errors:\n  ${serverErrors.slice(0, 20).join("\n  ")}`);
   fails.push(`${serverErrors.length} server/page error(s)`);

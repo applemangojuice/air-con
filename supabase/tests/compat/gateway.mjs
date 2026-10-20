@@ -21,6 +21,14 @@
  * JWT_SECRET, ANON_KEY, SERVICE_ROLE_KEY, STORAGE_DIR, PSQL (path to psql)
  * plus PGHOST / PGPORT / PGUSER / PGDATABASE for reading storage.buckets,
  * GATEWAY_LOG=1 to log every request.
+ *
+ * Test-only latency (off unless set): GATEWAY_LATENCY_MS holds every REST
+ * and Storage request that long before it's served, plus a random 0 to
+ * GATEWAY_JITTER_MS more, so requests overlap and finish out of order the
+ * way they do between Vercel and a busy Supabase project. `POST
+ * /__compat/latency?ms=<n>&jitter=<n>` changes both while it runs (the
+ * handover loop, run-handover-loop.sh, sets up its job at full speed, then
+ * slows the stack down to widen every race on the screen).
  */
 import { createHash, randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
@@ -40,6 +48,9 @@ const STORAGE_DIR = resolve(process.env.STORAGE_DIR ?? "./storage");
 const OBJECTS = join(STORAGE_DIR, "objects");
 const META = join(STORAGE_DIR, "meta");
 const LOG = process.env.GATEWAY_LOG === "1";
+const ms = (v) => Math.min(10_000, Math.max(0, Number(v ?? 0) || 0));
+let LATENCY_MS = ms(process.env.GATEWAY_LATENCY_MS);
+let JITTER_MS = ms(process.env.GATEWAY_JITTER_MS);
 /** Supabase's project-wide upload ceiling (Free plan default: 50 MB). */
 const GLOBAL_MAX_BYTES = 50 * 1024 * 1024;
 /** Signed upload URLs last two hours, as on Supabase. */
@@ -660,6 +671,15 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url ?? "/", "http://gateway");
   if (LOG) res.on("finish", () => console.log(`${req.method} ${url.pathname}${url.search.slice(0, 200)} → ${res.statusCode} ${Date.now() - started}ms`));
   if (req.method === "OPTIONS") return send(res, 204, "");
+  if (url.pathname === "/__compat/latency" && req.method === "POST") {
+    LATENCY_MS = ms(url.searchParams.get("ms"));
+    JITTER_MS = ms(url.searchParams.get("jitter"));
+    console.log(`gateway: test latency now ${LATENCY_MS} ms + up to ${JITTER_MS} ms per request`);
+    return send(res, 200, { latencyMs: LATENCY_MS, jitterMs: JITTER_MS });
+  }
+  if ((LATENCY_MS || JITTER_MS) && url.pathname !== "/health") {
+    await new Promise((r) => setTimeout(r, LATENCY_MS + Math.random() * JITTER_MS));
+  }
   try {
     if (url.pathname === "/rest/v1" || url.pathname.startsWith("/rest/v1/")) {
       return rest(req, res, url.pathname.slice("/rest/v1".length) || "/", url.search);
@@ -678,5 +698,7 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, "127.0.0.1", () => console.log(`gateway listening on http://localhost:${PORT}`));
+server.listen(PORT, "127.0.0.1", () =>
+  console.log(`gateway listening on http://localhost:${PORT}${LATENCY_MS || JITTER_MS ? ` (test latency ${LATENCY_MS} ms + up to ${JITTER_MS} ms per request)` : ""}`),
+);
 for (const sig of ["SIGINT", "SIGTERM"]) process.on(sig, () => server.close(() => process.exit(0)));

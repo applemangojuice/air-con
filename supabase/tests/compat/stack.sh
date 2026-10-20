@@ -16,6 +16,8 @@
 #   COMPAT_GW_PORT   gateway port: the SUPABASE_URL (default 54321)
 #   POSTGREST_BIN    a PostgREST 12.2.3 binary; else ~/.cache/aircon-compat, else downloaded
 #   GATEWAY_LOG=1    log every gateway request (to $COMPAT_WORK/gateway.log)
+#   GATEWAY_LATENCY_MS, GATEWAY_JITTER_MS  test-only: hold every REST and Storage request
+#                    that long plus a random 0 to JITTER more (gateway.mjs; off by default)
 #   KEEP=1           keep the temp dir on stop
 #
 # After compat_start: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_ANON_KEY,

@@ -29,7 +29,7 @@ export async function POST(request: Request, { params }: Params): Promise<Respon
   const body = bodySchema.safeParse(await readJson(request));
   if (!body.success) return json({ error: "Give the reason: it goes on the record." }, 400);
   return answer(async () => {
-    await reviewException(projectId, staff, body.data);
-    return { ok: true };
+    const { review } = await reviewException(projectId, staff, body.data);
+    return { ok: true, review };
   });
 }
