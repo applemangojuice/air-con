@@ -92,6 +92,7 @@ const chosenPosition = (over: Partial<OutdoorPosition> = {}): OutdoorPosition =>
   chosen: true,
   mediaId: "22222222-2222-4222-8222-222222222222",
   distanceToNeighbourWindowM: 6,
+  reflectingSurfaces: "two",
   heightM: 0,
   defrostDrainage: "Gravel strip to the gully",
   ...over,
@@ -330,8 +331,8 @@ test("outdoor: a chosen position needs its photo, neighbour distance and drainag
   const m = complete();
   assert.deepEqual(missingItems({ ...m, outdoor: { positions: [chosenPosition({ chosen: false })] } }), ["Choose the outdoor unit position"]);
   assert.deepEqual(
-    missingItems({ ...m, outdoor: { positions: [chosenPosition({ mediaId: undefined, distanceToNeighbourWindowM: undefined, defrostDrainage: " " })] } }),
-    ["Rear patio: photo", "Rear patio: distance to the nearest neighbour's window", "Rear patio: where defrost water will drain"],
+    missingItems({ ...m, outdoor: { positions: [chosenPosition({ mediaId: undefined, distanceToNeighbourWindowM: undefined, reflectingSurfaces: undefined, defrostDrainage: " " })] } }),
+    ["Rear patio: photo", "Rear patio: distance to the nearest neighbour's window", "Rear patio: hard surfaces within 1 m (for the noise calculation)", "Rear patio: where defrost water will drain"],
   );
   assert.deepEqual(
     missingItems({ ...m, outdoor: { positions: [chosenPosition({ base: "wall-bracket", heightM: undefined })] } }),

@@ -151,7 +151,7 @@ export function PositionEditor({ positionId }: { positionId: string }) {
         <NumberField
           field="distanceToNeighbourWindowM"
           label="Distance to the nearest neighbour's window"
-          hint="To the nearest window of a habitable room next door (not a bathroom or landing). The noise calculation needs it."
+          hint="To a point 1 m out from the centre of the nearest window or glazed door of a habitable room next door (not a bathroom or landing): MCS 020(a)'s assessment position. The noise calculation needs it."
           unit="m"
           value={p.distanceToNeighbourWindowM}
           onChange={(v) => set((x) => setOpt(x, "distanceToNeighbourWindowM", v))}
@@ -159,7 +159,17 @@ export function PositionEditor({ positionId }: { positionId: string }) {
           max={500}
           missing={miss("distanceToNeighbourWindowM")}
         />
-        {close && <Callout tone="warn">Under 3 m to a neighbour&apos;s window can fail the 42 dB(A) limit. Note any screening, and look for a better spot.</Callout>}
+        <ChoiceGroup
+          field="reflectingSurfaces"
+          legend="Hard surfaces within 1 m of the unit (the ground counts)"
+          hint="Walls, fences and the ground reflect sound back towards the neighbour: the noise calculation needs the count."
+          value={p.reflectingSurfaces}
+          options={choices(SURVEY_LABELS.reflectingSurfaces)}
+          onChange={(reflectingSurfaces) => set((x) => ({ ...x, reflectingSurfaces }))}
+          columns={1}
+          missing={miss("reflectingSurfaces")}
+        />
+        {close && <Callout tone="warn">Under 3 m to a neighbour&apos;s window often fails the MCS 020(a) noise check. Note any screening, and look for a better spot.</Callout>}
       </FieldCard>
 
       <FieldCard title="Mounting and access">

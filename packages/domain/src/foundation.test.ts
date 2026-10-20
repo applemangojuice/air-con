@@ -70,7 +70,8 @@ test("the permitted development checklist covers every Class G check once", () =
     "article4-checked",
   ]);
   for (const c of PD_CHECKS) assert.ok(c.label.length > 10 && c.help.length > 20, c.id);
-  assert.match(PD_CHECKS.find((c) => c.id === "noise-ok")!.label, /42 dB\(A\)/);
+  assert.match(PD_CHECKS.find((c) => c.id === "noise-ok")!.label, /MCS 020\(a\)/);
+  assert.match(PD_CHECKS.find((c) => c.id === "noise-ok")!.help, /37\.0 dB\(A\) or less \(the 42 dB\(A\) limit includes an assumed 40 dB\(A\) background\)/);
   assert.match(PD_CHECKS.find((c) => c.id === "volume-ok")!.label, /1\.5 m³/);
 });
 

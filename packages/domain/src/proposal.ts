@@ -804,7 +804,7 @@ export function defaultPlanningNote(flagged: ReturnType<typeof planningFlaggedOp
   const found: string[] = [];
   if (ids.has("unit-count")) found.push("the number of outdoor units is more than permitted development allows for your home");
   if (ids.has("outdoor-volume")) found.push("the outdoor unit's size still has to be checked against the permitted development limit");
-  if (ids.has("noise")) found.push("the noise at your neighbour's nearest window needs a closer look against the 42 dB(A) limit");
+  if (ids.has("noise")) found.push("the noise at your neighbour's nearest window needs a closer look against the permitted development noise limit (MCS 020(a))");
   const which = flagged.length < allOptions ? `For the ${flagged.map((o) => o.label).join(" and ")} option${flagged.length === 1 ? "" : "s"}, our` : "Our";
   return `${which} design checks found that ${found.join(", and ") || "the planning checks need a closer look"}. A planning application, or a different position or unit, may be needed. Before any work starts we'll check it, with the council if needed, and tell you what it means for the dates and the price. Nothing is installed until it's settled.`;
 }

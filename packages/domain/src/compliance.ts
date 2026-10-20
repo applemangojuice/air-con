@@ -162,7 +162,7 @@ export const COMPLIANCE_TEMPLATE: ComplianceTemplateItem[] = [
     allowNa: false,
     basis: "MCS 020(a), required by Class G.1",
     guidance:
-      "Run the MCS 020(a) calculation for the chosen outdoor unit and position. It needs the unit's sound power (LWA) from the datasheet or EPREL fiche, the distance to the nearest neighbour's habitable-room window and the reflective surfaces nearby. The figure usually quoted is 42 dB(A): confirm it against the current MCS 020(a) issue. Without the unit's LWA, this can't be approved.",
+      "Run the MCS 020(a) calculation for the chosen outdoor unit and position. It needs the unit's sound power (LWA) from the datasheet or EPREL fiche, the distance to the assessment position (1 m out from the centre of the nearest habitable-room window or door next door), the hard surfaces within 1 m of the unit (Q2, Q4, or Q8 in a corner) and any barrier. The 42 dB(A) limit includes an assumed 40 dB(A) background, so the heat pump's own level must be 37.0 dB(A) or less: confirm the figure and the steps against the current MCS 020(a) issue. The design's noise check is an estimate with no barrier credit. Without the unit's LWA, this can't be approved.",
     evidenceHint: "The completed calculation (PDF or a photo of the worksheet), where the LWA came from, and the measured distance.",
   },
   {

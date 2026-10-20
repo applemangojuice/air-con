@@ -778,6 +778,8 @@ try {
     await m.getByLabel("Choose photo").setInputFiles(PHOTO);
     await m.getByRole("button", { name: /^(?!Photo waiting).+: mark it up$/ }).waitFor({ timeout: 30_000 });
     await m.getByLabel("Distance to the nearest neighbour's window").fill("6");
+    // MCS 020(a) needs the reflecting surfaces: on the ground against the house wall is two (Q4).
+    await choose(m.getByLabel(/^Two: on the ground against a wall/));
     await m.getByRole("button", { name: "Gravel soakaway under the unit" }).click();
     check("outdoor position complete", await waitFor(surveyor, /Nothing left to do here/));
     await next("Electrics");
@@ -913,7 +915,7 @@ try {
       check(`${tab}: margin above the 25% minimum after the discount`, /GROSS MARGIN\s*(2[5-9]|[3-9]\d)\.\d%/.test(t), t.match(/GROSS MARGIN[\s\S]{0,40}/)?.[0]);
     }
     check("units read as quantities (no 'per ms')", !(await has(admin, /per ms\b/)));
-    // The design's own planning or noise check (Class G unit count and size, 42 dB(A)) is flagged for an
+    // The design's own planning or noise check (Class G unit count and size, MCS 020(a) noise) is flagged for an
     // option: the office tells the family in a note on the proposal (never "planning isn't needed").
     const suggest = m.getByRole("button", { name: "Start from the suggested note" });
     if (await suggest.count()) {

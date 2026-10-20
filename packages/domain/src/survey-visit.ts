@@ -84,8 +84,8 @@ export const PD_CHECKS: { id: PdCheckId; label: string; help: string }[] = [
   },
   {
     id: "noise-ok",
-    label: "Noise at the neighbour's window is 42 dB(A) or less",
-    help: "Calculated with the MCS 020 method, at the assessment position of the nearest neighbouring habitable room window.",
+    label: "Noise at the neighbour's window passes the MCS 020(a) check",
+    help: "Calculated, not measured: the heat pump's own level 1 m out from the nearest habitable-room window next door must be 37.0 dB(A) or less (the 42 dB(A) limit includes an assumed 40 dB(A) background). The design works it out; answer from that.",
   },
   {
     id: "siting-minimises-impact",
@@ -131,12 +131,19 @@ export interface MeasuredRoom {
   selfSurveyRoomId?: string;
 }
 
+export type ReflectingSurfaces = "one" | "two" | "three";
+
+/** MCS 020(a) directivity from the reflecting surfaces counted at the survey. */
+export const DIRECTIVITY_Q: Record<ReflectingSurfaces, 2 | 4 | 8> = { one: 2, two: 4, three: 8 };
+
 export interface OutdoorPosition {
   id: string;
   label: string;
   location: OutdoorLocation;
   mediaId?: string;
   distanceToNeighbourWindowM?: number;
+  /** Hard surfaces within 1 m of the unit, the ground included: MCS 020(a)'s directivity (one Q2, two Q4, three Q8). */
+  reflectingSurfaces?: ReflectingSurfaces;
   base: "ground-feet" | "wall-bracket" | "slab" | "roof-frame" | "other";
   heightM?: number;
   accessEquipment: "none" | "ladder" | "tower" | "scaffold";
@@ -355,6 +362,11 @@ export const SURVEY_LABELS = {
     "via-loft": "Through the loft",
     other: "Other",
   } satisfies Record<NonNullable<MeasuredRoom["route"]>, string>,
+  reflectingSurfaces: {
+    one: "One: free-standing on the ground, or high on a wall clear of corners (Q2)",
+    two: "Two: on the ground against a wall, or on a wall near the ground (Q4)",
+    three: "Three: in a corner or a side return, such as house wall, boundary wall and ground (Q8)",
+  } satisfies Record<ReflectingSurfaces, string>,
   base: {
     "ground-feet": "Ground feet",
     "wall-bracket": "Wall bracket",
@@ -665,6 +677,10 @@ export function surveyChecks(m: MeasuredSurvey): SurveyCheck[] {
     add("outdoor", `${name}: distance to the nearest neighbour's window`, (num(p.distanceToNeighbourWindowM) ?? -1) >= 0, {
       ...at,
       field: "distanceToNeighbourWindowM",
+    });
+    add("outdoor", `${name}: hard surfaces within 1 m (for the noise calculation)`, p.reflectingSurfaces === "one" || p.reflectingSurfaces === "two" || p.reflectingSurfaces === "three", {
+      ...at,
+      field: "reflectingSurfaces",
     });
     if (p.base === "wall-bracket" || p.base === "roof-frame") {
       add("outdoor", `${name}: mounting height`, (num(p.heightM) ?? -1) >= 0, { ...at, field: "heightM" });

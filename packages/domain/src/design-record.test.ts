@@ -67,7 +67,7 @@ const ROOMS = [
 ];
 
 function position(over: Partial<OutdoorPosition> = {}): OutdoorPosition {
-  return { id: "o1", label: "Rear patio", location: "ground-rear", base: "ground-feet", accessEquipment: "none", distanceToNeighbourWindowM: 8, chosen: true, mediaId: "photo-out", ...over };
+  return { id: "o1", label: "Rear patio", location: "ground-rear", base: "ground-feet", reflectingSurfaces: "two", accessEquipment: "none", distanceToNeighbourWindowM: 8, chosen: true, mediaId: "photo-out", ...over };
 }
 
 function survey(rooms: MeasuredRoom[], over: Partial<MeasuredSurvey> = {}): MeasuredSurvey {
@@ -301,14 +301,33 @@ test("the refrigerant rule says 'cannot determine' rather than inventing a charg
   assert.match(rule(d, "standard", "refrigerant").detail, /Cannot determine the extra charge/);
 });
 
-test("noise: MCS 020-style estimate from the unit's LWA and the measured distance", () => {
+test("noise: the MCS 020(a) estimate from the unit's LWA, the measured distance and the counted surfaces", () => {
   assert.equal(Math.round(soundPressureDb(59, 6, 4) * 10) / 10, 38.5);
   assert.equal(Math.round(addDecibels([40, 40]) * 10) / 10, 43);
   const near = draft(ROOMS.slice(0, 1), { measured: { outdoor: { positions: [position({ distanceToNeighbourWindowM: 2 })] } } });
   assert.equal(rule(near, "standard", "noise").status, "review");
-  assert.match(rule(near, "standard", "noise").detail, /over the 42 dB\(A\) limit/);
+  assert.match(rule(near, "standard", "noise").detail, /over the 37\.0 dB\(A\) MCS 020\(a\) allows the heat pump at the assessment position \(the 42 dB\(A\) limit includes an assumed 40 dB\(A\) background\)/);
+  // DM-BRZ25-O, 59 dB(A) LWA, 8 m, against one wall (Q4): 36.0 dB(A), at least 1 dB under 37.0.
   const far = draft(ROOMS.slice(0, 1));
   assert.equal(rule(far, "standard", "noise").status, "pass");
+  assert.match(rule(far, "standard", "noise").detail, /^About 36 dB\(A\) from the heat pump, under the 37\.0 dB\(A\)/);
+  // The review's case: 38.5 dB(A) (61 dB(A) LWA at 7.5 m, Q4) used to pass "3.5 dB inside 42"; MCS 020(a) fails it.
+  assert.equal(Math.round(soundPressureDb(61, 7.5, 4) * 10) / 10, 38.5);
+  const louder = draft(ROOMS.slice(0, 1), { measured: { outdoor: { positions: [position({ distanceToNeighbourWindowM: 7.5 })] } }, catalogue: DEMO_CATALOGUE.map((i) => (i.id === "demo-out-brz25" ? { ...i, specs: { ...i.specs, soundPowerDb: 61 } } : i)) });
+  assert.equal(rule(louder, "standard", "noise").status, "review");
+  assert.match(rule(louder, "standard", "noise").detail, /About 38\.5 dB\(A\) from the heat pump, over the 37\.0/);
+  // In a corner or a London side return (three surfaces, Q8) the same unit is 3 dB louder again.
+  const corner = draft(ROOMS.slice(0, 1), { measured: { outdoor: { positions: [position({ reflectingSurfaces: "three" })] } } });
+  assert.match(rule(corner, "standard", "noise").detail, /About 39 dB\(A\)[\s\S]*Q8/);
+  assert.equal(rule(corner, "standard", "noise").status, "review");
+  // Surfaces not counted at the survey: never a pass, and it says what to count.
+  const uncounted = draft(ROOMS.slice(0, 1), { measured: { outdoor: { positions: [position({ reflectingSurfaces: undefined })] } } });
+  assert.equal(rule(uncounted, "standard", "noise").status, "review");
+  assert.match(rule(uncounted, "standard", "noise").detail, /Count the hard surfaces within 1 m of "Rear patio"/);
+  // Within 1 dB of the limit: review, with what to check.
+  const close = draft(ROOMS.slice(0, 1), { measured: { outdoor: { positions: [position({ distanceToNeighbourWindowM: 7.5 })] } } });
+  assert.equal(rule(close, "standard", "noise").status, "review");
+  assert.match(rule(close, "standard", "noise").detail, /within 1 dB of the 37\.0/);
   const unmeasured = draft(ROOMS.slice(0, 1), { measured: { outdoor: { positions: [position({ distanceToNeighbourWindowM: undefined })] } } });
   assert.equal(rule(unmeasured, "standard", "noise").status, "fail");
   assert.match(rule(unmeasured, "standard", "noise").detail, /measure the distance/);

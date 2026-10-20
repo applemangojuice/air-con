@@ -113,6 +113,7 @@ function finish(m: MeasuredSurvey, photos: { room: string; outdoor: string; boar
           chosen: true,
           mediaId: photos.outdoor,
           distanceToNeighbourWindowM: 5,
+          reflectingSurfaces: "two",
           defrostDrainage: "Gravel to the gully",
         },
       ],

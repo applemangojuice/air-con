@@ -316,7 +316,7 @@ const SCENARIOS: Scenario[] = [
       { key: "r1", name: "Main bedroom", type: "bedroom", size: "medium", floor: "first", glazing: "medium", orientation: "south", lengthM: 4.2, widthM: 3.4, pipeRunM: 5, heightDropM: 3, route: "external-trunking", condensate: "gravity", hasExternalWall: true, std: "demo-ind-brz25" },
     ],
     systems: [
-      { key: "s1", label: "System", roomKeys: ["r1"], std: "demo-out-brz25", position: { label: "Rear patio, by the kitchen door", location: "ground-rear", base: "ground-feet", accessEquipment: "none", distanceToNeighbourWindowM: 5 } },
+      { key: "s1", label: "System", roomKeys: ["r1"], std: "demo-out-brz25", position: { label: "Rear patio, by the kitchen door", location: "ground-rear", base: "ground-feet", reflectingSurfaces: "two", accessEquipment: "none", distanceToNeighbourWindowM: 5 } },
     ],
     wishes: { priorities: ["quiet", "cooling"], heatingUse: "supplementary", timing: "Before next summer" },
     access: { accessNotes: "Side gate on the left of the house (DEMO).", parkingNotes: "Free on-street parking (DEMO)." },
@@ -340,8 +340,8 @@ const SCENARIOS: Scenario[] = [
       { key: "r2", name: "Living room", type: "living-room", size: "large", floor: "ground", glazing: "high", orientation: "south", lengthM: 5.6, widthM: 3.9, pipeRunM: 3, heightDropM: 0.5, route: "through-wall", condensate: "gravity", hasExternalWall: true, std: "demo-ind-brz35", prem: "demo-ind-whs35" },
     ],
     systems: [
-      { key: "s1", label: "System 1 (Main bedroom)", roomKeys: ["r1"], std: "demo-out-brz25", prem: "demo-out-whs25", position: { label: "Rear patio, left", location: "ground-rear", base: "ground-feet", accessEquipment: "none", distanceToNeighbourWindowM: 4.5 } },
-      { key: "s2", label: "System 2 (Living room)", roomKeys: ["r2"], std: "demo-out-brz35", prem: "demo-out-whs35", position: { label: "Side return, by the bins", location: "ground-side", base: "ground-feet", accessEquipment: "none", distanceToNeighbourWindowM: 3.2 } },
+      { key: "s1", label: "System 1 (Main bedroom)", roomKeys: ["r1"], std: "demo-out-brz25", prem: "demo-out-whs25", position: { label: "Rear patio, left", location: "ground-rear", base: "ground-feet", reflectingSurfaces: "two", accessEquipment: "none", distanceToNeighbourWindowM: 4.5 } },
+      { key: "s2", label: "System 2 (Living room)", roomKeys: ["r2"], std: "demo-out-brz35", prem: "demo-out-whs35", position: { label: "Side return, by the bins", location: "ground-side", base: "ground-feet", reflectingSurfaces: "three", accessEquipment: "none", distanceToNeighbourWindowM: 3.2 } },
     ],
     premium: true,
     discountCode: "PILOT15",
@@ -368,7 +368,7 @@ const SCENARIOS: Scenario[] = [
       { key: "r3", name: "Home office", type: "home-office", size: "small", floor: "first", glazing: "low", orientation: "east", lengthM: 3.0, widthM: 2.6, pipeRunM: 11, heightDropM: 3, route: "external-trunking", condensate: "gravity", hasExternalWall: true, std: "demo-ind-brz25" },
     ],
     systems: [
-      { key: "s1", label: "System", roomKeys: ["r1", "r2", "r3"], std: "demo-out-trio52", position: { label: "Rear garden, against the garage wall", location: "ground-rear", base: "slab", accessEquipment: "ladder", distanceToNeighbourWindowM: 6 } },
+      { key: "s1", label: "System", roomKeys: ["r1", "r2", "r3"], std: "demo-out-trio52", position: { label: "Rear garden, against the garage wall", location: "ground-rear", base: "slab", reflectingSurfaces: "two", accessEquipment: "ladder", distanceToNeighbourWindowM: 6 } },
     ],
     discountCode: "PILOT15",
     earlyStart: true,
@@ -420,7 +420,7 @@ const SCENARIOS: Scenario[] = [
       { key: "r2", name: "Loft bedroom", type: "loft-room", size: "small", floor: "loft", glazing: "high", orientation: "south", lengthM: 3.4, widthM: 3.0, pipeRunM: 8, heightDropM: 9, route: "external-trunking", condensate: "gravity", hasExternalWall: true, std: "demo-ind-brz25" },
     ],
     systems: [
-      { key: "s1", label: "System", roomKeys: ["r1", "r2"], std: "demo-out-duo50", position: { label: "Rear garden, against the boundary wall", location: "ground-rear", base: "ground-feet", accessEquipment: "tower", distanceToNeighbourWindowM: 3.5 } },
+      { key: "s1", label: "System", roomKeys: ["r1", "r2"], std: "demo-out-duo50", position: { label: "Rear garden, against the boundary wall", location: "ground-rear", base: "ground-feet", reflectingSurfaces: "two", accessEquipment: "tower", distanceToNeighbourWindowM: 3.5 } },
     ],
     wishes: { priorities: ["discreet", "quiet"], heatingUse: "supplementary", notes: "Nothing visible from the street (DEMO)." },
     surveyHour: 13,
@@ -445,7 +445,7 @@ const SCENARIOS: Scenario[] = [
       { key: "r2", name: "Living room", type: "living-room", size: "large", floor: "ground", glazing: "high", orientation: "west", lengthM: 5.5, widthM: 4.0, pipeRunM: 5, heightDropM: 0.5, route: "through-wall", condensate: "gravity", hasExternalWall: true, std: "demo-ind-brz35" },
     ],
     systems: [
-      { key: "s1", label: "System", roomKeys: ["r1", "r2"], std: "demo-out-duo50", position: { label: "Rear patio, under the kitchen window", location: "ground-rear", base: "ground-feet", accessEquipment: "none", distanceToNeighbourWindowM: 4.5 } },
+      { key: "s1", label: "System", roomKeys: ["r1", "r2"], std: "demo-out-duo50", position: { label: "Rear patio, under the kitchen window", location: "ground-rear", base: "ground-feet", reflectingSurfaces: "two", accessEquipment: "none", distanceToNeighbourWindowM: 4.5 } },
     ],
     discountCode: "PILOT30",
     wishes: { priorities: ["quiet", "heating"], heatingUse: "supplementary", timing: "Before the autumn" },
@@ -702,7 +702,7 @@ function rules(sc: Scenario, review: boolean): RuleResult[] {
     },
     { id: "mounting", title: "Indoor unit mounting", status: review ? "review" : "pass", detail: review ? "Main bedroom unit is on an internal wall: the route goes via the loft." : "Every unit is on an outside wall." },
     { id: "clearances", title: "Service clearances", status: "pass", detail: "Standard 300 mm rear, 600 mm front clearances." },
-    { id: "noise", title: "Noise at nearest neighbour", status: "pass", detail: "Estimated 36 dB(A) at the nearest neighbouring window, inside the 42 dB(A) guidance (DEMO)." },
+    { id: "noise", title: "Noise at nearest neighbour", status: "pass", detail: "About 35.8 dB(A) from the heat pump at the nearest neighbouring window, under the 37.0 dB(A) MCS 020(a) allows (DEMO)." },
   ];
 }
 

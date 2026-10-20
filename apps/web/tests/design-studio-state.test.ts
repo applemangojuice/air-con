@@ -53,7 +53,7 @@ const measured: MeasuredSurvey = {
   wishes: { priorities: [], heatingUse: "supplementary" },
   house: { type: "detached", era: "2000+", wallConstruction: "cavity", storeys: 2, loftAccess: true, listedOrConservation: "no", asbestosRisk: "none-suspected" },
   rooms: [room("r1", "Main bedroom"), room("r2", "Living room", { type: "living-room", floor: "ground", lengthM: 5.5, widthM: 4, pipeRunM: 3 })],
-  outdoor: { positions: [{ id: "o1", label: "Rear patio (DEMO)", location: "ground-rear", base: "ground-feet", accessEquipment: "none", distanceToNeighbourWindowM: 8, chosen: true, mediaId: "photo-out" }] },
+  outdoor: { positions: [{ id: "o1", label: "Rear patio (DEMO)", location: "ground-rear", base: "ground-feet", reflectingSurfaces: "two", accessEquipment: "none", distanceToNeighbourWindowM: 8, chosen: true, mediaId: "photo-out" }] },
   electrics: { boardType: "modern-rcbo", spareWays: 2, cableRouteM: 8, asbestosFlashGuard: "no", mediaIds: [] },
   permissions: { pd: {} },
   risks: { workingAtHeight: false, structuralConcern: false, concealedServicesConcern: false },

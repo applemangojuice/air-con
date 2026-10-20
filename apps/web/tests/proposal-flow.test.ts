@@ -504,7 +504,7 @@ test("a design whose planning or noise check is in review: the builder's issue w
   const { defaultPlanningNote, planningFlaggedOptions, customerSafeProposal } = await import("@aircon/domain");
   const suggested = defaultPlanningNote(planningFlaggedOptions((await proposalsRepo.get(draftId))!, flagged), priced.options.length);
   assert.match(suggested, /may be needed/);
-  assert.match(suggested, /42 dB\(A\)/);
+  assert.match(suggested, /permitted development noise limit \(MCS 020\(a\)\)/);
   assert.doesNotMatch(suggested, /isn't needed|not needed|no planning/i);
 
   // An internal reason lets it go, and the customer never sees it.

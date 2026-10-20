@@ -12,10 +12,11 @@ import {
   type CombinationCheck,
   type CompatibilityRule,
 } from "./catalogue.ts";
-import { NOISE_LIMIT_DB, designVerdict, estimateHeightDiffM, estimatePipeRunM, type DesignVerdict, type RuleResult, type RuleStatus } from "./design.ts";
+import { MCS_HEAT_PUMP_LIMIT_DB, NOISE_LIMIT_DB, designVerdict, estimateHeightDiffM, estimatePipeRunM, type DesignVerdict, type RuleResult, type RuleStatus } from "./design.ts";
 import { estimateRoomLoadWatts, selectCapacityKw } from "./heatload.ts";
 import type { PropertyIntel } from "./intelligence.ts";
 import {
+  DIRECTIVITY_Q,
   PD_CHECKS,
   emptyMeasuredSurvey,
   measuredToEngineSurvey,
@@ -164,7 +165,7 @@ export interface DesignSite {
     pd: Partial<Record<PdCheckId, "yes" | "no" | "unsure">>;
     intel?: { conservationArea: boolean; listedBuilding: boolean; article4: boolean };
   };
-  outdoorPositions: Pick<OutdoorPosition, "id" | "label" | "location" | "base" | "distanceToNeighbourWindowM" | "heightM" | "accessEquipment" | "mediaId" | "chosen">[];
+  outdoorPositions: Pick<OutdoorPosition, "id" | "label" | "location" | "base" | "distanceToNeighbourWindowM" | "reflectingSurfaces" | "heightM" | "accessEquipment" | "mediaId" | "chosen">[];
   risks: Pick<MeasuredSurvey["risks"], "workingAtHeight" | "structuralConcern" | "concealedServicesConcern">;
 }
 
@@ -291,6 +292,7 @@ export function siteFromSurvey(measured: MeasuredSurvey, intel?: PropertyIntel):
       location: p.location,
       base: p.base,
       ...(p.distanceToNeighbourWindowM !== undefined ? { distanceToNeighbourWindowM: p.distanceToNeighbourWindowM } : {}),
+      ...(p.reflectingSurfaces ? { reflectingSurfaces: p.reflectingSurfaces } : {}),
       ...(p.heightM !== undefined ? { heightM: p.heightM } : {}),
       accessEquipment: p.accessEquipment,
       ...(p.mediaId ? { mediaId: p.mediaId } : {}),
@@ -764,9 +766,15 @@ export function refrigerantFor(outdoor: CatalogueItem | undefined, runsM: number
   return { totalPipeM, prechargedPipeM: pre, additionalChargeG: Math.round(Math.max(0, totalPipeM - pre) * perM), chargeKnown: true };
 }
 
-/** MCS 020-style directivity: on the ground against a wall reflects off two surfaces; a wall bracket off one. */
+/** A guess at the directivity from the base alone (on the ground, against a wall: two surfaces; a wall bracket: one), for a position whose surfaces weren't counted. */
 export function directivityFor(base: OutdoorPosition["base"] | undefined): 2 | 4 {
   return base === "wall-bracket" || base === "roof-frame" ? 2 : 4;
+}
+
+/** MCS 020(a) directivity for a position: from the reflecting surfaces counted at the survey (Q2, Q4, Q8), else guessed from the base (`counted` false). */
+export function directivityOf(pos: Pick<OutdoorPosition, "base" | "reflectingSurfaces"> | undefined): { q: 2 | 4 | 8; counted: boolean } {
+  const counted = pos?.reflectingSurfaces ? DIRECTIVITY_Q[pos.reflectingSurfaces] : undefined;
+  return counted ? { q: counted, counted: true } : { q: directivityFor(pos?.base), counted: false };
 }
 
 /** Sound pressure at distance r (m) from sound power LWA with directivity Q: Lp = LWA + 10·log10(Q / 4πr²). */
@@ -1544,10 +1552,11 @@ function designRules(x: RuleInput): RuleResult[] {
     else add("outdoor-volume", "Outdoor unit size (permitted development)", "pass", `${vols.map((v) => `${codeOf(v.o)} ${v.m3!.toFixed(2)} m³`).join("; ")}: within the ${limit} m³ limit.`);
   }
 
-  // 10. Noise at the neighbour: needs the outdoor unit's sound power and a measured distance.
+  // 10. Noise at the neighbour (MCS 020(a)): needs the outdoor unit's sound power, a measured distance and the reflecting surfaces.
   {
     const parts: { label: string; lp: number }[] = [];
     const missing: string[] = [];
+    const uncounted: string[] = [];
     for (const s of systems) {
       const o = outdoorOf(s);
       if (!o) continue;
@@ -1561,20 +1570,23 @@ function designRules(x: RuleInput): RuleResult[] {
         missing.push(`measure the distance from ${pos ? `"${pos.label}"` : `${codeOf(o)}'s position`} to the nearest neighbouring window`);
         continue;
       }
-      const q = directivityFor(pos.base);
-      parts.push({ label: `${codeOf(o)} ${lwa} dB(A) LWA at ${pos.distanceToNeighbourWindowM} m, Q=${q}`, lp: soundPressureDb(lwa, pos.distanceToNeighbourWindowM, q) });
+      const { q, counted } = directivityOf(pos);
+      if (!counted) uncounted.push(`"${pos.label}"`);
+      parts.push({ label: `${codeOf(o)} ${lwa} dB(A) LWA at ${pos.distanceToNeighbourWindowM} m, Q${q}${counted ? "" : " (surfaces not counted: guessed from the base)"}`, lp: soundPressureDb(lwa, pos.distanceToNeighbourWindowM, q) });
     }
+    const limit = `the ${MCS_HEAT_PUMP_LIMIT_DB.toFixed(1)} dB(A) MCS 020(a) allows the heat pump at the assessment position (the ${NOISE_LIMIT_DB} dB(A) limit includes an assumed 40 dB(A) background)`;
     if (systems.length === 0 || !systems.some((s) => outdoorOf(s))) {
       add("noise", "Noise at nearest neighbour", "fail", "Cannot determine: no outdoor unit chosen yet.");
     } else if (missing.length) {
       add("noise", "Noise at nearest neighbour", "fail", `Cannot determine: ${missing.join("; ")}.`);
     } else {
       const total = Math.round(addDecibels(parts.map((p) => p.lp)) * 10) / 10;
-      const margin = round1(NOISE_LIMIT_DB - total);
-      const basis = `${parts.map((p) => p.label).join("; ")}. MCS 020-style estimate, no barrier credit${parts.length > 1 ? ", units added together" : ""}; the full MCS 020(a) calculation is the technical lead's.`;
-      if (margin >= 3) add("noise", "Noise at nearest neighbour", "pass", `About ${total} dB(A) at the nearest neighbouring window, ${margin} dB inside the ${NOISE_LIMIT_DB} dB(A) limit. ${basis}`);
-      else if (margin >= 0) add("noise", "Noise at nearest neighbour", "review", `About ${total} dB(A), within ${NOISE_LIMIT_DB} dB(A) but with under 3 dB to spare. ${basis}`);
-      else add("noise", "Noise at nearest neighbour", "review", `About ${total} dB(A), over the ${NOISE_LIMIT_DB} dB(A) limit: move the unit, choose a quieter one, or plan for an application. ${basis}`);
+      const basis = `${parts.map((p) => p.label).join("; ")}. Estimate by the MCS 020(a) method (Lp = LWA + 10·log10(Q ÷ 4πr²)), no barrier credit${parts.length > 1 ? ", units added together" : ""}; the full MCS 020(a) calculation, with any barrier, is the technical lead's.`;
+      const count = uncounted.length ? ` Count the hard surfaces within 1 m of ${uncounted.join(", ")} at the survey (a corner or side return is Q8): until then this can't pass.` : "";
+      if (total > MCS_HEAT_PUMP_LIMIT_DB) add("noise", "Noise at nearest neighbour", "review", `About ${total} dB(A) from the heat pump, over ${limit}: move the unit, choose a quieter one, credit a barrier in the full calculation, or plan for an application.${count} ${basis}`);
+      else if (uncounted.length) add("noise", "Noise at nearest neighbour", "review", `About ${total} dB(A) from the heat pump, under ${limit}, but not every position's surfaces were counted.${count} ${basis}`);
+      else if (total > MCS_HEAT_PUMP_LIMIT_DB - 1) add("noise", "Noise at nearest neighbour", "review", `About ${total} dB(A) from the heat pump, within 1 dB of ${limit}: check the distance (to the assessment position, 1 m out from the window) and the datasheet LWA. ${basis}`);
+      else add("noise", "Noise at nearest neighbour", "pass", `About ${total} dB(A) from the heat pump, under ${limit}. ${basis}`);
     }
   }
 

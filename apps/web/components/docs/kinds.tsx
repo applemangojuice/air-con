@@ -925,6 +925,7 @@ export function SurveyReportDoc({ snap, ctx }: { snap: SurveyReportSnapshot; ctx
               rows={[
                 ["Mounting", plain(pos.base)],
                 ["Nearest neighbouring window", pos.distanceToNeighbourWindowM !== undefined ? `${num(pos.distanceToNeighbourWindowM, 1)} m` : ""],
+                ["Hard surfaces within 1 m", pos.reflectingSurfaces ? ({ one: "One (Q2)", two: "Two (Q4)", three: "Three (Q8)" } as const)[pos.reflectingSurfaces] : ""],
                 ["Access", pos.accessEquipment === "none" ? "No special access needed" : plain(pos.accessEquipment)],
                 ["Defrost water", pos.defrostDrainage ?? ""],
                 ["Notes", pos.note ?? ""],

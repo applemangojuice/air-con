@@ -115,6 +115,7 @@ const positionSchema = z.object({
   location: z.enum(OUTDOOR),
   mediaId: mediaId.optional(),
   distanceToNeighbourWindowM: measure(0, 500),
+  reflectingSurfaces: z.enum(["one", "two", "three"]).optional(),
   base: z.enum(["ground-feet", "wall-bracket", "slab", "roof-frame", "other"]),
   heightM: measure(0, 30),
   accessEquipment: z.enum(["none", "ladder", "tower", "scaffold"]),
