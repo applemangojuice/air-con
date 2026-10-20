@@ -219,6 +219,15 @@ signatures, confirmations. Fill every one it asks for, then tap **Pass**.
   re-take a reading to make it pass. (The pressure test and the vacuum are
   judged as a whole instead: below.)
 
+**Pipe runs** (day 2, each room's **Pipework** step): measure the run you
+actually laid, one way, and type it in **As-built pipe run to this room**.
+The step says the design's run and the outdoor unit's limits from its
+manual (for example "3 to 20 m to one indoor unit"). Outside them the
+reading is flagged **Needs review** for the technical lead. Never cut a run
+shorter than the manual's minimum: the manual says how any extra may be
+laid. On day 3 the charge step checks the whole length (on a multi-split,
+all the runs added up) against the unit's limits the same way.
+
 **The pressure test and the vacuum** (day 3, F-gas):
 
 - *Strength and tightness test.* Oxygen-free nitrogen at the manual's test
@@ -341,6 +350,15 @@ the R32 charge** (over 1.84 kg in one system, every room it serves needs the
 manual's minimum floor area: the app uses the IEC 60335-2-40 formula and
 blocks approval when a room is too small or not measured; check the
 manual's own table), mounting, access, catalogue data.
+**Pipe length & height limits**: each run against the outdoor unit's
+minimum and maximum from the catalogue; on a multi-split also the total,
+the longest branch, the fewest indoor units, the least connected capacity
+and the height between indoor units (the survey gives each room's height
+from the outdoor unit, not above or below, so two rooms are at least the
+difference and at most the sum apart: over the limit at least blocks, over
+it only at most is a CHECK). Outside a limit on record blocks approval with
+the figures; a limit not on record is a CHECK: read it in the manual, and
+add it to the catalogue item for next time.
 Multi-split only from a combination the catalogue marks verified. Then
 **Approve and sign**: that locks the layout photos the crew works from.
 

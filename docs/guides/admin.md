@@ -159,7 +159,12 @@ design**. It is drafted from the measured survey and the catalogue.
   reason: planning constraints, noise at the nearest neighbour (MCS
   020(a): 37.0 dB(A) from the heat pump, an estimate), the room size for the
   R32 charge (a system over 1.84 kg can't serve a room below its minimum
-  floor area: approval is blocked), mounting, access, catalogue data.
+  floor area: approval is blocked), **Pipe length & height limits** (each
+  run against the outdoor unit's minimum and maximum; on a multi-split the
+  total, the longest branch, the fewest indoor units, the least connected
+  capacity and the height between indoor units: outside a limit on record
+  blocks approval with the figures, a limit not on record in the catalogue
+  is a CHECK), mounting, access, catalogue data.
   They're for the engineer's eye, not decisions.
 - **Rooms**: the suggested size ("rule-of-thumb estimate for review, not a
   heat-loss calculation"), the size picked, condensate, pipe run, the indoor

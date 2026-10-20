@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import {
   CATALOGUE_CSV_COLUMNS,
+  SPEC_FIELDS,
   DEMO_CATALOGUE,
   DEMO_COMPATIBILITY,
   PROVISIONAL_RULE_WARNING,
@@ -357,6 +358,26 @@ test("catalogue-data.ts is the research JSON, honestly mapped (regenerate with b
   assert.equal(item("mitsubishi-electric-msz-hr25vf").customerBlurb, "As quiet as 21 dB(A) on its lowest setting.");
   assert.ok(RESEARCHED_CATALOGUE.every((i) => i.sources.every((s) => /^https?:\/\//.test(s.url))));
   assert.equal(new Set(RESEARCHED_CATALOGUE.map((i) => i.id)).size, RESEARCHED_CATALOGUE.length);
+  // The manufacturer's limits beyond the maximum run come over exactly, null where the research has none.
+  const LIMITS = ["minPipeM", "maxPipePerBranchM", "minTotalPipeM", "maxTotalPipeM", "maxIndoorHeightDiffM", "minIndoorUnits", "minConnectedKw"] as const;
+  for (const raw of seed.items) for (const k of LIMITS) assert.equal(item(raw.id).specs?.[k] ?? null, raw.specs?.[k] ?? null, `${raw.id} ${k}`);
+  assert.equal(seed.items.filter((r: { specs?: Record<string, unknown> }) => LIMITS.some((k) => r.specs?.[k] !== null && r.specs?.[k] !== undefined)).length, 22, "22 outdoor units have at least one, each from its own notes");
+});
+
+test("the manufacturer's limits are catalogue fields: in the editor's list, the CSV and back", () => {
+  for (const k of ["minPipeM", "maxPipePerBranchM", "minTotalPipeM", "maxTotalPipeM", "maxIndoorHeightDiffM", "minIndoorUnits", "minConnectedKw"]) {
+    assert.ok(SPEC_FIELDS.some((f) => f.key === k && f.kind === "number"), k);
+    assert.ok(CATALOGUE_CSV_COLUMNS.includes(`spec.${k}`), k);
+  }
+  const multi = RESEARCHED_CATALOGUE.find((i) => i.id === "panasonic-cu-4z80cbe")!;
+  const [back] = catalogueFromCsv(catalogueToCsv([multi])).items;
+  assert.deepEqual(
+    [back!.specs?.minPipeM, back!.specs?.maxPipePerBranchM, back!.specs?.minTotalPipeM, back!.specs?.maxTotalPipeM, back!.specs?.minIndoorUnits],
+    [3, 25, 6, 70, 2],
+  );
+  // A blank cell is "not on record", never zero.
+  const blank = catalogueFromCsv(catalogueToCsv([{ ...multi, specs: { ...multi.specs, minPipeM: null } }])).items[0]!;
+  assert.equal(blank.specs?.minPipeM, null);
 });
 
 test("DEMO data is labelled DEMO everywhere, and its first nineteen ids match the web demo seed", () => {

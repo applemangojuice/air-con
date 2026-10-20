@@ -42,6 +42,24 @@ export interface EquipmentSpecs {
   gasPipeMm: number | null;
   maxPipeM: number | null;
   maxHeightDiffM: number | null;
+  /**
+   * The installation manual's limits beyond the maximum run (outdoor units;
+   * null or absent = not on record, which the design reads as "check the
+   * manual", never as a pass). The shortest run per indoor unit (a single
+   * split's run, each branch of a multi-split), m.
+   */
+  minPipeM?: number | null;
+  /** Multi-splits: the longest run to any one indoor unit, m. */
+  maxPipePerBranchM?: number | null;
+  /** Multi-splits: the shortest and the longest total of all the runs, m. */
+  minTotalPipeM?: number | null;
+  maxTotalPipeM?: number | null;
+  /** Multi-splits: the most two indoor units on it may be apart in height, m. */
+  maxIndoorHeightDiffM?: number | null;
+  /** Multi-splits: the fewest indoor units it runs with. */
+  minIndoorUnits?: number | null;
+  /** Multi-splits: the least indoor capacity connected (cooling, kW). */
+  minConnectedKw?: number | null;
   prechargedPipeM: number | null;
   additionalChargeGPerM: number | null;
   /** Outdoor units: the refrigerant charged at the factory (nameplate), kg. With the added charge it sets the R32 minimum room size. */
@@ -72,7 +90,14 @@ export const SPEC_FIELDS: { key: keyof EquipmentSpecs; label: string; unit?: str
   { key: "liquidPipeMm", label: "Liquid pipe", unit: "mm", kind: "number" },
   { key: "gasPipeMm", label: "Gas pipe", unit: "mm", kind: "number" },
   { key: "maxPipeM", label: "Maximum pipe length", unit: "m", kind: "number" },
-  { key: "maxHeightDiffM", label: "Maximum height difference", unit: "m", kind: "number" },
+  { key: "maxHeightDiffM", label: "Maximum height difference, outdoor to indoor", unit: "m", kind: "number" },
+  { key: "minPipeM", label: "Minimum pipe length per indoor unit", unit: "m", kind: "number" },
+  { key: "maxPipePerBranchM", label: "Maximum pipe length per indoor unit (multi-split)", unit: "m", kind: "number" },
+  { key: "minTotalPipeM", label: "Minimum total pipe length (multi-split)", unit: "m", kind: "number" },
+  { key: "maxTotalPipeM", label: "Maximum total pipe length (multi-split)", unit: "m", kind: "number" },
+  { key: "maxIndoorHeightDiffM", label: "Maximum height between indoor units (multi-split)", unit: "m", kind: "number" },
+  { key: "minIndoorUnits", label: "Fewest indoor units connected (multi-split)", kind: "number" },
+  { key: "minConnectedKw", label: "Minimum connected indoor capacity (multi-split)", unit: "kW", kind: "number" },
   { key: "prechargedPipeM", label: "Pre-charged (chargeless) pipe length", unit: "m", kind: "number" },
   { key: "additionalChargeGPerM", label: "Additional charge per metre", unit: "g/m", kind: "number" },
   { key: "factoryChargeKg", label: "Factory refrigerant charge", unit: "kg", kind: "number" },
@@ -875,13 +900,25 @@ const demoIndoor = (kw: number, heatKw: number, lowDb: number, w: number): Parti
   releaseHeightM: 1.8,
 });
 
-const demoOutdoor = (kw: number, precharged: number, maxPipe: number, powerDb: number, factoryKg: number): Partial<EquipmentSpecs> => ({
+/** DEMO limits: every DEMO outdoor unit takes runs of 3 m or more; the multi-splits add their own (fictional) table. */
+const DEMO_MULTI_LIMITS = (maxTotal: number, minKw: number): Partial<EquipmentSpecs> => ({
+  maxPipePerBranchM: 20,
+  minTotalPipeM: 6,
+  maxTotalPipeM: maxTotal,
+  maxIndoorHeightDiffM: 7.5,
+  minIndoorUnits: 2,
+  minConnectedKw: minKw,
+});
+
+const demoOutdoor = (kw: number, precharged: number, maxPipe: number, powerDb: number, factoryKg: number, multi?: Partial<EquipmentSpecs>): Partial<EquipmentSpecs> => ({
   coolingKw: kw,
   heatingKw: Math.round(kw * 1.25 * 10) / 10,
   refrigerant: "R32",
   soundPowerDb: powerDb,
   maxPipeM: maxPipe,
   maxHeightDiffM: 15,
+  minPipeM: 3,
+  ...multi,
   prechargedPipeM: precharged,
   additionalChargeGPerM: 20,
   factoryChargeKg: factoryKg,
@@ -908,8 +945,8 @@ export const DEMO_CATALOGUE: CatalogueItem[] = [
   demo({ id: "demo-out-brz35", kind: "outdoor", manufacturer: DEMO_MAKER, series: "Breeze", model: "DM-BRZ35-O", label: "Breeze 35 outdoor unit (DEMO)", tier: "standard", ports: 1, pairedWith: "demo-ind-brz35", specs: demoOutdoor(3.5, 15, 20, 61, 0.75), costPence: 60_000 }),
   demo({ id: "demo-out-whs25", kind: "outdoor", manufacturer: DEMO_MAKER, series: "Whisper", model: "DM-WHS25-O", label: "Whisper 25 outdoor unit (DEMO)", tier: "premium", ports: 1, pairedWith: "demo-ind-whs25", specs: demoOutdoor(2.5, 15, 20, 56, 0.6), costPence: 66_000 }),
   demo({ id: "demo-out-whs35", kind: "outdoor", manufacturer: DEMO_MAKER, series: "Whisper", model: "DM-WHS35-O", label: "Whisper 35 outdoor unit (DEMO)", tier: "premium", ports: 1, pairedWith: "demo-ind-whs35", specs: demoOutdoor(3.5, 15, 20, 57, 0.75), costPence: 74_000 }),
-  demo({ id: "demo-out-duo50", kind: "outdoor", manufacturer: DEMO_MAKER, series: "Duo", model: "DM-DUO50", label: "Duo 50 two-room outdoor unit (DEMO)", tier: "standard", multiSplitCapable: true, ports: 2, specs: demoOutdoor(5.0, 20, 30, 62, 1.2), costPence: 112_000 }),
-  demo({ id: "demo-out-trio52", kind: "outdoor", manufacturer: DEMO_MAKER, series: "Trio", model: "DM-TRIO52", label: "Trio 52 three-room outdoor unit (DEMO)", tier: "standard", multiSplitCapable: true, ports: 3, specs: demoOutdoor(5.2, 30, 45, 63, 1.6), costPence: 145_000 }),
+  demo({ id: "demo-out-duo50", kind: "outdoor", manufacturer: DEMO_MAKER, series: "Duo", model: "DM-DUO50", label: "Duo 50 two-room outdoor unit (DEMO)", tier: "standard", multiSplitCapable: true, ports: 2, specs: demoOutdoor(5.0, 20, 30, 62, 1.2, DEMO_MULTI_LIMITS(30, 4.0)), costPence: 112_000 }),
+  demo({ id: "demo-out-trio52", kind: "outdoor", manufacturer: DEMO_MAKER, series: "Trio", model: "DM-TRIO52", label: "Trio 52 three-room outdoor unit (DEMO)", tier: "standard", multiSplitCapable: true, ports: 3, specs: demoOutdoor(5.2, 30, 45, 63, 1.6, DEMO_MULTI_LIMITS(45, 5.0)), costPence: 145_000 }),
 
   demo({ id: "demo-mat-lineset", kind: "material", label: "Insulated copper line set, 1/4 + 3/8 (DEMO)", unit: "m", category: "pipework", costPence: 900, supplier: DEMO_TRADE }),
   demo({ id: "demo-mat-trunking", kind: "material", label: "Line-set trunking, 2 m length (DEMO)", unit: "length", category: "pipework", costPence: 1_200, supplier: DEMO_TRADE }),

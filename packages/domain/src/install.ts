@@ -720,7 +720,7 @@ export interface InstallJobV2 extends InstallJob {
 }
 
 /** Bumped when the template changes; a job keeps the version it was built with. */
-export const INSTALL_TEMPLATE_VERSION: string = "pilot-runsheet-2";
+export const INSTALL_TEMPLATE_VERSION: string = "pilot-runsheet-3";
 
 /** R32 GWP for the F-gas label (tCO2e = kg × 675 / 1000). */
 export const RUNSHEET_GWP = R32_GWP;
@@ -746,6 +746,7 @@ export type EvidenceRole =
   | "vacuum-hold-time"
   | "vacuum-decay"
   | "as-built-length"
+  | "as-built-run"
   | "additional-charge"
   | "factory-charge"
   | "fgas-label"
@@ -765,9 +766,11 @@ export type EvidenceRole =
  *  * candidate: an unverified research figure (e.g. a recalled torque
  *    table), checked against but needing the tech lead's confirmation.
  *  * tech-lead: set (or confirmed as record-only) on this job by the tech lead.
+ *  * catalogue: the outdoor unit's limits on record in the catalogue (the
+ *    manual's minimum and maximum runs): outside them is an exception.
  */
 export interface WindowSource {
-  basis: "record" | "candidate" | "tech-lead";
+  basis: "record" | "candidate" | "tech-lead" | "catalogue";
   note?: string;
   setBy?: string;
   setAt?: string;
@@ -1112,6 +1115,35 @@ function vacuumSlotDefs(): SlotDef[] {
   ];
 }
 
+const num_ = (n: number | null | undefined): number | undefined => (typeof n === "number" && Number.isFinite(n) && n >= 0 ? n : undefined);
+
+/** One run's limits from the outdoor unit's catalogue record: a single split's run, or one branch of a multi-split. */
+function runLimits(outdoor: CatalogueItem | undefined, branch: boolean): { min?: number; max?: number; window: WindowSource; words: string } {
+  const code = outdoor?.model ?? outdoor?.label ?? "the outdoor unit";
+  const min = num_(outdoor?.specs?.minPipeM);
+  const max = num_(branch ? outdoor?.specs?.maxPipePerBranchM : outdoor?.specs?.maxPipeM);
+  return limitWindow(code, min, max, branch ? "to one indoor unit" : "for the run");
+}
+
+/** A multi-split's limits on all its runs added up. */
+function totalRunLimits(outdoor: CatalogueItem | undefined): { min?: number; max?: number; window: WindowSource; words: string } {
+  const code = outdoor?.model ?? outdoor?.label ?? "the outdoor unit";
+  return limitWindow(code, num_(outdoor?.specs?.minTotalPipeM), num_(outdoor?.specs?.maxTotalPipeM), "in total");
+}
+
+function limitWindow(code: string, min: number | undefined, max: number | undefined, what: string): { min?: number; max?: number; window: WindowSource; words: string } {
+  if (min === undefined && max === undefined) {
+    return { window: RECORD_ONLY(`No limits on record for ${code}: check the installation manual.`), words: `No pipe-length limits ${what} on record for ${code}: check the installation manual before cutting.` };
+  }
+  const range = min !== undefined && max !== undefined ? `${min} to ${max} m` : min !== undefined ? `at least ${min} m` : `at most ${max} m`;
+  return {
+    ...(min !== undefined ? { min } : {}),
+    ...(max !== undefined ? { max } : {}),
+    window: { basis: "catalogue", note: `${code}'s limits on record ${what}: ${range}. Outside them, stop and tell the tech lead.` },
+    words: `${code}'s manual (catalogue): ${range} ${what}.${min !== undefined ? ` Never cut it shorter than ${min} m: the manual says how any extra may be laid.` : ""}`,
+  };
+}
+
 function decayStepDef(kind: DecayStep["kind"]): DecayStep {
   return kind === "pressure"
     ? { kind, limit: { targetKey: "pressure.decay", unit: "bar", window: RECORD_ONLY("No fall beyond the gauge's resolution, unless the tech lead sets the manual's allowance.") } }
@@ -1444,6 +1476,8 @@ export function runsheetFromDesign(
     });
   }
   for (const r of rooms) {
+    const sys = systems.find((x) => x.sel.id === r.systemId);
+    const run = runLimits(sys?.outdoor, (sys?.rooms.length ?? 1) > 1);
     add({
       key: `d2-pipework-${r.key}`,
       phase: 6,
@@ -1452,10 +1486,20 @@ export function runsheetFromDesign(
       item: r.name,
       roomId: r.id,
       systemId: r.systemId,
-      guidance: "Swept bends, continuous insulation, clipped and protected. UV protection outside; label the run at both ends.",
+      guidance: `Swept bends, continuous insulation, clipped and protected. UV protection outside; label the run at both ends. Design run ${r.pipeRunM} m. ${run.words}`,
       slots: [
         { key: "bends", kind: "photo", label: "Bends swept, insulation continuous, no kinks", tag: "pipe-route" },
         { key: "labels", kind: "photo", label: "UV protection outside, run labelled at both ends", tag: "pipe-route" },
+        {
+          key: "run",
+          kind: "measurement",
+          label: "As-built pipe run to this room (one way)",
+          unit: "m",
+          role: "as-built-run",
+          ...(run.min !== undefined ? { min: run.min } : {}),
+          ...(run.max !== undefined ? { max: run.max } : {}),
+          window: run.window,
+        },
       ],
     });
   }
@@ -1612,6 +1656,7 @@ export function runsheetFromDesign(
     const roomNote = tightest
       ? ` R32 room size: keep the total (nameplate factory charge plus what you add) at or under ${tightest.maxKg} kg, ${tightest.area ? `the most ${tightest.name} (${tightest.area} m²) may hold` : "the level above which every room needs measuring"}; over it, stop and tell the tech lead.`
       : "";
+    const totalLimits = s.rooms.length > 1 ? totalRunLimits(s.outdoor) : runLimits(s.outdoor, false);
     add({
       key: `d3-charge-${s.key}`,
       phase: 10,
@@ -1620,9 +1665,18 @@ export function runsheetFromDesign(
       item: sysItem(s),
       systemId: s.sel.id,
       requires: "fgas",
-      guidance: `Charge by weight from the outdoor unit's formula, using the as-built length. ${formula} Fill in the F-gas label in the unit: factory, added and total charge in kg and tCO2e (R32, GWP ${R32_GWP}).${roomNote}`,
+      guidance: `Charge by weight from the outdoor unit's formula, using the as-built length. ${formula}${totalLimits.min !== undefined || totalLimits.max !== undefined ? ` ${totalLimits.words}` : ""} Fill in the F-gas label in the unit: factory, added and total charge in kg and tCO2e (R32, GWP ${R32_GWP}).${roomNote}`,
       slots: [
-        { key: "length", kind: "measurement", label: "As-built one-way pipe length", unit: "m", role: "as-built-length", window: RECORD_ONLY("Measured as built, not the design length.") },
+        {
+          key: "length",
+          kind: "measurement",
+          label: s.rooms.length > 1 ? "As-built pipe length, all runs added up (one way)" : "As-built one-way pipe length",
+          unit: "m",
+          role: "as-built-length",
+          ...(totalLimits.min !== undefined ? { min: totalLimits.min } : {}),
+          ...(totalLimits.max !== undefined ? { max: totalLimits.max } : {}),
+          window: totalLimits.min !== undefined || totalLimits.max !== undefined ? totalLimits.window : RECORD_ONLY("Measured as built, not the design length."),
+        },
         {
           key: "added",
           kind: "measurement",

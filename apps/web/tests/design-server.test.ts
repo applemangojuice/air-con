@@ -230,6 +230,15 @@ test("catalogue editor: every researched item passes the editor's schema, and a 
   assert.match(text, /Title of link 1: 301 characters, at most 300/);
   assert.match(text, /Cooling capacity: should be a number/);
   assert.doesNotMatch(text, /Invalid input|specs\.|costSource\./);
+
+  // The manufacturer's limits save through the editor; the fewest indoor units is a whole number.
+  const multi = RESEARCHED_CATALOGUE.find((i) => i.id === "panasonic-cu-2z50cbe")!;
+  const limits = await catalogue.saveItem({ ...multi, specs: { ...multi.specs, maxIndoorHeightDiffM: 5, minConnectedKw: 3.2 } }, TECH, "update");
+  assert.ok(limits.ok, limits.ok ? "" : limits.errors.join(" "));
+  assert.deepEqual([limits.ok && limits.value.specs?.minPipeM, limits.ok && limits.value.specs?.maxIndoorHeightDiffM, limits.ok && limits.value.specs?.minIndoorUnits], [3, 5, 2]);
+  const half = await catalogue.saveItem({ ...multi, specs: { ...multi.specs, minIndoorUnits: 2.5 } }, TECH, "update");
+  assert.ok(!half.ok);
+  assert.match(half.errors.join(" "), /Fewest indoor units connected \(multi-split\)/);
 });
 
 test("two tabs: a stale catalogue or staff editor never silently undoes a price rise, a retirement or a deactivation", async () => {

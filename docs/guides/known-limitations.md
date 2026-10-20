@@ -79,15 +79,32 @@ says what to do instead. Approvals that need a professional are in
    the catalogue's own **Warranty** notes (research, "NOT confirmed") never
    reach a family: the handover pack states the warranty wording frozen on
    their accepted proposal.
-9a. **Manufacturer minimums aren't modelled.** The design checks maximum
-   pipe lengths, height differences, ports and connected capacity, but not
-   the manuals' minimum pipe length (per room or in total), the fewest indoor
-   units a multi-split takes, the height between two indoor units, or a
-   height limit that depends on whether the outdoor unit is above or below.
-   A run under the minimum reads as a pass. *Instead:* the technical lead
-   checks them from the installation manual (the **Manufacturer installation
-   requirements** item now names minimum lengths), and the crew coils any
-   excess rather than cutting a run below the manual's minimum.
+9a. **Manufacturer minimums are modelled only where the catalogue has them**
+   (§K47; was "aren't modelled"). The design checks each run against the
+   outdoor unit's minimum and maximum, and a multi-split's total, longest
+   branch, fewest indoor units, least connected capacity and the height
+   between indoor units; outside a limit on record blocks approval with the
+   figures, a limit not on record is a CHECK, never a pass, and the engine
+   never suggests a multi-split outside one. The install day checks each
+   room's as-built run and the system's total against the same figures.
+   But: *22 of the 40 researched outdoor units carry one or more of these
+   limits, each from its own research notes* (Panasonic: 3 m minimum, and
+   the multi-splits' totals, branches and two-room minimum; Daikin: 1.5 m on
+   three singles, the MXM branches, totals and 7.5 m between indoor units;
+   Mitsubishi MXZ: branches and totals). Every other figure is blank: the
+   Mitsubishi singles and most Daikin singles have no minimum on record, no
+   Panasonic or Mitsubishi multi has a height between indoor units, and no
+   unit has a minimum connected capacity of its own (the compatibility
+   rules' figures still apply). Nothing was read from a manual here (the
+   manufacturers' hosts were unreachable): these are search-engine extracts.
+   Still not modelled: a height limit that depends on whether the outdoor
+   unit is above or below (Mitsubishi MXZ: 15 m, 10 m if it's higher; the
+   survey records the height without the direction, so the design uses the
+   15 m), and a total that depends on the indoor units (Daikin 3MXM52: 30 m
+   with floor units). *Instead:* the technical lead reads every CHECK in the
+   manual and fills the blanks in the catalogue (**Catalogue** → the item →
+   the limits fields, or a CSV), and the crew lays any excess rather than
+   cutting a run short.
 9b. **R32 room size needs each outdoor unit's factory charge.** Above 1.84 kg
    in one system, every room it serves needs a minimum floor area (IEC
    60335-2-40 Annex GG formula; the manual's own table can be stricter, and

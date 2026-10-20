@@ -2706,4 +2706,37 @@ changelog and the reasons, so nobody "fixes" a deliberate choice back.
       here, so no limit is asserted as verified; the 500 micron standard and
       the gauge-resolution allowance are the company's, stricter than what
       they replace.
+    - *Manufacturer minimums* (was known limitation 9a, "aren't modelled"):
+      `EquipmentSpecs` gains `minPipeM` (per indoor unit), and for
+      multi-splits `maxPipePerBranchM`, `minTotalPipeM`, `maxTotalPipeM`,
+      `maxIndoorHeightDiffM`, `minIndoorUnits`, `minConnectedKw`
+      (`SPEC_FIELDS`, so the editor, CSV and zod carry them; `minIndoorUnits`
+      a whole number 1 to 9); `maxHeightDiffM` is relabelled "outdoor to
+      indoor". `build-catalogue-data.mjs` maps them; the researched seed
+      fills them for 22 outdoor units only where each item's own notes state
+      the figure (`conventions.manufacturerLimits` lists what wasn't filled:
+      assumed, direction-dependent or combination-dependent figures); the
+      DEMO catalogue has fictional ones. `manufacturerLimitsCheck(outdoor,
+      rule, rooms, indoors)` (design-record) returns `errors`, `unknown`,
+      `review` and `passes`: the minimum run per indoor unit; on a multi
+      outdoor unit the fewest indoor units and the least connected capacity;
+      with two or more rooms the minimum and maximum total, the longest
+      branch and the height between indoor units. A limit both the catalogue
+      and the rule give is the stricter (`tighterMax`); one only the rule
+      gives stays validateCombination's message. Heights are unsigned in the
+      survey, so two rooms are at least |a − b| and at most a + b apart: over
+      the limit at least is an error, at most only is review. Errors join the
+      system's compatibility errors (so `designApprovalErrors` blocks, with
+      the figures) and the `pipe-limits` rule (fail); unknown and review make
+      it review, never pass; the rule's multi total is the stricter of the
+      rule's and the catalogue's; `bestMulti` never suggests a multi-split
+      with an error. The runsheet (`pilot-runsheet-3`): each room's Pipework
+      step has `as-built-run` (one way) with the unit's minimum and branch
+      (or single-split) maximum as its window, `WindowSource.basis`
+      "catalogue" (outside is an exception for the tech lead), and the
+      guidance names the design run and the limits; the charge step's
+      as-built length takes the run's limits (single) or the total's
+      (multi). Untouched jobs rebuild to it (targets carried); a job already
+      started keeps its pipework steps. The manufacturer-requirements
+      compliance item names the new limits.
 

@@ -134,6 +134,14 @@ export default async function FieldHelpPage() {
           <p>Everything saves on this phone first and sends by itself (see the sync badge, below).</p>
         </Fold>
 
+        <Fold id="runs" title="Pipe runs and the manual's limits">
+          <p>
+            Each room&apos;s <B>Pipework</B> step asks for the run you actually laid, one way, and says the outdoor unit&apos;s limits from its manual (for example 3 to
+            20 m to one indoor unit). Outside them the reading goes to the tech lead as <B>Needs review</B>. Never cut a run shorter than the minimum: the manual says
+            how any extra may be laid. The charge step checks the whole length the same way (on a multi-split, all the runs added up).
+          </p>
+        </Fold>
+
         <Fold id="tests" title="The pressure test and the vacuum">
           <p>
             <B>Strength and tightness test</B> (oxygen-free nitrogen): apply the manual&apos;s test pressure, never above the outdoor unit&apos;s nameplate PS, and type it with the

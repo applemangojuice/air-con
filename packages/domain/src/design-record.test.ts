@@ -19,6 +19,7 @@ import {
   editsFromDesign,
   hydrateDesign,
   layoutMediaIdsOf,
+  manufacturerLimitsCheck,
   needsCombinationAck,
   recomputeVariant,
   refrigerantFor,
@@ -647,3 +648,115 @@ test("the Quiet option may say 'quieter' only when every room's unit is quieter 
   assert.ok(prem! < std!, JSON.stringify(units(panasonic)));
   assert.equal(premiumIsQuieter({ design: panasonic, catalogue: RESEARCHED_CATALOGUE }, panasonic.variants.find((v) => v.tier === "premium")!), true);
 });
+
+/* ------------------------------------------------------------------ */
+/* The manufacturer's minimums and multi-split limits                  */
+/* ------------------------------------------------------------------ */
+
+const item = (id: string) => RESEARCHED_CATALOGUE.find((i) => i.id === id)!;
+const ruleFor = (model: string) => RESEARCHED_COMPATIBILITY.find((r) => r.outdoorModel === model);
+const at = (roomName: string, pipeRunM: number, heightDiffM = 3) => ({ roomName, pipeRunM, heightDiffM });
+
+test("the researched seed carries only the limits each item's own notes state; the rest are unknown, never invented", () => {
+  // Panasonic CU-2Z50CBE: "Min 3 m pipe per indoor unit; min 2 indoor units connected ... Total pipe 6-30 m, 3-20 m per room".
+  const two = item("panasonic-cu-2z50cbe").specs!;
+  assert.deepEqual([two.minPipeM, two.maxPipePerBranchM, two.minTotalPipeM, two.maxTotalPipeM, two.minIndoorUnits, two.maxIndoorHeightDiffM], [3, 20, 6, 30, 2, null]);
+  // Daikin 2MXM50A8: "20 m per room, 30 m total, 15 m IU-OU level, 7.5 m IU-IU, min 3 m per room".
+  const mxm = item("daikin-2mxm50a2v1b8").specs!;
+  assert.deepEqual([mxm.minPipeM, mxm.maxPipePerBranchM, mxm.maxTotalPipeM, mxm.maxIndoorHeightDiffM, mxm.minIndoorUnits], [3, 20, 30, 7.5, null]);
+  assert.equal(item("daikin-rxf25f5v1b").specs!.minPipeM, 1.5, "Minimum pipe 1.5 m (installer guide)");
+  assert.equal(item("daikin-rxf35f5v1b").specs!.minPipeM, null, "the RXF35F's notes give no minimum: not copied from its sibling");
+  assert.equal(item("daikin-2mxm40a2v1b9").specs!.maxPipePerBranchM, null, "a figure 'assumed same' as another model isn't filled");
+  assert.equal(item("mitsubishi-electric-muz-ap25vg").specs!.minPipeM, null);
+  // Only outdoor units carry them.
+  for (const i of RESEARCHED_CATALOGUE.filter((x) => x.kind === "indoor")) {
+    for (const k of ["minPipeM", "maxPipePerBranchM", "minTotalPipeM", "maxTotalPipeM", "maxIndoorHeightDiffM", "minIndoorUnits", "minConnectedKw"] as const) assert.equal(i.specs?.[k] ?? null, null, `${i.id} ${k}`);
+  }
+});
+
+test("limits: a run under the minimum, too few indoor units and a short total are errors with the figures", () => {
+  const out = item("panasonic-cu-2z50cbe");
+  const z25 = item("panasonic-cs-z25ckew");
+  const ok = manufacturerLimitsCheck(out, ruleFor("CU-2Z50CBE"), [at("Main bedroom", 6), at("Office", 8)], [z25, z25]);
+  assert.deepEqual(ok.errors, []);
+  assert.match(ok.passes.join(" "), /every run at least 3 m/);
+  // A 2.5 m back-to-back run is under the 3 m minimum; with a 3 m run the total of 5.5 m is under 6 m too.
+  const short = manufacturerLimitsCheck(out, ruleFor("CU-2Z50CBE"), [at("Main bedroom", 2.5), at("Office", 3)], [z25, z25]);
+  assert.ok(short.errors.some((e) => /^Main bedroom: 2\.5 m pipe run is under CU-2Z50CBE's 3 m minimum per indoor unit/.test(e)), short.errors.join(" | "));
+  assert.ok(short.errors.some((e) => /^Total pipe 5\.5 m is under CU-2Z50CBE's 6 m minimum total/.test(e)));
+  // One room on a two-room outdoor unit.
+  const lonely = manufacturerLimitsCheck(out, ruleFor("CU-2Z50CBE"), [at("Main bedroom", 6)], [z25]);
+  assert.ok(lonely.errors.some((e) => /CU-2Z50CBE runs with at least 2 indoor units; this has 1/.test(e)));
+  // Height between indoor units isn't on record for the Panasonic: unknown, for review.
+  assert.ok(ok.unknown.includes("the most two indoor units may be apart in height"));
+});
+
+test("limits: the height between indoor units from the survey's outdoor-to-indoor heights, at least |a − b|, at most a + b", () => {
+  const out = item("daikin-2mxm50a2v1b8");
+  const ftxm = RESEARCHED_CATALOGUE.find((i) => i.kind === "indoor" && i.manufacturer === "Daikin")!;
+  const rule = ruleFor("2MXM50A2V1B8");
+  // Ground floor 0.5 m and loft room 9 m above the outdoor unit: at least 8.5 m apart, over 7.5 m.
+  const far = manufacturerLimitsCheck(out, rule, [at("Living room", 6, 0.5), at("Loft", 12, 9)], [ftxm, ftxm]);
+  assert.ok(far.errors.some((e) => /^Living room and Loft: at least 8\.5 m apart in height, over 2MXM50A2V1B8's 7\.5 m between indoor units/.test(e)), far.errors.join(" | "));
+  // 3 m and 5 m: 2 m apart if both are above it, 8 m if it sits between them: for review.
+  const maybe = manufacturerLimitsCheck(out, rule, [at("Main bedroom", 6, 3), at("Office", 7, 5)], [ftxm, ftxm]);
+  assert.deepEqual(maybe.errors, []);
+  assert.match(maybe.review[0]!, /could be up to 8 m apart in height if the outdoor unit sits between them/);
+  // 3 m and 4 m: at most 7 m apart whatever the outdoor unit does.
+  assert.deepEqual(manufacturerLimitsCheck(out, rule, [at("Main bedroom", 6, 3), at("Office", 7, 4)], [ftxm, ftxm]).review, []);
+  // The rule's own limits (20 m a room) are validateCombination's message, not a second one here.
+  assert.deepEqual(manufacturerLimitsCheck(out, rule, [at("Main bedroom", 22), at("Office", 7)], [ftxm, ftxm]).errors, []);
+  // A catalogue figure stricter than the rule's is checked here.
+  const strict = { ...out, specs: { ...out.specs, maxPipePerBranchM: 15, maxTotalPipeM: 20 } };
+  const tight = manufacturerLimitsCheck(strict, rule, [at("Main bedroom", 16), at("Office", 7)], [ftxm, ftxm]);
+  assert.ok(tight.errors.some((e) => /Main bedroom: 16 m pipe run is over 2MXM50A2V1B8's 15 m maximum per indoor unit/.test(e)));
+  assert.ok(tight.errors.some((e) => /Total pipe 23 m is over 2MXM50A2V1B8's 20 m maximum total/.test(e)));
+});
+
+test("limits: not on record is review in the design, never a pass; outside a limit blocks approval", () => {
+  // A Mitsubishi single split: no minimum run on record.
+  const mits = draftDesign({ projectId: "p1", id: "d1", version: 1, measured: survey([room("r1", "Bedroom", { lengthM: 3.5, widthM: 3 })]), baseSurvey: BASE, catalogue: RESEARCHED_CATALOGUE, compatibility: RESEARCHED_COMPATIBILITY, intel: INTEL, now: NOW, manufacturer: "Mitsubishi Electric" });
+  const r = rule(mits, "standard", "pipe-limits");
+  assert.equal(r.status, "review");
+  assert.match(r.detail, /not on record, check the installation manual: the shortest pipe run per indoor unit/);
+  // A Panasonic single split on a 2 m back-to-back run: under its 3 m minimum, so approval is blocked with the figures.
+  const pan = draftDesign({ projectId: "p1", id: "d1", version: 1, measured: survey([room("r1", "Bedroom", { lengthM: 3.5, widthM: 3, pipeRunM: 2 })]), baseSurvey: BASE, catalogue: RESEARCHED_CATALOGUE, compatibility: RESEARCHED_COMPATIBILITY, intel: INTEL, now: NOW, manufacturer: "Panasonic" });
+  assert.equal(rule(pan, "standard", "pipe-limits").status, "fail");
+  assert.ok(designApprovalErrors(pan).some((e) => /Bedroom: 2 m pipe run is under CU-\w+CKE's 3 m minimum per indoor unit/.test(e)), designApprovalErrors(pan).join(" | "));
+  // At 3 m it's fine.
+  const pan3 = draftDesign({ projectId: "p1", id: "d1", version: 1, measured: survey([room("r1", "Bedroom", { lengthM: 3.5, widthM: 3, pipeRunM: 3 })]), baseSurvey: BASE, catalogue: RESEARCHED_CATALOGUE, compatibility: RESEARCHED_COMPATIBILITY, intel: INTEL, now: NOW, manufacturer: "Panasonic" });
+  assert.ok(!designApprovalErrors(pan3).some((e) => /minimum per indoor unit/.test(e)));
+});
+
+test("limits: the engine never suggests a multi-split a room's run is too short for", () => {
+  // Two Panasonic rooms, one on a 2 m run: no Panasonic multi-split takes it (each needs 3 m a room), so two single splits.
+  const d = pana([room("a", "Main bedroom", { pipeRunM: 2 }), room("b", "Office", { lengthM: 3, widthM: 2.6, pipeRunM: 8 })]);
+  const std = standard(d);
+  assert.ok(std.systems.every((s) => s.topology === "single"), JSON.stringify(std.systems.map((s) => [s.outdoorItemId, s.roomIds])));
+});
+
+test("limits reach the install day: each room's as-built run and the system's total are checked against the catalogue's limits", () => {
+  const d = pana([room("a", "Main bedroom", { pipeRunM: 6 }), room("b", "Office", { lengthM: 3, widthM: 2.6, pipeRunM: 8 })]);
+  const variant = d.variants.find((v) => v.systems.some((s) => s.outdoorItemId === "panasonic-cu-2z50cbe")) ?? d.variants[0]!;
+  const steps = runsheetFromDesign(d, variant.id, RESEARCHED_CATALOGUE);
+  assert.equal(variant.systems[0]!.outdoorItemId, "panasonic-cu-2z50cbe");
+  assert.match(rule(d, variant.id, "pipe-limits").detail, /14 m in total \(6 to 30 m\)/);
+  const pipework = steps.filter((s) => s.title === "Pipework");
+  const run = pipework[0]!.evidence.find((e) => e.role === "as-built-run")!;
+  assert.deepEqual([run.min, run.max, run.window?.basis], [3, 20, "catalogue"]);
+  assert.match(pipework[0]!.guidance ?? "", /Design run 6 m\. CU-2Z50CBE's manual \(catalogue\): 3 to 20 m to one indoor unit\. Never cut it shorter than 3 m/);
+  const charge = steps.find((s) => s.title === "F-gas label and charge record")!;
+  const total = charge.evidence.find((e) => e.role === "as-built-length")!;
+  assert.deepEqual([total.min, total.max, total.label], [6, 30, "As-built pipe length, all runs added up (one way)"]);
+  // A single split's run: the unit's own minimum and maximum; a unit with none on record says so.
+  const single = runsheetFromDesign(pana([room("r1", "Bedroom", { lengthM: 3.5, widthM: 3 })]), "standard", RESEARCHED_CATALOGUE);
+  const singleRun = single.find((s) => s.title === "Pipework")!.evidence.find((e) => e.role === "as-built-run")!;
+  assert.deepEqual([singleRun.min, singleRun.window?.basis], [3, "catalogue"]);
+  const mits = draftDesign({ projectId: "p1", id: "d1", version: 1, measured: survey([room("r1", "Bedroom", { lengthM: 3.5, widthM: 3 })]), baseSurvey: BASE, catalogue: RESEARCHED_CATALOGUE, compatibility: RESEARCHED_COMPATIBILITY, intel: INTEL, now: NOW, manufacturer: "Mitsubishi Electric" });
+  const m = runsheetFromDesign(mits, "standard", RESEARCHED_CATALOGUE).find((s) => s.title === "Pipework")!;
+  const mRun = m.evidence.find((e) => e.role === "as-built-run")!;
+  assert.equal(mRun.min, undefined);
+  assert.equal(mRun.max, 20, "the maximum is on record, the minimum isn't");
+  assert.match(m.guidance ?? "", /at most 20 m for the run/);
+});
+

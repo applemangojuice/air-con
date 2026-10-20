@@ -52,6 +52,13 @@ const SPEC_HINT: Partial<Record<SpecKey, string>> = {
   prechargedPipeM: "Needed to work out the extra refrigerant.",
   factoryChargeKg: "Outdoor units, from the nameplate: sets the smallest room the system may serve (R32).",
   releaseHeightM: "Indoor units: 1.8 for a wall unit, 0.6 floor, 2.2 ceiling. Blank counts as a wall unit.",
+  minPipeM: "From the installation manual: a design run shorter than this blocks approval. Blank: the design asks for a check.",
+  maxPipePerBranchM: "Multi-splits, from the manual: the longest run to one indoor unit.",
+  minTotalPipeM: "Multi-splits, from the manual: all the runs added up.",
+  maxTotalPipeM: "Multi-splits, from the manual: all the runs added up.",
+  maxIndoorHeightDiffM: "Multi-splits, from the manual: how far apart in height two indoor units may be.",
+  minIndoorUnits: "Multi-splits, from the manual: fewer blocks approval (a whole number).",
+  minConnectedKw: "Multi-splits, from the manual's combination table (cooling kW).",
 };
 
 const str = (v: unknown) => (v === null || v === undefined ? "" : String(v));

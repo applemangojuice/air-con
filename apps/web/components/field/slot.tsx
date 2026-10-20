@@ -171,7 +171,9 @@ export function Slot({ projectId, step, slot, waiting, refused, imageUrl, disabl
           <p className="text-sm text-ink-500">
             {EVIDENCE_KIND_LABEL[spec.kind]}
             {numeric && spec.unit ? ` · ${spec.unit}` : ""}
-            {numeric ? ` · ${win ? `window ${win}${spec.window?.basis === "candidate" ? " (candidate, tech lead confirms)" : spec.window?.basis === "tech-lead" ? " (set by the tech lead)" : ""}` : "record the reading"}` : ""}
+            {numeric
+              ? ` · ${win ? `window ${win}${spec.window?.basis === "candidate" ? " (candidate, tech lead confirms)" : spec.window?.basis === "tech-lead" ? " (set by the tech lead)" : spec.window?.basis === "catalogue" ? " (the manual's limits, from the catalogue)" : ""}` : "record the reading"}`
+              : ""}
           </p>
         </div>
         <Chip state={state} waiting={waiting} kept={kept} />

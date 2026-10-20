@@ -877,6 +877,11 @@ try {
       await hydrated(designer);
     }
     check("no check is blocked", await has(designer, /BLOCKED\s*0/), (await text(designer)).match(/Checks[\s\S]{0,400}/)?.[0]);
+    check(
+      "the pipe limits check reads the manual's minimums from the catalogue (3 m a room)",
+      await has(designer, /every run at least 3 m/),
+      (await text(designer)).match(/Pipe length & height limits[\s\S]{0,500}/)?.[0],
+    );
     check("bill of materials fully priced", !(await has(designer, /have no buy price/)));
     const layout = designer.getByLabel("Layout photo");
     for (let i = 0; i < (await layout.count()); i++) if (!(await layout.nth(i).isChecked())) await choose(layout.nth(i));

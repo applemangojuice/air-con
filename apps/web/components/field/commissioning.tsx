@@ -54,6 +54,7 @@ const BASIS: Record<JobTarget["basis"], { text: string; tone: string }> = {
   record: { text: "No target yet", tone: "bg-amber-50 text-amber-900" },
   candidate: { text: "Candidate: confirm it", tone: "bg-amber-50 text-amber-900" },
   "tech-lead": { text: "Set", tone: "bg-emerald-50 text-emerald-800" },
+  catalogue: { text: "From the catalogue", tone: "bg-surface text-ink-700" },
 };
 
 function TargetRow({ projectId, target, canEdit, locked, onAnswer }: { projectId: string; target: JobTarget; canEdit: boolean; locked: boolean; onAnswer: (a: TargetAnswer) => void }) {

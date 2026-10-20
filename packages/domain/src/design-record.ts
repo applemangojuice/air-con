@@ -540,6 +540,135 @@ export function pickIndoor(opts: { kw: number; tier: "standard" | "premium"; man
   return indoorCandidates({ ...opts, manufacturer: undefined })[0] ?? indoorCandidates({ ...opts, manufacturer: undefined, tier: opts.tier === "standard" ? "premium" : "standard" })[0];
 }
 
+/* ------------------------------------------------------------------ */
+/* The manufacturer's limits beyond the maximum run                    */
+/* ------------------------------------------------------------------ */
+
+export interface ManufacturerLimitsCheck {
+  /** Outside a limit on record: compatibility errors, so approval is blocked, with the figures. */
+  errors: string[];
+  /** Limits this system needs that aren't on record: the design reads them as "check the manual", never a pass. */
+  unknown: string[];
+  /** In range but worth a look (the height between two indoor units can't be told from the survey alone). */
+  review: string[];
+  /** In range, with the figures. */
+  passes: string[];
+}
+
+const limitOf = (n: number | null | undefined): number | null => (typeof n === "number" && Number.isFinite(n) && n >= 0 ? n : null);
+/** The stricter of two maximums on record (either may be missing). */
+const tighterMax = (a: number | null, b: number | null): number | null => (a === null ? b : b === null ? a : Math.min(a, b));
+
+/**
+ * One system's runs and rooms against its outdoor unit's limits beyond the
+ * maximum run (validateCombination and the height check cover those): the
+ * shortest run per indoor unit; on a multi-split outdoor unit the fewest
+ * indoor units and the least connected capacity; with two or more rooms the
+ * shortest and longest total, the longest branch and the most two indoor
+ * units may be apart in height. A limit both the catalogue and the
+ * compatibility rule give is the stricter of the two; one only the rule
+ * gives is left to validateCombination (no second message). A limit not on
+ * record is `unknown`. Heights in the survey are each room's difference from
+ * the outdoor unit, without saying above or below, so two rooms are at least
+ * |a − b| and at most a + b apart: over the limit at least is an error,
+ * over it only at most is for review.
+ */
+export function manufacturerLimitsCheck(
+  outdoor: CatalogueItem,
+  rule: CompatibilityRule | undefined,
+  rooms: Pick<RoomDesignInput, "roomName" | "pipeRunM" | "heightDiffM">[],
+  indoors: (CatalogueItem | undefined)[],
+): ManufacturerLimitsCheck {
+  const out: ManufacturerLimitsCheck = { errors: [], unknown: [], review: [], passes: [] };
+  if (rooms.length === 0) return out;
+  const sp = outdoor.specs ?? {};
+  const code = codeOf(outdoor);
+  const runs = rooms.map((r) => round1(r.pipeRunM));
+  const total = round1(sum(runs));
+
+  // The shortest run per indoor unit.
+  const minRun = limitOf(sp.minPipeM);
+  if (minRun === null) out.unknown.push("the shortest pipe run per indoor unit");
+  else {
+    const short = rooms.filter((r, i) => runs[i]! < minRun);
+    for (const r of short) out.errors.push(`${r.roomName}: ${round1(r.pipeRunM)} m pipe run is under ${code}'s ${minRun} m minimum per indoor unit: plan the route to at least ${minRun} m (the manual says how any extra may be laid), never shorter.`);
+    if (!short.length) out.passes.push(`every run at least ${minRun} m (${code}'s minimum)`);
+  }
+
+  if (isMultiOutdoor(outdoor)) {
+    const fewest = limitOf(sp.minIndoorUnits);
+    if (fewest === null) out.unknown.push("the fewest indoor units it runs with");
+    else if (rooms.length < fewest) out.errors.push(`${code} runs with at least ${plural(fewest, "indoor unit")}; this has ${rooms.length}. Add a room to it, or use a single split.`);
+    else out.passes.push(`${plural(rooms.length, "indoor unit")} (at least ${fewest})`);
+    const minKw = limitOf(sp.minConnectedKw);
+    const kws = indoors.map(kwOf);
+    if (minKw === null) {
+      if (rule?.minConnectedKw === null || rule?.minConnectedKw === undefined) out.unknown.push("the least connected indoor capacity");
+    } else if (kws.some((k) => k === null) || kws.length < rooms.length) {
+      out.unknown.push("the connected capacity (an indoor unit's capacity isn't on record)");
+    } else {
+      const connected = round1(sum(kws as number[]));
+      const ruleKw = limitOf(rule?.minConnectedKw);
+      // The rule's own minimum is validateCombination's message; only a stricter catalogue figure adds one.
+      if (connected < minKw) {
+        if (ruleKw === null || minKw > ruleKw) out.errors.push(`Connected capacity ${fmtKw(connected)} is below ${code}'s minimum of ${fmtKw(minKw)}.`);
+      } else out.passes.push(`${fmtKw(connected)} connected (at least ${fmtKw(Math.max(minKw, ruleKw ?? 0))})`);
+    }
+  }
+
+  if (rooms.length > 1) {
+    // Totals and branches: the stricter of the catalogue's and the rule's.
+    const minTotal = limitOf(sp.minTotalPipeM);
+    const specTotal = limitOf(sp.maxTotalPipeM);
+    const ruleTotal = limitOf(rule?.maxTotalPipeM);
+    const maxTotal = tighterMax(specTotal, ruleTotal);
+    if (minTotal === null) out.unknown.push("the shortest total pipe length");
+    else if (total < minTotal) out.errors.push(`Total pipe ${total} m is under ${code}'s ${minTotal} m minimum total.`);
+    if (maxTotal === null) out.unknown.push("the longest total pipe length");
+    else if (total > maxTotal) {
+      if (specTotal !== null && (ruleTotal === null || specTotal < ruleTotal)) out.errors.push(`Total pipe ${total} m is over ${code}'s ${specTotal} m maximum total.`);
+    }
+    const lowOk = minTotal !== null && total >= minTotal;
+    const highOk = maxTotal !== null && total <= maxTotal;
+    if (lowOk || highOk) out.passes.push(`${total} m in total (${lowOk && highOk ? `${minTotal} to ${maxTotal} m` : lowOk ? `at least ${minTotal} m` : `at most ${maxTotal} m`})`);
+    const specBranch = limitOf(sp.maxPipePerBranchM);
+    const ruleBranch = limitOf(rule?.maxPipePerRoomM);
+    const maxBranch = tighterMax(specBranch, ruleBranch);
+    if (maxBranch === null) out.unknown.push("the longest run to one indoor unit");
+    else {
+      const long = rooms.filter((_, i) => runs[i]! > maxBranch);
+      if (specBranch !== null && (ruleBranch === null || specBranch < ruleBranch)) {
+        for (const r of long) out.errors.push(`${r.roomName}: ${round1(r.pipeRunM)} m pipe run is over ${code}'s ${specBranch} m maximum per indoor unit.`);
+      }
+      if (!long.length) out.passes.push(`every run at most ${maxBranch} m`);
+    }
+    const maxApart = limitOf(sp.maxIndoorHeightDiffM);
+    if (maxApart === null) out.unknown.push("the most two indoor units may be apart in height");
+    else {
+      let worstLeast = { m: -1, a: "", b: "" };
+      let worstMost = { m: -1, a: "", b: "" };
+      for (let i = 0; i < rooms.length; i++) {
+        for (let j = i + 1; j < rooms.length; j++) {
+          const a = rooms[i]!;
+          const b = rooms[j]!;
+          const least = round1(Math.abs(a.heightDiffM - b.heightDiffM));
+          const most = round1(a.heightDiffM + b.heightDiffM);
+          if (least > worstLeast.m) worstLeast = { m: least, a: a.roomName, b: b.roomName };
+          if (most > worstMost.m) worstMost = { m: most, a: a.roomName, b: b.roomName };
+        }
+      }
+      if (worstLeast.m > maxApart) {
+        out.errors.push(`${worstLeast.a} and ${worstLeast.b}: at least ${worstLeast.m} m apart in height, over ${code}'s ${maxApart} m between indoor units.`);
+      } else if (worstMost.m > maxApart) {
+        out.review.push(
+          `${worstMost.a} and ${worstMost.b} could be up to ${worstMost.m} m apart in height if the outdoor unit sits between them (${code} allows ${maxApart} m between indoor units): check on the drawings.`,
+        );
+      } else out.passes.push(`indoor units at most ${worstMost.m} m apart in height (at most ${maxApart} m)`);
+    }
+  }
+  return out;
+}
+
 interface Arranged {
   systems: SystemChoice[];
   units: Map<string, string>;
@@ -565,6 +694,8 @@ function bestMulti(
     if (units.some((u) => !u)) continue;
     const check = validateCombination(rule, outdoor, units as CatalogueItem[], group.map((r) => r.pipeRunM));
     if (!check.ok) continue;
+    // Nor one outside its manual's other limits on record (a run under the minimum, too few rooms, too far apart).
+    if (manufacturerLimitsCheck(outdoor, rule, group, units).errors.length) continue;
     // Never suggest a multi-split that's too much R32 for one of its rooms (or whose charge can't be worked out).
     const a2l = a2lSystemCheck(outdoor, refrigerantFor(outdoor, group.map((r) => r.pipeRunM)), group.map((room, i) => ({ room, indoor: units[i] })));
     if (a2l.errors.length === 0) found.push({ outdoor, rule, units: units as CatalogueItem[] });
@@ -1320,9 +1451,9 @@ function designRules(x: RuleInput): RuleResult[] {
       const maxHeight = o.specs?.maxHeightDiffM;
       const multi = s.topology === "multi";
       const total = s.refrigerant.totalPipeM;
-      // A multi-split's total comes from its rule (the outdoor spec's figure can be per room); a single split's from the unit.
+      // A multi-split's total: the stricter of its rule's and the catalogue's maximum total (the outdoor spec's maxPipeM can be per room); a single split's from the unit.
       const rule = s.ruleId ? x.compatibility.find((r) => r.id === s.ruleId) : undefined;
-      const maxRun = multi ? rule?.maxTotalPipeM : o.specs?.maxPipeM;
+      const maxRun = multi ? tighterMax(limitOf(rule?.maxTotalPipeM), limitOf(o.specs?.maxTotalPipeM)) : o.specs?.maxPipeM;
       const limit = typeof maxRun === "number" ? maxRun : null;
       if (limit === null) {
         status = worst([status, "review"]);
@@ -1343,6 +1474,22 @@ function designRules(x: RuleInput): RuleResult[] {
           status = worst([status, "review"]);
         }
       }
+      // The manual's minimums and multi-split limits: outside one fails (and blocks approval), one not on record is for review.
+      const groupRooms = s.roomIds.map((id) => rooms.find((r) => r.roomId === id)).filter((r): r is RoomDesignInput => Boolean(r));
+      const limits = manufacturerLimitsCheck(o, rule, groupRooms, s.roomIds.map(unitFor));
+      if (limits.errors.length) {
+        status = "fail";
+        notes.push(...limits.errors);
+      }
+      if (limits.review.length) {
+        status = worst([status, "review"]);
+        notes.push(...limits.review);
+      }
+      if (limits.unknown.length) {
+        status = worst([status, "review"]);
+        notes.push(`${codeOf(o)}: not on record, check the installation manual: ${limits.unknown.join("; ")}.`);
+      }
+      if (limits.passes.length && !limits.errors.length) notes.push(`${codeOf(o)}: ${limits.passes.join(", ")}.`);
     }
     const estimated = rooms.filter((r) => r.estimated?.some((e) => e === "pipeRunM" || e === "heightDiffM"));
     if (estimated.length) {
@@ -1784,6 +1931,9 @@ function buildVariant(input: {
           };
         }
       }
+      // The manual's other limits on record: outside one blocks approval, with the figures.
+      const limits = manufacturerLimitsCheck(outdoor, rule, groupRooms, indoors);
+      if (limits.errors.length) compatibility_ = { ok: false, errors: [...compatibility_.errors, ...limits.errors], warnings: compatibility_.warnings };
     }
 
     let refrigerant = refrigerantFor(outdoor, runs);
