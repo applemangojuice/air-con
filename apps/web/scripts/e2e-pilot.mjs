@@ -1114,7 +1114,7 @@ try {
         /Not applicable[\s\S]*Not needed: .* recorded "PD checks passed"/.test(await consentCard.innerText()),
     );
     // Round 10: the certificates and the notice about the finished work wait for it (3 statutory items).
-    check("no statutory item left open before install but the three about the finished work", await has(tech, /STATUTORY OPEN\s*[0-3]\b/));
+    check("no statutory item left open before install but the three about the finished work and commissioning", await has(tech, /STATUTORY OPEN\s*[0-4]\b/));
     const hpCert = tech.locator("main li").filter({ has: tech.locator("h3", { hasText: "Building Regulations certificate for the heat pump" }) });
     check("the heat pump's certificate can't be approved before the install", /Opens once the install is complete/.test(await hpCert.innerText()) && (await hpCert.locator("summary", { hasText: /^\s*▸?\s*Review\s*$/ }).count()) === 0);
     await shot(tech, "G-compliance");
@@ -1423,6 +1423,15 @@ try {
     await hpForm.locator("textarea").fill("DEMO: scheme certificate DEMO-HP-0001, emailed to the family.");
     await hpForm.getByRole("button", { name: "Save evidence" }).click();
     await tech.waitForTimeout(1500);
+    // Its review form opens by itself (waiting for review), so approve it here: the helper reads an open form's
+    // "Not applicable" choice as a settled item.
+    const hpReview = hpCard.locator("details").filter({ has: tech.locator("summary", { hasText: /^\s*▸?\s*Review\s*$/ }) });
+    if (!(await hpReview.evaluate((e) => e.open))) await hpReview.locator("summary").click();
+    await hpReview.getByLabel("Approve", { exact: true }).check();
+    await hpReview.locator("textarea").fill("DEMO: certificate DEMO-HP-0001 attached and emailed to the family.");
+    await hpReview.getByRole("button", { name: "Save the review" }).click();
+    await tech.waitForTimeout(1500);
+    check("the heat pump's certificate approves with its file and number", /Approved by/.test(await hpCard.innerText()));
     await reviewCompliance(tech);
     check("every compliance item settled", await has(tech, /DONE\s*(\d+) of \1/));
     check("auto items name a person, not a phrase", !(await has(tech, /Approved by Recorded on the project/)));
