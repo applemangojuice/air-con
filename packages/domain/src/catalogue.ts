@@ -590,6 +590,26 @@ const CONFIDENCES = new Set(["verified", "provisional", "stale"]);
 const TIERS = new Set(["standard", "premium"]);
 
 /**
+ * A date cell from the catalogue CSV as yyyy-mm-dd, or null when it isn't
+ * one. Takes the export's own 2026-10-18 and the UK day-first form Excel and
+ * Google Sheets rewrite it to on the export, edit, import round trip
+ * (18/10/2026, 8/1/2026; a time after it is ignored). Never month-first.
+ */
+export function csvDate(raw: string): string | null {
+  const v = raw.trim();
+  let iso: string | null = null;
+  if (/^\d{4}-\d{2}-\d{2}(?:$|[T\s])/.test(v)) iso = v.slice(0, 10);
+  else {
+    const uk = /^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:$|\s)/.exec(v);
+    if (uk) iso = `${uk[3]}-${uk[2]!.padStart(2, "0")}-${uk[1]!.padStart(2, "0")}`;
+  }
+  if (!iso || dayNumber(iso) === null) return null;
+  // dayNumber rolls 31/02 over to March: only a date that reads back the same is real.
+  const d = new Date(`${iso}T12:00:00Z`);
+  return d.toISOString().slice(0, 10) === iso ? iso : null;
+}
+
+/**
  * Items from a CSV, with row-level errors in plain English ("Row 7
  * (daikin-x): cost "12abc" isn't a number"). A row with any error is left
  * out, so the caller can show the errors before anything is applied.
@@ -642,11 +662,12 @@ export function catalogueFromCsv(csv: string): { items: CatalogueItem[]; errors:
     const date = (name: string, label: string): string | undefined => {
       const v = text(name);
       if (!v) return undefined;
-      if (!/^\d{4}-\d{2}-\d{2}/.test(v) || dayNumber(v) === null) {
-        fail(`${label} "${v}" should be a date like 2026-10-18.`);
+      const iso = csvDate(v);
+      if (!iso) {
+        fail(`${label} "${v}" should be a date like 2026-10-18 or 18/10/2026.`);
         return undefined;
       }
-      return v.slice(0, 10);
+      return iso;
     };
 
     if (!id) fail("the id is blank.");

@@ -443,7 +443,10 @@ Worth knowing:
 confidence and sources → **Save changes**. Items over 90 days since they
 were verified show as stale: check the datasheet again before quoting.
 **Export CSV** / **Import CSV** for supplier price lists (it shows every
-change before saving). **Compatibility rules** lists which outdoor units
+change before saving; dates may be 2026-10-18 or day-first 18/10/2026, as a
+spreadsheet saves them). If a save is refused, the message names the field
+as the form labels it, with why (for example "Operating range, heating: 230
+characters, at most 200"). **Compatibility rules** lists which outdoor units
 take which indoor units; only use a multi-split combination marked
 verified against the manufacturer's table.
 

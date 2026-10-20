@@ -352,7 +352,9 @@ email, the same way you did; installers land on the field app.
 6. Materials (pipe, cable, trunking, brackets): none are priced yet. Price
    the ones you use the same way, or **Export CSV**, fill in the cost column
    from your supplier's list, and **Import CSV** (it shows every change
-   before saving). Any unpriced line on a proposal must be typed in (or
+   before saving). Excel and Google Sheets turn the dates into 18/10/2026
+   when you save: that's fine, the import reads day-first dates as well as
+   2026-10-18. Any unpriced line on a proposal must be typed in (or
    overridden by an admin with a reason) before it can be issued.
 7. Multi-split (one outdoor unit, several rooms): only use a combination
    after checking the manufacturer's official table. **Compatibility rules**

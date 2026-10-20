@@ -11,6 +11,7 @@ import {
   catalogueItemErrors,
   catalogueToCsv,
   compatibilityRuleErrors,
+  csvDate,
   effectiveConfidence,
   findRule,
   isConnectable,
@@ -182,6 +183,26 @@ test("CSV round trip: the researched catalogue comes back exactly", () => {
   assert.deepEqual(back.items, RESEARCHED_CATALOGUE);
 });
 
+test("CSV dates: the export's 2026-10-18 and the day-first form Excel and Google Sheets rewrite it to", () => {
+  assert.equal(csvDate("2026-10-18"), "2026-10-18");
+  assert.equal(csvDate("2026-10-18T09:00:00Z"), "2026-10-18");
+  assert.equal(csvDate("18/10/2026"), "2026-10-18");
+  assert.equal(csvDate("8/1/2026"), "2026-01-08", "day first, never month first");
+  assert.equal(csvDate("08/01/2026 00:00:00"), "2026-01-08");
+  assert.equal(csvDate("31/02/2026"), null, "not a real day");
+  assert.equal(csvDate("2026-02-31"), null);
+  assert.equal(csvDate("10/18/2026"), null, "a US month-first date isn't guessed at");
+  assert.equal(csvDate("18 Oct 2026"), null);
+  // An exported file whose dates a spreadsheet rewrote comes back with the same dates.
+  const one = RESEARCHED_CATALOGUE.find((i) => i.verifiedAt && i.costSource?.observedAt) ?? { ...RESEARCHED_CATALOGUE[0]!, verifiedAt: "2026-10-18", costSource: { observedAt: "2026-09-01" } };
+  const csv = catalogueToCsv([one]).replace(/(\d{4})-(\d{2})-(\d{2})/g, (_, y, m, d) => `${Number(d)}/${Number(m)}/${y}`);
+  const back = catalogueFromCsv(csv);
+  assert.deepEqual(back.errors, []);
+  assert.equal(back.items[0]!.verifiedAt, one.verifiedAt);
+  assert.equal(back.items[0]!.costSource?.observedAt, one.costSource?.observedAt);
+  assert.match(catalogueFromCsv(csv.replace(one.verifiedAt ? /\d{1,2}\/\d{1,2}\/\d{4}/ : /$^/, "18 October")).errors.join(" "), /like 2026-10-18 or 18\/10\/2026/);
+});
+
 test("CSV round trip: the DEMO catalogue keeps every value (absent specs come back as null)", () => {
   const back = catalogueFromCsv(catalogueToCsv(DEMO_CATALOGUE));
   assert.deepEqual(back.errors, []);
@@ -216,7 +237,7 @@ test("CSV import reports row-level errors and leaves bad rows out", () => {
     "id,kind,label,costGbpExVat,status,confidence,active,verifiedAt,ports,sources,spec.coolingKw",
     "good-1,material,Good thing,£1234.50,,,yes,,,,",
     'good-2,indoor,"Indoor, two",12,available,verified,TRUE,2026-10-01,,https://example.com/a | Title A,2.5',
-    "bad kind,fridge,,12abc,lost,maybe,perhaps,18/10/2026,12,ftp://nope,lots",
+    "bad kind,fridge,,12abc,lost,maybe,perhaps,18 Oct 2026,12,ftp://nope,lots",
     "good-1,material,Duplicate,,,,,,,,",
   ].join("\n");
   const { items, errors } = catalogueFromCsv(csv);

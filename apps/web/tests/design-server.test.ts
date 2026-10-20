@@ -199,3 +199,35 @@ test("catalogue: create, update, validation, CSV preview and apply, research see
   const del = await catalogue.deleteRule("does-not-exist", TECH);
   assert.equal(del.ok, false);
 });
+
+test("catalogue editor: every researched item passes the editor's schema, and a refusal names the field, the length and the limit", async () => {
+  const { RESEARCHED_CATALOGUE } = await import("@aircon/domain/catalogue-data");
+  const refused = RESEARCHED_CATALOGUE.map((item) => ({ id: item.id, r: catalogue.catalogueItemSchema.safeParse(item) }))
+    .filter((x) => !x.r.success)
+    .map((x) => `${x.id}: ${x.r.success ? "" : catalogue.issuesOf(x.r.error, RESEARCHED_CATALOGUE.find((i) => i.id === x.id)).join("; ")}`);
+  assert.deepEqual(refused, [], "Load researched catalogue, then Save, works for every item (the Daikin Perfera outdoor units included)");
+  // The Perfera's heating range is the long one: it saves through the editor.
+  const perfera = RESEARCHED_CATALOGUE.find((i) => i.id === "daikin-rxm35a5v1b9")!;
+  assert.ok((perfera.specs?.operatingRangeHeatingC ?? "").length > 60);
+  await catalogue.loadResearchedCatalogue(false, TECH);
+  const saved = await catalogue.saveItem(perfera, TECH, "update");
+  assert.ok(saved.ok, saved.ok ? "" : saved.errors.join(" "));
+
+  // Too long: the form's label, how long it is and the limit, never a zod path or "Invalid input".
+  const long = "x".repeat(catalogue.SPEC_TEXT_MAX + 11);
+  const tooLong = await catalogue.saveItem({ ...perfera, specs: { ...perfera.specs, operatingRangeHeatingC: long } }, TECH, "update");
+  assert.ok(!tooLong.ok);
+  assert.deepEqual(tooLong.errors, [`Operating range, heating: ${long.length} characters, at most ${catalogue.SPEC_TEXT_MAX}`]);
+  const several = await catalogue.saveItem(
+    { ...perfera, label: "", costSource: { url: "ftp://nope" }, sources: [{ url: "https://example.com", title: "t".repeat(301) }], specs: { ...perfera.specs, coolingKw: "lots" } },
+    TECH,
+    "update",
+  );
+  assert.ok(!several.ok);
+  const text = several.errors.join(" | ");
+  assert.match(text, /Label: Give the item a label/);
+  assert.match(text, /Link to the price: Links must start http:\/\/ or https:\/\//);
+  assert.match(text, /Title of link 1: 301 characters, at most 300/);
+  assert.match(text, /Cooling capacity: should be a number/);
+  assert.doesNotMatch(text, /Invalid input|specs\.|costSource\./);
+});

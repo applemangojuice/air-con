@@ -1,5 +1,6 @@
 import {
   CATALOGUE_KINDS,
+  SPEC_FIELDS,
   catalogueFromCsv,
   catalogueItemErrors,
   catalogueToCsv,
@@ -88,20 +89,24 @@ const nullableText = (max: number) =>
     .optional()
     .transform((v) => (v === undefined ? undefined : v ? v : null));
 
+/** The longest free-text spec (energy class, refrigerant, operating ranges). */
+export const SPEC_TEXT_MAX = 200;
+
 const specsSchema = z
   .object({
     coolingKw: nullableNum,
     heatingKw: nullableNum,
     seer: nullableNum,
     scop: nullableNum,
-    energyClassCooling: nullableText(20),
-    energyClassHeating: nullableText(20),
+    // Free text from datasheets runs long ("-15 to 24 °C (wet bulb); down to -25 °C with …"): 200 is room enough.
+    energyClassCooling: nullableText(SPEC_TEXT_MAX),
+    energyClassHeating: nullableText(SPEC_TEXT_MAX),
     soundPressureLowDb: nullableNum,
     soundPressureHighDb: nullableNum,
     soundPowerDb: nullableNum,
     dimensionsMm: z.object({ w: num.positive(), h: num.positive(), d: num.positive() }).nullable().optional(),
     weightKg: nullableNum,
-    refrigerant: nullableText(20),
+    refrigerant: nullableText(SPEC_TEXT_MAX),
     liquidPipeMm: nullableNum,
     gasPipeMm: nullableNum,
     maxPipeM: nullableNum,
@@ -111,8 +116,8 @@ const specsSchema = z
     powerSupply: nullableText(500),
     recommendedBreakerA: nullableNum,
     wifi: nullableText(500),
-    operatingRangeCoolingC: nullableText(60),
-    operatingRangeHeatingC: nullableText(60),
+    operatingRangeCoolingC: nullableText(SPEC_TEXT_MAX),
+    operatingRangeHeatingC: nullableText(SPEC_TEXT_MAX),
   })
   .strict();
 
@@ -171,12 +176,102 @@ export const compatibilityRuleSchema = z
   })
   .strict();
 
-/** zod issues as the plain sentences the forms show. */
-export function issuesOf(error: z.ZodError): string[] {
-  return error.issues.map((i) => {
-    const where = i.path.length ? `${i.path.join(".")}: ` : "";
-    return `${where}${i.message}`;
-  });
+/** The editors' own words for each field, so a refusal names what the office sees on the form. */
+const FIELD_LABEL: Record<string, string> = {
+  id: "Catalogue id",
+  kind: "Kind",
+  manufacturer: "Manufacturer",
+  series: "Series",
+  model: "Model code",
+  label: "Label",
+  tier: "Tier",
+  multiSplitCapable: "Works on a multi-split",
+  ports: "Ports (rooms it can serve)",
+  pairedWith: "Paired with (single split)",
+  unit: "Unit",
+  category: "Category",
+  customerBlurb: "Customer line",
+  costPence: "Cost (£ ex VAT)",
+  "costSource.url": "Link to the price",
+  "costSource.supplier": "Supplier",
+  "costSource.observedAt": "Price seen on",
+  "costSource.vatIncluded": "The price I saw included VAT",
+  "costSource.note": "Note on the price",
+  supplier: "Usual supplier",
+  status: "Availability",
+  confidence: "Confidence",
+  verifiedAt: "Last verified",
+  warranty: "Warranty",
+  notes: "Notes",
+  active: "In use",
+  // Compatibility rules
+  outdoorModel: "Outdoor model",
+  maxIndoorUnits: "Most indoor units",
+  connectableIndoorSeries: "Indoor series it takes",
+  connectableIndoorModels: "Indoor models it takes",
+  minConnectedKw: "Smallest connected capacity (kW)",
+  maxConnectedKw: "Largest connected capacity (kW)",
+  maxTotalPipeM: "Most pipe in total (m)",
+  maxPipePerRoomM: "Most pipe per room (m)",
+  "source.url": "Source link",
+  "source.title": "Source title",
+  ...Object.fromEntries(SPEC_FIELDS.map((f) => [`specs.${f.key}`, f.label])),
+};
+
+function labelFor(path: PropertyKey[]): string {
+  const key = path.map(String).join(".");
+  if (FIELD_LABEL[key]) return FIELD_LABEL[key]!;
+  const [head, n, tail] = path.map(String);
+  if (head === "sources" && /^\d+$/.test(n ?? "")) return `${tail === "title" ? "Title of link" : "Link"} ${Number(n) + 1}`;
+  if (head === "specs" && n === "dimensionsMm") return "Dimensions W × H × D";
+  if (head && FIELD_LABEL[head]) return FIELD_LABEL[head]!;
+  return key || "The item";
+}
+
+function valueAt(input: unknown, path: PropertyKey[]): unknown {
+  let v: unknown = input;
+  for (const k of path) {
+    if (v === null || typeof v !== "object") return undefined;
+    v = (v as Record<PropertyKey, unknown>)[k];
+  }
+  return v;
+}
+
+/** Why zod refused a value, in plain words: the length and the limit, the range, or the field's own rule. */
+function reasonOf(issue: z.core.$ZodIssue, input: unknown): string {
+  const value = valueAt(input, issue.path);
+  const custom = issue.message && !/^Invalid|^Too (big|small)/.test(issue.message) ? issue.message : null;
+  switch (issue.code) {
+    case "too_big":
+      if (issue.origin === "string") return `${typeof value === "string" ? value.trim().length : "too many"} characters, at most ${issue.maximum}`;
+      if (issue.origin === "array") return `${Array.isArray(value) ? value.length : "too many"} entries, at most ${issue.maximum}`;
+      return `${String(value)} is more than ${issue.maximum}`;
+    case "too_small":
+      if (custom) return custom;
+      if (issue.origin === "string") return "can't be blank";
+      return `${String(value)} is less than ${issue.minimum}`;
+    case "invalid_type":
+      return issue.expected === "number" ? "should be a number" : issue.expected === "boolean" ? "should be ticked or not" : "isn't filled in the right way";
+    case "invalid_value":
+      return `should be one of ${issue.values.map(String).join(", ")}`;
+    case "unrecognized_keys":
+      return `isn't something the catalogue keeps (${issue.keys.join(", ")})`;
+    case "invalid_union": {
+      // An optional field that may also be blank: the first real reason from its branches.
+      for (const branch of issue.errors) {
+        const inner = branch.find((i) => i.code !== "invalid_union" && i.code !== "invalid_type");
+        if (inner) return reasonOf({ ...inner, path: [...issue.path, ...inner.path] } as z.core.$ZodIssue, input);
+      }
+      return "isn't valid";
+    }
+    default:
+      return custom ?? "isn't valid";
+  }
+}
+
+/** zod issues as the plain sentences the forms show: the field's label, then why (e.g. "Operating range, heating: 71 characters, at most 200"). */
+export function issuesOf(error: z.ZodError, input?: unknown): string[] {
+  return [...new Set(error.issues.map((i) => `${labelFor(i.path)}: ${reasonOf(i, input)}`))];
 }
 
 /** Optional fields absent rather than undefined, specs only when there are any. */
@@ -208,7 +303,7 @@ function cleanItem(raw: z.infer<typeof catalogueItemSchema>): CatalogueItem {
  */
 export async function saveItem(input: unknown, actor: StaffMember, mode: "create" | "update"): Promise<Result<CatalogueItem>> {
   const parsed = catalogueItemSchema.safeParse(input);
-  if (!parsed.success) return fail(issuesOf(parsed.error));
+  if (!parsed.success) return fail(issuesOf(parsed.error, input));
   const item = cleanItem(parsed.data);
   const problems = catalogueItemErrors(item);
   if (problems.length) return fail(problems);
@@ -341,7 +436,7 @@ export async function applyCsv(csv: string, actor: StaffMember): Promise<Result<
 
 export async function saveRule(input: unknown, actor: StaffMember, mode: "create" | "update"): Promise<Result<CompatibilityRule>> {
   const parsed = compatibilityRuleSchema.safeParse(input);
-  if (!parsed.success) return fail(issuesOf(parsed.error));
+  if (!parsed.success) return fail(issuesOf(parsed.error, input));
   const raw = parsed.data;
   const rule: CompatibilityRule = {
     id: raw.id,
