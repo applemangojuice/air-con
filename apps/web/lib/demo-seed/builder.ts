@@ -8,6 +8,8 @@ import {
   TAX_CODES,
   applyProjectAction,
   buildRunsheet,
+  judgePressureDecay,
+  judgeVacuumDecay,
   createProject,
   customerSafeProposal,
   designVerdict,
@@ -85,6 +87,11 @@ import { demoChecklist, keysUpTo, type ChecklistState } from "./compliance.ts";
 import { addDays, at, londonDate, nextWorkingDay, prevWorkingDay, workingDaysEnding, workingDaysFrom } from "./dates.ts";
 import { demoId } from "./ids.ts";
 import { DEMO_PHOTO_HEIGHT, DEMO_PHOTO_WIDTH, demoPhoto, type DemoScene } from "./photos.ts";
+
+/** A DEMO decay judgement as the commissioning record keeps it. */
+function demoDecay<F>(j: { figures: F; fails: string[]; complete: boolean }): { result: "pass" | "fail" | "incomplete"; figures: F; fails: string[]; failedRuns: number } {
+  return { result: !j.complete ? "incomplete" : j.fails.length ? "fail" : "pass", figures: j.figures, fails: j.fails, failedRuns: 0 };
+}
 
 /**
  * The DEMO pilots: five fictional homes, each at a different point of the
@@ -1887,6 +1894,14 @@ function buildProject(sc: Scenario, today: string, settings: PilotSettings, invo
         holdBar: 41.4,
         vacuumMicrons: 350,
         decayMicrons: 480,
+        // DEMO tests as the app judges them: 41.5 bar g at 14 °C, 41.4 at 13 °C an hour later on a 0.1 bar gauge; 350 micron rising to 480 in an hour.
+        pressureTest: demoDecay(
+          judgePressureDecay(
+            { appliedBarG: 41.5, startC: 14, endBarG: 41.4, endC: 13, holdMinutes: 60, gaugeResolutionBar: 0.1 },
+            { testMinBarG: 40, testMaxBarG: 41.5, holdMinMinutes: 60 },
+          ),
+        ),
+        vacuumTest: demoDecay(judgeVacuumDecay({ reachedMicron: 350, holdMinutes: 60, afterMicron: 480 }, { holdMinMinutes: 60, riseMaxMicron: 200 })),
         additionalChargeG: system.refrigerant.additionalChargeG,
         coolingSplitC,
         heatingSplitC,

@@ -43,6 +43,11 @@ import {
   withStepStatus,
   buildRunsheet,
   NUMERIC_KINDS,
+  carryTargets,
+  decayRetestMarkers,
+  decayTest,
+  withDecayTests,
+  withRetestMarkers,
   type EvidenceRecord,
   type EvidenceSpec,
   type InstallJobV2,
@@ -188,11 +193,24 @@ function job(steps: InstallStep[], evidence: EvidenceRecord[] = []): InstallJobV
   };
 }
 
+/** Real-shaped readings for a decay test's slots: 30 bar g held at 15 °C for an hour on a 0.1 bar gauge; 350 micron rising to 400. */
+const DECAY_READING: Record<string, number> = {
+  "strength-test": 30,
+  "strength-start-temp": 15,
+  "strength-hold": 30,
+  "strength-end-temp": 15,
+  "strength-hold-time": 60,
+  "gauge-resolution": 0.1,
+  vacuum: 350,
+  "vacuum-hold-time": 60,
+  "vacuum-decay": 400,
+};
+
 /** A capture that passes this slot (mid-window, or a plausible reading for record-only slots). */
 function passing(spec: EvidenceSpec, i: number, at = AT): EvidenceRecord {
   const base = { id: `ev-${spec.id}-${i}`, specId: spec.id, at, by: TECH.name, byStaffId: TECH.id };
   if (NUMERIC_KINDS.has(spec.kind) || spec.kind === "measurement") {
-    const v = plausibleValue(spec) ?? 10;
+    const v = plausibleValue(spec) ?? (spec.role ? DECAY_READING[spec.role] : undefined) ?? 10;
     return { ...base, value: v };
   }
   if (spec.kind === "photo" || spec.kind === "video" || spec.kind === "signature") return { ...base, mediaId: `m-${i}` };
@@ -296,14 +314,28 @@ test("the wrong tests are gone: no boundary noise limit, no flat earth-continuit
 
 test("test pressure and vacuum start with no window: record the reading, tech lead confirms", () => {
   const steps = runsheetFromDesign(design(1, "single"), "v-std", CATALOGUE);
-  for (const role of ["strength-test", "strength-hold", "vacuum", "vacuum-decay", "cooling-split", "heating-split"]) {
-    for (const spec of specByRole(steps, role)) {
+  for (const role of ["strength-test", "strength-start-temp", "strength-hold", "strength-end-temp", "strength-hold-time", "gauge-resolution", "vacuum", "vacuum-hold-time", "vacuum-decay", "cooling-split", "heating-split"]) {
+    const specs = specByRole(steps, role);
+    assert.equal(specs.length, 1, role);
+    for (const spec of specs) {
       assert.equal(spec.min, undefined, role);
       assert.equal(spec.max, undefined, role);
       assert.equal(spec.window?.basis, "record", role);
-      if (role.startsWith("strength") || role.startsWith("vacuum")) assert.match(spec.window?.note ?? "", /tech lead confirms/);
     }
   }
+  assert.match(specByRole(steps, "strength-test")[0]!.window?.note ?? "", /tech lead confirms/);
+  assert.match(specByRole(steps, "vacuum")[0]!.window?.note ?? "", /500 micron/);
+  // The two tests are judged as steps, with their own limit (the allowed fall, the rise limit), unset.
+  const pressure = steps.find((s) => s.title === "Strength and tightness test")!;
+  const vacuum = steps.find((s) => s.title === "Vacuum and decay test")!;
+  assert.deepEqual([pressure.decay?.kind, pressure.decay?.limit.targetKey, pressure.decay?.limit.max], ["pressure", "pressure.decay", undefined]);
+  assert.deepEqual([vacuum.decay?.kind, vacuum.decay?.limit.targetKey, vacuum.decay?.limit.max], ["vacuum", "vacuum.rise", undefined]);
+  assert.deepEqual(
+    pressure.evidence.map((e) => e.id.split(".")[1]),
+    ["applied", "start-temp", "held", "end-temp", "hold-time", "resolution", "gauge"],
+    "the readings in the order they're taken",
+  );
+  assert.deepEqual(vacuum.evidence.map((e) => e.id.split(".")[1]), ["reached", "hold-time", "decay", "gauge"]);
 });
 
 test("flare torque by pipe size from the catalogue, as candidates marked for the tech lead", () => {
@@ -530,14 +562,20 @@ test("exceptions: out-of-window readings wait for the tech lead; accept or ask f
 test("targets: the job's targets, set by the tech lead, re-judge readings; commissioning waits for them", () => {
   const steps = runsheetFromDesign(design(2, "single"), "v-std", CATALOGUE);
   const keys = jobTargets(steps).map((t) => t.key);
-  for (const k of ["pressure.test", "vacuum.target", "vacuum.decay", "torque.6.35", "torque.9.52", "torque.12.7", "condensate.fall"]) assert.ok(keys.includes(k as never), k);
-  assert.equal(jobTargets(steps).find((t) => t.key === "pressure.test")!.specCount, 4, "two readings × two systems");
+  for (const k of ["pressure.test", "pressure.hold", "pressure.decay", "vacuum.target", "vacuum.hold", "vacuum.decay", "vacuum.rise", "torque.6.35", "torque.9.52", "torque.12.7", "condensate.fall"]) assert.ok(keys.includes(k as never), k);
+  assert.equal(jobTargets(steps).find((t) => t.key === "pressure.test")!.specCount, 2, "the applied pressure × two systems");
+  assert.equal(jobTargets(steps).find((t) => t.key === "pressure.decay")!.specCount, 2, "one allowed fall per system's test");
   assert.deepEqual(unconfirmedTargets(steps).length, keys.length);
 
   assert.equal(targetError("pressure.test", 30, undefined), "Set the maximum too: the outdoor unit's nameplate PS.");
   assert.equal(targetError("pressure.test", 40, 30), "The minimum is above the maximum.");
   assert.match(targetError("vacuum.target", 100, 500) ?? "", /maximum only/);
   assert.equal(targetError("condensate.fall", undefined, undefined), null, "record-only is a valid confirmation");
+  assert.equal(targetError("pressure.decay", undefined, undefined), null, "the allowed fall may stay at the gauge's resolution");
+  assert.equal(targetError("vacuum.target", undefined, undefined), null, "the vacuum target may stay at 500 micron");
+  for (const k of ["pressure.test", "pressure.hold", "vacuum.hold", "vacuum.rise"] as const) assert.ok(targetError(k, undefined, undefined), `${k} needs a number from the manual`);
+  assert.equal(targetError("pressure.test", undefined, 41.5), "Set the minimum too: the manual's test pressure.");
+  assert.match(targetError("pressure.hold", 0, undefined) ?? "", /more than 0/);
   assert.throws(() => setJobTarget(steps, { key: "pressure.test", min: -1, max: 40 }, TECH.name, AT), /positive/);
 
   let sheet = setJobTarget(steps, { key: "pressure.test", min: 30, max: 41.5, note: "DEMO manual p.12" }, TECH.name, AT);
@@ -547,10 +585,11 @@ test("targets: the job's targets, set by the tech lead, re-judge readings; commi
   // A reading recorded before the target existed is judged against it now.
   const j = { ...job(sheet), evidence: [{ id: "p1", specId: test1.id, value: 45, at: AT, by: "DEMO" }] };
   assert.equal(slotView(j, test1).state, "exception");
-  // Confirm everything else (record only where that's what the manual says).
+  // Confirm everything else (record only where that's what the manual says; a number where one is needed).
+  const NEEDED: Partial<Record<string, { min?: number; max?: number }>> = { "pressure.hold": { min: 60 }, "vacuum.hold": { min: 60 }, "vacuum.rise": { max: 200 } };
   for (const t of jobTargets(sheet)) {
     if (t.basis === "tech-lead") continue;
-    sheet = setJobTarget(sheet, { key: t.key, ...(t.min !== undefined ? { min: t.min } : {}), ...(t.max !== undefined ? { max: t.max } : {}) }, TECH.name, AT);
+    sheet = setJobTarget(sheet, { key: t.key, ...(t.min !== undefined ? { min: t.min } : {}), ...(t.max !== undefined ? { max: t.max } : {}), ...NEEDED[t.key] }, TECH.name, AT);
   }
   assert.deepEqual(unconfirmedTargets(sheet), []);
   assert.ok(JOB_TARGETS["torque.9.52"].hint.includes("Daikin"));
@@ -560,9 +599,32 @@ test("targets: the job's targets, set by the tech lead, re-judge readings; commi
 /* Commissioning                                                       */
 /* ------------------------------------------------------------------ */
 
+/** Every target set as a tech lead would from a (DEMO) manual: 30 to 41.5 bar g held an hour, 500 micron, an hour's decay hold rising at most 200. */
+function confirmAll(steps: InstallStep[]): InstallStep[] {
+  let out = steps;
+  for (const t of jobTargets(steps)) {
+    const n =
+      t.key === "pressure.test"
+        ? { min: 30, max: 41.5 }
+        : t.key === "pressure.hold" || t.key === "vacuum.hold"
+          ? { min: 60 }
+          : t.key === "vacuum.target"
+            ? { max: 500 }
+            : t.key === "vacuum.decay"
+              ? { max: 700 }
+              : t.key === "vacuum.rise"
+                ? { max: 200 }
+                : t.key.startsWith("torque")
+                  ? { min: t.min ?? 10, max: t.max ?? 80 }
+                  : {};
+    out = setJobTarget(out, { key: t.key, ...n }, TECH.name, AT);
+  }
+  return out;
+}
+
 function commissionedJob(): InstallJobV2 {
   let steps = runsheetFromDesign(design(2, "multi"), "v-std", CATALOGUE);
-  for (const t of jobTargets(steps)) steps = setJobTarget(steps, { key: t.key, ...(t.key === "pressure.test" ? { min: 30, max: 41.5 } : {}), ...(t.key === "vacuum.target" ? { max: 500 } : {}), ...(t.key === "vacuum.decay" ? { max: 700 } : {}), ...(t.key.startsWith("torque") ? { min: t.min ?? 10, max: t.max ?? 80 } : {}) }, TECH.name, AT);
+  steps = confirmAll(steps);
   let j = job(steps);
   const value = (role: string, v: number, item?: string) => {
     for (const s of steps) {
@@ -577,9 +639,15 @@ function commissionedJob(): InstallJobV2 {
     }
   };
   j = fill(j);
+  // A second, complete run of each test (the first, from fill, passed too): 38 bar g at 14 °C, 37.9 at 13 °C an hour later.
   value("strength-test", 38);
+  value("strength-start-temp", 14);
   value("strength-hold", 37.9);
+  value("strength-end-temp", 13);
+  value("strength-hold-time", 60);
+  value("gauge-resolution", 0.1);
   value("vacuum", 320);
+  value("vacuum-hold-time", 60);
   value("vacuum-decay", 450);
   value("additional-charge", 0);
   value("factory-charge", 1.4);
@@ -637,13 +705,194 @@ test("commissioning sign-off: tech lead only, runsheet complete, targets confirm
   assert.ok(commissioningSignErrors(j, FGAS_INSTALLER, ON).some((e) => /tech lead/.test(e)));
   const unsure = { ...j, runsheet: runsheetFromDesign(design(2, "multi"), "v-std", CATALOGUE) };
   assert.ok(commissioningSignErrors(unsure, TECH, ON).some((e) => /targets/.test(e)));
-  const bad = { ...j, evidence: [...j.evidence, { id: "x", specId: specByRole(j.runsheet, "vacuum")[0]!.id, value: 900, at: "2026-11-10T18:00:00.000Z", by: "DEMO" }] };
+  const bad = { ...j, evidence: [...j.evidence, { id: "x", specId: specByRole(j.runsheet, "flare-gas")[0]!.id, value: 900, at: "2026-11-10T18:00:00.000Z", by: "DEMO" }] };
   assert.ok(commissioningSignErrors(bad, TECH, ON).some((e) => /outside the window/.test(e)));
+  // One vacuum reading typed again starts a new run: the step isn't finished until the whole decay test is taken again.
+  const retyped = { ...j, evidence: [...j.evidence, { id: "y", specId: specByRole(j.runsheet, "vacuum")[0]!.id, value: 900, at: "2026-11-10T18:00:00.000Z", by: "DEMO" }] };
+  assert.ok(commissioningSignErrors(retyped, TECH, ON).some((e) => /1 step still to finish/.test(e)));
+  // A whole run that fails holds the signature, with the reason and what to do.
+  const wet = {
+    ...j,
+    evidence: [
+      ...j.evidence,
+      ...[["vacuum", 900], ["vacuum-hold-time", 60], ["vacuum-decay", 1400]].map(([role, value], i) => ({ id: `w${i}`, specId: specByRole(j.runsheet, role as string)[0]!.id, value: value as number, at: "2026-11-10T18:00:00.000Z", by: "DEMO" })),
+    ],
+  };
+  const errs = commissioningSignErrors(wet, TECH, ON);
+  assert.ok(errs.some((e) => /vacuum decay test failed and hasn't been done again \(Reached 900 micron, above the 500 micron target/.test(e)), errs.join(" | "));
   const rec = buildCommissioningRecord(j, TECH, "2026-11-10T16:00:00.000Z", "  DEMO notes ");
   assert.equal(rec.signedBy.qualificationRef, "DEMO-FGAS-1");
   assert.equal(rec.notes, "DEMO notes");
   assert.equal(rec.results.length, 1);
   assert.ok(commissioningSignErrors({ ...j, commissioning: rec }, TECH, ON).includes("Commissioning is already signed."));
+});
+
+/* ------------------------------------------------------------------ */
+/* Decay tests                                                         */
+/* ------------------------------------------------------------------ */
+
+/** One run of a decay test: each reading, in the order taken, a minute apart. */
+function run(steps: InstallStep[], readings: [string, number][], tag: string, systemItem?: string): EvidenceRecord[] {
+  return readings.map(([role, value], i) => {
+    const spec = steps.filter((s) => !systemItem || s.item === systemItem).flatMap((s) => s.evidence).find((e) => e.role === role)!;
+    return { id: `${tag}-${i}`, specId: spec.id, value, at: `2026-11-10T1${Math.min(9, i)}:00:00.000Z`, by: TECH.name, byStaffId: TECH.id };
+  });
+}
+
+/** The gauge photos on both tests (the steps' other required slot). */
+const gaugePhotos = (steps: InstallStep[]): EvidenceRecord[] =>
+  steps
+    .filter((s) => s.decay)
+    .flatMap((s) => s.evidence.filter((e) => e.kind === "photo"))
+    .map((e, i) => ({ id: `photo-${i}`, specId: e.id, mediaId: `m-gauge-${i}`, at: AT, by: TECH.name }));
+
+const PRESSURE_OK: [string, number][] = [
+  ["strength-test", 30],
+  ["strength-start-temp", 20],
+  ["strength-hold", 29.4],
+  ["strength-end-temp", 15],
+  ["strength-hold-time", 60],
+  ["gauge-resolution", 0.1],
+];
+
+test("decay: a fall the temperature explains passes, with the correction on the record", () => {
+  const steps = confirmAll(runsheetFromDesign(design(1, "single"), "v-std", CATALOGUE));
+  const step = steps.find((s) => s.decay?.kind === "pressure")!;
+  const j = job(steps, [...gaugePhotos(steps), ...run(steps, PRESSURE_OK, "p1")]);
+  const t = decayTest(j, step)!;
+  assert.equal(t.result, "pass");
+  assert.equal(t.failedRuns, 0);
+  assert.ok(Math.abs(t.pressure!.endCorrectedBarG! - 29.928) < 0.001);
+  assert.equal(t.pressure!.allowanceFrom, "gauge-resolution");
+  assert.equal(stepView(j, step).state, "done");
+  const [r] = commissioningFromJob(j);
+  assert.deepEqual([r!.strengthTestBar, r!.holdBar, r!.pressureTest?.result], [30, 29.4, "pass"]);
+});
+
+test("decay: a fall beyond the gauge fails the step; re-typing one reading never clears it; a full retest does", () => {
+  const steps = confirmAll(runsheetFromDesign(design(1, "single"), "v-std", CATALOGUE));
+  const step = steps.find((s) => s.decay?.kind === "pressure")!;
+  // 30.0 bar g to 29.4 at a steady 15 °C: 0.6 bar lost.
+  const leak: [string, number][] = PRESSURE_OK.map(([r, v]) => [r, r === "strength-start-temp" ? 15 : v]);
+  let j = job(steps, [...gaugePhotos(steps), ...run(steps, leak, "p1")]);
+  let t = decayTest(j, step)!;
+  assert.deepEqual([t.result, t.retestNeeded, t.failedRuns], ["fail", true, 1]);
+  assert.match(t.fails[0]!, /^Fell 0\.6 bar/);
+  let v = stepView(j, step);
+  assert.equal(v.state, "failed");
+  assert.ok(v.slots.filter((s) => s.spec.role !== undefined).every((s) => s.state === "recapture"), "every reading is to take again");
+  assert.ok(commissioningSignErrors(j, TECH, ON).some((e) => /strength and tightness test failed/.test(e)));
+  // A tap on Pass doesn't clear it.
+  j = withStepStatus(j, { stepId: step.id, outcome: "pass", at: AT, by: TECH.name });
+  assert.equal(stepView(j, step).state, "failed");
+  // Typing the end pressure again (a "better" number) starts a retest; the failure stands meanwhile.
+  j = { ...j, evidence: [...j.evidence, ...run(steps, [["strength-hold", 30]], "p2")] };
+  t = decayTest(j, step)!;
+  assert.deepEqual([t.result, t.retestNeeded, t.toTake.length], ["fail", true, 5]);
+  assert.equal(stepView(j, step).state, "failed");
+  // The rest of the retest: joints remade, held again, every reading taken again.
+  j = { ...j, evidence: [...j.evidence, ...run(steps, PRESSURE_OK.filter(([r]) => r !== "strength-hold"), "p3")] };
+  t = decayTest(j, step)!;
+  assert.deepEqual([t.result, t.retestNeeded, t.failedRuns], ["pass", false, 1], "the earlier failure is counted, not hidden");
+  // 30 bar g at 20 °C, 30 at 15 °C: it rose once corrected.
+  assert.ok(t.pressure!.fallBar! < 0);
+  assert.equal(stepView(j, step).state, "done");
+  assert.equal(commissioningFromJob(j)[0]!.pressureTest?.failedRuns, 1);
+});
+
+test("decay: a target change can't pass a failed test; the retest is judged against it", () => {
+  const steps = confirmAll(runsheetFromDesign(design(1, "single"), "v-std", CATALOGUE));
+  const step = steps.find((s) => s.decay?.kind === "pressure")!;
+  // 0.15 bar lost at a steady temperature: over the 0.1 bar gauge, under a 0.2 bar manual allowance.
+  const slow: [string, number][] = PRESSURE_OK.map(([r, v]) => [r, r === "strength-start-temp" ? 15 : r === "strength-hold" ? 29.85 : v]);
+  const j = job(steps, run(steps, slow, "p1"));
+  assert.equal(decayTest(j, step)!.result, "fail");
+  const next = setJobTarget(steps, { key: "pressure.decay", max: 0.2, note: "DEMO manual p.20" }, TECH.name, AT);
+  assert.equal(decayTest(j, next.find((s) => s.id === step.id)!)!.result, "pass", "on its own the change would pass it");
+  const markers = decayRetestMarkers(j, next);
+  assert.deepEqual(markers.map((m) => [m.stepId, m.evidenceId]), [[step.id, "p1-5"]]);
+  const marked = withRetestMarkers(next, markers);
+  const ms = marked.find((s) => s.id === step.id)!;
+  const held = decayTest(j, ms)!;
+  assert.deepEqual([held.result, held.retestNeeded], ["fail", true]);
+  assert.match(held.fails[0]!, /more than the 0\.1 bar allowed \(the gauge's resolution\)/, "the reason it failed when it was taken");
+  // The same fall on a retest now passes against the manual's 0.2 bar.
+  const retest = { ...j, runsheet: marked, evidence: [...j.evidence, ...run(marked, slow, "p2")] };
+  const t = decayTest(retest, ms)!;
+  assert.deepEqual([t.result, t.failedRuns, t.pressure!.allowanceFrom], ["pass", 1, "tech-lead"]);
+  // Nothing to mark when nothing has failed.
+  assert.deepEqual(decayRetestMarkers(retest, marked), []);
+});
+
+test("vacuum decay: 350 micron rising to 420 in an hour passes; climbing to 1,900 fails until the whole test is retaken", () => {
+  const steps = confirmAll(runsheetFromDesign(design(1, "single"), "v-std", CATALOGUE));
+  const step = steps.find((s) => s.decay?.kind === "vacuum")!;
+  const dry = job(steps, [...gaugePhotos(steps), ...run(steps, [["vacuum", 350], ["vacuum-hold-time", 60], ["vacuum-decay", 420]], "v1")]);
+  const t = decayTest(dry, step)!;
+  assert.deepEqual([t.result, t.vacuum!.riseMicron, t.vacuum!.riseMaxMicron, t.vacuum!.targetMicron], ["pass", 70, 200, 500]);
+  const wet = job(steps, [...gaugePhotos(steps), ...run(steps, [["vacuum", 350], ["vacuum-hold-time", 60], ["vacuum-decay", 1900]], "v1")]);
+  assert.equal(stepView(wet, step).state, "failed");
+  assert.match(decayTest(wet, step)!.fails[0]!, /moisture or a leak/);
+  const again = { ...wet, evidence: [...wet.evidence, ...run(steps, [["vacuum", 300], ["vacuum-hold-time", 60], ["vacuum-decay", 380]], "v2")] };
+  assert.equal(stepView(again, step).state, "done");
+  // An out-of-window decay reading is judged by the test, never an exception to accept.
+  assert.deepEqual(openExceptions(wet), []);
+});
+
+test("decay: readings that can't be right wait to be taken again, without forcing a retest", () => {
+  const steps = confirmAll(runsheetFromDesign(design(1, "single"), "v-std", CATALOGUE));
+  const step = steps.find((s) => s.decay?.kind === "pressure")!;
+  const typo: [string, number][] = PRESSURE_OK.map(([r, v]) => [r, r === "strength-end-temp" ? 150 : v]);
+  let j = job(steps, run(steps, typo, "p1"));
+  let t = decayTest(j, step)!;
+  assert.equal(t.result, "incomplete");
+  assert.match(t.invalid[0]!, /150 °C/);
+  assert.equal(stepView(j, step).state, "in-progress");
+  j = { ...j, evidence: [...j.evidence, ...run(steps, [["strength-end-temp", 15]], "p2")] };
+  t = decayTest(j, step)!;
+  assert.equal(t.result, "pass");
+});
+
+test("withDecayTests: a runsheet from before the decay tests gains their readings, keeps its ids and the tech lead's targets", () => {
+  const fresh = runsheetFromDesign(design(1, "single"), "v-std", CATALOGUE);
+  // The pilot-runsheet-1 shape: applied, held (on the test-pressure target), gauge photo; applied, decay, photo.
+  const old: InstallStep[] = fresh.map((s) => {
+    if (!s.decay) return s;
+    const { decay: _decay, ...rest } = s;
+    const keep = s.decay.kind === "pressure" ? ["strength-test", "strength-hold"] : ["vacuum", "vacuum-decay"];
+    return {
+      ...rest,
+      evidence: s.evidence
+        .filter((e) => !e.role || keep.includes(e.role))
+        .map((e) => (e.role === "strength-hold" ? { ...e, targetKey: "pressure.test" as const } : e)),
+    };
+  });
+  const set = setJobTarget(old, { key: "pressure.test", min: 30, max: 41.5, note: "DEMO manual" }, TECH.name, AT);
+  const up = withDecayTests(set);
+  const p = up.find((s) => s.title === "Strength and tightness test")!;
+  assert.equal(p.decay?.kind, "pressure");
+  assert.deepEqual(p.evidence.map((e) => e.id.split(".")[1]), ["applied", "start-temp", "held", "end-temp", "hold-time", "resolution", "gauge"]);
+  const applied = p.evidence.find((e) => e.role === "strength-test")!;
+  assert.deepEqual([applied.min, applied.max, applied.window?.basis, applied.window?.note], [30, 41.5, "tech-lead", "DEMO manual"]);
+  const v = up.find((s) => s.title === "Vacuum and decay test")!;
+  assert.deepEqual(v.evidence.map((e) => e.id.split(".")[1]), ["reached", "hold-time", "decay", "gauge"]);
+  assert.equal(withDecayTests(up), up, "idempotent");
+  const other = up.find((s) => s.title === "Release and leak check")!;
+  assert.equal(other, set.find((s) => s.id === other.id), "other steps untouched");
+});
+
+test("carryTargets: a rebuilt runsheet keeps every target the tech lead set", () => {
+  const before = setJobTarget(
+    setJobTarget(runsheetFromDesign(design(1, "single"), "v-std", CATALOGUE), { key: "vacuum.rise", max: 150, note: "DEMO p.9" }, TECH.name, AT),
+    { key: "pressure.test", min: 30, max: 41.5 },
+    TECH.name,
+    AT,
+  );
+  const after = carryTargets(before, runsheetFromDesign(design(1, "single"), "v-std", CATALOGUE));
+  const rise = jobTargets(after).find((t) => t.key === "vacuum.rise")!;
+  assert.deepEqual([rise.max, rise.basis, rise.setBy, rise.setAt, rise.note], [150, "tech-lead", TECH.name, AT, "DEMO p.9"]);
+  assert.equal(jobTargets(after).find((t) => t.key === "pressure.test")!.min, 30);
+  assert.equal(jobTargets(after).find((t) => t.key === "vacuum.hold")!.basis, "record", "unset stays unset");
 });
 
 test("legacy demo runsheet: commissioning still derives from labels", () => {

@@ -40,18 +40,31 @@ says what to do instead. Approvals that need a professional are in
 7. **Commissioning targets are set by the technical lead, per job.** No
    manufacturer test pressure, vacuum, decay, torque or drain-fall figure
    was verified, so the app shows the unverified candidates as hints, records
-   every reading, and only judges readings once the technical lead sets the
-   targets from the manual.
-   - *A pressure drop isn't worked out.* The test pressure and the pressure
-     at the end of the hold are each checked against the same window, never
-     against each other, and the hold time and the temperatures at the start
-     and end aren't asked for (the vacuum decay is the same: each reading on
-     its own). *Instead:* set the test-pressure target's minimum to the
-     manual's test pressure, so any drop below it is flagged; the engineer
-     writes the hold time and temperatures in the step's note and marks the
-     step **Fail** for any drop the temperature doesn't explain; the
-     technical lead compares "Test pressure" and "After the hold" on the
-     **Commission** tab before signing.
+   every reading, and judges readings against the targets the technical lead
+   sets from the manual (the pressure and vacuum tests also against the
+   company's own defaults meanwhile: no fall beyond the gauge's resolution,
+   500 micron).
+   - *The pressure and vacuum decay tests are judged from their readings*
+     (round 8's "a pressure drop isn't worked out" is closed, §K47): the
+     end-of-hold pressure is corrected to the start temperature (absolute
+     pressure × kelvin ratio, at a standard atmosphere of 1.01325 bar) and
+     the test fails on any fall beyond the gauge's resolution, or the
+     manual's allowance; the vacuum against 500 micron or a stricter manual
+     figure, and its rise over the hold against the job's limit. A failed
+     test can't be accepted, cleared by Pass or passed by a later target
+     change: only a full retest clears it. But: *no manufacturer test
+     pressure, hold time, allowance or rise limit was verified* (the
+     manuals' hosts were unreachable again; the Daikin figures in the hints
+     are search-engine extracts), so the technical lead sets the test
+     pressure and PS, both hold times and the rise limit from the manual
+     before signing; the barometric pressure on the day (about ±0.03 bar) and
+     the thermometer's own error aren't modelled, so a fall within a
+     hundredth or two of the allowance is worth a second look; a gauge
+     resolution typed too coarse loosens the default allowance (it's printed
+     on the certificate); and readings are put in order by the time the
+     phone stamped them, so a phone with a badly wrong clock could mix two
+     runs. *Instead:* set the targets from the manual before the install
+     day, and use a phone with automatic time.
    - *The R32 room size is re-checked from the catalogue's factory charge.*
      The charge step flags an added charge over what the smallest room on
      the system allows, worked out with the catalogue's factory charge, not

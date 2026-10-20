@@ -129,9 +129,30 @@ export default async function FieldHelpPage() {
 
         <Fold id="evidence" title="Evidence: photos, readings, serials">
           <p>Each step has slots: photos, readings, serial numbers, signatures. Fill every one it asks for, then tap Pass.</p>
-          <p>A reading outside the allowed range is flagged <B>Needs review</B> for the tech lead. Record what you actually measured: never re-take it to make it pass.</p>
+          <p>A reading outside the allowed range is flagged <B>Needs review</B> for the tech lead (the pressure test and the vacuum are judged as a whole instead: see below). Record what you actually measured: never re-take it to make it pass.</p>
           <p>Photos: whole item in shot, label readable for serials, nothing in the way.</p>
           <p>Everything saves on this phone first and sends by itself (see the sync badge, below).</p>
+        </Fold>
+
+        <Fold id="tests" title="The pressure test and the vacuum">
+          <p>
+            <B>Strength and tightness test</B> (oxygen-free nitrogen): apply the manual&apos;s test pressure, never above the outdoor unit&apos;s nameplate PS, and type it with the
+            ambient temperature by the pipework. Hold for the manual&apos;s time, then type the pressure and the temperature again, how long it held, and your gauge&apos;s
+            resolution (the smallest step it reads: 0.1 bar on most digital manifolds). Photograph the gauge.
+          </p>
+          <p>
+            The app works out the result from your readings: it corrects the end pressure to the start temperature (a cooler afternoon lowers the gauge without a leak) and
+            fails the test if it fell by more than the gauge&apos;s resolution, or the manual&apos;s allowance if the tech lead set one. Above PS or below the manual&apos;s
+            pressure, or a hold shorter than the manual&apos;s, fails too.
+          </p>
+          <p>
+            <B>Vacuum</B>: digital micron gauge. Pull down to 500 micron (or the manual&apos;s figure if it&apos;s stricter), isolate the pump, hold for the manual&apos;s time and
+            type the reading after. A rise above the job&apos;s limit fails: moisture or a leak.
+          </p>
+          <p className="rounded-xl bg-red-50 px-3 py-2 font-semibold text-red-900">
+            A failed test is found, fixed and done again, with every reading taken again. Typing one reading again, or tapping Pass, never clears it, and nobody can accept it:
+            commissioning can&apos;t be signed until a retest passes. Record what the gauge says.
+          </p>
         </Fold>
 
         <Fold id="outcomes" title="Pass, Fail, Blocked, N/A">
@@ -225,7 +246,7 @@ export default async function FieldHelpPage() {
 
         <Fold id="sign-off" title="Commissioning and handover sign-off">
           <p>
-            <B>Commission</B> (the tech lead signs): the results for each system, from the evidence; the manufacturer&apos;s targets; every Needs review item looked at. <B>Sign commissioning</B> completes the install and issues the certificate. It can&apos;t be undone from the field.
+            <B>Commission</B> (the tech lead signs): the results for each system, from the evidence, with the pressure and vacuum tests worked out; the manufacturer&apos;s targets (test pressure and PS, hold times, the allowed fall, the vacuum target and rise limit, torques, drain fall); every Needs review item looked at. A failed pressure or vacuum test stops the signature until it&apos;s retested. <B>Sign commissioning</B> completes the install and issues the certificate. It can&apos;t be undone from the field.
           </p>
           <p>
             <B>Handover</B>, with the customer beside you: show them the remote, the modes, the app, cleaning the filters, and what&apos;s normal (steam when it defrosts, a few drips). The handover pack appears once commissioning is signed. They pick <B>All good</B> or <B>There&apos;s a snag</B> (write each snag down), type their name and sign. Each snag becomes an issue with an owner and a date, and the customer can see it.

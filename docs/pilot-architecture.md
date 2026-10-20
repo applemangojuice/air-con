@@ -2642,3 +2642,68 @@ changelog and the reasons, so nobody "fixes" a deliberate choice back.
       "already designed" claims; `loadIntel("demo")` and the no-database
       fallback need `demoModeAllowed`, `isSampleIntel` labels the sample
       DEMO, and **Seed sample book** runs only on a demo deployment.
+
+47. **The two engineering gaps round 8 left (known limitations 7 and 9a,
+    before the first real customers).**
+    - *Decay tests* (was known limitation 7's "a pressure drop isn't worked
+      out"): pure `decay.ts`. `judgePressureDecay` takes the applied and
+      end pressures (bar g), the ambient at each, the hold time and the
+      gauge's resolution; corrects the end reading to the start temperature
+      in absolute terms (`correctedEndBarG`: (P_end + 1.01325) × T_start K ÷
+      T_end K − 1.01325, `ATMOSPHERE_BAR`, `KELVIN`); and fails a fall
+      beyond the allowance (the tech lead's `pressure.decay`, else the
+      gauge's resolution, `allowanceFrom`), a test above the pressure.test
+      maximum (the nameplate PS) or below its minimum (the manual's), or a
+      hold shorter than `pressure.hold`. `judgeVacuumDecay`: the target is
+      the stricter of `VACUUM_STANDARD_MICRON` (500, 66.7 Pa) and the tech
+      lead's `vacuum.target` (`vacuumTargetMicron`); fails above it, a hold
+      shorter than `vacuum.hold`, a rise over `vacuum.rise`, or an end reading
+      over `vacuum.decay` (kept, as an absolute ceiling). Readings that can't
+      be right (ambient outside −30 to 60 °C, a non-positive pressure, hold or
+      gauge step, a step as big as the test) don't count until typed again.
+      `pressureDecayRows`/`vacuumDecayRows`/`decayResultText` are the words on
+      every surface. In the runsheet (`INSTALL_TEMPLATE_VERSION`
+      `pilot-runsheet-2`) the two steps carry `InstallStep.decay` (`kind`, a
+      step-level `limit` holding the `pressure.decay`/`vacuum.rise` target,
+      and `retestAfter`) and new slots with roles `strength-start-temp`,
+      `strength-end-temp`, `strength-hold-time`, `gauge-resolution`,
+      `vacuum-hold-time` (`pressureSlotDefs`/`vacuumSlotDefs`, shared with
+      `withDecayTests`, which brings a pilot-runsheet-1 runsheet up to them,
+      keeping ids and targets: `installJobs.fromRow` applies it to every
+      unsigned job, so the next save stores it). New targets `pressure.hold`,
+      `pressure.decay`, `vacuum.hold`, `vacuum.rise`; `TargetDef.recordOnly`
+      names the no-number confirmation ("Use the gauge's resolution", "Use
+      500 micron") or forbids it (pressure.test now needs both bounds; the
+      hold times and the rise limit need a number). `jobTargets`/`setJobTarget`
+      (`applyTarget`) cover the step-level limit; `carryTargets` keeps the
+      tech lead's targets when an untouched job is rebuilt to the new template
+      (`ensureInstallJob`). `decayTest(job, step)` reads the evidence log in
+      order as disjoint *runs*: a run closes once every reading has been
+      taken since the last one closed (and is believable), and is judged with
+      the targets as they stand; re-typing a reading after a run starts a new
+      one, so a failed run stays failed until a whole retest passes
+      (`retestNeeded`, `toTake`, `failedRuns`). `stepView` takes the test's
+      word: its slots are never exceptions (so `openExceptions`, now from
+      `stepView`, skips them) and are "recapture" while a retest is owed; a
+      failing test is `failed` whatever outcome was tapped; done needs a
+      pass. `reviewException` refuses a decay slot. A target change that
+      would pass a failed run leaves it failed: `setTarget` saves the change
+      with `decayRetestMarkers` → `withRetestMarkers` (`decay.retestAfter`:
+      the run's last evidence id and its reasons) and answers them, and the
+      screen lays them over its copy (`withAnswers`). `commissioningSignErrors`
+      names each failed test. `CommissioningResult.pressureTest`/`vacuumTest`
+      (`DecayRecord`: result, figures exactly as measured and worked out,
+      fails, failedRuns) freeze into the record, and the headline readings
+      come from the judged run. The step card (`DecayPanel`), the Commission
+      tab, the certificate and the handover pack (`CommissioningResults`)
+      show the readings, the correction, the allowance and the result; the
+      DEMO commissioning record carries judged tests. Sources: Daikin R32
+      split installer guides and manuals (2 bar minimum, 30 bar recommended;
+      −0.1 MPa, at least an hour held with the pump off) and REFCOM's OFN
+      pressure-testing bulletin (temperature, absolute units), all through
+      search-engine extracts or secondary summaries: daikin.eu,
+      legislation.gov.uk, hse.gov.uk and every other host failed DNS from
+      here, so no limit is asserted as verified; the 500 micron standard and
+      the gauge-resolution allowance are the company's, stricter than what
+      they replace.
+

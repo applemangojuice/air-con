@@ -216,14 +216,42 @@ signatures, confirmations. Fill every one it asks for, then tap **Pass**.
   in the way.
 - Readings: record what you actually measured. A reading outside its
   allowed range is flagged **Needs review** for the technical lead. Never
-  re-take a reading to make it pass.
+  re-take a reading to make it pass. (The pressure test and the vacuum are
+  judged as a whole instead: below.)
+
+**The pressure test and the vacuum** (day 3, F-gas):
+
+- *Strength and tightness test.* Oxygen-free nitrogen at the manual's test
+  pressure, never above the outdoor unit's nameplate PS. Type the pressure
+  you applied and the ambient temperature by the pipework; hold for the
+  manual's time; then type the pressure and the temperature at the end, how
+  long it held, and your gauge's **resolution** (the smallest step it reads:
+  0.1 bar on most digital manifolds). Photograph the gauge.
+- The app judges it from those readings. It corrects the end pressure to the
+  start temperature in absolute terms (end + 1.013 bar, × start K ÷ end K,
+  − 1.013 bar: a cooler afternoon lowers the gauge without a leak, a warmer
+  one can hide one) and fails the test if it fell by more than the gauge's
+  resolution, or the manual's allowance if the technical lead set one.
+  Testing above PS or below the manual's pressure, or holding for less than
+  the manual's time, fails too.
+- *Vacuum and decay test.* Digital micron gauge, not the compound gauge.
+  Pull down to 500 micron (66.7 Pa), or the manual's figure if it's
+  stricter; isolate the pump; hold for the manual's time; type the reading
+  after. A rise above the job's limit fails: moisture or a leak.
+- **A failed test is found, fixed and done again, with every reading taken
+  again.** Typing one reading again or tapping **Pass** doesn't clear it, the
+  technical lead can't accept it, and a target changed afterwards doesn't
+  pass it either: commissioning can't be signed until a retest passes. A
+  reading that can't be right (a 150 °C ambient) just waits to be typed
+  again. The step shows the readings, the correction and the result, and so
+  do the commissioning certificate and the family's handover pack.
 
 **Outcomes**
 
 | Outcome | When | Needs |
 | --- | --- | --- |
 | **Pass** | Done, and every slot captured | Nothing more |
-| **Fail** | Done, but the result is wrong (a pressure test that drops) | What happened. A failed critical step stops the job until the technical lead looks |
+| **Fail** | Done, but the result is wrong (a joint that bubbles, a pump that won't discharge). A pressure or vacuum test that fails on its readings is marked failed for you | What happened. A failed critical step stops the job until the technical lead looks |
 | **Blocked** | You can't do it (no access, a missing part, not safe) | Why. It raises an issue for the office |
 | **N/A** | It doesn't apply to this job (no condensate pump on this one) | Why |
 
@@ -329,12 +357,19 @@ clear it.
 
 1. **This job's targets**: the manufacturer figures weren't verified in our
    research, so you set each one from this model's installation manual:
-   nitrogen test pressure (never above the outdoor unit's nameplate PS),
-   vacuum target, decay test, flare torque for each pipe size, condensate
-   fall. Type the figure and the manual page → **Set target**. Readings
-   already taken are judged against what you set.
-2. **Ready to sign?** lists what's left: unfinished steps, targets not set,
-   readings to review, and anything for this job still on your phone (the
+   nitrogen test pressure (the manual's figure as the minimum, the outdoor
+   unit's nameplate PS as the maximum), the pressure test's hold time and
+   allowed fall (**Use the gauge's resolution** unless the manual gives a
+   figure), the vacuum target (**Use 500 micron** unless the manual's is
+   stricter), the vacuum decay hold time and rise limit, the highest
+   reading after the hold if the manual gives one, flare torque for each
+   pipe size, condensate fall. Type the figure and the manual page → **Set
+   target**. Readings already taken are judged against what you set; a
+   change that would pass a test that already failed leaves it failed,
+   owing a retest.
+2. **Ready to sign?** lists what's left: unfinished steps, a failed
+   pressure or vacuum test still to retest, targets not set, readings to
+   review, and anything for this job still on your phone (the
    certificate is made from what the server has, so **Sign** waits for it to
    sync: **Sync first**).
 3. Review every **Needs review** reading.

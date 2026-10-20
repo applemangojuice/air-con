@@ -1,4 +1,4 @@
-import { jobTargets, setJobTarget, withExceptionReview, type CommissioningRecord, type ExceptionReview, type InstallJobV2, type TargetKey } from "@aircon/domain";
+import { jobTargets, setJobTarget, withExceptionReview, withRetestMarkers, type CommissioningRecord, type ExceptionReview, type InstallJobV2, type TargetKey } from "@aircon/domain";
 import type { FieldHeader, FieldHeaderState } from "./types";
 
 /**
@@ -21,8 +21,13 @@ export function withHeaderState(header: FieldHeader, state: FieldHeaderState | n
   return { ...rest, ...state };
 }
 
-/** A target the server set: exactly what setJobTarget applied, by whom and when. */
-export type TargetAnswer = { input: { key: TargetKey; min?: number; max?: number; note?: string }; by: string; at: string };
+/** A target the server set: exactly what setJobTarget applied, by whom and when, and any retest it left owing. */
+export type TargetAnswer = {
+  input: { key: TargetKey; min?: number; max?: number; note?: string };
+  by: string;
+  at: string;
+  retest?: { stepId: string; evidenceId: string; reasons: string[] }[];
+};
 export type SignAnswer = { record: CommissioningRecord; certificate: { id: string; ref: string } | null; already?: boolean; header?: FieldHeaderState };
 
 /**
@@ -39,7 +44,7 @@ export function withAnswers(job: InstallJobV2, answers: { targets: TargetAnswer[
       const has = serverSetAt.get(a.input.key);
       if (has && has >= a.at) continue;
       try {
-        runsheet = setJobTarget(runsheet, a.input, a.by, a.at);
+        runsheet = withRetestMarkers(setJobTarget(runsheet, a.input, a.by, a.at), a.retest ?? []);
       } catch {
         /* the server accepted it, so this can't refuse; if it does, the page's data stands */
       }

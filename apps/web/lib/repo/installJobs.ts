@@ -1,11 +1,12 @@
-import type {
-  CommissioningRecord,
-  ExceptionReview,
-  InstallJobV2,
-  InstallStep,
-  Project,
-  QaStatus,
-  StepStatusRecord,
+import {
+  withDecayTests,
+  type CommissioningRecord,
+  type ExceptionReview,
+  type InstallJobV2,
+  type InstallStep,
+  type Project,
+  type QaStatus,
+  type StepStatusRecord,
 } from "@aircon/domain";
 import { compact, db, isUuid, jsonArray, jsonObject, must, nowIso, optStr, uuidOrNull, type Row } from "./base";
 import * as evidenceRepo from "./evidence";
@@ -29,20 +30,27 @@ export type InstallJobParts = Pick<
 
 const QA_STATUSES: QaStatus[] = ["in-progress", "auto-approved", "exceptions", "signed-off"];
 
+/**
+ * The stored job. A runsheet from before the decay tests (pilot-runsheet-1)
+ * that isn't signed yet is read with them (withDecayTests: the pressure and
+ * vacuum steps gain their temperature, hold-time and gauge readings; ids and
+ * the tech lead's targets kept), and the next save stores it that way. A
+ * signed job is read exactly as it was signed.
+ */
 export function fromRow(row: Row): InstallJobParts {
   const qa = jsonObject<{ status?: unknown; reviewedBy?: unknown; note?: unknown }>(row.qa);
+  const commissioning =
+    row.commissioning && typeof row.commissioning === "object" ? (row.commissioning as CommissioningRecord) : undefined;
+  const runsheet = jsonArray<InstallStep>(row.runsheet);
   return compact<InstallJobParts>({
     id: String(row.id),
     projectId: String(row.project_id),
     designId: optStr(row.design_id),
     templateVersion: String(row.template_version ?? ""),
-    runsheet: jsonArray<InstallStep>(row.runsheet),
+    runsheet: commissioning ? runsheet : withDecayTests(runsheet),
     stepStatuses: jsonArray<StepStatusRecord>(row.step_statuses),
     exceptionReviews: jsonArray<ExceptionReview>(row.exception_reviews),
-    commissioning:
-      row.commissioning && typeof row.commissioning === "object"
-        ? (row.commissioning as CommissioningRecord)
-        : undefined,
+    commissioning,
     qa: compact({
       status: QA_STATUSES.includes(qa.status as QaStatus) ? (qa.status as QaStatus) : "in-progress",
       reviewedBy: optStr(qa.reviewedBy),

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { INSTALL_TEMPLATE_VERSION, jobTargets, openExceptions, runsheetFromDesign, type CatalogueItem, type DesignRecord, type InstallJobV2 } from "@aircon/domain";
+import { INSTALL_TEMPLATE_VERSION, decayTest, jobTargets, openExceptions, runsheetFromDesign, type CatalogueItem, type DesignRecord, type InstallJobV2 } from "@aircon/domain";
 import { withAnswers, withHeaderState } from "../components/field/answers.ts";
 import type { FieldHeader, FieldHeaderState } from "../components/field/types.ts";
 
@@ -135,6 +135,19 @@ test("a target the tech lead set shows at once; the page's newer setting of it w
   const later = withAnswers(page, { targets: [{ ...set, input: { key, min: 3, max: 40 }, at: "2026-11-12T14:05:00.000Z" }], reviews: [], signed: null });
   const relaid = withAnswers(later, { targets: [set], reviews: [], signed: null });
   assert.equal(jobTargets(relaid.runsheet).find((x) => x.key === key)!.min, 3);
+});
+
+test("a target change that leaves a retest owing shows it at once: the failed test stays failed on screen", () => {
+  const page = job();
+  const step = page.runsheet.find((s) => s.decay?.kind === "pressure")!;
+  const spec = (role: string) => step.evidence.find((e) => e.role === role)!.id;
+  const readings: [string, number][] = [["strength-test", 30], ["strength-start-temp", 15], ["strength-hold", 29.85], ["strength-end-temp", 15], ["strength-hold-time", 60], ["gauge-resolution", 0.1]];
+  const withRun = { ...page, evidence: readings.map(([role, value], i) => ({ id: `e${i}`, specId: spec(role), value, at: `2026-11-12T1${i}:00:00.000Z`, by: "DEMO" })) };
+  assert.equal(decayTest(withRun, step)!.result, "fail");
+  const set = { input: { key: "pressure.decay" as const, max: 0.2 }, by: "DEMO Tess", at: "2026-11-12T16:00:00.000Z", retest: [{ stepId: step.id, evidenceId: "e5", reasons: ["DEMO: fell 0.15 bar"] }] };
+  const shown = withAnswers(withRun, { targets: [set], reviews: [], signed: null });
+  const t = decayTest(shown, shown.runsheet.find((s) => s.id === step.id)!)!;
+  assert.deepEqual([t.result, t.fails], ["fail", ["DEMO: fell 0.15 bar"]]);
 });
 
 test("a review and the signature show at once, once each", () => {

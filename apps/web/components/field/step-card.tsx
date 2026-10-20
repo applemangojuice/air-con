@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { canRecord, canSetOutcome, type StaffMember, type StepOutcome, type StepView } from "@aircon/domain";
 import { captureOutcome } from "./capture";
+import { DecayPanel } from "./decay-panel";
 import { Slot } from "./slot";
 import type { MergedJob } from "./use-outbox";
 
@@ -80,6 +81,14 @@ export function StepCard({
   function explainPass() {
     const left = required.filter((x) => x.state === "missing" || x.state === "recapture");
     const out = required.filter((x) => x.state === "exception");
+    if (view.test?.result === "fail") {
+      setPassNote("The test failed on its readings: find and fix the cause, then take every reading again. Pass comes from a retest that passes.");
+      return;
+    }
+    if (view.test && !left.length && view.test.result === "incomplete") {
+      setPassNote(view.test.invalid[0] ?? "A reading above still needs taking for the test to be judged.");
+      return;
+    }
     if (left.length) {
       setPassNote(`Capture ${left.length === 1 ? "the slot" : `the ${left.length} slots`} above first: Pass comes from the evidence.`);
       // Show them which one: brought into view (only as far as needed) and ringed for a moment.
@@ -161,6 +170,7 @@ export function StepCard({
             </p>
           )}
           {step.guidance && <p className="text-base leading-relaxed text-ink-700">{step.guidance}</p>}
+          {view.test && <DecayPanel test={view.test} compact={view.test.result === "incomplete" && view.test.fails.length === 0 && view.test.invalid.length === 0} />}
           {view.latest && view.latest.outcome !== "pass" && (
             <p className={`rounded-xl px-3 py-2 text-sm font-medium ${view.latest.outcome === "na" ? "bg-surface text-ink-900" : "bg-red-50 text-red-900"}`}>
               {OUTCOMES.find((o) => o.value === view.latest!.outcome)!.label} · {view.latest.reason}
@@ -230,7 +240,15 @@ export function StepCard({
               })}
             </div>
             {current === "pass" && !picking && (
-              <p className="mt-2 text-sm text-ink-500">{view.state === "done" ? "Every required slot is in: this step is done." : "Pass once every slot above is captured. Fail, Blocked or N/A need a reason."}</p>
+              <p className="mt-2 text-sm text-ink-500">
+                {view.state === "done"
+                  ? view.test
+                    ? "Every reading is in and the test passes: this step is done."
+                    : "Every required slot is in: this step is done."
+                  : view.test
+                    ? "The readings decide this test: it passes once they're all in and within the job's limits. Fail, Blocked or N/A need a reason."
+                    : "Pass once every slot above is captured. Fail, Blocked or N/A need a reason."}
+              </p>
             )}
             {current !== "pass" && !picking && <p className="mt-2 text-sm text-ink-500">Tap Pass to clear it once it's sorted: the evidence decides from there.</p>}
             {picking && (

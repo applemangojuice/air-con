@@ -1,5 +1,16 @@
 import type { CatalogueItem } from "./catalogue.ts";
 import { A2L_ROOM_CHECK_ABOVE_KG, a2lMaxChargeKg, releaseHeightOf, type DesignRecord, type DesignVariant, type SystemSelection } from "./design-record.ts";
+import {
+  judgePressureDecay,
+  judgeVacuumDecay,
+  type DecayJudgement,
+  type PressureDecayFigures,
+  type PressureDecayReadings,
+  type PressureDecayTargets,
+  type VacuumDecayFigures,
+  type VacuumDecayReadings,
+  type VacuumDecayTargets,
+} from "./decay.ts";
 import { R32_GWP, fgasRecord, type FgasRecord, type InstalledEquipmentRow } from "./documents.ts";
 import type { PhotoTag } from "./media.ts";
 import { can, meetsRequirement, qualificationStatus, type StaffMember, type StepRequirement } from "./staff.ts";
@@ -107,6 +118,32 @@ export interface InstallStep {
   systemId?: string;
   /** Kit check steps: the unit whose serial this step captures. */
   equipment?: { kind: "indoor" | "outdoor"; room: string; label: string; model: string };
+  /**
+   * The strength/tightness test or the vacuum decay test: the step's
+   * readings are judged together (decay.ts), never one by one, and a failed
+   * test only clears with a retest (every reading taken again).
+   */
+  decay?: DecayStep;
+}
+
+/** A step-level decay test: its kind, the job's limit on the fall (or rise), and any retest the tech lead's target change left owing. */
+export interface DecayStep {
+  kind: "pressure" | "vacuum";
+  /** Pressure: the allowed fall (bar, blank = the gauge's resolution). Vacuum: the rise limit (micron). A per-job target. */
+  limit: DecayLimit;
+  /**
+   * Set when a target change would have passed a test that had failed: the
+   * readings up to this evidence record stay failed, so only a retest clears it.
+   */
+  retestAfter?: { evidenceId: string; reasons: string[] };
+}
+
+export interface DecayLimit {
+  targetKey: TargetKey;
+  unit: string;
+  min?: number;
+  max?: number;
+  window?: WindowSource;
 }
 
 export interface InstallPhaseDef {
@@ -647,11 +684,23 @@ export interface CommissioningResult {
   holdBar?: number;
   vacuumMicrons?: number;
   decayMicrons?: number;
+  /** The strength/tightness test as measured: readings, the temperature correction, the allowance and the result. */
+  pressureTest?: DecayRecord<PressureDecayFigures>;
+  /** The evacuation and decay test as measured: readings, the target, the rise and its limit, and the result. */
+  vacuumTest?: DecayRecord<VacuumDecayFigures>;
   additionalChargeG?: number;
   coolingSplitC: Record<string, number>;
   heatingSplitC: Record<string, number>;
   noiseDb?: number;
   serials: { item: string; serial: string }[];
+}
+
+/** A decay test as it stood: the figures exactly as measured and worked out, the result, and how many runs failed before it. */
+export interface DecayRecord<F> {
+  result: "pass" | "fail" | "incomplete";
+  figures: F;
+  fails: string[];
+  failedRuns: number;
 }
 
 export interface CommissioningRecord {
@@ -671,7 +720,7 @@ export interface InstallJobV2 extends InstallJob {
 }
 
 /** Bumped when the template changes; a job keeps the version it was built with. */
-export const INSTALL_TEMPLATE_VERSION: string = "pilot-runsheet-1";
+export const INSTALL_TEMPLATE_VERSION: string = "pilot-runsheet-2";
 
 /** R32 GWP for the F-gas label (tCO2e = kg × 675 / 1000). */
 export const RUNSHEET_GWP = R32_GWP;
@@ -688,8 +737,13 @@ export type EvidenceRole =
   | "flare-gas"
   | "condensate-fall"
   | "strength-test"
+  | "strength-start-temp"
   | "strength-hold"
+  | "strength-end-temp"
+  | "strength-hold-time"
+  | "gauge-resolution"
   | "vacuum"
+  | "vacuum-hold-time"
   | "vacuum-decay"
   | "as-built-length"
   | "additional-charge"
@@ -723,8 +777,12 @@ export interface WindowSource {
 
 export type TargetKey =
   | "pressure.test"
+  | "pressure.hold"
+  | "pressure.decay"
   | "vacuum.target"
+  | "vacuum.hold"
   | "vacuum.decay"
+  | "vacuum.rise"
   | "torque.6.35"
   | "torque.9.52"
   | "torque.12.7"
@@ -739,6 +797,11 @@ export interface TargetDef {
   bounds: "min" | "max" | "min-max";
   /** What the research found (or didn't), shown next to the inputs. Never applied silently. */
   hint: string;
+  /**
+   * Confirming it with no number: the button's words ("Record only", or the
+   * default that then applies). False: a number is needed, from the manual.
+   */
+  recordOnly?: string | false;
 }
 
 export const JOB_TARGETS: Record<TargetKey, TargetDef> = {
@@ -747,21 +810,55 @@ export const JOB_TARGETS: Record<TargetKey, TargetDef> = {
     label: "Nitrogen test pressure",
     unit: "bar g",
     bounds: "min-max",
-    hint: "From this model's installation manual. Set the maximum to the outdoor unit's nameplate PS: never test above it. Research candidate (Daikin guides, unverified): at least 2 bar, 30 bar recommended.",
+    hint: "From this model's installation manual: the minimum is the manual's test pressure, the maximum the outdoor unit's nameplate PS (never test above it). Research candidate (Daikin R32 split guides, read through search extracts, unverified): at least 2 bar, 30 bar recommended to find small leaks.",
+    recordOnly: false,
+  },
+  "pressure.hold": {
+    key: "pressure.hold",
+    label: "Pressure test: hold time",
+    unit: "min",
+    bounds: "min",
+    hint: "How long the manual says to hold the test pressure. No manufacturer figure was found in the research: set it from this model's manual.",
+    recordOnly: false,
+  },
+  "pressure.decay": {
+    key: "pressure.decay",
+    label: "Pressure test: allowed fall",
+    unit: "bar",
+    bounds: "max",
+    hint: "The most the pressure may fall over the hold once the end reading is corrected to the start temperature. Left at the default, it's no fall beyond the gauge's resolution (the smallest step it reads), which the engineer records. Set a figure only from the manual.",
+    recordOnly: "Use the gauge's resolution",
   },
   "vacuum.target": {
     key: "vacuum.target",
     label: "Vacuum target",
     unit: "micron",
     bounds: "max",
-    hint: "500 micron is common company practice, not a verified manufacturer figure. A compound gauge can't prove it: use the digital micron gauge.",
+    hint: "500 micron (66.7 Pa) is the company standard and always applies; a manual's stricter figure replaces it. Daikin R32 split guides (search extracts, unverified) say −0.1 MPa on the manifold, which is about 9,900 micron absolute: a compound gauge can't prove a deep vacuum, so use the digital micron gauge.",
+    recordOnly: "Use 500 micron",
+  },
+  "vacuum.hold": {
+    key: "vacuum.hold",
+    label: "Vacuum decay: hold time",
+    unit: "min",
+    bounds: "min",
+    hint: "How long to hold with the pump isolated. Daikin R32 split guides (search extracts, unverified): at least 1 hour with the pump off. Set it from this model's manual.",
+    recordOnly: false,
   },
   "vacuum.decay": {
     key: "vacuum.decay",
     label: "Decay test: highest reading after the hold",
     unit: "micron",
     bounds: "max",
-    hint: "Pump isolated, hold as the manual says (Daikin guides: 4-5 minutes, unverified). No rise limit was found in the research: set the job's limit.",
+    hint: "Where the manual gives the highest reading allowed after the hold, set it here; otherwise record only (the rise limit below still judges the test).",
+  },
+  "vacuum.rise": {
+    key: "vacuum.rise",
+    label: "Vacuum decay: rise limit",
+    unit: "micron",
+    bounds: "max",
+    hint: "The most the reading may rise over the hold: more is moisture or a leak. No manufacturer figure was found in the research (Daikin's guides say only that it must hold): set it from this model's manual.",
+    recordOnly: false,
   },
   "torque.6.35": {
     key: "torque.6.35",
@@ -888,6 +985,7 @@ interface StepDef {
   stage?: "install" | "handover";
   guidance?: string;
   equipment?: InstallStep["equipment"];
+  decay?: DecayStep;
   slots: SlotDef[];
 }
 
@@ -925,6 +1023,156 @@ interface SystemCtx {
 }
 
 const ERA_NEEDS_ASBESTOS_CHECK = new Set(["pre-1930", "1930-1950", "1950-2000"]);
+
+function specFromSlot(stepKey: string, s: SlotDef): EvidenceSpec {
+  const spec: EvidenceSpec = { id: `${stepKey}.${s.key}`, kind: s.kind, label: s.label };
+  if (s.unit) spec.unit = s.unit;
+  if (s.min !== undefined) spec.min = s.min;
+  if (s.max !== undefined) spec.max = s.max;
+  if (s.optional) spec.optional = true;
+  if (s.tag) spec.tag = s.tag;
+  if (s.role) spec.role = s.role;
+  if (s.targetKey) spec.targetKey = s.targetKey;
+  if (s.window) spec.window = s.window;
+  return spec;
+}
+
+const PRESSURE_GUIDANCE =
+  "Oxygen-free nitrogen through a regulator with a relief valve, at the manual's test pressure and never above the outdoor unit's nameplate PS. Note the ambient temperature as you apply it, hold for the manual's time, then read the gauge and the temperature again, and bubble-test every joint. The app corrects the end reading to the start temperature (absolute pressure × kelvin ratio) and fails the test if it fell by more than the allowance: no more than the gauge's resolution unless the tech lead set the manual's figure. A failed test is found, fixed and tested again: every reading again.";
+
+const VACUUM_GUIDANCE =
+  "Digital micron gauge, not the compound gauge. Evacuate to 500 micron (66.7 Pa) or the manual's figure if it's stricter, isolate the pump, hold for the manual's time and read it again. A rise above the job's limit is moisture or a leak: find it, evacuate again and repeat the decay test, every reading again.";
+
+const TECH_LEAD_SETS = "Record the reading. The tech lead confirms it against the manufacturer's manual.";
+
+/** The strength/tightness test's readings, in the order they're taken. Shared by new runsheets and the upgrade of older ones. */
+function pressureSlotDefs(): SlotDef[] {
+  return [
+    { key: "applied", kind: "pressure-reading", label: "Test pressure applied (nitrogen)", unit: "bar g", role: "strength-test", targetKey: "pressure.test", window: RECORD_ONLY(TECH_LEAD_SETS) },
+    {
+      key: "start-temp",
+      kind: "measurement",
+      label: "Ambient temperature when it was applied",
+      unit: "°C",
+      role: "strength-start-temp",
+      window: RECORD_ONLY("Air temperature by the pipework, read as the pressure is applied: the end reading is corrected to it."),
+    },
+    {
+      key: "held",
+      kind: "pressure-reading",
+      label: "Pressure at the end of the hold",
+      unit: "bar g",
+      role: "strength-hold",
+      window: RECORD_ONLY("Judged with the other readings: corrected to the start temperature, it may fall by no more than the allowance."),
+    },
+    {
+      key: "end-temp",
+      kind: "measurement",
+      label: "Ambient temperature at the end of the hold",
+      unit: "°C",
+      role: "strength-end-temp",
+      window: RECORD_ONLY("Same place and thermometer as at the start."),
+    },
+    { key: "hold-time", kind: "measurement", label: "How long it held", unit: "min", role: "strength-hold-time", targetKey: "pressure.hold", window: RECORD_ONLY(TECH_LEAD_SETS) },
+    {
+      key: "resolution",
+      kind: "measurement",
+      label: "Gauge resolution (the smallest step it reads)",
+      unit: "bar",
+      role: "gauge-resolution",
+      window: RECORD_ONLY("Unless the tech lead set the manual's allowance, the pressure may fall by no more than this."),
+    },
+    { key: "gauge", kind: "photo", label: "Gauge at the end of the hold", tag: "gauge" },
+  ];
+}
+
+/** The evacuation and decay test's readings, in the order they're taken. */
+function vacuumSlotDefs(): SlotDef[] {
+  return [
+    {
+      key: "reached",
+      kind: "vacuum-reading",
+      label: "Vacuum reached",
+      unit: "micron",
+      role: "vacuum",
+      targetKey: "vacuum.target",
+      window: RECORD_ONLY("Judged against 500 micron (66.7 Pa), or the manual's figure if the tech lead set a stricter one."),
+    },
+    { key: "hold-time", kind: "measurement", label: "Decay hold with the pump isolated", unit: "min", role: "vacuum-hold-time", targetKey: "vacuum.hold", window: RECORD_ONLY(TECH_LEAD_SETS) },
+    {
+      key: "decay",
+      kind: "vacuum-reading",
+      label: "After the decay hold, pump isolated",
+      unit: "micron",
+      role: "vacuum-decay",
+      targetKey: "vacuum.decay",
+      window: RECORD_ONLY("The rise over the hold is judged against the job's limit: more is moisture or a leak."),
+    },
+    { key: "gauge", kind: "photo", label: "Micron gauge at the end of the hold", tag: "gauge" },
+  ];
+}
+
+function decayStepDef(kind: DecayStep["kind"]): DecayStep {
+  return kind === "pressure"
+    ? { kind, limit: { targetKey: "pressure.decay", unit: "bar", window: RECORD_ONLY("No fall beyond the gauge's resolution, unless the tech lead sets the manual's allowance.") } }
+    : { kind, limit: { targetKey: "vacuum.rise", unit: "micron", window: RECORD_ONLY("The tech lead sets the rise limit from the manual.") } };
+}
+
+/**
+ * A runsheet built before the decay tests (pilot-runsheet-1), brought up to
+ * them: the pressure and vacuum steps gain the readings the tests need (the
+ * temperatures, the hold times, the gauge's resolution) and their step-level
+ * limit. Everything already there is kept as it is: spec ids (so captured
+ * evidence still belongs), and every target the tech lead has set.
+ * Idempotent; other steps are untouched.
+ */
+export function withDecayTests(runsheet: InstallStep[]): InstallStep[] {
+  let changed = false;
+  const out = runsheet.map((step) => {
+    if (step.decay) return step;
+    const kind: DecayStep["kind"] | null = step.evidence.some((e) => e.role === "strength-test")
+      ? "pressure"
+      : step.evidence.some((e) => e.role === "vacuum") && step.evidence.some((e) => e.role === "vacuum-decay")
+        ? "vacuum"
+        : null;
+    if (!kind) return step;
+    changed = true;
+    const defs = kind === "pressure" ? pressureSlotDefs() : vacuumSlotDefs();
+    const used = new Set<string>();
+    const ids = new Set(step.evidence.map((e) => e.id));
+    const evidence: EvidenceSpec[] = [];
+    for (const def of defs) {
+      const existing = step.evidence.find((e) => !used.has(e.id) && (def.role ? e.role === def.role : e.kind === def.kind && e.tag === def.tag));
+      if (existing) {
+        used.add(existing.id);
+        evidence.push(existing);
+        continue;
+      }
+      let spec = specFromSlot(step.id, def);
+      for (let i = 2; ids.has(spec.id); i++) spec = { ...spec, id: `${step.id}.${def.key}-${i}` };
+      ids.add(spec.id);
+      evidence.push(spec);
+    }
+    for (const e of step.evidence) if (!used.has(e.id)) evidence.push(e);
+    return { ...step, evidence, decay: decayStepDef(kind) };
+  });
+  return changed ? out : runsheet;
+}
+
+/**
+ * Every target the tech lead set on one runsheet, set again on another (a
+ * runsheet rebuilt from a newer template before anyone started): the same
+ * numbers, note, name and time, for each target the new one uses.
+ */
+export function carryTargets(from: InstallStep[], to: InstallStep[]): InstallStep[] {
+  let out = to;
+  const keys = new Set(jobTargets(to).map((t) => t.key));
+  for (const t of jobTargets(from)) {
+    if (t.basis !== "tech-lead" || !keys.has(t.key)) continue;
+    out = applyTarget(out, t.key, { ...(t.min !== undefined ? { min: t.min } : {}), ...(t.max !== undefined ? { max: t.max } : {}) }, { basis: "tech-lead", ...(t.setBy ? { setBy: t.setBy } : {}), ...(t.setAt ? { setAt: t.setAt } : {}), ...(t.note ? { note: t.note } : {}) });
+  }
+  return out;
+}
 
 /**
  * The runsheet for one job, from the approved design's variant (the one
@@ -1306,29 +1554,9 @@ export function runsheetFromDesign(
       systemId: s.sel.id,
       requires: "fgas",
       critical: true,
-      guidance:
-        "Oxygen-free nitrogen through a regulator with a relief valve. Never above the outdoor unit's nameplate PS. Hold as the manual says, allowing for any temperature change, and bubble-test every joint.",
-      slots: [
-        {
-          key: "applied",
-          kind: "pressure-reading",
-          label: "Test pressure applied (nitrogen)",
-          unit: "bar g",
-          role: "strength-test",
-          targetKey: "pressure.test",
-          window: RECORD_ONLY("Record the reading. The tech lead confirms it against the manufacturer's manual."),
-        },
-        {
-          key: "held",
-          kind: "pressure-reading",
-          label: "Pressure at the end of the hold",
-          unit: "bar g",
-          role: "strength-hold",
-          targetKey: "pressure.test",
-          window: RECORD_ONLY("Record the reading. The tech lead confirms it against the manufacturer's manual."),
-        },
-        { key: "gauge", kind: "photo", label: "Gauge at the end of the hold", tag: "gauge" },
-      ],
+      guidance: PRESSURE_GUIDANCE,
+      decay: decayStepDef("pressure"),
+      slots: pressureSlotDefs(),
     });
   }
   for (const s of systems) {
@@ -1341,28 +1569,9 @@ export function runsheetFromDesign(
       systemId: s.sel.id,
       requires: "fgas",
       critical: true,
-      guidance: "Digital micron gauge, not the compound gauge. Isolate the pump for the decay hold; a rise means moisture or a leak.",
-      slots: [
-        {
-          key: "reached",
-          kind: "vacuum-reading",
-          label: "Vacuum reached",
-          unit: "micron",
-          role: "vacuum",
-          targetKey: "vacuum.target",
-          window: RECORD_ONLY("Record the reading. The tech lead confirms it against the manufacturer's manual."),
-        },
-        {
-          key: "decay",
-          kind: "vacuum-reading",
-          label: "After the decay hold, pump isolated",
-          unit: "micron",
-          role: "vacuum-decay",
-          targetKey: "vacuum.decay",
-          window: RECORD_ONLY("Record the reading. The tech lead confirms it against the manufacturer's manual."),
-        },
-        { key: "gauge", kind: "photo", label: "Micron gauge at the end of the hold", tag: "gauge" },
-      ],
+      guidance: VACUUM_GUIDANCE,
+      decay: decayStepDef("vacuum"),
+      slots: vacuumSlotDefs(),
     });
   }
   for (const s of systems) {
@@ -1562,18 +1771,8 @@ export function runsheetFromDesign(
       ...(d.roomId ? { roomId: d.roomId } : {}),
       ...(d.systemId ? { systemId: d.systemId } : {}),
       ...(d.equipment ? { equipment: d.equipment } : {}),
-      evidence: d.slots.map((s) => {
-        const spec: EvidenceSpec = { id: `${d.key}.${s.key}`, kind: s.kind, label: s.label };
-        if (s.unit) spec.unit = s.unit;
-        if (s.min !== undefined) spec.min = s.min;
-        if (s.max !== undefined) spec.max = s.max;
-        if (s.optional) spec.optional = true;
-        if (s.tag) spec.tag = s.tag;
-        if (s.role) spec.role = s.role;
-        if (s.targetKey) spec.targetKey = s.targetKey;
-        if (s.window) spec.window = s.window;
-        return spec;
-      }),
+      ...(d.decay ? { decay: d.decay } : {}),
+      evidence: d.slots.map((s) => specFromSlot(d.key, s)),
     };
     return step;
   });
@@ -1919,6 +2118,8 @@ export interface StepView {
   latest?: StepStatusRecord;
   /** Required slots still to capture (missing or recapture). */
   missing: number;
+  /** A strength/tightness or vacuum decay step: the readings judged together. */
+  test?: DecayTestView;
 }
 
 /** The latest outcome recorded for a step (by time; ties go to the later record). */
@@ -1932,15 +2133,26 @@ export function latestStepStatus(job: Pick<InstallJobV2, "stepStatuses">, stepId
 }
 
 export function stepView(job: Pick<InstallJobV2, "evidence" | "exceptionReviews" | "stepStatuses">, step: InstallStep): StepView {
-  const slots = step.evidence.map((spec) => slotView(job, spec));
+  const test = decayTest(job, step) ?? undefined;
+  let slots = step.evidence.map((spec) => slotView(job, spec));
+  if (test) {
+    // The test judges its readings together: no reading is an exception on its own, and a failed run's readings are taken again.
+    const retake = new Set(test.retestNeeded ? test.toTake : []);
+    slots = slots.map((v) => {
+      if (!v.spec.role || !DECAY_ROLES.has(v.spec.role) || v.state === "missing") return v;
+      if (retake.has(v.spec.id)) return { spec: v.spec, state: "recapture" as const, ...(v.record ? { record: v.record } : {}) };
+      return v.state === "exception" || v.state === "accepted" ? { spec: v.spec, state: "pass" as const, ...(v.record ? { record: v.record } : {}) } : v;
+    });
+  }
   const required = slots.filter((s) => !s.spec.optional);
   const missing = required.filter((s) => s.state === "missing" || s.state === "recapture").length;
   const latest = latestStepStatus(job, step.id);
-  const base = { step, slots, missing, ...(latest ? { latest } : {}) };
+  const base = { step, slots, missing, ...(latest ? { latest } : {}), ...(test ? { test } : {}) };
   if (latest?.outcome === "na" && latest.reason?.trim()) return { ...base, state: "na" };
   if (latest?.outcome === "blocked") return { ...base, state: "blocked" };
   if (latest?.outcome === "fail") return { ...base, state: "failed" };
-  if (required.every((s) => SLOT_OK.has(s.state))) return { ...base, state: "done" };
+  if (test?.result === "fail") return { ...base, state: "failed" };
+  if (required.every((s) => SLOT_OK.has(s.state)) && (!test || test.result === "pass")) return { ...base, state: "done" };
   if (slots.some((s) => s.state === "exception")) return { ...base, state: "exception" };
   if (slots.some((s) => s.state === "recapture")) return { ...base, state: "recapture" };
   if (slots.some((s) => s.state !== "missing")) return { ...base, state: "in-progress" };
@@ -2077,14 +2289,11 @@ export function withExceptionReview(job: InstallJobV2, review: ExceptionReview):
   return { ...job, exceptionReviews: [...job.exceptionReviews, review] };
 }
 
-/** Every slot that's out of its window and not yet reviewed, with its step. */
+/** Every slot that's out of its window and not yet reviewed, with its step (a decay test's readings are judged by the test instead). */
 export function openExceptions(job: InstallJobV2): { step: InstallStep; slot: SlotView }[] {
   const out: { step: InstallStep; slot: SlotView }[] = [];
   for (const step of job.runsheet) {
-    for (const spec of step.evidence) {
-      const slot = slotView(job, spec);
-      if (slot.state === "exception") out.push({ step, slot });
-    }
+    for (const slot of stepView(job, step).slots) if (slot.state === "exception") out.push({ step, slot });
   }
   return out;
 }
@@ -2113,11 +2322,16 @@ export interface JobTarget {
   specCount: number;
 }
 
+/** Everything on a step that carries a per-job target: its slots, and a decay test's limit. */
+function targetHolders(step: InstallStep): Pick<EvidenceSpec, "targetKey" | "min" | "max" | "window">[] {
+  return step.decay ? [...step.evidence, step.decay.limit] : step.evidence;
+}
+
 /** The per-job targets this runsheet uses, as they stand. */
 export function jobTargets(runsheet: InstallStep[]): JobTarget[] {
   const out = new Map<TargetKey, JobTarget>();
   for (const step of runsheet) {
-    for (const spec of step.evidence) {
+    for (const spec of targetHolders(step)) {
       const key = spec.targetKey;
       if (!key || !JOB_TARGETS[key]) continue;
       const existing = out.get(key);
@@ -2148,7 +2362,7 @@ export function unconfirmedTargets(runsheet: InstallStep[]): TargetKey[] {
     .map((t) => t.key);
 }
 
-/** Why these numbers can't be a window, or null. Both empty is fine: "record only", confirmed. */
+/** Why these numbers can't be a window, or null. Both empty is fine ("record only", confirmed) where the target allows it. */
 export function targetError(key: TargetKey, min: number | undefined, max: number | undefined): string | null {
   const def = JOB_TARGETS[key];
   if (!def) return "Unknown target.";
@@ -2161,13 +2375,39 @@ export function targetError(key: TargetKey, min: number | undefined, max: number
   if (key === "pressure.test" && min !== undefined && max === undefined) {
     return "Set the maximum too: the outdoor unit's nameplate PS.";
   }
+  if (key === "pressure.test" && min === undefined && max !== undefined) return "Set the minimum too: the manual's test pressure.";
+  if (def.recordOnly === false && min === undefined && max === undefined) {
+    return key === "pressure.test" ? "Set the manual's test pressure and the nameplate PS." : `Set ${def.label.toLowerCase()} from the manual: it can't be record only.`;
+  }
+  if ((key === "pressure.hold" || key === "vacuum.hold") && min !== undefined && min <= 0) return "A hold time is more than 0 minutes.";
   return null;
+}
+
+/** One target's numbers and source onto every slot (and decay limit) that uses it. */
+function applyTarget(runsheet: InstallStep[], key: TargetKey, bounds: { min?: number; max?: number }, window: WindowSource): InstallStep[] {
+  const set = <T extends { targetKey?: TargetKey; min?: number; max?: number; window?: WindowSource }>(spec: T): T => {
+    if (spec.targetKey !== key) return spec;
+    const { min: _min, max: _max, ...rest } = spec;
+    return {
+      ...rest,
+      ...(bounds.min !== undefined ? { min: bounds.min } : {}),
+      ...(bounds.max !== undefined ? { max: bounds.max } : {}),
+      window,
+    } as T;
+  };
+  return runsheet.map((step) => ({
+    ...step,
+    evidence: step.evidence.map(set),
+    ...(step.decay ? { decay: { ...step.decay, limit: set(step.decay.limit) } } : {}),
+  }));
 }
 
 /**
  * Set (or confirm as record-only) one per-job target: every reading that
  * uses it gets the window and the tech lead's name. Existing readings are
- * re-judged against it, so a reading may become an exception.
+ * re-judged against it, so a reading may become an exception, and a decay
+ * test may fail (a change that would pass a failed one leaves it owing a
+ * retest: decayRetestMarkers).
  */
 export function setJobTarget(
   runsheet: InstallStep[],
@@ -2178,19 +2418,170 @@ export function setJobTarget(
   const error = targetError(input.key, input.min, input.max);
   if (error) throw new Error(error);
   const note = input.note?.trim();
-  return runsheet.map((step) => ({
-    ...step,
-    evidence: step.evidence.map((spec) => {
-      if (spec.targetKey !== input.key) return spec;
-      const { min: _min, max: _max, ...rest } = spec;
-      return {
-        ...rest,
-        ...(input.min !== undefined ? { min: input.min } : {}),
-        ...(input.max !== undefined ? { max: input.max } : {}),
-        window: { basis: "tech-lead" as const, setBy: by, setAt: at, ...(note ? { note } : {}) },
-      };
-    }),
-  }));
+  return applyTarget(
+    runsheet,
+    input.key,
+    { ...(input.min !== undefined ? { min: input.min } : {}), ...(input.max !== undefined ? { max: input.max } : {}) },
+    { basis: "tech-lead" as const, setBy: by, setAt: at, ...(note ? { note } : {}) },
+  );
+}
+
+/* ---------------- decay tests ---------------- */
+
+const PRESSURE_ROLES: Record<keyof PressureDecayReadings, EvidenceRole> = {
+  appliedBarG: "strength-test",
+  startC: "strength-start-temp",
+  endBarG: "strength-hold",
+  endC: "strength-end-temp",
+  holdMinutes: "strength-hold-time",
+  gaugeResolutionBar: "gauge-resolution",
+};
+
+const VACUUM_ROLES: Record<keyof VacuumDecayReadings, EvidenceRole> = {
+  reachedMicron: "vacuum",
+  holdMinutes: "vacuum-hold-time",
+  afterMicron: "vacuum-decay",
+};
+
+/** The roles a decay test reads: their slots are judged by the test, never one by one. */
+export const DECAY_ROLES: ReadonlySet<EvidenceRole> = new Set<EvidenceRole>([...Object.values(PRESSURE_ROLES), ...Object.values(VACUUM_ROLES)]);
+
+export interface DecayTestView {
+  kind: DecayStep["kind"];
+  /** incomplete: readings still to take (or a reading that can't be right); fail stands until every reading is taken again. */
+  result: "incomplete" | "pass" | "fail";
+  /** A test failed and not every reading has been taken again since. */
+  retestNeeded: boolean;
+  /** How many complete runs of this test failed, this one included when it's failing. */
+  failedRuns: number;
+  /** Why it fails (or, while incomplete, what already can't pass). */
+  fails: string[];
+  /** Readings that can't be right, in plain words: they don't count until taken again. */
+  invalid: string[];
+  /** Slot ids still to capture, or to capture again for the retest. */
+  toTake: string[];
+  /** The job's targets for this test the tech lead hasn't set or confirmed yet: judged so far without them. */
+  pending: TargetKey[];
+  pressure?: PressureDecayFigures;
+  vacuum?: VacuumDecayFigures;
+}
+
+type AnyJudgement = DecayJudgement<PressureDecayFigures> | DecayJudgement<VacuumDecayFigures>;
+
+/** The test's slots by reading, its targets as the job has them, and its judge. */
+function decayParts(step: InstallStep) {
+  const kind = step.decay!.kind;
+  const roles: Record<string, EvidenceRole> = kind === "pressure" ? PRESSURE_ROLES : VACUUM_ROLES;
+  const slots = Object.entries(roles).map(([field, role]) => ({ field, role, spec: step.evidence.find((e) => e.role === role) }));
+  const by = (role: EvidenceRole) => step.evidence.find((e) => e.role === role);
+  const limit = step.decay!.limit;
+  const pTargets: PressureDecayTargets = {
+    ...(by("strength-test")?.min !== undefined ? { testMinBarG: by("strength-test")!.min } : {}),
+    ...(by("strength-test")?.max !== undefined ? { testMaxBarG: by("strength-test")!.max } : {}),
+    ...(by("strength-hold-time")?.min !== undefined ? { holdMinMinutes: by("strength-hold-time")!.min } : {}),
+    ...(limit.max !== undefined ? { allowanceBar: limit.max } : {}),
+  };
+  const vTargets: VacuumDecayTargets = {
+    ...(by("vacuum")?.max !== undefined ? { targetMaxMicron: by("vacuum")!.max } : {}),
+    ...(by("vacuum-hold-time")?.min !== undefined ? { holdMinMinutes: by("vacuum-hold-time")!.min } : {}),
+    ...(limit.max !== undefined ? { riseMaxMicron: limit.max } : {}),
+    ...(by("vacuum-decay")?.max !== undefined ? { afterMaxMicron: by("vacuum-decay")!.max } : {}),
+  };
+  const judge = (values: Record<string, number>): AnyJudgement => (kind === "pressure" ? judgePressureDecay(values, pTargets) : judgeVacuumDecay(values, vTargets));
+  const pending = [...new Set(targetHolders(step).filter((h) => h.targetKey && h.window?.basis !== "tech-lead").map((h) => h.targetKey!))];
+  return { kind, slots, judge, pending };
+}
+
+/**
+ * The step's decay test, from the evidence log in the order it arrived (the
+ * order latestEvidence uses), as a series of runs. A run is one reading of
+ * every slot taken after the previous run closed; it closes, and is judged
+ * with the job's targets as they stand now, once every reading is in and
+ * believable. Readings are never mixed across runs, so re-typing one reading
+ * after a run starts a new run: a failed test stays failed until every
+ * reading has been taken again and that run passes. Null for a step that
+ * isn't a decay test.
+ */
+export function decayTest(job: Pick<InstallJob, "evidence">, step: InstallStep): DecayTestView | null {
+  if (!step.decay) return null;
+  const { kind, slots, judge, pending } = decayParts(step);
+  const fieldOf = new Map(slots.filter((x) => x.spec).map((x) => [x.spec!.id, x.field]));
+  const markerIndex = step.decay.retestAfter ? job.evidence.findIndex((e) => e.id === step.decay!.retestAfter!.evidenceId) : -1;
+  // Readings of the run under way: those taken since the last run closed.
+  let open = new Map<string, number>();
+  const runs: { index: number; fails: string[]; figures: AnyJudgement["figures"] }[] = [];
+  for (let i = 0; i < job.evidence.length; i++) {
+    const e = job.evidence[i]!;
+    const field = fieldOf.get(e.specId);
+    if (!field) continue;
+    if (typeof e.value === "number" && Number.isFinite(e.value)) open.set(field, e.value);
+    else open.delete(field);
+    if (open.size < slots.length) continue;
+    const j = judge(Object.fromEntries(open));
+    if (!j.complete) continue; // a reading that can't be right: the run waits for it to be taken again
+    runs.push({ index: i, fails: j.fails, figures: j.figures });
+    open = new Map();
+  }
+  // A target change that would have passed a failed run: that run stays failed.
+  const marked = markerIndex >= 0 ? runs.filter((r) => r.index <= markerIndex).at(-1) : undefined;
+  if (marked && !marked.fails.length) marked.fails = step.decay.retestAfter!.reasons;
+  const failedRuns = runs.filter((r) => r.fails.length).length;
+  const lastRun = runs.at(-1);
+  const last = lastRun ? { ...lastRun, failed: lastRun.fails.length > 0 } : undefined;
+  const current = judge(Object.fromEntries(open));
+  const figuresOf = (f: AnyJudgement["figures"]) => (kind === "pressure" ? { pressure: f as PressureDecayFigures } : { vacuum: f as VacuumDecayFigures });
+  const toTake = slots.filter((x) => !x.spec || current.missing.includes(x.field)).map((x) => x.spec?.id ?? x.role);
+  const runUnderWay = open.size > 0;
+  if (last && !runUnderWay) {
+    return {
+      kind,
+      result: last.failed ? "fail" : "pass",
+      retestNeeded: last.failed,
+      failedRuns,
+      fails: last.fails,
+      invalid: [],
+      toTake: last.failed ? slots.filter((x) => x.spec).map((x) => x.spec!.id) : [],
+      pending,
+      ...figuresOf(last.figures),
+    };
+  }
+  if (last?.failed) {
+    // The retest is under way: the failure stands until it's complete and passes.
+    return { kind, result: "fail", retestNeeded: true, failedRuns, fails: last.fails, invalid: current.invalid, toTake, pending, ...figuresOf(last.figures) };
+  }
+  return { kind, result: "incomplete", retestNeeded: false, failedRuns, fails: current.fails, invalid: current.invalid, toTake, pending, ...figuresOf(current.figures) };
+}
+
+/**
+ * The retests a target change leaves owing: each decay test on the job that
+ * fails now and wouldn't with the new runsheet's targets keeps its failed
+ * run (marked at its last reading), so the change can't pass it without a
+ * retest. Empty when nothing would be cleared.
+ */
+export function decayRetestMarkers(job: Pick<InstallJob, "evidence" | "runsheet">, next: InstallStep[]): { stepId: string; evidenceId: string; reasons: string[] }[] {
+  const out: { stepId: string; evidenceId: string; reasons: string[] }[] = [];
+  for (const step of job.runsheet) {
+    if (!step.decay) continue;
+    const before = decayTest(job, step);
+    const after = next.find((s) => s.id === step.id);
+    if (before?.result !== "fail" || !after?.decay) continue;
+    const now = decayTest(job, after);
+    if (now?.result === "fail") continue;
+    const ids = new Set(step.evidence.filter((e) => e.role && DECAY_ROLES.has(e.role)).map((e) => e.id));
+    const last = [...job.evidence].reverse().find((e) => ids.has(e.specId) && e.id);
+    if (!last?.id) continue;
+    out.push({ stepId: step.id, evidenceId: last.id, reasons: before.fails.length ? before.fails : ["The test failed against the targets when it was taken."] });
+  }
+  return out;
+}
+
+/** Lay retest markers onto a runsheet (the server's answer to a target change, applied the same way on the phone). */
+export function withRetestMarkers(runsheet: InstallStep[], markers: { stepId: string; evidenceId: string; reasons: string[] }[]): InstallStep[] {
+  if (!markers.length) return runsheet;
+  return runsheet.map((step) => {
+    const m = markers.find((x) => x.stepId === step.id);
+    return m && step.decay ? { ...step, decay: { ...step.decay, retestAfter: { evidenceId: m.evidenceId, reasons: m.reasons } } } : step;
+  });
 }
 
 /* ---------------- commissioning ---------------- */
@@ -2283,6 +2674,22 @@ export function commissioningFromJob(job: InstallJobV2): CommissioningResult[] {
     set("additionalChargeG", "additional-charge");
     set("noiseDb", "noise-measured");
     for (const s of steps) {
+      const t = decayTest(job, s);
+      if (!t) continue;
+      const rec = { result: t.result, fails: t.fails, failedRuns: t.failedRuns };
+      // The headline readings are the judged run's, never a mix of two runs.
+      if (t.kind === "pressure" && t.pressure) {
+        res.pressureTest = { ...rec, figures: t.pressure };
+        if (t.pressure.appliedBarG !== undefined) res.strengthTestBar = t.pressure.appliedBarG;
+        if (t.pressure.endBarG !== undefined) res.holdBar = t.pressure.endBarG;
+      }
+      if (t.kind === "vacuum" && t.vacuum) {
+        res.vacuumTest = { ...rec, figures: t.vacuum };
+        if (t.vacuum.reachedMicron !== undefined) res.vacuumMicrons = t.vacuum.reachedMicron;
+        if (t.vacuum.afterMicron !== undefined) res.decayMicrons = t.vacuum.afterMicron;
+      }
+    }
+    for (const s of steps) {
       const room = s.item ?? "Room";
       const cool = num(valueFor(job, s, "cooling-split"));
       const heat = num(valueFor(job, s, "heating-split"));
@@ -2354,6 +2761,12 @@ export function commissioningSignErrors(job: InstallJobV2, signer: StaffMember, 
   }
   if (progress.blocked > 0) errors.push(`${progress.blocked} step${progress.blocked === 1 ? " is" : "s are"} blocked.`);
   if (progress.missing > 0) errors.push(`${progress.missing} step${progress.missing === 1 ? "" : "s"} still to finish on the runsheet.`);
+  for (const step of job.runsheet) {
+    const t = decayTest(job, step);
+    if (t?.result !== "fail") continue;
+    const what = t.kind === "pressure" ? "strength and tightness test" : "vacuum decay test";
+    errors.push(`${step.item ? `${step.item}: the` : "The"} ${what} failed and hasn't been done again (${t.fails[0] ?? "see the runsheet"}). Find and fix the cause, then the crew retests with every reading taken again.`);
+  }
   const pending = unconfirmedTargets(job.runsheet);
   if (pending.length) errors.push(`Set or confirm ${pending.length} of the job's targets: ${pending.map((k) => JOB_TARGETS[k].label.toLowerCase()).join("; ")}.`);
   return errors;

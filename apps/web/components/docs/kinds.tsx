@@ -5,7 +5,10 @@ import {
   ISSUE_KIND_LABEL,
   PD_CHECKS,
   TAX_CODES,
+  decayResultText,
   earlyStartWording,
+  pressureDecayRows,
+  vacuumDecayRows,
   variationHasOwnRight,
   type Annotation,
   type CertificateSnapshot,
@@ -604,12 +607,25 @@ function CommissioningResults({ commissioning }: { commissioning: CommissioningC
       {commissioning.results.map((r) => (
         <div key={r.system} className="doc-avoid space-y-2">
           <h3 className="font-semibold text-ink-900">{r.system}</h3>
+          {/* The strength/tightness and vacuum decay tests exactly as measured, with the working (a record signed before the tests were judged has only the readings). */}
+          {r.pressureTest && (
+            <>
+              <p className="pt-1 font-semibold text-ink-900">Strength and tightness test (oxygen-free nitrogen): {decayResultText(r.pressureTest)}</p>
+              <Facts rows={pressureDecayRows(r.pressureTest.figures)} />
+            </>
+          )}
+          {r.vacuumTest && (
+            <>
+              <p className="pt-1 font-semibold text-ink-900">Evacuation and decay test: {decayResultText(r.vacuumTest)}</p>
+              <Facts rows={vacuumDecayRows(r.vacuumTest.figures)} />
+            </>
+          )}
           <Facts
             rows={[
-              ["Strength test", r.strengthTestBar !== undefined ? `${num(r.strengthTestBar)} bar` : ""],
-              ["Pressure hold", r.holdBar !== undefined ? `${num(r.holdBar)} bar` : ""],
-              ["Vacuum reached", r.vacuumMicrons !== undefined ? `${num(r.vacuumMicrons, 0)} microns` : ""],
-              ["Vacuum decay", r.decayMicrons !== undefined ? `${num(r.decayMicrons, 0)} microns` : ""],
+              ["Strength test", r.pressureTest || r.strengthTestBar === undefined ? "" : `${num(r.strengthTestBar)} bar`],
+              ["Pressure hold", r.pressureTest || r.holdBar === undefined ? "" : `${num(r.holdBar)} bar`],
+              ["Vacuum reached", r.vacuumTest || r.vacuumMicrons === undefined ? "" : `${num(r.vacuumMicrons, 0)} microns`],
+              ["Vacuum decay", r.vacuumTest || r.decayMicrons === undefined ? "" : `${num(r.decayMicrons, 0)} microns`],
               ["Refrigerant added", r.additionalChargeG !== undefined ? `${num(r.additionalChargeG, 0)} g` : ""],
               ["Temperature drop, cooling", splits(r.coolingSplitC)],
               ["Temperature rise, heating", splits(r.heatingSplitC)],

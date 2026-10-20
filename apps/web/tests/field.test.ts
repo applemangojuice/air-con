@@ -1,7 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  commissioningSignErrors,
   createProject,
+  decayTest,
   generateQuote,
   INSTALL_TEMPLATE_VERSION,
   runsheetFromDesign,
@@ -805,6 +807,57 @@ test("commissioning: signing a job that's already signed answers with the record
   assert.equal(r.already, true);
   assert.equal(r.record.at, AT);
   assert.equal(field.headerStateOf(r.project).handoverStatus, "commissioned");
+});
+
+test("decay: a failed strength test can't be accepted, a target change leaves it owing a retest, and it holds the signature", async () => {
+  await seed("in-progress");
+  const tech = staffMember("aa000000-0000-4000-8000-0000000000f4", { roles: ["tech-lead"], qualifications: FGAS.qualifications });
+  const step = (await installJobsRepo.loadForProject(PROJECT))!.runsheet.find((s) => s.decay?.kind === "pressure")!;
+  const spec = (role: string) => step.evidence.find((e) => e.role === role)!;
+  // 30.0 bar g to 29.85 at a steady 15 °C over an hour, on a 0.1 bar gauge: 0.15 bar lost.
+  const readings: [string, number][] = [["strength-test", 30], ["strength-start-temp", 15], ["strength-hold", 29.85], ["strength-end-temp", 15], ["strength-hold-time", 60], ["gauge-resolution", 0.1]];
+  for (const [i, [role, value]] of readings.entries()) {
+    await evidenceRepo.appendIdempotent(PROJECT, { id: `decay-${i}`, specId: spec(role).id, value, at: `2026-11-12T1${i}:00:00.000Z`, by: tech.name, byStaffId: tech.id });
+  }
+  const failing = (await installJobsRepo.loadForProject(PROJECT))!;
+  assert.equal(decayTest(failing, step)!.result, "fail");
+  await assert.rejects(field.reviewException(PROJECT, tech, { specId: spec("strength-hold").id, resolution: "accepted", reason: "DEMO: looks fine" }), /can't be accepted on its own/);
+  // The manual's 0.2 bar allowance would pass those readings: the change is saved, the retest stays owed.
+  const { applied } = await field.setTarget(PROJECT, tech, { key: "pressure.decay", max: 0.2, note: "DEMO manual p.20" });
+  assert.deepEqual(applied.retest.map((r) => [r.stepId, r.evidenceId]), [[step.id, "decay-5"]]);
+  const after = (await installJobsRepo.loadForProject(PROJECT))!;
+  const saved = after.runsheet.find((s) => s.id === step.id)!;
+  assert.equal(saved.decay?.limit.max, 0.2);
+  assert.equal(decayTest(after, saved)!.result, "fail", "a target change never passes a failed test");
+  assert.ok(commissioningSignErrors(after, tech, "2026-11-12").some((e) => /strength and tightness test failed and hasn't been done again/.test(e)));
+  // The retest, judged against the manual's figure: passes.
+  for (const [i, [role, value]] of readings.entries()) {
+    await evidenceRepo.appendIdempotent(PROJECT, { id: `decay-r-${i}`, specId: spec(role).id, value, at: `2026-11-13T1${i}:00:00.000Z`, by: tech.name, byStaffId: tech.id });
+  }
+  const retested = (await installJobsRepo.loadForProject(PROJECT))!;
+  const t = decayTest(retested, retested.runsheet.find((s) => s.id === step.id)!)!;
+  assert.deepEqual([t.result, t.failedRuns, t.pressure?.allowanceFrom], ["pass", 1, "tech-lead"]);
+});
+
+test("decay: a runsheet stored before the decay tests is read with them, ids and targets kept; a signed one as signed", async () => {
+  await seed("in-progress");
+  const stored = (await installJobsRepo.getForProject(PROJECT))!;
+  const old = stored.runsheet.map((s) => {
+    if (!s.decay) return s;
+    const { decay: _d, ...rest } = s;
+    const keep = s.decay.kind === "pressure" ? ["strength-test", "strength-hold"] : ["vacuum", "vacuum-decay"];
+    return { ...rest, evidence: s.evidence.filter((e) => !e.role || keep.includes(e.role)) };
+  });
+  await installJobsRepo.save({ ...stored, templateVersion: "pilot-runsheet-1", runsheet: old });
+  const read = (await installJobsRepo.getForProject(PROJECT))!;
+  const p = read.runsheet.find((s) => s.title === "Strength and tightness test")!;
+  assert.equal(p.decay?.kind, "pressure");
+  assert.ok(p.evidence.some((e) => e.role === "strength-start-temp") && p.evidence.some((e) => e.role === "gauge-resolution"));
+  assert.equal(p.evidence[0]!.id, old.find((s) => s.id === p.id)!.evidence[0]!.id, "the applied pressure keeps its id");
+  const record = { signedBy: { staffId: FGAS.id, name: FGAS.name, qualificationRef: "DEMO-F" }, at: AT, results: [] };
+  await installJobsRepo.save({ ...stored, templateVersion: "pilot-runsheet-1", runsheet: old, commissioning: record });
+  const signed = (await installJobsRepo.getForProject(PROJECT))!;
+  assert.equal(signed.runsheet.find((s) => s.title === "Strength and tightness test")!.decay, undefined, "signed jobs are read exactly as signed");
 });
 
 test("starting the day that's already under way answers with it, not 'already started'", async () => {

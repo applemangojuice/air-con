@@ -13,9 +13,12 @@ import {
   runsheetProgress,
   windowText,
   type Blocker,
+  type CommissioningResult,
+  type DecayTestView,
   type ExceptionReview,
   type JobTarget,
 } from "@aircon/domain";
+import { DecayPanel } from "./decay-panel";
 import { BlockerList } from "@/components/kit/blocker-list";
 import { withAnswers, type SignAnswer, type TargetAnswer } from "./answers";
 import { parseReading } from "./capture";
@@ -86,7 +89,8 @@ function TargetRow({ projectId, target, canEdit, locked, onAnswer }: { projectId
         <div className="min-w-0">
           <p className="font-semibold text-ink-900">{def.label}</p>
           <p className="text-sm text-ink-700">
-            {windowText({ ...(target.min !== undefined ? { min: target.min } : {}), ...(target.max !== undefined ? { max: target.max } : {}), unit: def.unit }) ?? "Record only"}
+            {windowText({ ...(target.min !== undefined ? { min: target.min } : {}), ...(target.max !== undefined ? { max: target.max } : {}), unit: def.unit }) ??
+              (target.basis === "tech-lead" && def.recordOnly ? def.recordOnly.replace(/^Use /, "Using ") : target.basis === "tech-lead" ? "Record only" : "Not set")}
             {target.basis === "tech-lead" && target.setBy ? ` · ${personName(target.setBy)}` : ""}
             {` · ${target.specCount} reading${target.specCount === 1 ? "" : "s"}`}
           </p>
@@ -129,9 +133,9 @@ function TargetRow({ projectId, target, canEdit, locked, onAnswer }: { projectId
             <button type="button" disabled={busy} onClick={() => void save(false)} className={`${PRIMARY} flex-1`}>
               {busy ? "Saving…" : target.basis === "candidate" ? "Confirm these numbers" : "Set target"}
             </button>
-            {target.key !== "pressure.test" && (
+            {def.recordOnly !== false && (
               <button type="button" disabled={busy} onClick={() => void save(true)} className={SECONDARY}>
-                Record only
+                {def.recordOnly ?? "Record only"}
               </button>
             )}
           </div>
@@ -203,6 +207,21 @@ const onPhoneText = (n: number) =>
   `${n === 1 ? "1 capture for this job is" : `${n} captures for this job are`} still on this phone, not on the server. The certificate is made from what the server has: get signal and let them sync (tap the sync badge), then sign.`;
 
 const fmtNum = (v: number | undefined, unit: string) => (v === undefined ? "Not recorded" : `${v} ${unit}`);
+
+/** A result's decay record, shown the way the runsheet step shows the live test. */
+function asTestView(kind: DecayTestView["kind"], rec: NonNullable<CommissioningResult["pressureTest"] | CommissioningResult["vacuumTest"]>): DecayTestView {
+  return {
+    kind,
+    result: rec.result,
+    retestNeeded: rec.result === "fail",
+    failedRuns: rec.failedRuns,
+    fails: rec.fails,
+    invalid: [],
+    toTake: [],
+    pending: [],
+    ...(kind === "pressure" ? { pressure: rec.figures as NonNullable<DecayTestView["pressure"]> } : { vacuum: rec.figures as NonNullable<DecayTestView["vacuum"]> }),
+  };
+}
 
 export function Commissioning({ data: page, certificateHref, holds = [] }: { data: FieldJob; certificateHref?: string; holds?: Blocker[] }) {
   useRefreshOnSync();
@@ -406,6 +425,12 @@ export function Commissioning({ data: page, certificateHref, holds = [] }: { dat
                         </>
                       )}
                     </dl>
+                    {(r.pressureTest || r.vacuumTest) && (
+                      <div className="mt-3 space-y-2">
+                        {r.pressureTest && <DecayPanel test={asTestView("pressure", r.pressureTest)} />}
+                        {r.vacuumTest && <DecayPanel test={asTestView("vacuum", r.vacuumTest)} />}
+                      </div>
+                    )}
                     {Object.keys(r.coolingSplitC).length + Object.keys(r.heatingSplitC).length > 0 && (
                       <table className="mt-4 w-full text-left text-base">
                         <caption className="mb-1 text-left text-sm font-semibold text-ink-900">Air temperature split, °C (recorded, no pass/fail)</caption>

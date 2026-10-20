@@ -7,6 +7,7 @@ export * from "./intelligence.ts";
 export * from "./operations.ts";
 export * from "./design.ts";
 export * from "./install.ts";
+export * from "./decay.ts";
 export * from "./finance.ts";
 export * from "./investor.ts";
 export {

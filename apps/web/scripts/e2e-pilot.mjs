@@ -319,6 +319,8 @@ const ids = {};
 /** A plausible reading for a slot, from its window when it has one, else from its unit and label. */
 function readingFor(slotText) {
   const n = Number;
+  // The pressure test's gauge: a digital manifold reading to 0.1 bar (the default allowance on the fall).
+  if (/Gauge resolution/.test(slotText)) return "0.1";
   let m = slotText.match(/window (-?[\d.]+) to (-?[\d.]+)/);
   if (m) return String(Math.round(((n(m[1]) + n(m[2])) / 2) * 100) / 100);
   m = slotText.match(/window at least (-?[\d.]+)/);
@@ -445,7 +447,11 @@ async function endDay(page, n, update, learnings) {
 
 const TARGETS = {
   "Nitrogen test pressure": { min: "2", max: "41.5" },
+  "Pressure test: hold time": { min: "15" },
+  "Pressure test: allowed fall": { recordOnly: "Use the gauge's resolution" },
   "Vacuum target": { max: "500" },
+  "Vacuum decay: hold time": { min: "15" },
+  "Vacuum decay: rise limit": { max: "200" },
   "Decay test": { max: "500" },
   "Flare torque": {},
   "Condensate drain fall": { recordOnly: true },
@@ -464,7 +470,7 @@ async function setTargets(page) {
     if (t.min !== undefined) await c.getByLabel(/^Minimum/).fill(t.min);
     if (t.max !== undefined) await c.getByLabel(/^Maximum/).fill(t.max);
     await c.getByLabel("Source (manual page)").fill("DEMO: installation manual, commissioning table");
-    await c.getByRole("button", { name: t.recordOnly ? "Record only" : /^(Set target|Confirm these numbers)$/ }).click();
+    await c.getByRole("button", { name: t.recordOnly ? (typeof t.recordOnly === "string" ? t.recordOnly : "Record only") : /^(Set target|Confirm these numbers)$/ }).click();
     await page.waitForTimeout(1200);
     const err = await c.getByRole("alert").allInnerTexts().catch(() => []);
     out.push(`${label}${err.length ? `: ${err.join(" ")}` : ""}`);
@@ -1260,6 +1266,8 @@ try {
     const set = await setTargets(techPhone);
     check(`job targets set from the manual (${set.length})`, set.length >= 4, set.join("; "));
     check("results show the F-gas record", await has(techPhone, /F-gas label\s*R32: factory 1\.1 kg/));
+    check("results judge the strength test from its readings", await has(techPhone, /Strength and tightness test: Pass/));
+    check("results judge the vacuum decay test against the rise limit", await has(techPhone, /Vacuum decay test: Pass[\s\S]*Rise limit \(manual\)\s*200 micron/i));
     check("ready to sign", await waitFor(techPhone, /Everything is in\. Ready for your signature/));
     await techPhone.getByLabel("Notes (optional, printed on the certificate)").fill("DEMO: commissioned in heating and cooling; all readings within the manual.");
     await techPhone.getByRole("button", { name: /^Sign as/ }).click();
@@ -1268,6 +1276,12 @@ try {
     const cert = await techPhone.getByRole("link", { name: "Commissioning certificate" }).getAttribute("href");
     await go(techPhone, `${cert}`);
     check("commissioning certificate renders", await waitFor(techPhone, /Commissioning certificate/i, 20_000, "body") && (await has(techPhone, /DEMO-FGAS-0001/, "body")));
+    check(
+      "the certificate shows the tests as measured: readings, the temperature correction, the allowance and the result",
+      (await has(techPhone, /Strength and tightness test \(oxygen-free nitrogen\): Pass/, "body")) &&
+        (await has(techPhone, /Allowed fall\s*0\.1 bar \(no fall beyond the gauge's resolution\)/, "body")) &&
+        (await has(techPhone, /Evacuation and decay test: Pass/, "body")),
+    );
     await shot(techPhone, "I-certificate");
   });
 

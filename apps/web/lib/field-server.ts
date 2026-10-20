@@ -34,6 +34,10 @@ import {
   runsheetPercent,
   runsheetProgress,
   setJobTarget,
+  carryTargets,
+  decayRetestMarkers,
+  withRetestMarkers,
+  DECAY_ROLES,
   transitionIssue,
   variationStart,
   withExceptionReview,
@@ -348,6 +352,8 @@ export async function ensureInstallJob(
   let runsheet: InstallStep[];
   try {
     runsheet = runsheetFromDesign(source.design, source.variantId, catalogue, survey?.data);
+    // A rebuild keeps every target the tech lead had already set from the manual.
+    if (existing) runsheet = carryTargets(existing.runsheet, runsheet);
   } catch (err) {
     return { ok: false, reason: `The runsheet couldn't be built from the design: ${(err as Error).message}` };
   }
@@ -1519,6 +1525,9 @@ export async function reviewException(
   if (job.commissioning) throw new FieldError("Commissioning is signed: the readings are closed.", 409);
   const spec = job.runsheet.flatMap((s) => s.evidence).find((e) => e.id === input.specId);
   if (!spec) throw new FieldError("That reading isn't on this runsheet.", 404);
+  if (spec.role && DECAY_ROLES.has(spec.role) && job.runsheet.some((s) => s.decay && s.evidence.includes(spec))) {
+    throw new FieldError("This reading is part of a pressure or vacuum test, which the readings decide together: it can't be accepted on its own. A failed test is retested.", 409);
+  }
   const record = latestEvidence(job, spec.id);
   if (!record) throw new FieldError("There's no reading to review.", 409);
   if (input.evidenceId && record.id && input.evidenceId !== record.id) {
@@ -1543,7 +1552,7 @@ export async function setTarget(
   projectId: string,
   staff: StaffMember,
   input: { key: TargetKey; min?: number; max?: number; note?: string },
-): Promise<{ job: InstallJobV2; applied: { input: typeof input; by: string; at: string } }> {
+): Promise<{ job: InstallJobV2; applied: { input: typeof input; by: string; at: string; retest: { stepId: string; evidenceId: string; reasons: string[] }[] } }> {
   const project = await projectForStaff(projectId, staff);
   const today = londonToday();
   const gate = canReviewExceptions(staff, today);
@@ -1554,10 +1563,16 @@ export async function setTarget(
   const problem = targetError(input.key, input.min, input.max);
   if (problem) throw new FieldError(problem, 400);
   const at = nowIso();
-  const saved = await mutateJob(projectId, (parts) => ({ ...parts, runsheet: setJobTarget(parts.runsheet, input, staff.name, at) }));
-  await audit({ actor: staff, action: "install.target", entity: "project", entityId: projectId, detail: input });
-  // What was applied, exactly: the screen applies the same setJobTarget to its own copy at once.
-  return { job: asV2(saved, job), applied: { input, by: staff.name, at } };
+  // A change that would pass a failed pressure or vacuum test leaves it owing a retest: it never clears one by itself.
+  let retest: { stepId: string; evidenceId: string; reasons: string[] }[] = [];
+  const saved = await mutateJob(projectId, (parts) => {
+    const next = setJobTarget(parts.runsheet, input, staff.name, at);
+    retest = decayRetestMarkers({ evidence: job.evidence, runsheet: parts.runsheet }, next);
+    return { ...parts, runsheet: withRetestMarkers(next, retest) };
+  });
+  await audit({ actor: staff, action: "install.target", entity: "project", entityId: projectId, detail: { ...input, ...(retest.length ? { retestOwing: retest.map((r) => r.stepId) } : {}) } });
+  // What was applied, exactly: the screen applies the same setJobTarget (and retest markers) to its own copy at once.
+  return { job: asV2(saved, job), applied: { input, by: staff.name, at, retest } };
 }
 
 function header(settings: Awaited<ReturnType<typeof getSettings>>, project: Project, at: string) {
