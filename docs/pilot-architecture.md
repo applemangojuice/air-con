@@ -2741,3 +2741,87 @@ changelog and the reasons, so nobody "fixes" a deliberate choice back.
       started keeps its pipework steps. The manufacturer-requirements
       compliance item names the new limits.
 
+
+48. **Pre-launch review, round 9 (one critical finding and the round's
+    medium list, before the first real customers).**
+    - *Planning consent* (was: "planning route needed" approved
+      `planning-pd` like "PD checks passed", and nothing held day 1).
+      `ComplianceItem.planningOutcome` (`PlanningOutcome`: "pd" |
+      "consent-needed", `PLANNING_OUTCOMES`, `PLANNING_OUTCOME_TEXT`) is
+      required to approve `planning-pd` (`ComplianceReviewContext.
+      planningOutcome`), refused as "pd" while `listedOnRecord` (the
+      designations item's own answer once approved,
+      `ComplianceItem.listedBuilding` "yes" | "no", asked to approve it;
+      else the survey's `not-listed` "no" or the property record's flag,
+      `ListingFacts`). New statutory template item `planning-consent`
+      ("Planning permission or listed building consent granted",
+      ready-to-install, admin, `allowNa: false`, `approvalNeeds:
+      "evidence-and-note"`: the decision notice and its reference, date and
+      conditions). `syncCompliance` marks it not applicable when the
+      outcome is "pd" and nothing is listed, `evidence-required` when the
+      outcome is "consent-needed" or a listed building is on record, back to
+      not started when the outcome is reopened; a person's approval or
+      rejection stands. Approvals of `planning-pd` or `designations` made
+      before the answer was a choice are reopened by the sync while the
+      install hasn't started. `planningConsentForGate` gives the day-1 gate
+      (project-service `buildReadinessContext` and ops-core
+      `contextFromRecords`) the item in line with the outcome without
+      waiting for the compliance page, adding it to an older checklist;
+      `loadChecklist` adds it for real before day 1 (`SELF_ADDED_KEYS`),
+      and `reviewItem` re-syncs after a planning or designations review.
+      `blockersFor` words it as one line (skipped while `planning-pd` is
+      itself open). `PLANNING_NOISE_RULE_IDS` gains the design's `planning`
+      rule, so a listed building or a "no" PD answer asks for the customer
+      note; `defaultPlanningNote` names listed building consent when
+      `planningRuleSaysListed`. The compliance page asks the outcome and
+      the listing question as radios, shows the consent item's context,
+      and lists missing template items by name.
+    - *Runsheet* (`pilot-runsheet-4`; untouched jobs rebuild with their
+      targets carried): a flare with no catalogue pipe size gets target
+      `torque.unsized` (recordOnly false); the release step names the
+      method (electronic R32 detector, 5 g a year) and records the
+      detector and the pressure at the joints (`LEAK_CHECK_GUIDANCE`, the
+      fail path: pump down, re-make, retest); a room whose BOM line says
+      "needs a brazed joint" gets `d2-joint-<room>` (F-gas, critical:
+      hot-work, nitrogen, permanent joint, photo, fire watch;
+      `BRAZED_JOINT_GUIDANCE`) and the RAMS risk line names the hot work;
+      the circuit step drops "as designed" (the electrician sizes the
+      device, its RCD type and the cable for the route) and checks the
+      interconnect with a terminal photo; the EIC step confirms its scope;
+      suspected asbestos at the survey adds "what cleared it" to
+      `d1-asbestos`; no charge rate reads as unknown, not "design: 0 g",
+      and `designApprovalErrors` refuses a system with `chargeKnown:
+      false`. The job pack adds the A2L detector, brazing kit,
+      extinguisher and fire blanket, and the BOM's joint note.
+    - *Electrics*: the design rule is "Board and circuit plan", reviews an
+      unrecorded earthing and says what it can't see; `electricsFinding`
+      no longer calls the circuit "a straightforward addition";
+      `boardAssumption` writes the proposal's fuse board line from the
+      survey; new internal template item `supply-and-dno` (booking,
+      electrician, `approvalNeeds: "note"`, now enforced for internal items
+      too); `electrical-cert-updated` refuses "not-required" (a new circuit
+      always needs its EIC; the button is gone). The researched RCBOs'
+      "Type A" is marked a placeholder in the seed.
+    - *Consents and safety*: `ReadinessContext.authorityConsentNeeded`
+      (survey tenure leaseholder or tenant) makes `ownership-authority` a
+      day-1 block, and its approval needs the written consent attached (no
+      note, no override). `asbestosSuspectedAtSurvey` makes the asbestos
+      item approve only on a file and a note; `submitSurvey` raises the
+      asbestos and flash-guard stop-work issues itself.
+      `ReadinessContext.asbestosAwarenessNeeded` warns at booking when no
+      crew member holds current asbestos awareness. Guidance only: RAMS
+      under CDM 2015, flats in blocks (full plans, the Building Safety
+      Regulator), ladders and two-person lifts.
+    - *Handover and aftercare*: `HandoverPackSnapshot.guarantees`
+      (`packGuarantees`: the accepted proposal's frozen lines) and the
+      proposal document's own `guarantees` replace today's settings; the
+      aftercare card shows the pack's warranty wording. The pack and the
+      family's page list the heat pump's Building Regulations certificate
+      apart from the circuit's (`HubPack.heatPumpCertificate`, from its
+      checklist item), and never "Not needed" from the electrical status.
+      `handover-pack-published` carries `warrantyDueOn`, kept by
+      `handover-signed`, so one date shows everywhere; daily job
+      `warranty-due` alerts the team 14 and 7 days ahead, on the day and
+      weekly while late. Primary sources (legislation.gov.uk, HSE, MCS,
+      ENA, the manufacturers) were unreachable from here again: every limit
+      is from search-engine extracts and is worded as to be confirmed.

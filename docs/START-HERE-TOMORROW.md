@@ -321,7 +321,9 @@ and in date.
    prices or margins.
 4. **Qualifications** → **Add a qualification**: pick **F-gas Category I**
    or **Part P competent person scheme**, type the certificate or
-   registration number, who issued it, and the expiry date.
+   registration number, who issued it, and the expiry date. Add **Asbestos
+   awareness** too for anyone who surveys or drills homes built before
+   2000: the booking warns when nobody on an older home's crew has it.
 5. **Add to the team**.
 6. You land on their page. Next to each qualification, **Upload evidence**
    (a photo or PDF of the certificate), tick **I've checked it against the
@@ -489,6 +491,19 @@ What you do the day before:
    Messages page is safe: nothing is ever sent twice.
 4. For an install: the booking is **Confirmed**, the kit is **Delivered**
    and **Checked**, and the project's checklist (**Compliance**) is approved.
+   Three items now hold day 1 with their reason until they're in:
+   - **Planning permission or listed building consent granted**, when the
+     technical lead chose "consent needed" on **Permitted development
+     checks** (or the home is listed): attach the council's decision notice
+     and write its reference, date and conditions. "PD checks passed" on an
+     unlisted home settles it by itself.
+   - **Owner's authority to contract**, for a leaseholder or a tenant:
+     attach the freeholder's or landlord's written consent.
+   - **Asbestos check before drilling**, when the survey suspected it: the
+     test result (or the route that avoids it), attached, with a note.
+   Before the booking, the electrician writes the supply check and the
+   network operator's route on **Supply capacity and the network operator
+   (DNO)**.
 
 ## 13. If something goes wrong
 

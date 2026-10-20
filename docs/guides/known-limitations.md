@@ -1,7 +1,7 @@
 # Known limitations
 
 An honest list of what the pilot platform doesn't do, or does only
-partly, as of 20 October 2026 (round 8, and the two gaps it left: §K47). None of these stops the four pilots; each
+partly, as of 20 October 2026 (round 9 of the pre-launch review: §K48). None of these stops the four pilots; each
 says what to do instead. Approvals that need a professional are in
 [approvals-required.md](approvals-required.md).
 
@@ -115,6 +115,53 @@ says what to do instead. Approvals that need a professional are in
    are taken as wall units at 1.8 m; a floor or ceiling unit needs its
    height set.
 
+9c. **Multi-split reducers aren't modelled.** The catalogue has no port
+   sizes for multi-split outdoor units, so the design's bill of materials
+   and the kit never add a reducer, the job pack's flare heads are the
+   indoor units' sizes only, and the runsheet records one torque reading per
+   line (the field flares), not the reducer's joint. The flares step tells
+   the crew to tighten a reducer's nuts as the manual says. *Instead:* the
+   technical lead reads the outdoor unit's port and reducer table in the
+   manual, adds any reducers to the purchase order, and checks them on the
+   day.
+9d. **The weighed charge isn't compared with the as-built length.** The
+   charge step shows the design's figure and the formula, and asks the
+   engineer to charge from the as-built length; nothing works out the
+   expected figure from the length they type or flags a weighed figure far
+   from it (only the R32 room-size maximum is an exception). A design with
+   no charge rate in the catalogue can't be approved, and the step says the
+   rate is missing instead of "design: 0 g". *Instead:* the technical lead
+   checks the weighed figure against max(0, as-built length − pre-charged
+   length) × g/m before signing.
+9e. **The electrics design is a starting point, not the circuit design.**
+   The breaker comes from the manufacturer (or a labelled rule of thumb)
+   and the cable from the breaker alone; nothing works out maximum demand,
+   the cable's rating for its route (insulation, the outside section) or
+   voltage drop, picks the RCD type, or puts armoured cable in the bill of
+   materials for an outside run, and the survey doesn't record the cut-out
+   rating, a looped service or existing large loads. The design's check
+   says so, and the runsheet asks the electrician to size it. *Instead:* the
+   electrician designs the circuit and writes the supply check and the
+   network operator's route on the checklist item **Supply capacity and the
+   network operator (DNO)** before the booking; price any armoured cable or
+   board work as a cost line.
+9f. **Access at height is the surveyor's and the technical lead's call.**
+   The survey accepts a ladder for a bracket at any height, a tower or
+   scaffold is priced only when the surveyor picks one, and nothing checks
+   that the crew has two people for the lift. *Instead:* the technical lead
+   decides the access on the **Working at height plan** item (no long tasks
+   off a ladder; a tower or podium for first-floor brackets) and adds any
+   hire to the proposal as a cost line.
+9g. **Flats in blocks get no block questions.** The survey doesn't ask the
+   block's height or storeys, its common parts or whether a pipe crosses a
+   compartment wall or floor, and there's no fire-stopping photo for such a
+   crossing. *Instead:* for any flat, the admin confirms the route with
+   building control on **Building Regulations route for the heat pump** (a
+   full plans application rather than a building notice in most blocks; the
+   Building Safety Regulator's approval in a higher-risk building outside a
+   competent person scheme), and the crew photographs the sleeve and its
+   fire-stopping in the core-drilling step.
+
 ## The field app
 
 10. **No native app.** It's a website on the phone: use it in Safari or
@@ -157,6 +204,12 @@ says what to do instead. Approvals that need a professional are in
 13. **Barcode reading works on Android only.** In Chrome on Android a serial
     number can be read from a photo of its label; on iPhones (Safari) it has
     to be typed, with the label photographed as evidence.
+
+13a. **The leak check records the method, not the instrument's
+    calibration.** The release step asks for the electronic detector's make
+    and model and the pressure at the joints; the app can't check the
+    detector's sensitivity or calibration. *Instead:* keep the detector's
+    certificate with the F-gas records.
 
 ## Planning and scheduling
 
@@ -252,6 +305,27 @@ says what to do instead. Approvals that need a professional are in
       (issued before, installed after) goes to the accountant (approvals
       item 11).
 
+23a. **Paperwork after handover is partly by hand.**
+    - *The heat pump's own Building Regulations certificate* is tracked on
+      its checklist item (the file and number go there as evidence) and
+      shown on the family's page and in the pack; it isn't a customer
+      document of its own, and the weekly overdue alert covers only the
+      electrical certificate. *Instead:* email it to the family when it
+      comes, attach it to the checklist item, and check that item 30 days
+      after completion.
+    - *Warranty terms per brand aren't stored.* The registration date the
+      app keeps is the pack's (completion plus 90 days for Daikin, 30 for
+      the rest), counted from completion, not commissioning, and the
+      brands' own deadlines and owner steps weren't verified (approvals
+      item 20). The team is alerted 14 and 7 days ahead, on the day, and
+      weekly while it's late. *Instead:* put each brand's real deadline and
+      conditions in **Settings → Warranty** before quoting.
+    - *The yearly service reminder goes once* (about 30 days before the
+      first service), and services aren't recorded. A warranty that needs
+      a yearly service can lapse from year 2. *Instead:* put the service
+      condition in the warranty wording in Settings, so it's in the
+      contract and the pack, and diary each household's later services.
+
 ## Customers and messages
 
 24. **Texts are one-way.** The sender name `DangItsHot` can't receive
@@ -305,6 +379,32 @@ says what to do instead. Approvals that need a professional are in
     until they're worked out; the website makes no such promise.
 31. **No finance offers** until an FCA-authorised lender or broker is in
     place.
+
+31a. **Planning, consent and site safety: what the app enforces and what it
+    doesn't.**
+    - *Planning*: the technical lead's outcome is a recorded choice, and
+      "consent needed" (or a listed building on record) holds install day 1
+      until the council's decision notice is attached (§K48). The app
+      doesn't track the application itself (when it went in, the council's
+      decision period, conditions to discharge). *Instead:* note the
+      application on the planning consent item, and check its conditions
+      against the install before approving it.
+    - *Leasehold and rented homes*: the day-1 gate rests on the survey's
+      tenure. The quote form only asks "own or rent", so a leaseholder
+      learns about the freeholder's consent at the survey, not from the
+      online price. *Instead:* the surveyor records the tenure carefully;
+      tell a leaseholder about the consent at the survey.
+    - *CDM 2015*: the RAMS item asks for the construction phase plan's
+      content (site rules, welfare, induction, coordination), but nothing
+      records who is principal contractor and principal designer, and the
+      handover pack has no health and safety file for a job with a
+      subcontracted electrician. *Instead:* write both into the RAMS, and
+      add the hidden pipe and cable routes, the R32 note and the isolators
+      to the pack's notes for those jobs.
+    - *Asbestos awareness*: the booking warns (doesn't block) when a pre-2000
+      home's crew has no current asbestos awareness training on file, and
+      nothing checks the surveyor's. *Instead:* add the training to each
+      person's staff record (approvals item 4).
 
 ## Legal text
 

@@ -278,13 +278,30 @@ The project → **Kit** (or **Raise purchase orders** on the command centre).
 
 ### 3.8 Compliance checklist
 
-The project → **Open the checklist**. Twenty items, each with its gate
+The project → **Open the checklist**. Twenty-five items, each with its gate
 (before the proposal, before booking, before install day, before closing).
 **Statutory** items can't be overridden. The technical lead reviews each
 (**Review** → Approve or Not applicable, with a note → **Save the
-review**). Some update by themselves (the design sign-off, the electrical
-certificate). Everything for install day must be approved before the crew
-can start.
+review**). Some update by themselves (the design sign-off, commissioning,
+the warranty, and the planning consent item when the outcome is "PD checks
+passed"). Everything for install day must be approved before the crew can
+start. A few ask for more than a note:
+
+- **Permitted development checks**: choose the outcome. "Planning
+  permission or listed building consent needed" holds day 1 on **Planning
+  permission or listed building consent granted** until you attach the
+  council's decision notice and write its reference, date and conditions.
+- **Listed building, conservation area and Article 4**: answer "listed?"
+  from the heritage list.
+- **Owner's authority to contract**: for a leaseholder or tenant, the
+  written consent attached (holds day 1).
+- **Asbestos check before drilling**: when the survey suspected it, the
+  test result (or the avoiding route) attached.
+- **Supply capacity and the network operator (DNO)**: the electrician's
+  written outcome, before booking.
+
+A checklist made before an item existed shows **Add the missing items**
+with their names; the planning consent item adds itself before day 1.
 
 ### 3.9 Install days
 
@@ -321,12 +338,18 @@ can start.
   good** or **There's a snag**. Each snag becomes an issue with an owner and
   a date; the family can see it.
 - **Handover** box → **Electrical certificate received**: upload it,
-  certificate number, issued by → **Add to their documents**. Or mark it
-  pending from the scheme. The law gives 30 days; the team gets a weekly
-  alert while it's overdue.
+  certificate number, issued by → **Add to their documents**. It can't be
+  marked "not required": every install adds a new circuit. The law gives 30
+  days; the team gets a weekly alert while it's overdue.
+- **The heat pump's own Building Regulations certificate** (from the scheme
+  that covers the installation, or the council) is separate from the
+  circuit's: attach it to its checklist item and email it to the family.
+  Their page shows it as to come until the item is approved.
 - **Warranty registered**: register with the manufacturer (the box shows
-  the date to register by, 30 days after handover), then type the
-  registration reference → **Add to their documents**.
+  the date to register by: the one in the family's handover pack,
+  completion plus 90 days for Daikin and 30 for the rest; the team is
+  alerted 14 and 7 days ahead, on the day, and weekly while late), then
+  type the registration reference → **Add to their documents**.
 
 ### 3.11 Closing
 

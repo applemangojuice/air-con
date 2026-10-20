@@ -221,7 +221,7 @@ to a family who pressed **Stop follow-up emails** or who cancelled.
 | Message | When |
 | --- | --- |
 | The morning email | Every day at 6am (7am in summer): today's visits, what's blocked or overdue, money owed, yesterday's website enquiries |
-| Team alerts | When a family books a survey, accepts, asks for changes, pays, raises something urgent; when a message fails; a weekly reminder while an electrical certificate is overdue; when a proposal is later than we promised |
+| Team alerts | When a family books a survey, accepts, asks for changes, pays, raises something urgent; when a message fails; a weekly reminder while an electrical certificate is overdue; the warranty registration date coming up (14 and 7 days ahead, on the day, weekly while late); when a proposal is later than we promised |
 
 They go to the `LEADS_NOTIFY_EMAIL` inbox (or the `EMAIL_FROM` address if
 that isn't set).

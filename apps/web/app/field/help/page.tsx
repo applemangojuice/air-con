@@ -163,6 +163,26 @@ export default async function FieldHelpPage() {
           </p>
         </Fold>
 
+        <Fold id="joints" title="Leak checks, brazed joints and the electrics">
+          <p>
+            <B>Release and leak check</B>: every field joint with an electronic leak detector rated for R32 (A2L), sensitive to 5 g a year or better. Spray alone isn&apos;t
+            enough indoors. Type the detector&apos;s make and model and the pressure the joints were at: a quarter of the nameplate PS or more (on a cold day, run it in
+            heating). A leak: don&apos;t top up. Pump down (or recover), re-make the joint, then pressure test, evacuate and decay test again.
+          </p>
+          <p>
+            <B>Brazed joint</B> (only on a run longer than one coil): it&apos;s hot work. Clear or shield anything that burns, extinguisher and fire blanket out, nitrogen
+            flowing while you braze, a photo of the joint before it&apos;s insulated, and a fire watch after the last flame for as long as the RAMS says. Inside the home only a
+            permanent brazed joint: no flare or reusable joint in the run.
+          </p>
+          <p>
+            <B>Electrics</B>: the electrician sizes the breaker, its RCD type and the cable for the route; the design&apos;s figures are a starting point. The interconnect
+            between the units is mains voltage: the cable the manual names, terminals tight, strain relief on, earth first, and a photo of the terminal blocks.
+          </p>
+          <p className="rounded-xl bg-red-50 px-3 py-2 font-semibold text-red-900">
+            Suspected asbestos at the survey: the day-1 check asks what cleared it (a test result, or the route changed to avoid it). Never drill it.
+          </p>
+        </Fold>
+
         <Fold id="outcomes" title="Pass, Fail, Blocked, N/A">
           <ul className="space-y-2">
             <li>

@@ -132,6 +132,9 @@ loft hatch, and a torch for the fuse board.
       (quiet, discreet, app control, budget); timing.
    3. **House**: construction, era, loft access. Older homes get the
       asbestos questions: suspected asbestos means stop and raise it.
+      Possible or suspected asbestos (or a flash guard that may be) raises
+      the stop-work issue by itself when you submit, so day 1 waits for a
+      test result or a route that avoids it.
    4. **Rooms**: for each room, the measurements, windows and sun, and a
       **tagged photo** with the unit drawn where it would go (tools: indoor
       unit, core hole, pipe route, condensate, cable, obstacle,
@@ -202,8 +205,26 @@ The three days, roughly:
 | Day | What |
 | --- | --- |
 | 1 · Prep and building work | Arrival, protection, condition photos, RAMS, kit and serial check, marking out (scan the wall first), core drilling, wall plates, outdoor base or bracket |
-| 2 · Mechanical and electrical | Indoor units, outdoor unit, pipework, flares and torque (F-gas), condensate, the electrical circuit (electrician) |
-| 3 · Test, commission, hand over | Pressure test, vacuum, release and leak check (F-gas), commissioning in heating and cooling, electrical tests, walkthrough, paperwork, finished photos, clean up |
+| 2 · Mechanical and electrical | Indoor units, outdoor unit, pipework, any brazed joint in a long run (F-gas, hot work), flares and torque (F-gas), condensate, the electrical circuit and the interconnects (electrician) |
+| 3 · Test, commission, hand over | Pressure test, vacuum, release and leak check with an electronic R32 detector (F-gas), commissioning in heating and cooling, electrical tests, walkthrough, paperwork, finished photos, clean up |
+
+A few steps say more than a tick:
+
+- **Asbestos check before drilling**: if the survey suspected asbestos,
+  the step says what it found and asks what cleared it (the test result's
+  reference, or "avoided: route changed" and how). Never drill it.
+- **Brazed joint in the pipe run** (only when a run is longer than one
+  coil): hot work. Clear or shield anything that burns, have the
+  extinguisher and fire blanket out, braze with nitrogen flowing, photograph
+  the joint before it's insulated, and keep a fire watch after the last
+  flame for as long as the RAMS says. Inside the home only a permanent
+  brazed joint: no flare or reusable joint in the run.
+- **Release and leak check**: every field joint with an electronic leak
+  detector rated for R32 (A2L), sensitive to 5 g a year or better; record
+  the detector and the pressure the joints were at (a quarter of the
+  nameplate PS or more: on a cold day, run it in heating). A leak: don't
+  top up. Pump down (or recover), re-make the joint, then pressure test,
+  evacuate and decay test again.
 
 ![A day's runsheet (DEMO)](../screenshots/guides/15-field-runsheet.png)
 
@@ -326,6 +347,17 @@ second update and still stops your clock.
   breaker, terminations, tests) and **Electrical certificate** on **Day 3**.
   They're marked **Electrician** (and the circuit **Critical**), and locked
   for anyone without Part P.
+- The design's breaker and cable are a starting point, not your design:
+  you confirm the supply can take it (cut-out rating, a looped service,
+  existing large loads, earthing), choose the RCD type the outdoor unit's
+  manual asks for (Type A, F or B), and size the cable for its route. Before
+  the booking, write that outcome, and whether the network operator (UK
+  Power Networks) is told or applied to first, on the checklist's
+  **Supply capacity and the network operator (DNO)** item.
+- The circuit step also checks the **interconnect** between the units
+  (mains voltage: the cable the manual specifies, terminals tight, strain
+  relief, earth) with a photo of the terminal blocks, and the certificate
+  step confirms the EIC covers the interconnects.
 - Warn the family before switching off: the power is off for up to about 30
   minutes. Their project page already tells them to expect it.
 - The **electrical installation certificate** and the scheme's Building
@@ -364,7 +396,22 @@ Multi-split only from a combination the catalogue marks verified. Then
 
 **The compliance checklist** (desk). The project → **Open the checklist** →
 each item → **Review** → **Approve** or **Not applicable**, with a note →
-**Save the review**. Statutory items can't be skipped.
+**Save the review**. Statutory items can't be skipped. Two approvals ask a
+question first:
+
+- **Permitted development checks**: the outcome, **PD checks passed** or
+  **Planning permission or listed building consent needed**. "Needed" (or
+  a listed building on record) holds install day 1 on **Planning permission
+  or listed building consent granted** until the office attaches the
+  council's decision notice with its reference, date and conditions.
+  "Passed" on a building that isn't listed marks that item not applicable
+  by itself. A listed building can't be recorded as "passed".
+- **Listed building, conservation area and Article 4**: is it a listed
+  building, or in the curtilage of one? Your answer from the heritage list
+  decides over the survey's.
+
+Suspected asbestos at the survey: the asbestos item approves only with the
+test result (or the avoiding route) attached and a note.
 
 **On site.** The F-gas steps (flares and torque, pressure test, vacuum,
 release and leak check) are yours or another F-gas holder's. Anything a
@@ -381,7 +428,11 @@ clear it.
    figure), the vacuum target (**Use 500 micron** unless the manual's is
    stricter), the vacuum decay hold time and rise limit, the highest
    reading after the hold if the manual gives one, flare torque for each
-   pipe size, condensate fall. Type the figure and the manual page → **Set
+   pipe size (and **Flare torque, pipe size not in the catalogue** when an
+   indoor unit has no pipe sizes on record: set it from the manual, and add
+   the sizes to the catalogue), condensate fall. On a multi-split, any
+   reducer on an outdoor port is tightened as the manual says, not to the
+   field flare's window. Type the figure and the manual page → **Set
    target**. Readings already taken are judged against what you set; a
    change that would pass a test that already failed leaves it failed,
    owing a retest.
