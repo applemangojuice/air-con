@@ -74,6 +74,77 @@ supabase-js with the service-role key, as a demo deployment
 **Admin break-glass**. Node 22.22.0, pnpm 10.12.1, PostgreSQL 16.15,
 PostgREST 12.2.3.
 
+## What round 9 found
+
+A ninth pass of the pre-launch review, with site-safety, refrigeration,
+electrics and aftercare reviewers, found one problem that reaches real
+families, and a list of medium ones. All are fixed or written up
+(architecture §K48), each with tests that fail without the fix:
+
+- **"Planning route needed" cleared install day 1.** The technical lead's
+  only planning decision was a free-text note, and "Planning route
+  needed: Grade II listed, listed building consent required" approved the
+  item exactly like "PD checks passed". Nothing then recorded that planning
+  permission or listed building consent had been granted, so a listed house
+  could be drilled with every light green (works to a listed building
+  without consent are an offence). Now the outcome is a choice: "PD checks
+  passed", or "Planning permission or listed building consent needed",
+  which a listed building on record (the survey, the property record, or
+  the designations check's own "listed?" answer) forces. A new statutory
+  item, **Planning permission or listed building consent granted**, holds
+  day 1 with one clear line until the council's decision notice is
+  attached with its reference, date and conditions; it marks itself not
+  applicable when PD passed on a building that isn't listed. Approvals from
+  before the outcome was a choice are asked again before day 1, the day-1
+  gate and the board read it without waiting for the compliance page, and
+  older checklists gain the item. The design's planning check (a listed
+  building, a "no" PD answer) now asks for the customer note, and a listed
+  building's suggested note names listed building consent. (Tests: the
+  review's repro on the domain and on the real modules, the listing rules,
+  an older checklist, the customer note; in the walk, the item on the
+  checklist and "PD checks passed" settling it.)
+
+From the round's medium list, fixed: a flare with no pipe size in the
+catalogue gets a target the technical lead must set; the leak check names
+its method (an electronic R32 detector, 5 g a year) and records the
+detector and the pressure, with the fail path, and the pack carries the
+detector; a run longer than one coil gets an F-gas brazed-joint step with
+the hot-work checks, the RAMS names the hot work and the pack the brazing
+kit, extinguisher and fire blanket; the circuit step no longer says "cable
+as designed" (the electrician sizes the device, its RCD type and the cable)
+and checks the interconnect with a terminal photo, and the EIC step
+confirms its scope; no charge rate reads as unknown, never "design: 0 g",
+and blocks design approval; a new checklist item for the supply's capacity
+and the network operator; the design's electrics check says what it can't
+see and the proposal's fuse board line follows the survey; a leaseholder's
+or tenant's consent holds day 1 until it's attached; suspected asbestos
+raises its stop-work issue at submit and its check needs the result; an
+older home warns at booking without asbestos awareness on the crew; the
+electrical certificate can't be marked "not required"; the pack and the
+family's page list the heat pump's own Building Regulations certificate;
+the pack, the proposal document and the aftercare card state the agreed
+guarantee and warranty wording; the warranty date is one date everywhere,
+with team alerts before it; CDM 2015, flats in blocks, ladders and lifts in
+the checklist guidance; honest service-reminder and FAQ copy. Written up
+with the workaround instead (known limitations 9c to 9g, 13a, 23a, 31a;
+approvals 13a, 18a, 18b): multi-split reducers, comparing the weighed
+charge with the as-built length, the circuit's own design (maximum demand,
+cable rating, RCD type, armoured cable), access at height, flats in blocks,
+the heat pump certificate as a document, per-brand warranty terms, yearly
+service reminders, the leasehold quote option, the CDM file and the
+surveyor's training. Primary sources (legislation.gov.uk, HSE, MCS, ENA,
+the manufacturers) were unreachable from here: every limit is from
+search-engine extracts and worded as to be confirmed.
+
+**The two gaps round 8 left, checked again.** Read against the code and
+passed their own tests and walk checks in both rounds: the decay tests (the
+end pressure corrected to the start temperature in absolute terms, a fall
+beyond the gauge's resolution or the manual's allowance, a test above PS or
+below the manual's pressure, a short hold, 500 micron and the rise limit,
+and a failed test cleared only by a full retest) and the manufacturer
+minimums (each run and a multi-split's totals, branches, fewest rooms and
+height between rooms from the catalogue, a blank a CHECK, never a pass).
+
 ## The two gaps round 8 left
 
 Round 8 wrote two engineering gaps up as known limitations (7 and 9a). Both
