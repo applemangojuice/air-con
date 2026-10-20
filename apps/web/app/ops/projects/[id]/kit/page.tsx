@@ -441,7 +441,10 @@ function OrderCard({
             <Panel title="Check the kit against the design" open={po.status === "delivered"}>
               <ActionForm flash action={inspectionAction.bind(null, projectId)} submitLabel="Save the check" busyLabel="Saving…">
                 <input type="hidden" name="poId" value={po.id} />
-                <p className="mb-3 text-sm text-ink-500">For each line: how many units are good and how many are damaged, out of what arrived. Damage raises an issue that holds install day 1.</p>
+                <p className="mb-3 text-sm text-ink-500">
+                  Only from the boxes in front of you: for each line, how many units are good and how many are damaged, out of what arrived. The family is told our team has checked it. Damage raises an issue that holds install day 1.
+                  {po.destination === "customer" ? " This order went to the family's home: if nobody has seen the boxes yet, leave this for the crew's day-1 kit check." : ""}
+                </p>
                 <ul className="space-y-4">
                   {po.lines
                     .filter((l) => l.receivedQty > 0)
@@ -454,7 +457,7 @@ function OrderCard({
                         <div className="mt-2 flex flex-wrap items-end gap-4">
                           <div>
                             <label className="mb-1 block text-xs font-semibold text-ink-700" htmlFor={`good-${l.id}`}>Good</label>
-                            <input id={`good-${l.id}`} name={`good:${l.id}`} type="number" inputMode="numeric" min={0} max={l.receivedQty} defaultValue={l.receivedQty - l.damagedQty} className={small} />
+                            <input id={`good-${l.id}`} name={`good:${l.id}`} type="number" inputMode="numeric" required min={0} max={l.receivedQty} defaultValue={l.inspectedQty > 0 ? l.inspectedQty - l.damagedQty : undefined} className={small} />
                           </div>
                           <div>
                             <label className="mb-1 block text-xs font-semibold text-ink-700" htmlFor={`dmg-${l.id}`}>Damaged</label>

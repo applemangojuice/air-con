@@ -284,6 +284,8 @@ export function commsForAction(project: Project, action: ProjectAction, actor?: 
             shortages: action.shortages,
             // At their home, or with us until the crew brings it: the email never says "delivered" for the second.
             ...(action.status !== "confirmed" && p.kit.deliveredTo ? { deliveredTo: p.kit.deliveredTo } : {}),
+            // Confirmed: where it's going (a delivery to their home needs someone in).
+            ...(action.status === "confirmed" && action.deliveredTo ? { deliveredTo: action.deliveredTo } : {}),
             supplied: p.proposal.contractType !== "install-only",
           },
           discriminator,

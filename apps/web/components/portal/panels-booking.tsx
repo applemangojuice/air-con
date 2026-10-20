@@ -255,6 +255,19 @@ export function BookingPanel({ data, state, slots }: PanelProps) {
                     : "Your team and dates are locked in. We'll be in touch the evening before."
                 : "We'll confirm once your team and kit are lined up. You'll get an email when we do."}
             </p>
+            {!started && (data.holds ?? []).length > 0 && (
+              <p className="mt-2 rounded-xl bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900">
+                Day 1 can only go ahead once we have{" "}
+                {[
+                  (data.holds ?? []).includes("landlord-consent") ? "your landlord's written consent" : null,
+                  (data.holds ?? []).includes("freeholder-consent") ? "the freeholder's (or managing agent's) written consent" : null,
+                  (data.holds ?? []).includes("planning-consent") ? "the council's planning permission or listed building consent" : null,
+                ]
+                  .filter(Boolean)
+                  .join(" and ")}
+                . We&apos;ll move your dates if it isn&apos;t in time.
+              </p>
+            )}
           </div>
           {!started && !changing && (
             <Secondary onClick={() => setChanging(true)}>Change my dates</Secondary>

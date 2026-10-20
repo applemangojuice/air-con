@@ -710,6 +710,12 @@ export const DEFAULT_PREP_ITEMS: Omit<PrepItem, "done">[] = [
     confirmable: true,
   },
   {
+    id: "delivery",
+    label: "Take in the equipment delivery, if it comes to your home",
+    detail: "Your kit emails say where it's going and when. If it's your home, someone needs to be in to take it (the boxes are big and heavy). Keep them unopened, somewhere dry and out of the way, until day 1.",
+    confirmable: true,
+  },
+  {
     id: "parking",
     label: "Tell us about parking for one van",
     detail: "Where we can park as close as possible, and whether you're in a controlled parking zone. If we need a permit or a suspended bay, we arrange it, and the cost is ours unless your proposal lists it.",
@@ -1360,7 +1366,8 @@ export function blockersFor(project: Project, ctx: ReadinessContext, gate: GateI
         if (kit.deliveredLines < kit.requiredLines) {
           block("kit-not-delivered", `${kit.deliveredLines} of ${kit.requiredLines} kit lines delivered.`, "ops", "Chase the supplier");
         } else if (kit.inspectedLines < kit.requiredLines) {
-          warn("kit-not-inspected", `${kit.inspectedLines} of ${kit.requiredLines} kit lines checked.`, "installer", "Check the kit against the design");
+          // Recorded on the Kit page (purchasing.edit: an admin or the tech lead), from the boxes themselves.
+          warn("kit-not-inspected", `${kit.inspectedLines} of ${kit.requiredLines} kit lines checked.`, "ops", "Check the boxes against the design on the Kit page");
         }
         if (kit.damaged > 0) {
           warn("kit-damaged", `${kit.damaged} kit item${kit.damaged === 1 ? "" : "s"} recorded as damaged.`, "ops", "Raise an issue and arrange a replacement");
@@ -3841,7 +3848,29 @@ export function variationsAwaitingCustomer<T extends NextActionIssue>(issues: re
  * the snapshot, and it comes first (the crew is waiting on the answer, and
  * the email and text already told them it needs their OK).
  */
-export function customerNextAction(project: Project, issues: readonly NextActionIssue[] = []): { label: string; href?: string } | null {
+/**
+ * What holds install day 1 that only the family (or the council) can settle,
+ * from the open checklist items: a tenant's or leaseholder's written consent,
+ * and planning permission or listed building consent still to be granted.
+ * The family's page asks for it instead of "You're all set" (round 10).
+ */
+export type CustomerHold = "landlord-consent" | "freeholder-consent" | "planning-consent";
+
+export const CONSENT_HOLD_LABEL: Record<"landlord-consent" | "freeholder-consent", string> = {
+  "landlord-consent": "Send us your landlord's written consent",
+  "freeholder-consent": "Send us the freeholder's written consent",
+};
+
+export function customerHolds(items: readonly { key: string; status: string }[], tenure?: string): CustomerHold[] {
+  const open = (key: string) => items.some((i) => i.key === key && i.status !== "approved" && i.status !== "not-applicable");
+  const out: CustomerHold[] = [];
+  if ((tenure === "tenant" || tenure === "leaseholder") && open("ownership-authority")) out.push(tenure === "tenant" ? "landlord-consent" : "freeholder-consent");
+  // The consent item is waiting for a decision notice only when one is needed (syncCompliance).
+  if (items.some((i) => i.key === "planning-consent" && (i.status === "evidence-required" || i.status === "under-review" || i.status === "rejected"))) out.push("planning-consent");
+  return out;
+}
+
+export function customerNextAction(project: Project, issues: readonly NextActionIssue[] = [], holds: readonly CustomerHold[] = []): { label: string; href?: string } | null {
   const p = project;
   const base = `/p/${p.id}`;
   const feedbackDue = Boolean(p.aftercare.feedbackRequestedAt) && !p.aftercare.feedback;
@@ -3854,6 +3883,7 @@ export function customerNextAction(project: Project, issues: readonly NextAction
       : null;
   }
 
+  const consentHold = holds.find((h): h is "landlord-consent" | "freeholder-consent" => h === "landlord-consent" || h === "freeholder-consent");
   const changes = variationsAwaitingCustomer(issues);
   if (changes.length) {
     return { label: changes.length === 1 ? VARIATION_ANSWER_LABEL : VARIATIONS_ANSWER_LABEL, href: `${base}#install` };
@@ -3888,10 +3918,12 @@ export function customerNextAction(project: Project, issues: readonly NextAction
       return null; // designing, or revising after a change request
     case "booking":
       if (p.booking.dates.length === 0) return { label: "Choose your install dates", href: `${base}#booking` };
-      return earlyStartReplyNeeded(p) ? { label: "Reply to confirm your early start", href: `${base}#booking` } : null;
+      if (earlyStartReplyNeeded(p)) return { label: "Reply to confirm your early start", href: `${base}#booking` };
+      return consentHold ? { label: CONSENT_HOLD_LABEL[consentHold], href: `${base}#booking` } : null;
     case "kit":
     case "install":
       if (earlyStartReplyNeeded(p)) return { label: "Reply to confirm your early start", href: `${base}#booking` };
+      if (p.install.status === "not-started" && consentHold) return { label: CONSENT_HOLD_LABEL[consentHold], href: `${base}#booking` };
       if (p.install.status === "not-started" && p.booking.prep.some((i) => i.confirmable && !i.done)) {
         return { label: "Get your home ready", href: `${base}#booking` };
       }

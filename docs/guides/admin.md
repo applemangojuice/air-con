@@ -274,8 +274,13 @@ The project → **Kit** (or **Raise purchase orders** on the command centre).
 3. **Record a delivery** when it arrives: who took it in → **Save the
    delivery**. The family is told when the supplier confirms, when it's
    delivered, and when it's checked; never on an estimate.
-4. **Check the kit against the design**: serial numbers → **Save the
-   check**. (The installer can do this on site on day 1 instead.)
+4. **Check the kit against the design**, only from the boxes in front of
+   you: type how many are good and how many damaged on each line (nothing is
+   filled in for you), the serial numbers → **Save the check**. The family
+   is told our team has checked it. If the kit went to the family's home and
+   nobody has seen it yet, leave it: the crew's day-1 **Kit and serial
+   check** steps check the boxes (the office warning stays until someone
+   records the check here; it doesn't hold day 1).
 5. Afterwards: type what the supplier actually charged → **Save actual
    costs**, so the margin on the Pilots page is real.
 

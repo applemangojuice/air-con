@@ -169,7 +169,10 @@ export async function inspectionAction(projectId: string, _prev: ActionState, fo
   const lineIds = form.getAll("lineId").map(String).slice(0, 100);
   const lines: { lineId: string; goodQty: number; damagedQty: number; serials: string[] }[] = [];
   for (const lineId of lineIds) {
-    const good = Number(String(form.get(`good:${lineId}`) ?? "0").trim() || "0");
+    // Good is typed from the boxes, never assumed (round 10: it defaulted to everything that arrived).
+    const goodRaw = String(form.get(`good:${lineId}`) ?? "").trim();
+    if (!goodRaw) return invalid("Type how many are good on every line, from the boxes in front of you (0 if none).");
+    const good = Number(goodRaw);
     const damaged = Number(String(form.get(`damaged:${lineId}`) ?? "0").trim() || "0");
     if (![good, damaged].every((n) => Number.isInteger(n) && n >= 0 && n <= 999)) return invalid("Quantities are whole numbers.");
     const serials = String(form.get(`serials:${lineId}`) ?? "")

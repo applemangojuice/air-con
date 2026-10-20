@@ -1304,13 +1304,23 @@ const TEMPLATES: { [E in CommsEventId]: Renderer<E> } = {
       d.deliveredTo === "elsewhere" && d.supplied !== false && d.status !== "confirmed"
         ? "Your cancellation period starts on the day the equipment is brought to your home, not today. We'll email you the exact last day then."
         : null;
+    // At (or coming to) their home, there is something to do: take it in, and keep it safe until day 1 (round 10).
+    const atHome = d.deliveredTo === "customer";
+    const yourPart =
+      atHome && d.status === "confirmed"
+        ? "It's coming to your home: please make sure someone is in to take it (the boxes are big and heavy). Keep them unopened, somewhere dry and out of the way, until your first install day. If the day doesn't suit, call us and we'll move it with the supplier."
+        : atHome && d.status === "delivered"
+          ? "Please keep the boxes unopened, somewhere dry and out of the way, until your first install day: the crew opens and checks them with you. If anything looks damaged, tell us."
+          : atHome && d.status === "inspected"
+            ? "Please keep it somewhere dry and out of the way until your first install day."
+            : "Nothing for you to do: we'll keep you posted on your project page.";
     return {
       subject: head.subject,
       body: [
         { p: head.p },
         ...(toCome ? [{ p: toCome } as Block] : []),
         ...(held ? [{ p: held } as Block] : []),
-        { p: "Nothing for you to do: we'll keep you posted on your project page." },
+        { p: yourPart },
       ],
       cta: "See your project",
     };

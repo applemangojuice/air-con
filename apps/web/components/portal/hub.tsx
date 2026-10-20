@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
+  CONSENT_HOLD_LABEL,
   VARIATIONS_ANSWER_LABEL,
   VARIATION_ANSWER_LABEL,
   currentStage,
@@ -88,6 +89,9 @@ function nextDetail(label: string, data: HubData): string | null {
       return `Pick a block that suits you, from ${fmtDay(data.earliestStart.date)}.`;
     case "Reply to confirm your early start":
       return "We need your request in writing before we can start early.";
+    case CONSENT_HOLD_LABEL["landlord-consent"]:
+    case CONSENT_HOLD_LABEL["freeholder-consent"]:
+      return `We can't drill or fit anything until we have their written permission for the work (holes in the outside wall, the outdoor unit). Email it to ${data.company.email}${data.company.phone ? ` or call ${data.company.phone}` : ""}: your install day waits for it.`;
     case "Get your home ready": {
       const left = p.booking.prep.filter((i) => i.confirmable && !i.done).length;
       return `${left} thing${left === 1 ? "" : "s"} to sort before ${p.booking.dates.length ? blockLabel(p.booking.dates) : "we arrive"}.`;
@@ -110,7 +114,7 @@ function NextStep({ data, go }: { data: HubData; go: (stage: ProjectStageId, anc
   const staff = hub.mode === "staff";
 
   if (!next) {
-    const w = waitingCopy(p, data.onTheWay, data.today);
+    const w = waitingCopy(p, data.onTheWay, data.today, data.holds ?? []);
     return (
       <section aria-labelledby="next-title" className="rounded-3xl border border-line bg-white p-5 sm:p-7">
         <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">{staff ? "Customer's next step" : "Your next step"}</p>

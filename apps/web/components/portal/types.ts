@@ -1,5 +1,6 @@
 import type {
   Blocker,
+  CustomerHold,
   DocumentKind,
   IssueKind,
   IssueStatus,
@@ -149,6 +150,8 @@ export interface HubData extends HubFacts {
   commissioning: HubCommissioning | null;
   /** The published handover pack's paperwork position, from its snapshot. */
   pack: HubPack | null;
+  /** What holds install day 1 that only they (or the council) can settle (customerHolds); missing means none. */
+  holds?: CustomerHold[];
 }
 
 export interface HubPack {

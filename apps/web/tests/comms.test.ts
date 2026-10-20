@@ -769,6 +769,8 @@ test("bookings, kit, install days and handover map per the contract", () => {
   }
   p.kit.expectedDate = "2026-11-28";
   assert.equal(commsForAction(p, { type: "kit-updated", status: "confirmed", shortages: 0 })[0].discriminator, "confirmed:2026-11-28");
+  // Round 10: where the confirmed kit is going reaches its email, so a delivery to their home asks for someone in.
+  assert.equal((commsForAction(p, { type: "kit-updated", status: "confirmed", shortages: 0, deliveredTo: "customer" })[0].data as { deliveredTo?: string }).deliveredTo, "customer");
   assert.equal(commsForAction(p, { type: "kit-updated", status: "inspected", shortages: 0 })[0].event, "kit-update");
 
   p.install.days = [
@@ -1399,6 +1401,18 @@ test("the end-of-day update is signed by the crew lead, never an arbitrary subco
   assert.equal(signer([sub, fitter], { staffId: sub.staffId, name: sub.name }), sub.name, "no tech lead: whoever ended the day");
   assert.equal(signer([sub, fitter]), fitter.name, "no tech lead, no actor: an employed installer");
   assert.equal(signer([sub]), undefined, "never a subcontractor nobody chose");
+});
+
+test("round 10: kit coming to (or at) the family's home says someone needs to be in and to keep it boxed; kit with us still says nothing to do", () => {
+  const coming = render("kit-update", { status: "confirmed", expectedDate: "2026-11-28", shortages: 0, deliveredTo: "customer", supplied: true });
+  assert.match(coming.text, /coming to your home: please make sure someone is in to take it/);
+  assert.match(coming.text, /unopened, somewhere dry/);
+  assert.doesNotMatch(coming.text, /Nothing for you to do/);
+  const arrived = render("kit-update", { status: "delivered", shortages: 0, deliveredTo: "customer", supplied: true });
+  assert.match(arrived.text, /keep the boxes unopened, somewhere dry and out of the way/);
+  assert.doesNotMatch(arrived.text, /Nothing for you to do/);
+  assert.match(render("kit-update", { status: "delivered", shortages: 0, deliveredTo: "elsewhere", supplied: true }).text, /Nothing for you to do/);
+  assert.match(render("kit-update", { status: "confirmed", expectedDate: "2026-11-28", shortages: 0 }).text, /Nothing for you to do/, "destination unknown: as before");
 });
 
 test("kit checked: the email says our team checked it (the office often does), as the portal and timeline do", () => {

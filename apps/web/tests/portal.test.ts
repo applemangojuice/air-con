@@ -248,6 +248,19 @@ test("kit steps never run ahead of what someone recorded", () => {
   assert.match(view.kitHeadline(p), /checked by our team/);
 });
 
+test("round 10: waiting on planning permission is never 'You're all set'", () => {
+  const booked = () => {
+    const b = accepted("2026-10-02T09:00:00.000Z");
+    b.booking.status = "booked";
+    b.booking.dates = ["2026-11-02", "2026-11-03", "2026-11-04"];
+    return b;
+  };
+  const p = view.waitingCopy(booked(), null, undefined, ["planning-consent"]);
+  assert.equal(p.title, "Waiting for planning permission");
+  assert.match(p.body, /can't start until the council grants planning permission or listed building consent/);
+  assert.equal(view.waitingCopy(booked()).title, "You're all set");
+});
+
 test("waitingCopy promises only the date the survey email gave", () => {
   const p = project();
   p.survey.status = "submitted";

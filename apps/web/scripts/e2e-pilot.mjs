@@ -1089,6 +1089,10 @@ try {
     if (!(await inspect.evaluate((e) => e.open))) await inspect.locator("summary").click();
     const serials = inspect.locator('input[name^="serials:"]');
     for (let i = 0; i < (await serials.count()); i++) await serials.nth(i).fill(`DEMO-SN-${RUN}-${i}`);
+    // Round 10: nothing is counted for you. The good quantities are typed from the boxes (each line's "N arrived").
+    const goods = inspect.locator('input[name^="good:"]');
+    check("the kit check's good quantities start blank", (await goods.count()) > 0 && (await goods.evaluateAll((els) => els.every((e) => e.value === ""))));
+    for (let i = 0; i < (await goods.count()); i++) await goods.nth(i).fill(await goods.nth(i).getAttribute("max"));
     await inspect.getByRole("button", { name: "Save the check" }).click();
     check("every line checked good", await waitFor(admin, /CHECKED GOOD\s*(\d+) of \1/));
     check("customer wording is honest about who checked", await has(admin, /Customer sees: Your kit has been checked by our team/));

@@ -209,7 +209,7 @@ The big **Actions** button (bottom right on every job) does most of it.
    (or type one) → check the text → **Send**.
 2. On site: **Actions** → **Arrived: start day 1** (or 2, or 3). That starts
    the day and your clock. If it won't start, the screen says why (for
-   example the kit isn't checked, or the checklist isn't approved): sort it
+   example the kit hasn't arrived, or the checklist isn't approved): sort it
    or call the office. Joining a day someone else started: **Arrived: start
    my clock**.
 3. Work down the day's runsheet (the **Day 1**, **Day 2**, **Day 3** tabs).

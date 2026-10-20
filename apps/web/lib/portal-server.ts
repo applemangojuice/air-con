@@ -3,6 +3,7 @@ import {
   documentsConsentCovers,
   canonicalJson,
   currentStage,
+  customerHolds,
   customerNextAction,
   defaultsForKind,
   documentCompany,
@@ -21,6 +22,7 @@ import {
   type Issue,
   type MediaItem,
   type PilotSettings,
+  type CustomerHold,
   type Project,
   type ProjectAction,
   type ProjectStageId,
@@ -53,6 +55,7 @@ import * as issuesRepo from "./repo/issues";
 import * as mediaRepo from "./repo/media";
 import * as purchaseOrdersRepo from "./repo/purchaseOrders";
 import * as staffRepo from "./repo/staff";
+import * as surveysRepo from "./repo/surveys";
 import { smsConfigured } from "./providers/sms";
 import { enforceRateLimit } from "./rate-limit";
 import { SETTINGS_UNAVAILABLE, getSettings, settingsForWrite } from "./settings-server";
@@ -113,6 +116,18 @@ const customerName = (p: Project) => p.customer.name?.trim() || "The customer";
 /* ------------------------------------------------------------------ */
 
 /** Other projects' booked survey datetimes from today on (one surveyor, so they're taken). */
+/** Between acceptance and day 1 on an open project: when a consent the family must get can hold day 1. */
+const holdsMatter = (p: Project) => p.proposal.status === "accepted" && p.install.status === "not-started" && !p.closure.closed;
+
+/** customerHolds from the checklist and the survey's tenure; none when either can't be read (the gate itself still holds day 1). */
+async function customerHoldsFor(projectId: string): Promise<CustomerHold[]> {
+  const [items, survey] = await Promise.all([
+    safe("holds checklist", () => complianceRepo.listForProject(projectId), [] as Awaited<ReturnType<typeof complianceRepo.listForProject>>),
+    safe("holds survey", () => surveysRepo.currentForProject(projectId), null),
+  ]);
+  return customerHolds(items, survey?.data?.site?.tenure);
+}
+
 export async function takenSurveySlots(excludeProjectId: string, today: string): Promise<string[]> {
   const db = getServiceClient();
   if (!db) return [];
@@ -351,6 +366,8 @@ export async function loadHub(projectId: string, access: ProjectAccess): Promise
 
   const viewer: HubData["viewer"] =
     access.kind === "staff" ? { kind: "staff", name: access.staff.name } : { kind: "customer" };
+  // What holds day 1 that only they (or the council) can settle: asked for, never "You're all set".
+  const holds = holdsMatter(project) ? await customerHoldsFor(projectId) : [];
 
   return {
     // How "on the way" will reach them: the same rule the outbox sends by (lib/comms/on-the-way.ts).
@@ -361,6 +378,7 @@ export async function loadHub(projectId: string, access: ProjectAccess): Promise
     viewer,
     surveyor,
     crew,
+    holds,
     surveySlots: wantsSlots ? surveySlotDays({ settings, nowWall: londonWallClock(), ...slotLimits }) : [],
     installBlocks: wantsBlocks ? installBlockOptions({ project: raw, settings, today, booked, ...(kitArrivesOn ? { kitArrivesOn } : {}) }) : [],
     earliestStart: earliestOfferedStart(raw, today, settings, kitArrivesOn),
@@ -488,7 +506,7 @@ export async function customerHomes(): Promise<{ name: string; email: string; ho
       postcode: p.customer.postcode,
       stage,
       stageTitle: STAGE_INFO[stage].title,
-      next: customerNextAction(p, issues),
+      next: customerNextAction(p, issues, holdsMatter(p) ? await customerHoldsFor(id) : []),
       closed: p.closure.closed,
     });
   }

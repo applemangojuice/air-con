@@ -437,7 +437,8 @@ export async function syncKitStatus(projectId: string, staff: StaffMember | null
         ...(s.expectedDate ? { expectedDate: s.expectedDate } : {}),
         summary,
         shortages: s.shortages,
-        ...(arrived ? { deliveredTo: s.deliveredTo } : {}),
+        // Arrived: where it is. Confirmed: where it's going, so the family knows to be in for a delivery to their home.
+        ...(arrived || status === "confirmed" ? { deliveredTo: s.deliveredTo } : {}),
         // The period runs from the day the last of it arrived, not this update.
         ...(arrived && s.receivedOn ? { receivedOn: s.receivedOn } : {}),
       },

@@ -14,6 +14,7 @@ import {
   rescheduleFeeGbp,
   stageInfo,
   type PilotSettings,
+  type CustomerHold,
   type Project,
   type ProjectStageId,
   type StaffMember,
@@ -187,8 +188,8 @@ export function onTheWayPromise(onTheWay: HubFacts["onTheWay"]): string {
  * changes waiting for the customer's OK (they're issues, not on the
  * snapshot). The card, the panels' quiet echoes and /portal all use this.
  */
-export function hubNextAction(data: { project: Project; issues: readonly HubIssue[] }): { label: string; href?: string } | null {
-  return customerNextAction(data.project, data.issues);
+export function hubNextAction(data: { project: Project; issues: readonly HubIssue[]; holds?: readonly CustomerHold[] }): { label: string; href?: string } | null {
+  return customerNextAction(data.project, data.issues, data.holds ?? []);
 }
 
 /** The line under "Answer a change to your installation": which change, what it does to the price, and that nothing extra happens without their yes. */
@@ -206,7 +207,7 @@ export function variationNextDetail(issues: readonly HubIssue[]): string | null 
  * null: what we're doing and when they'll hear. Never invents a date, and
  * never repeats one that has passed (`today`).
  */
-export function waitingCopy(project: Project, onTheWay: HubFacts["onTheWay"] = null, today?: string): { title: string; body: string } {
+export function waitingCopy(project: Project, onTheWay: HubFacts["onTheWay"] = null, today?: string, holds: readonly CustomerHold[] = []): { title: string; body: string } {
   const p = project;
   const cancelled = cancelledCopy(p);
   if (cancelled) return cancelled;
@@ -245,6 +246,13 @@ export function waitingCopy(project: Project, onTheWay: HubFacts["onTheWay"] = n
         return {
           title: day ? `Install day ${day.n} ${day.status === "done" ? "done" : "in progress"}` : "Your install is under way",
           body: "You'll get an update with photos at the end of each day.",
+        };
+      }
+      // Day 1 waits on the council: never "You're all set" (round 10).
+      if (holds.includes("planning-consent")) {
+        return {
+          title: "Waiting for planning permission",
+          body: "Your install can't start until the council grants planning permission or listed building consent. We'll tell you as soon as we hear, and move your dates if we need to.",
         };
       }
       return {

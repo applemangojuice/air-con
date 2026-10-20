@@ -19,6 +19,8 @@ import {
   workDoneBeforeCancellation,
   createProject,
   currentStage,
+  CONSENT_HOLD_LABEL,
+  customerHolds,
   customerNextAction,
   VARIATION_ANSWER_LABEL,
   VARIATIONS_ANSWER_LABEL,
@@ -1779,6 +1781,22 @@ test("customerNextAction: one clear label per state", () => {
   assert.equal(label(walk()), null); // feedback given
 });
 
+test("round 10: a consent only the family can get is their next step, not 'You're all set'", () => {
+  const items = (status: string, key = "ownership-authority") => [{ key, status }];
+  assert.deepEqual(customerHolds(items("not-started"), "tenant"), ["landlord-consent"]);
+  assert.deepEqual(customerHolds(items("under-review"), "leaseholder"), ["freeholder-consent"]);
+  assert.deepEqual(customerHolds(items("approved"), "tenant"), [], "consent attached and approved");
+  assert.deepEqual(customerHolds(items("not-started"), "owner"), [], "an owner needs nobody's consent");
+  assert.deepEqual(customerHolds(items("evidence-required", "planning-consent")), ["planning-consent"]);
+  assert.deepEqual(customerHolds(items("not-applicable", "planning-consent")), [], "PD passed: nothing to wait for");
+  // The review's repro: booked, dates chosen, a tenant without the landlord's consent.
+  const booked = walk("booking-confirmed");
+  assert.deepEqual(customerNextAction(booked, [], ["landlord-consent"]), { label: CONSENT_HOLD_LABEL["landlord-consent"], href: "/p/proj-1#booking" });
+  assert.equal(customerNextAction(walk("install-dates-set", { early: false }), [], ["freeholder-consent"])?.label, CONSENT_HOLD_LABEL["freeholder-consent"]);
+  assert.equal(customerNextAction(walk("day-1"), [], ["landlord-consent"]), null, "once day 1 has started the gate was passed");
+  assert.equal(customerNextAction(booked, [], ["planning-consent"])?.label, "Get your home ready", "planning is the council's: the hub's waiting copy says so instead");
+});
+
 test("customerNextAction: a change sent for their OK is the next step, until they answer it", () => {
   const day1 = walk("day-1");
   assert.equal(customerNextAction(day1), null, "on its own, an install day is ours");
@@ -1821,7 +1839,7 @@ test("createProject seeds a v2 project from the quote", () => {
   assert.equal(p.survey.paymentStatus, "not-required");
   assert.equal(p.survey.durationMinutes, 90);
   assert.equal(p.booking.installDays, 3);
-  assert.equal(p.booking.prep.length, 6);
+  assert.equal(p.booking.prep.length, 7);
   assert.equal(p.proposal.status, "not-issued");
   assert.equal(p.electrics.status, "provisional");
   assert.equal(p.events.length, 1);
@@ -2106,7 +2124,7 @@ test("migrateProject is idempotent on v2 and tolerant of missing fields", () => 
   const sparse = migrateProject({ id: "x", siteVisit: { status: "booked" } });
   assert.equal(sparse.schemaVersion, 2);
   assert.equal(sparse.survey.status, "not-booked"); // booked with no slot isn't a booking
-  assert.equal(sparse.booking.prep.length, 6);
+  assert.equal(sparse.booking.prep.length, 7);
   assert.deepEqual(sparse.events, []);
 
   const junkType = migrateProject({ schemaVersion: 2, id: "z", proposal: { status: "not-issued", contractType: "lease" } });
