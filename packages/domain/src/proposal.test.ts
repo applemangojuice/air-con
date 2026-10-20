@@ -641,3 +641,30 @@ test("contractTaxCode: the accepted option's own code; else settings as they mus
   };
   assert.equal(contractTaxCode(junk, registered), "standard-20");
 });
+
+test("a listed building on the design's planning check: the proposal can't issue without the customer note, and the suggested note names listed building consent", async () => {
+  const { defaultPlanningNote, planningFlaggedOptions, planningNoteErrors, planningRuleSaysListed } = await import("./proposal.ts");
+  const listedRule = {
+    id: "planning",
+    title: "Planning constraints",
+    status: "review" as const,
+    detail: "Listed building on record: listed building consent and likely planning permission. The technical lead confirms the assessment; this isn't a planning decision.",
+  };
+  const p = draft();
+  const design = { variants: p.options.map((o) => ({ id: o.designVariantId, rules: [listedRule] })) } as unknown as Pick<DesignRecord, "variants">;
+  // The review's gap: only the planning rule was flagged, and no note was asked for.
+  assert.match(planningNoteErrors(p, design).join(" "), /planning or noise check is in review or blocked/);
+  const note = defaultPlanningNote(planningFlaggedOptions(p, design), p.options.length);
+  assert.match(note, /listed building consent is needed \(for the outdoor unit, and for the holes and pipe runs inside\)/);
+  assert.match(note, /Nothing is installed until it's settled/);
+  assert.doesNotMatch(note, /isn't needed|not needed|no planning/i);
+  // An "unsure" listing answer isn't read as listed; a "no" to "isn't a listed building" is.
+  assert.equal(planningRuleSaysListed("Unsure: “The house isn't a listed building, or in the grounds of one”."), false);
+  assert.equal(planningRuleSaysListed("Permitted development answered no: “The house isn't a listed building, or in the grounds of one”. This goes down the planning application route."), true);
+  assert.equal(planningRuleSaysListed("Permitted development answered no: “The outdoor unit is 1.5 m³ or smaller”. This goes down the planning application route. Unsure: “The house isn't a listed building, or in the grounds of one”."), false);
+  // A conservation-area-only flag still asks for the note, in general words.
+  const ca = { variants: p.options.map((o) => ({ id: o.designVariantId, rules: [{ ...listedRule, detail: "Conservation area on the property record: rear or concealed positions only, and confirm with the council." }] })) } as unknown as Pick<DesignRecord, "variants">;
+  const caNote = defaultPlanningNote(planningFlaggedOptions(p, ca), p.options.length);
+  assert.match(caNote, /planning position \(listed building, conservation area, Article 4 and the permitted development checks\) still has to be confirmed/);
+  assert.match(caNote, /may be needed/);
+});

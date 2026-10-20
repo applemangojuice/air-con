@@ -1054,10 +1054,27 @@ export function blockersFor(project: Project, ctx: ReadinessContext, gate: GateI
   // Compliance items for this gate. Ready-to-install also sweeps up every
   // earlier gate's items: nothing gets drilled until the paperwork is right.
   const complianceFor = (inclusiveOfEarlier: boolean) => {
+    const settled = (key: string) => ctx.compliance.some((i) => i.key === key && (i.status === "approved" || i.status === "not-applicable"));
     for (const item of ctx.compliance) {
       const idx = gateIndex(item.gate);
       const applies = inclusiveOfEarlier ? idx <= gateIndex(gate) : item.gate === gate;
       if (!applies || item.status === "approved" || item.status === "not-applicable") continue;
+      if (item.key === "planning-consent") {
+        // One clear line: while the planning outcome is still open, its own item says so.
+        const pdOpen = ctx.compliance.some((i) => i.key === "planning-pd") && !settled("planning-pd");
+        if (item.status === "not-started" && pdOpen) continue;
+        block(
+          "compliance:planning-consent",
+          item.status === "not-started"
+            ? "Planning permission or listed building consent: the planning outcome isn't recorded, so nobody knows yet whether a consent is needed."
+            : item.status === "rejected"
+              ? "Planning permission or listed building consent was refused or isn't in order: nothing is drilled until it's put right."
+              : "No drilling until the council has granted planning permission or listed building consent: attach the decision notice (reference, date and conditions) to the checklist.",
+          "tech-lead",
+          item.status === "not-started" ? "Record the planning outcome on the checklist" : "Add the decision notice to the checklist",
+        );
+        continue;
+      }
       const message = `${item.label}: ${COMPLIANCE_STATUS_LABEL[item.status]}.`;
       if (item.statutory) block(`compliance:${item.key}`, message, "tech-lead", "Review the compliance item");
       else warn(`compliance:${item.key}`, message, "tech-lead", "Review the compliance item");

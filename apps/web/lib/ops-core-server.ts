@@ -13,6 +13,7 @@ import {
   migrateProject,
   outstandingPence,
   owedInvoices,
+  planningConsentForGate,
   stillToBillPence,
   acceptedVariationsPence,
   projectFees,
@@ -243,7 +244,10 @@ export function contextFromRecords(
     today,
     settings,
     ...(actor ? { actor } : {}),
-    compliance: compliance.map((c) => ({ key: c.key, label: c.label, status: c.status, statutory: c.statutory, gate: c.gate })),
+    compliance: planningConsentForGate(compliance, project, {
+      ...(rec.surveys.get(id)?.data?.permissions?.pd ? { pd: rec.surveys.get(id)!.data.permissions.pd } : {}),
+      ...(rec.designs.get(id)?.site?.planning?.intel?.listedBuilding ? { intelListed: true } : {}),
+    }, new Date().toISOString()).map((c) => ({ key: c.key, label: c.label, status: c.status, statutory: c.statutory, gate: c.gate })),
     crew: project.booking.crew.map((m) => rec.staff.get(m.staffId)).filter((s): s is StaffMember => Boolean(s)),
     openIssues: issues.filter(isOpen).map((i) => ({
       id: i.id,

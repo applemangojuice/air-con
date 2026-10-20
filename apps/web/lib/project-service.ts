@@ -16,6 +16,7 @@ import {
   migrateProject,
   nextGate,
   outstandingPence,
+  planningConsentForGate,
   stillToBillPence,
   acceptedVariationsPence,
   projectFees,
@@ -500,7 +501,10 @@ export async function buildReadinessContext(project: Project, actor?: StaffMembe
     today,
     settings,
     ...(actor ? { actor } : {}),
-    compliance: withCompanyFgasReview(compliance, project, settings, today).map((c) => ({
+    compliance: planningConsentForGate(withCompanyFgasReview(compliance, project, settings, today), project, {
+      ...(survey?.data?.permissions?.pd ? { pd: survey.data.permissions.pd } : {}),
+      ...(design?.site?.planning?.intel?.listedBuilding ? { intelListed: true } : {}),
+    }, new Date().toISOString()).map((c) => ({
       key: c.key,
       label: c.label,
       status: c.status,

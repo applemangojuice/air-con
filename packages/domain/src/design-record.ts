@@ -192,8 +192,13 @@ export interface DesignRecord {
 /* Planning and noise                                                  */
 /* ------------------------------------------------------------------ */
 
-/** The design's own permitted-development and noise checks: Class G's unit count and size, and the MCS 020 noise estimate. */
-export const PLANNING_NOISE_RULE_IDS = ["unit-count", "outdoor-volume", "noise"] as const;
+/**
+ * The design's own planning and noise checks: the planning constraints
+ * (listed building, conservation area, Article 4, the survey's permitted
+ * development answers), Class G's unit count and size, and the MCS 020
+ * noise estimate. Any of them not a pass asks for a note to the customer.
+ */
+export const PLANNING_NOISE_RULE_IDS = ["planning", "unit-count", "outdoor-volume", "noise"] as const;
 
 /**
  * Those checks on one variant that aren't a plain pass: in review (over a

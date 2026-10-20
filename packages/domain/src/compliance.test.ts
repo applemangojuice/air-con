@@ -8,6 +8,8 @@ import {
   complianceProgress,
   complianceTemplateFor,
   instantiateCompliance,
+  listedOnRecord,
+  planningConsentForGate,
   reviewCompliance,
   syncCompliance,
   type ComplianceItem,
@@ -50,6 +52,7 @@ const CONTRACT_KEYS = [
   "planning-pd",
   "designations",
   "noise-assessment",
+  "planning-consent",
   "outdoor-siting",
   "structural-fixings",
   "asbestos",
@@ -156,11 +159,14 @@ test("non-statutory items: approve with evidence, or an admin override with a re
 
 test("planning is never approved without the written outcome", () => {
   const pd = item("planning-pd", { mediaIds: ["calc-pdf"] });
-  const evidenceOnly = reviewCompliance(pd, "approved", TECH, undefined, undefined, NOW);
+  const evidenceOnly = reviewCompliance(pd, "approved", TECH, undefined, undefined, NOW, { planningOutcome: "pd" });
   assert.equal(evidenceOnly.ok, false);
   assert.equal(reviewCompliance(pd, "not-applicable", TECH, "No planning needed", undefined, NOW).ok, false, "never 'not applicable'");
-  const ok = reviewCompliance(pd, "approved", TECH, "PD checks passed: technical lead confirms. DEMO.", undefined, NOW);
+  const noChoice = reviewCompliance(pd, "approved", TECH, "PD checks passed: technical lead confirms. DEMO.", undefined, NOW);
+  assert.ok(!noChoice.ok && /Choose the outcome/.test(noChoice.error), "the note alone can't say which way it went");
+  const ok = reviewCompliance(pd, "approved", TECH, "PD checks passed: technical lead confirms. DEMO.", undefined, NOW, { planningOutcome: "pd" });
   assert.ok(ok.ok);
+  if (ok.ok) assert.equal(ok.item.planningOutcome, "pd");
 });
 
 test("not applicable needs a reason, and only where it can be true", () => {
@@ -334,6 +340,131 @@ test("readiness blocks day 1 on open statutory items and only warns on the rest"
   assert.equal(b.find((x) => x.code === "compliance:outdoor-siting")?.severity, "warn");
 });
 
+/* ---------------- planning consent (round 9) ---------------- */
+
+const gateCtx = (items: ComplianceItem[]): ReadinessContext => ({
+  today: "2026-10-18",
+  settings: DEFAULT_SETTINGS,
+  compliance: items.map((i) => ({ key: i.key, label: i.label, status: i.status, statutory: i.statutory, gate: i.gate })),
+  crew: [],
+  openIssues: [],
+});
+/** Every item settled except the planning ones, which the test drives. */
+const allSettledBut = (keys: string[]) => checklist().map((i) => (keys.includes(i.key) ? i : { ...i, status: "approved" as const }));
+const LISTED_SURVEY = { pd: { "not-listed": "no" as const } };
+const planningBlocks = (items: ComplianceItem[]) => blockersFor(project(), gateCtx(items), "ready-to-install").filter((b) => /planning/.test(b.code));
+
+test("the review's repro: 'planning route needed' on a listed house no longer clears day 1", () => {
+  const pd = item("planning-pd", { status: "under-review" });
+  // The approval now records the outcome as a choice, not just a note.
+  const r = reviewCompliance(pd, "approved", TECH, "Planning route needed: Grade II listed, listed building consent required", undefined, NOW, {
+    planningOutcome: "consent-needed",
+    listed: true,
+  });
+  assert.ok(r.ok);
+  if (!r.ok) return;
+  assert.equal(r.item.planningOutcome, "consent-needed");
+  // "PD checks passed" can't be recorded on a listed building.
+  const passed = reviewCompliance(pd, "approved", TECH, "PD checks passed", undefined, NOW, { planningOutcome: "pd", listed: true });
+  assert.ok(!passed.ok && /listed building, or anything in its curtilage, has no permitted development rights/.test(passed.error));
+
+  // Every other item approved, the designations check approved by its map screenshot as before.
+  let items = allSettledBut(["planning-pd", "planning-consent", "designations"]).map((i) =>
+    i.key === "planning-pd" ? r.item : i.key === "designations" ? { ...i, status: "approved" as const, mediaIds: ["map"], listedBuilding: "yes" as const } : i,
+  );
+  const synced = new Map(syncCompliance(items, project(), NOW, undefined, { listing: LISTED_SURVEY }).map((c) => [c.key, c]));
+  const consent = synced.get("planning-consent");
+  assert.equal(consent?.status, "evidence-required");
+  assert.match(consent?.note ?? "", /Needed: a listed building is on record/);
+  items = items.map((i) => synced.get(i.key) ?? i);
+  const blocks = planningBlocks(items);
+  assert.equal(blocks.length, 1, "one clear block");
+  assert.equal(blocks[0]!.severity, "block");
+  assert.match(blocks[0]!.message, /No drilling until the council has granted planning permission or listed building consent: attach the decision notice/);
+
+  // The consent item can't be marked not applicable, and approves only on the decision notice plus its reference.
+  const c = items.find((i) => i.key === "planning-consent")!;
+  assert.equal(reviewCompliance(c, "not-applicable", ADMIN, "Not needed", undefined, NOW).ok, false);
+  const noteOnly = reviewCompliance(c, "approved", ADMIN, "2026/1234/L granted 3 Nov 2026", undefined, NOW);
+  assert.ok(!noteOnly.ok && /decision notice/.test(noteOnly.error));
+  assert.equal(reviewCompliance({ ...c, mediaIds: ["notice-pdf"] }, "approved", ADMIN, undefined, undefined, NOW).ok, false, "the file alone isn't enough");
+  const granted = reviewCompliance({ ...c, mediaIds: ["notice-pdf"] }, "approved", ADMIN, "2026/1234/L granted 3 Nov 2026; no conditions on the condenser", undefined, NOW);
+  assert.ok(granted.ok);
+  if (granted.ok) items = items.map((i) => (i.key === "planning-consent" ? granted.item : i));
+  assert.deepEqual(planningBlocks(items), [], "granted: day 1 can go ahead");
+  // A later sync leaves a person's approval alone.
+  assert.equal(syncCompliance(items, project(), NOW, undefined, { listing: LISTED_SURVEY }).find((x) => x.key === "planning-consent"), undefined);
+});
+
+test("planning consent: 'consent needed' on an unlisted house holds day 1 too; 'PD checks passed' settles it by itself", () => {
+  const base = allSettledBut(["planning-pd", "planning-consent"]);
+  const needed = base.map((i) => (i.key === "planning-pd" ? { ...i, status: "approved" as const, planningOutcome: "consent-needed" as const, reviewedBy: "DEMO Tess", reviewedAt: NOW } : i));
+  const n = syncCompliance(needed, project(), NOW).find((c) => c.key === "planning-consent");
+  assert.equal(n?.status, "evidence-required");
+  assert.match(n?.note ?? "", /DEMO Tess recorded "planning permission or listed building consent needed"/);
+
+  const pd = base.map((i) => (i.key === "planning-pd" ? { ...i, status: "approved" as const, planningOutcome: "pd" as const, reviewedBy: "DEMO Tess", reviewedAt: NOW } : i));
+  const na = syncCompliance(pd, project(), NOW).find((c) => c.key === "planning-consent");
+  assert.equal(na?.status, "not-applicable");
+  assert.match(na?.note ?? "", /^Not needed: DEMO Tess recorded "PD checks passed" on 18 Oct 2026, and no listed building is on record\./);
+  const settled = pd.map((i) => (i.key === "planning-consent" ? na! : i));
+  assert.deepEqual(planningBlocks(settled), []);
+
+  // The outcome reopened: the consent item goes back to waiting, and the open planning item is the one line.
+  const reopened = settled.map((i) => (i.key === "planning-pd" ? { ...i, status: "under-review" as const, planningOutcome: undefined } : i));
+  const back = syncCompliance(reopened, project(), NOW).find((c) => c.key === "planning-consent");
+  assert.equal(back?.status, "not-started");
+  const after = reopened.map((i) => (i.key === "planning-consent" ? back! : i));
+  assert.deepEqual(planningBlocks(after).map((b) => b.code), ["compliance:planning-pd"]);
+
+  // A listed building on record overrides "PD checks passed" (for example, the property record flags it).
+  const flagged = syncCompliance(pd, project(), NOW, undefined, { listing: { intelListed: true } }).find((c) => c.key === "planning-consent");
+  assert.equal(flagged?.status, "evidence-required");
+});
+
+test("listing on record: the designations check's answer decides once approved, else the survey or the property record", () => {
+  const des = (over: Partial<ComplianceItem>) => [item("designations", over)];
+  assert.equal(listedOnRecord(des({}), {}), false);
+  assert.equal(listedOnRecord(des({}), { pd: { "not-listed": "no" } }), true);
+  assert.equal(listedOnRecord(des({}), { pd: { "not-listed": "unsure" } }), false, "unsure isn't a listing (the designations check settles it)");
+  assert.equal(listedOnRecord(des({}), { intelListed: true }), true);
+  assert.equal(listedOnRecord(des({ status: "approved", listedBuilding: "no" }), { pd: { "not-listed": "no" } }), false, "the heritage list check corrects the survey");
+  assert.equal(listedOnRecord(des({ status: "approved", listedBuilding: "yes" }), {}), true);
+  // The designations check asks the question to approve, and keeps the answer only while approved.
+  const d = item("designations", { mediaIds: ["map"] });
+  assert.ok(!reviewCompliance(d, "approved", SURVEYOR, "Checked the map", undefined, NOW).ok);
+  const ok = reviewCompliance(d, "approved", TECH, "Checked the map and the heritage list", undefined, NOW, { listedBuilding: "no" });
+  assert.ok(ok.ok && ok.item.listedBuilding === "no");
+  if (ok.ok) {
+    const back = reviewCompliance(ok.item, "under-review", TECH, "Second look", undefined, NOW);
+    assert.ok(back.ok && back.item.listedBuilding === undefined);
+  }
+});
+
+test("approvals from before the outcome was a choice are asked again before day 1, never after", () => {
+  const legacy = allSettledBut([]).map((i) => (i.key === "planning-pd" ? { ...i, note: "Planning route needed: Grade II listed" } : i));
+  const changed = syncCompliance(legacy, project(), NOW);
+  const pd = changed.find((c) => c.key === "planning-pd");
+  assert.equal(pd?.status, "under-review");
+  assert.match(pd?.history?.at(-1)?.note ?? "", /choose the outcome/);
+  assert.equal(changed.find((c) => c.key === "designations")?.status, "under-review");
+  const started = project((x) => (x.install.status = "in-progress"));
+  assert.equal(syncCompliance(legacy, started, NOW).find((c) => c.key === "planning-pd"), undefined, "an install under way is left as it is");
+});
+
+test("the day-1 gate reads planning consent without the compliance page: added to an older checklist, and in line with the outcome", () => {
+  const older = allSettledBut(["planning-pd"]).filter((i) => i.key !== "planning-consent");
+  const pending = planningConsentForGate(older, project(), {}, NOW);
+  assert.ok(pending.some((i) => i.key === "planning-consent"));
+  const decided = older.map((i) => (i.key === "planning-pd" ? { ...i, status: "approved" as const, planningOutcome: "consent-needed" as const } : i));
+  const view = planningConsentForGate(decided, project(), {}, NOW);
+  assert.equal(view.find((i) => i.key === "planning-consent")?.status, "evidence-required");
+  assert.equal(planningBlocks(view).length, 1);
+  const pd = older.map((i) => (i.key === "planning-pd" ? { ...i, status: "approved" as const, planningOutcome: "pd" as const } : i));
+  assert.deepEqual(planningBlocks(planningConsentForGate(pd, project(), {}, NOW)), []);
+  assert.deepEqual(planningConsentForGate([], project(), {}, NOW), [], "no checklist: compliance-missing says so");
+});
+
 test("progress counts what's settled and what still holds a gate", () => {
   const items = checklist();
   items[0] = { ...items[0]!, status: "approved" };
@@ -375,7 +506,11 @@ test("planning and noise reviewed before the approved design version existed are
   const p = project((x) => (x.design = { status: "approved", designId: "d2", version: 2, approvedAt: "2026-10-20T16:30:00.000Z", approvedBy: "DEMO Tess" }));
   const v2 = { id: "d2", projectId: "p-1", version: 2, status: "approved", rooms: [], variants: [], overrides: [], createdAt: "2026-10-20T09:00:00.000Z" } as unknown as DesignRecord;
   const approvedAt = (at: string) =>
-    checklist().map((i) => (i.key === "planning-pd" || i.key === "noise-assessment" ? { ...i, status: "approved" as const, reviewedBy: "DEMO Tess", reviewedAt: at } : i));
+    checklist().map((i) =>
+      i.key === "planning-pd" || i.key === "noise-assessment"
+        ? { ...i, status: "approved" as const, reviewedBy: "DEMO Tess", reviewedAt: at, ...(i.key === "planning-pd" ? { planningOutcome: "pd" as const } : {}) }
+        : i,
+    );
   // Reviewed against version 1, the day before version 2 was drafted: both go back to waiting for review.
   const reopened = syncCompliance(approvedAt("2026-10-19T15:00:00.000Z"), p, NOW, v2).filter((c) => c.key === "planning-pd" || c.key === "noise-assessment");
   assert.deepEqual(reopened.map((c) => [c.key, c.status]).sort(), [["noise-assessment", "under-review"], ["planning-pd", "under-review"]]);
@@ -384,10 +519,11 @@ test("planning and noise reviewed before the approved design version existed are
   assert.deepEqual(syncCompliance(approvedAt("2026-10-20T16:10:00.000Z"), p, NOW, v2).filter((c) => c.key === "planning-pd" || c.key === "noise-assessment"), []);
 });
 
-test("the design's planning and noise flags: unit count, size and noise in review or blocked, never other rules", async () => {
+test("the design's planning and noise flags: planning constraints, unit count, size and noise in review or blocked, never other rules", async () => {
   const { planningNoiseFlags } = await import("./design-record.ts");
   const rule = (id: string, status: "pass" | "review" | "fail") => ({ id, title: id, status, detail: `${id} ${status}` });
   const flags = planningNoiseFlags({ rules: [rule("unit-count", "review"), rule("outdoor-volume", "pass"), rule("noise", "fail"), rule("planning", "review"), rule("pipe-length", "fail")] });
-  assert.deepEqual(flags.map((r) => r.id), ["unit-count", "noise"]);
+  // The planning constraints rule (a listed building, a conservation area, a "no" PD answer) asks for the customer note too.
+  assert.deepEqual(flags.map((r) => r.id), ["unit-count", "noise", "planning"]);
   assert.deepEqual(planningNoiseFlags(undefined), []);
 });

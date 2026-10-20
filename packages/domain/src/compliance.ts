@@ -20,8 +20,22 @@ import { can, type StaffMember, type StaffRole } from "./staff.ts";
  * warranty registration): they follow the project's own records through
  * `syncCompliance` and can't be approved by hand. Planning is never
  * concluded automatically: the survey's checklist moves `planning-pd` to
- * "under review", and only a reviewer's written outcome approves it.
+ * "under review", and only a reviewer's written outcome approves it. That
+ * outcome is recorded as a choice (`planningOutcome`): "PD checks passed",
+ * or "planning permission or listed building consent needed", which (like
+ * a listed building on record) holds install day 1 on `planning-consent`
+ * until the council's decision notice is attached.
  */
+
+/** The technical lead's planning outcome on `planning-pd`. */
+export type PlanningOutcome = "pd" | "consent-needed";
+
+export const PLANNING_OUTCOMES: readonly PlanningOutcome[] = ["pd", "consent-needed"];
+
+export const PLANNING_OUTCOME_TEXT: Record<PlanningOutcome, string> = {
+  pd: "PD checks passed: no application needed",
+  "consent-needed": "Planning permission or listed building consent needed",
+};
 
 export type ComplianceStatus =
   | "not-started"
@@ -70,8 +84,12 @@ export interface ComplianceTemplateItem {
   auto?: "design-approved" | "commissioning-signed" | "warranty-registered";
   /** May it honestly be marked not applicable (with a reason)? Default true. */
   allowNa?: boolean;
-  /** "note": approval needs the reviewer's written outcome, evidence alone isn't enough. Default: evidence or a note. */
-  approvalNeeds?: "evidence-or-note" | "note";
+  /**
+   * "note": approval needs the reviewer's written outcome, evidence alone isn't enough.
+   * "evidence-and-note": a file (the document itself) and a note of what it says.
+   * Default: evidence or a note.
+   */
+  approvalNeeds?: "evidence-or-note" | "note" | "evidence-and-note";
   /** Where a new checklist starts this item. Default "not-started". */
   initialStatus?: ComplianceStatus;
   /** The rule behind it, in a few words. */
@@ -92,7 +110,7 @@ export const COMPLIANCE_CATEGORY_LABEL: Record<ComplianceTemplateItem["category"
 
 /**
  * Keys: ownership-authority, planning-pd, designations, noise-assessment,
- * outdoor-siting, structural-fixings, asbestos, concealed-services,
+ * planning-consent, outdoor-siting, structural-fixings, asbestos, concealed-services,
  * electrical-scope, heat-pump-building-regs, fgas-company, fgas-engineer,
  * manufacturer-requirements, working-at-height, rams,
  * equipment-compatibility, design-approval, commissioning-approval,
@@ -100,7 +118,8 @@ export const COMPLIANCE_CATEGORY_LABEL: Record<ComplianceTemplateItem["category"
  * heat-pump-compliance-certificate, warranty-registration,
  * cancellation-and-consent.
  *
- * Statutory: planning (PD, designations, noise), asbestos, electrical (Part P
+ * Statutory: planning (PD, designations, noise, and the consent itself when
+ * one is needed), asbestos, electrical (Part P
  * scope and certificate), the heat pump as building work (its Part L route
  * before booking, the commissioning notice and the compliance certificate
  * before closing; building control to confirm), F-gas (company, engineers,
@@ -135,9 +154,9 @@ export const COMPLIANCE_TEMPLATE: ComplianceTemplateItem[] = [
     initialStatus: "evidence-required",
     basis: "GPDO 2015 Sch 2 Part 14 Class G, as amended from 29 May 2025",
     guidance:
-      "England, Class G as amended by SI 2025/560: the system is not used solely for cooling; the outdoor unit is 1.5 m³ or less (0.6 m³ on a block of flats); one unit on a house that isn't detached, two on a detached house; not on a pitched roof or within 1 m of a flat roof's edge; the MCS 020(a) noise calculation passes; not a listed building; the designated-land and highway-facing wall rules are met. A flat in a mixed-use building gets no permitted development. We never conclude \"no planning needed\": the technical lead writes the outcome (\"PD checks passed\" or \"planning route needed\"). Verify the current Class G text.",
+      "England, Class G as amended by SI 2025/560: the system is not used solely for cooling; the outdoor unit is 1.5 m³ or less (0.6 m³ on a block of flats); one unit on a house that isn't detached, two on a detached house; not on a pitched roof or within 1 m of a flat roof's edge; the MCS 020(a) noise calculation passes; not a listed building; the designated-land and highway-facing wall rules are met. A flat in a mixed-use building gets no permitted development. We never conclude \"no planning needed\" by ourselves: the technical lead chooses the outcome, \"PD checks passed\" or \"planning permission or listed building consent needed\", and writes what they checked. \"Needed\" (or a listed building on record) holds install day 1 until the council's decision notice is on the checklist (\"Planning permission or listed building consent granted\"). Verify the current Class G text.",
     evidenceHint:
-      "The survey's permitted development checklist, the MCS 020(a) calculation and the outdoor unit's spec sheet (for volume). Write the outcome in the note.",
+      "The survey's permitted development checklist, the MCS 020(a) calculation and the outdoor unit's spec sheet (for volume). Choose the outcome and write what you checked in the note.",
   },
   {
     key: "designations",
@@ -149,7 +168,7 @@ export const COMPLIANCE_TEMPLATE: ComplianceTemplateItem[] = [
     allowNa: false,
     basis: "GPDO Class G.2(i)–(k); Article 4 directions",
     guidance:
-      "Check the council's planning map and the National Heritage List: a listed building (no permitted development; listed building consent needed), a conservation area or World Heritage Site (no unit on a wall or roof facing a road, or nearer the road than the house), and any Article 4 direction that removes Class G rights.",
+      "Check the council's planning map and the National Heritage List: a listed building, or anything in its curtilage (no permitted development; listed building consent needed, for the outdoor unit and for inside work that affects its character, such as core holes and pipe runs), a conservation area or World Heritage Site (no unit on a wall or roof facing a road, or nearer the road than the house), and any Article 4 direction that removes Class G rights. Approving asks one question: is it listed, or in the curtilage of a listed building? \"Yes\" holds install day 1 until listed building consent is granted.",
     evidenceHint: "A screenshot or link from the council's map and the heritage list, with the date you checked.",
   },
   {
@@ -259,6 +278,21 @@ export const COMPLIANCE_TEMPLATE: ComplianceTemplateItem[] = [
   },
 
   /* ---------------- before install day 1 ---------------- */
+  {
+    key: "planning-consent",
+    label: "Planning permission or listed building consent granted",
+    category: "planning",
+    statutory: true,
+    gate: "ready-to-install",
+    ownerRole: "admin",
+    allowNa: false,
+    approvalNeeds: "evidence-and-note",
+    basis:
+      "Town and Country Planning Act 1990 (development needs planning permission unless permitted); Planning (Listed Buildings and Conservation Areas) Act 1990 ss.7 and 9 (works to a listed building without consent are an offence). Verify the current text",
+    guidance:
+      "Needed when the technical lead's planning outcome is \"planning permission or listed building consent needed\", or a listed building is on record (the survey, the property record or the designations check). Nothing is drilled until the council has granted it: planning permission for the outdoor unit, and for a listed building, listed building consent, which also covers inside work that affects its character (core holes, pipe and cable runs). Attach the decision notice and write its reference, the date it was granted and its conditions (and how this install meets them). When the outcome is \"PD checks passed\" on a building that isn't listed, this marks itself not applicable.",
+    evidenceHint: "The council's decision notice (PDF or photo), and in the note its reference, the date granted and the conditions.",
+  },
   {
     key: "outdoor-siting",
     label: "Outdoor unit siting and defrost drainage",
@@ -476,6 +510,29 @@ export interface ComplianceItem {
   blockerIssueId?: string;
   /** The latest written evidence (what someone checked), which counts as evidence like a file. */
   evidenceNote?: string;
+  /** planning-pd, while approved: the technical lead's outcome. */
+  planningOutcome?: PlanningOutcome;
+  /** designations, while approved: is it a listed building, or in the curtilage of one? */
+  listedBuilding?: "yes" | "no";
+}
+
+/** The survey's and the property record's word on listing, before anyone checks the heritage list. */
+export interface ListingFacts {
+  /** The survey's permitted development answers (`not-listed` "no" means listed). */
+  pd?: Partial<Record<string, "yes" | "no" | "unsure">>;
+  /** The property record's flag (design site intel). */
+  intelListed?: boolean;
+}
+
+/**
+ * Is a listed building on record? The designations check's own answer
+ * (from the heritage list) decides once it's approved; until then, the
+ * survey saying it's listed, or the property record flagging it.
+ */
+export function listedOnRecord(items: Pick<ComplianceItem, "key" | "status" | "listedBuilding">[], facts: ListingFacts = {}): boolean {
+  const checked = items.find((i) => i.key === "designations");
+  if (checked?.status === "approved" && checked.listedBuilding) return checked.listedBuilding === "yes";
+  return facts.pd?.["not-listed"] === "no" || facts.intelListed === true;
 }
 
 export function instantiateCompliance(projectId: string, makeId: () => string): ComplianceItem[] {
@@ -571,9 +628,19 @@ export function companyFgasCertProblem(
  */
 const restsOnSettingsCert = (item: Pick<ComplianceItem, "key" | "mediaIds">) => item.key === "fgas-company" && item.mediaIds.length === 0;
 
-/** What a review needs to know beyond the item: the company certificate's standing (companyFgasCertProblem). */
+/**
+ * What a review needs to know beyond the item: the company certificate's
+ * standing (companyFgasCertProblem), whether a listed building is on record
+ * (listedOnRecord), and the reviewer's own answer where an approval asks a
+ * question (planning-pd's outcome, designations' "listed?").
+ */
 export interface ComplianceReviewContext {
   companyFgasProblem?: string | null;
+  listed?: boolean;
+  planningOutcome?: PlanningOutcome;
+  listedBuilding?: "yes" | "no";
+  /** For syncCompliance: the survey's and property record's word on listing (listedOnRecord reads it with the checklist). */
+  listing?: ListingFacts;
 }
 
 export function reviewCompliance(
@@ -611,8 +678,24 @@ export function reviewCompliance(
       if (t?.auto) return fail(`This one updates itself when ${AUTO_SOURCE[t.auto]}.`);
       if (!reviews) return fail(`${reviewer.name} can't approve compliance items: that needs the compliance review permission.`);
       if (statutory) {
+        if (item.key === "planning-pd") {
+          if (!context.planningOutcome || !PLANNING_OUTCOMES.includes(context.planningOutcome)) {
+            return fail("Choose the outcome: PD checks passed, or planning permission or listed building consent needed.");
+          }
+          if (context.planningOutcome === "pd" && context.listed) {
+            return fail(
+              "A listed building is on record (the survey, the property record or the designations check): a listed building, or anything in its curtilage, has no permitted development rights. Choose \"consent needed\", or correct the designations check if it isn't listed.",
+            );
+          }
+        }
+        if (item.key === "designations" && context.listedBuilding !== "yes" && context.listedBuilding !== "no") {
+          return fail("Answer the question: is it a listed building, or in the curtilage of one?");
+        }
         if ((t?.approvalNeeds ?? "evidence-or-note") === "note" && !text) {
-          return fail("Write the outcome in the note (for example \"PD checks passed\" or \"planning route needed\"): evidence alone can't approve this.");
+          return fail("Write what you checked in the note: the outcome alone can't approve this.");
+        }
+        if (t?.approvalNeeds === "evidence-and-note" && (item.mediaIds.length === 0 || !text)) {
+          return fail("Attach the council's decision notice and write its reference, the date it was granted and its conditions: both are needed to approve this.");
         }
         if (!hasEvidence && !text) return fail("Attach the evidence, or write down what you checked, before approving.");
         // A note can't stand in for the certificate itself: settings must hold a current one, or the subcontractor's is attached.
@@ -675,6 +758,11 @@ export function reviewCompliance(
   }
   if (usedOverride) next.overrideReason = usedOverride;
   else delete next.overrideReason;
+  // The answers an approval records hold only while it stands.
+  if (to === "approved" && item.key === "planning-pd") next.planningOutcome = context.planningOutcome;
+  else delete next.planningOutcome;
+  if (to === "approved" && item.key === "designations") next.listedBuilding = context.listedBuilding;
+  else delete next.listedBuilding;
   return { ok: true, item: clean(next) };
 }
 
@@ -725,6 +813,9 @@ const lastEventAt = (p: Project, type: string) => lastEvent(p, type)?.at;
  */
 /** The note the design verdict leaves, so a later sync knows which approvals were its own. */
 const FROM_DESIGN = "From the approved design";
+
+/** How the planning consent item says it isn't needed. */
+const NOT_NEEDED = "Not needed";
 
 /**
  * "Equipment combination verified", read from the approved design (F3):
@@ -777,9 +868,16 @@ export function syncCompliance(
       delete next.reviewedBy;
       delete next.reviewedAt;
       delete next.reviewedByStaffId;
+      delete next.planningOutcome;
+      delete next.listedBuilding;
     }
+    // A status the system decided says why, where the item shows its note.
+    if (to === "not-applicable" || (item.key === "planning-consent" && to === "evidence-required")) next.note = note;
     changed.push(clean(next));
   };
+  const beforeDay1 = project.install.status === "not-started" && !project.closure.closed;
+  const planningPd = items.find((i) => i.key === "planning-pd");
+  const listed = listedOnRecord(items, context.listing);
 
   for (const item of items) {
     const auto = complianceTemplateFor(item.key)?.auto;
@@ -841,6 +939,48 @@ export function syncCompliance(
       set(item, "under-review", "System", now, `Reopened automatically: ${context.companyFgasProblem}`);
       continue;
     }
+    // Approved before the outcome (or the listing answer) was a recorded choice: the free-text note
+    // can't tell the checklist whether a consent must be granted first, so it's asked again before day 1.
+    if (beforeDay1 && item.status === "approved" && ((item.key === "planning-pd" && !item.planningOutcome) || (item.key === "designations" && !item.listedBuilding))) {
+      set(
+        item,
+        "under-review",
+        "System",
+        now,
+        item.key === "planning-pd"
+          ? "Reopened automatically: choose the outcome (PD checks passed, or planning permission or listed building consent needed), so the checklist knows whether a consent must be granted before day 1."
+          : "Reopened automatically: answer whether it's a listed building (or in the curtilage of one), so the checklist knows whether listed building consent must be granted before day 1.",
+      );
+      continue;
+    }
+    if (item.key === "planning-consent") {
+      const outcome = planningPd?.status === "approved" ? planningPd.planningOutcome : undefined;
+      const needed = listed || outcome === "consent-needed";
+      const notNeeded = !listed && outcome === "pd";
+      if (item.status === "approved" || item.status === "rejected") continue; // a person decided
+      if (notNeeded) {
+        if (item.status !== "not-applicable") {
+          const when = planningPd?.reviewedAt ? ` on ${shortDate(planningPd.reviewedAt)}` : "";
+          set(item, "not-applicable", "System", now, `${NOT_NEEDED}: ${planningPd?.reviewedBy ?? "the technical lead"} recorded "PD checks passed"${when}, and no listed building is on record.`);
+        }
+        continue;
+      }
+      if (item.status === "not-applicable" || (needed && item.status === "not-started")) {
+        const why = listed
+          ? "a listed building is on record (the survey, the property record or the designations check)"
+          : outcome === "consent-needed"
+            ? `${planningPd?.reviewedBy ?? "the technical lead"} recorded "planning permission or listed building consent needed"`
+            : "the planning outcome is no longer recorded";
+        set(
+          item,
+          needed ? "evidence-required" : "not-started",
+          "System",
+          now,
+          needed ? `Needed: ${why}. Attach the council's decision notice once it's granted.` : `Reopened automatically: ${why}.`,
+        );
+      }
+      continue;
+    }
     if (
       item.key === "planning-pd" &&
       project.survey.status === "submitted" &&
@@ -856,6 +996,25 @@ export function syncCompliance(
     }
   }
   return changed;
+}
+
+/**
+ * The checklist as the day-1 gate must read it, without waiting for someone
+ * to open the compliance page: the planning consent item added if this
+ * checklist predates it, and brought in line with the planning outcome and
+ * the listing on record (syncCompliance), so "PD checks passed" on a
+ * building that isn't listed settles it, and "consent needed" or a listed
+ * building holds day 1. Nothing is saved: the compliance page saves the
+ * same change when it's next opened.
+ */
+export function planningConsentForGate(items: ComplianceItem[], project: Project, listing: ListingFacts, now: string): ComplianceItem[] {
+  if (items.length === 0) return items;
+  const all: ComplianceItem[] = items.some((i) => i.key === "planning-consent")
+    ? items
+    : [...items, ...instantiateCompliance(project.id, () => "planning-consent-pending").filter((i) => i.key === "planning-consent")];
+  const relevant = all.filter((i) => i.key === "planning-consent" || i.key === "planning-pd" || i.key === "designations");
+  const changed = new Map(syncCompliance(relevant, project, now, undefined, { listing }).map((c) => [c.id, c]));
+  return all.map((i) => changed.get(i.id) ?? i);
 }
 
 /** Counts for a summary strip: how far the checklist is, and what still holds a gate. */

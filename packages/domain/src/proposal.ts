@@ -840,12 +840,28 @@ export function planningFlaggedOptions(
  */
 export function defaultPlanningNote(flagged: ReturnType<typeof planningFlaggedOptions>, allOptions: number): string {
   const ids = new Set(flagged.flatMap((o) => o.flags.map((f) => f.id)));
+  const listed = flagged.some((o) => o.flags.some((f) => f.id === "planning" && planningRuleSaysListed(f.detail)));
   const found: string[] = [];
+  if (listed) found.push("your home is recorded as a listed building, so listed building consent is needed (for the outdoor unit, and for the holes and pipe runs inside), and usually planning permission too");
+  else if (ids.has("planning")) found.push("your home's planning position (listed building, conservation area, Article 4 and the permitted development checks) still has to be confirmed");
   if (ids.has("unit-count")) found.push("the number of outdoor units is more than permitted development allows for your home");
   if (ids.has("outdoor-volume")) found.push("the outdoor unit's size still has to be checked against the permitted development limit");
   if (ids.has("noise")) found.push("the noise at your neighbour's nearest window needs a closer look against the permitted development noise limit (MCS 020(a))");
   const which = flagged.length < allOptions ? `For the ${flagged.map((o) => o.label).join(" and ")} option${flagged.length === 1 ? "" : "s"}, our` : "Our";
-  return `${which} design checks found that ${found.join(", and ") || "the planning checks need a closer look"}. A planning application, or a different position or unit, may be needed. Before any work starts we'll check it, with the council if needed, and tell you what it means for the dates and the price. Nothing is installed until it's settled.`;
+  return `${which} design checks found that ${found.join(", and ") || "the planning checks need a closer look"}. ${listed ? "" : "A planning application (or for a listed building, listed building consent), or a different position or unit, may be needed. "}Before any work starts we'll check it, with the council if needed, and tell you what it means for the dates and the price. Nothing is installed until it's settled.`;
+}
+
+/**
+ * Does the design's planning rule record a listed building: the property
+ * record's flag, or the survey answering "no" to "isn't a listed building"
+ * (an "unsure" answer isn't a listing)?
+ */
+export function planningRuleSaysListed(detail: string): boolean {
+  if (detail.includes("Listed building on record")) return true;
+  const start = detail.indexOf("Permitted development answered no:");
+  if (start < 0) return false;
+  const end = detail.indexOf("This goes down the planning application route", start);
+  return detail.slice(start, end < 0 ? undefined : end).includes("isn't a listed building");
 }
 
 /** Issue waits for one of the two: the customer told (a note on the proposal), or a recorded reason it doesn't apply. */

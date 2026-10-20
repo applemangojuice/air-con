@@ -5,12 +5,15 @@ import {
   complianceTemplateFor,
   createIssue,
   instantiateCompliance,
+  listedOnRecord,
   reviewCompliance,
   syncCompliance,
   transitionIssue,
   type ComplianceItem,
   type ComplianceStatus,
   type Issue,
+  type ListingFacts,
+  type PlanningOutcome,
   type Project,
   type StaffMember,
 } from "@aircon/domain";
@@ -20,13 +23,44 @@ import { fail, mutateRow, projectMediaIds, type Outcome } from "./purchasing-ser
 import * as complianceRepo from "./repo/compliance";
 import * as designsRepo from "./repo/designs";
 import * as issuesRepo from "./repo/issues";
+import * as surveysRepo from "./repo/surveys";
 import { getSettings } from "./settings-server";
 
-/** The company F-gas certificate's standing for this job (the fgas-company item rests on it unless the subcontractor's is attached). */
-async function reviewContext(project: Project) {
-  const settings = await getSettings();
-  return { companyFgasProblem: companyFgasCertProblem(settings.company.fgasCompanyCert, project, londonToday()) };
+/**
+ * The survey's and the property record's word on listing: the survey's
+ * permitted development answers, and the latest design's property record
+ * (listedOnRecord reads them with the checklist's designations answer).
+ */
+export async function listingFacts(projectId: string): Promise<ListingFacts> {
+  const [survey, design] = await Promise.all([
+    surveysRepo.currentForProject(projectId).catch(() => null),
+    designsRepo.latestForProject(projectId).catch(() => null),
+  ]);
+  return {
+    ...(survey?.data?.permissions?.pd ? { pd: survey.data.permissions.pd } : {}),
+    ...(design?.site?.planning?.intel?.listedBuilding ? { intelListed: true } : {}),
+  };
 }
+
+/**
+ * What a review needs beyond the item: the company F-gas certificate's
+ * standing for this job (the fgas-company item rests on it unless the
+ * subcontractor's is attached), and whether a listed building is on record.
+ */
+async function reviewContext(project: Project) {
+  const [settings, listing, items] = await Promise.all([getSettings(), listingFacts(project.id), complianceRepo.listForProject(project.id)]);
+  return {
+    companyFgasProblem: companyFgasCertProblem(settings.company.fgasCompanyCert, project, londonToday()),
+    listing,
+    listed: listedOnRecord(items, listing),
+  };
+}
+
+/** Install day 1 hasn't started and the job is open: the checklist can still gain the template's newer items by itself. */
+const beforeDay1 = (project: Project) => project.install.status === "not-started" && !project.closure.closed;
+
+/** Items the template gained after this checklist was made, and that must hold day 1 on their own (planning consent). */
+const SELF_ADDED_KEYS = ["planning-consent"];
 
 /**
  * The compliance checklist on the server (F5). Every status change goes
@@ -61,10 +95,24 @@ export async function ensureChecklist(projectId: string, staff: StaffMember | nu
  * write that loses a race is simply left for the next read.
  */
 export async function loadChecklist(project: Project): Promise<ComplianceItem[]> {
-  const [items, design] = await Promise.all([
+  let [items, design] = await Promise.all([
     complianceRepo.listForProject(project.id),
     project.design.status === "approved" ? designsRepo.approvedForProject(project.id).catch(() => null) : Promise.resolve(null),
   ]);
+  // A checklist made before the planning consent item existed gains it before day 1, so it can hold the job.
+  if (items.length > 0 && beforeDay1(project)) {
+    const have = new Set(items.map((i) => i.key));
+    const missing = instantiateCompliance(project.id, () => crypto.randomUUID()).filter((i) => SELF_ADDED_KEYS.includes(i.key) && !have.has(i.key));
+    if (missing.length) {
+      try {
+        await complianceRepo.insertMany(missing);
+        await audit({ actor: { kind: "system", name: "compliance sync" }, action: "compliance.create", entity: "project", entityId: project.id, detail: { keys: missing.map((i) => i.key) } });
+        items = await complianceRepo.listForProject(project.id);
+      } catch (err) {
+        console.error(`[compliance] adding ${missing.map((i) => i.key).join(", ")} to ${project.id} failed:`, err);
+      }
+    }
+  }
   const changed = syncCompliance(items, project, new Date().toISOString(), design, await reviewContext(project));
   for (const c of changed) {
     try {
@@ -85,11 +133,15 @@ export async function loadChecklist(project: Project): Promise<ComplianceItem[]>
 export async function reviewItem(
   projectId: string,
   itemId: string,
-  input: { to: ComplianceStatus; note?: string; overrideReason?: string },
+  input: { to: ComplianceStatus; note?: string; overrideReason?: string; planningOutcome?: PlanningOutcome; listedBuilding?: "yes" | "no" },
   staff: StaffMember,
 ): Promise<Outcome<ComplianceItem>> {
   const project = await loadProject(projectId);
-  const context = project ? await reviewContext(project) : {};
+  const context = {
+    ...(project ? await reviewContext(project) : {}),
+    ...(input.planningOutcome ? { planningOutcome: input.planningOutcome } : {}),
+    ...(input.listedBuilding ? { listedBuilding: input.listedBuilding } : {}),
+  };
   const res = await mutateRow<ComplianceItem>("compliance_items", itemId, complianceRepo, (current) => {
     if (current.projectId !== projectId) return { ok: false, error: "That item isn't on this project's checklist." };
     const r = reviewCompliance(current, input.to, staff, input.note, input.overrideReason, new Date().toISOString(), context);
@@ -115,6 +167,15 @@ export async function reviewItem(
       input.to === "rejected"
         ? "Saved, but the blocking issue couldn't be raised. Raise it by hand so the board shows it."
         : "Saved, but the linked blocking issue couldn't be resolved. Resolve it on the issues list.";
+  }
+  // The planning outcome or the listing answer decides the planning consent item: bring it in line now,
+  // so the board and the day-1 gate read the new state without waiting for the page to be opened again.
+  if (project && (item.key === "planning-pd" || item.key === "designations")) {
+    try {
+      await loadChecklist(project);
+    } catch (err) {
+      console.error(`[compliance] planning consent sync on ${projectId} failed:`, err);
+    }
   }
   return { ok: true, value: item, ...(warning ? { warning } : {}) };
 }

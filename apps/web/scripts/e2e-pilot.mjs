@@ -496,6 +496,11 @@ async function reviewCompliance(page, skip = /$^/) {
       const approve = det.getByLabel("Approve", { exact: true });
       if (await approve.count()) await approve.check();
       else await det.getByLabel("Not applicable", { exact: true }).check();
+      // The questions an approval asks: planning's outcome (a DEMO home that passes PD) and "listed?" (it isn't).
+      const outcome = det.getByLabel("PD checks passed: no application needed", { exact: true });
+      if (await outcome.count()) await outcome.check();
+      const notListed = det.getByLabel("No: not listed", { exact: true });
+      if (await notListed.count()) await notListed.check();
       await det.locator("textarea").fill(`DEMO: checked against the survey record, photos and design (${label}).`);
       await det.getByRole("button", { name: "Save the review" }).click();
       await page.waitForTimeout(1500);
@@ -1083,8 +1088,16 @@ try {
     await shot(admin, "G-kit");
 
     await go(tech, `/ops/projects/${ids.pid}/compliance`);
+    // Before the planning outcome is recorded, the consent item holds day 1 (round 9); the outcome settles it.
+    const consentCard = tech.locator("main li").filter({ has: tech.locator("h3", { hasText: "Planning permission or listed building consent granted" }) });
+    check("the planning consent item is on the checklist, statutory", (await consentCard.count()) === 1 && /Statutory/.test(await consentCard.innerText()));
     const reviewed = await reviewCompliance(tech, /Electrical certificate|warranty|Commissioning results/i);
     check(`compliance reviewed by the tech lead with notes (${reviewed.length} items)`, reviewed.length >= 10);
+    check(
+      "planning recorded as 'PD checks passed': the consent item marks itself not applicable",
+      /Outcome: PD checks passed/.test(await tech.locator("main li").filter({ has: tech.locator("h3", { hasText: /^Permitted development checks/ }) }).innerText()) &&
+        /Not applicable[\s\S]*Not needed: .* recorded "PD checks passed"/.test(await consentCard.innerText()),
+    );
     check("no statutory item left open before install", await has(tech, /STATUTORY OPEN\s*[0-2]\b/));
     await shot(tech, "G-compliance");
     await go(admin, `/ops/projects/${ids.pid}`);

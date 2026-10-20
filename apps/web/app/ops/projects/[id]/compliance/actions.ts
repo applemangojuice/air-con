@@ -1,7 +1,7 @@
 "use server";
 
 import { z } from "zod";
-import { COMPLIANCE_STATUSES, can, type ComplianceStatus, type StaffMember } from "@aircon/domain";
+import { COMPLIANCE_STATUSES, PLANNING_OUTCOMES, can, type ComplianceStatus, type PlanningOutcome, type StaffMember } from "@aircon/domain";
 import { requireProjectAccess, requireStaff } from "@/lib/auth/server";
 import { addEvidence, ensureChecklist, reviewItem } from "@/lib/compliance-server";
 import { isUuid } from "@/lib/repo/base";
@@ -51,6 +51,9 @@ export async function reviewAction(projectId: string, _prev: ActionState, form: 
   if (!itemId.success || !to.success) return invalid("Pick what to do with it.");
   const note = text(form, "note", 2000);
   const override = text(form, "overrideReason", 500);
+  // The questions an approval asks (planning-pd's outcome, designations' "listed?"); the domain says when one is missing.
+  const outcome = z.enum(PLANNING_OUTCOMES as [PlanningOutcome, ...PlanningOutcome[]]).safeParse(form.get("planningOutcome"));
+  const listed = z.enum(["yes", "no"]).safeParse(form.get("listedBuilding"));
   const done: Record<ComplianceStatus, string> = {
     approved: "Approved.",
     "not-applicable": "Marked not applicable.",
@@ -60,7 +63,18 @@ export async function reviewAction(projectId: string, _prev: ActionState, form: 
     "not-started": "Reset.",
   };
   return toState(
-    await reviewItem(projectId, itemId.data, { to: to.data, ...(note ? { note } : {}), ...(override ? { overrideReason: override } : {}) }, staff),
+    await reviewItem(
+      projectId,
+      itemId.data,
+      {
+        to: to.data,
+        ...(note ? { note } : {}),
+        ...(override ? { overrideReason: override } : {}),
+        ...(outcome.success ? { planningOutcome: outcome.data } : {}),
+        ...(listed.success ? { listedBuilding: listed.data } : {}),
+      },
+      staff,
+    ),
     done[to.data],
   );
 }

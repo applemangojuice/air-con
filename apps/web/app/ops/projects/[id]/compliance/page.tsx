@@ -4,7 +4,10 @@ import {
   COMPLIANCE_CATEGORY_LABEL,
   COMPLIANCE_GATE_GROUPS,
   COMPLIANCE_STATUS_TEXT,
+  COMPLIANCE_TEMPLATE,
   PD_CHECKS,
+  PLANNING_OUTCOMES,
+  PLANNING_OUTCOME_TEXT,
   ROLE_LABEL,
   can,
   cancellationStatus,
@@ -74,7 +77,8 @@ export default async function CompliancePage({ params }: { params: Promise<{ id:
   const contributor = reviewer || can(staff, "projects.edit") || can(staff, "install.work");
   const today = londonToday();
 
-  const context = (item: ComplianceItem) => contextFor(item, { project: p, survey: survey?.data.permissions.pd, crew, settingsCert: settings.company.fgasCompanyCert, today, design });
+  const context = (item: ComplianceItem) => contextFor(item, { project: p, survey: survey?.data.permissions.pd, crew, settingsCert: settings.company.fgasCompanyCert, today, design, items });
+  const missingKeys = COMPLIANCE_TEMPLATE.filter((t) => !items.some((i) => i.key === t.key));
 
   return (
     <main className="mx-auto w-full min-w-0 max-w-5xl px-4 py-8 sm:px-6">
@@ -94,9 +98,9 @@ export default async function CompliancePage({ params }: { params: Promise<{ id:
             <Stat label="Waiting for review" value={String(progress.awaitingReview)} hint={reviewer ? "You can review these" : "A technical lead reviews these"} />
             <Stat label="Rejected" value={String(progress.rejected)} tone={progress.rejected ? "danger" : "neutral"} hint="Each holds a blocking issue" />
           </div>
-          {items.length < 20 && contributor && (
+          {missingKeys.length > 0 && contributor && (
             <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-              This checklist is missing some of the current template&apos;s items.
+              This checklist is missing some of the current template&apos;s items: {missingKeys.map((t) => t.label).join("; ")}.
               <ActionForm flash action={createChecklistAction.bind(null, p.id)} submitLabel="Add the missing items" variant="secondary" />
             </div>
           )}
@@ -154,6 +158,8 @@ function contextFor(
     today: string;
     /** The approved design: its own unit-count, size and noise checks sit beside the survey's answers. */
     design?: DesignRecord | null;
+    /** The whole checklist: the planning consent item reads the planning outcome and the listing answer. */
+    items: ComplianceItem[];
   },
 ): ContextRow[] {
   const p = facts.project;
@@ -166,7 +172,29 @@ function contextFor(
             const a = facts.survey?.[c.id];
             return { label: c.label, value: a === "yes" ? "Yes" : a === "no" ? "No" : a === "unsure" ? "Unsure" : "Not answered", tone: a === "yes" ? "success" : a === "no" ? "danger" : "warn" };
           });
-      return [...answers, ...designChecks(facts.design, ["unit-count", "outdoor-volume", "noise"])];
+      return [...answers, ...designChecks(facts.design, ["planning", "unit-count", "outdoor-volume", "noise"])];
+    }
+    case "planning-consent": {
+      const pd = facts.items.find((i) => i.key === "planning-pd");
+      const des = facts.items.find((i) => i.key === "designations");
+      const listedAnswer = facts.survey?.["not-listed"];
+      return [
+        {
+          label: "Planning outcome",
+          value: pd?.status === "approved" && pd.planningOutcome ? `${PLANNING_OUTCOME_TEXT[pd.planningOutcome]}${pd.reviewedBy ? ` (${pd.reviewedBy})` : ""}` : "Not recorded yet",
+          tone: pd?.status === "approved" && pd.planningOutcome === "pd" ? "success" : "warn",
+        },
+        {
+          label: "Listed building (designations check)",
+          value: des?.status === "approved" && des.listedBuilding ? (des.listedBuilding === "yes" ? "Yes" : "No") : "Not checked yet",
+          tone: des?.status === "approved" && des.listedBuilding === "no" ? "success" : des?.listedBuilding === "yes" ? "danger" : "warn",
+        },
+        {
+          label: "Survey: isn't a listed building",
+          value: listedAnswer === "yes" ? "Yes" : listedAnswer === "no" ? "No: listed" : listedAnswer === "unsure" ? "Unsure" : "Not answered",
+          tone: listedAnswer === "yes" ? "success" : listedAnswer === "no" ? "danger" : "warn",
+        },
+      ];
     }
     case "noise-assessment":
       return designChecks(facts.design, ["noise"]);
@@ -291,6 +319,10 @@ function ItemCard({
 
         {(item.reviewedBy || item.note) && (
           <div className="mt-3 text-sm">
+            {item.status === "approved" && item.planningOutcome && <p className="font-semibold text-ink-900">Outcome: {PLANNING_OUTCOME_TEXT[item.planningOutcome]}</p>}
+            {item.status === "approved" && item.listedBuilding && (
+              <p className="font-semibold text-ink-900">Listed building, or in the curtilage of one: {item.listedBuilding === "yes" ? "Yes" : "No"}</p>
+            )}
             {item.note && <p className="text-ink-900">{item.note}</p>}
             {item.reviewedBy && (
               <p className="mt-1 text-xs text-ink-500">
@@ -391,21 +423,61 @@ function ItemCard({
                     ))}
                   </div>
                 </fieldset>
+                {item.key === "planning-pd" && choices.some((c) => c.to === "approved") && (
+                  <fieldset className="mt-3">
+                    <legend className="mb-1.5 text-sm font-semibold text-ink-900">Outcome (to approve)</legend>
+                    <div className="flex flex-col gap-y-1">
+                      {PLANNING_OUTCOMES.map((o) => (
+                        <label key={o} className="flex min-h-11 items-center gap-2 text-sm text-ink-900">
+                          <input type="radio" name="planningOutcome" value={o} className="h-4 w-4 accent-accent-600" />
+                          {PLANNING_OUTCOME_TEXT[o]}
+                        </label>
+                      ))}
+                    </div>
+                    <p className="mt-1 text-xs text-ink-500">&quot;Needed&quot; holds install day 1 until the council&apos;s decision notice is on &quot;Planning permission or listed building consent granted&quot;.</p>
+                  </fieldset>
+                )}
+                {item.key === "designations" && choices.some((c) => c.to === "approved") && (
+                  <fieldset className="mt-3">
+                    <legend className="mb-1.5 text-sm font-semibold text-ink-900">Is it a listed building, or in the curtilage of one? (to approve)</legend>
+                    <div className="flex flex-wrap gap-x-5 gap-y-1">
+                      {(["no", "yes"] as const).map((v) => (
+                        <label key={v} className="flex min-h-11 items-center gap-2 text-sm text-ink-900">
+                          <input type="radio" name="listedBuilding" value={v} className="h-4 w-4 accent-accent-600" />
+                          {v === "yes" ? "Yes: listed" : "No: not listed"}
+                        </label>
+                      ))}
+                    </div>
+                    <p className="mt-1 text-xs text-ink-500">&quot;Yes&quot; holds install day 1 until listed building consent is granted.</p>
+                  </fieldset>
+                )}
                 <label htmlFor={`rn-${item.id}`} className="mb-1.5 mt-3 block text-sm font-semibold text-ink-900">
-                  {item.key === "planning-pd" ? "Outcome (required to approve)" : "Note"}
+                  {item.key === "planning-pd"
+                    ? "What you checked (required to approve)"
+                    : item.key === "planning-consent"
+                      ? "Decision notice: reference, date granted and conditions (required to approve)"
+                      : "Note"}
                 </label>
                 <textarea
                   id={`rn-${item.id}`}
                   name="note"
                   maxLength={2000}
                   className={textarea}
-                  placeholder={item.key === "planning-pd" ? "PD checks passed: technical lead confirms (or: planning route needed)" : "What you checked, or why"}
+                  placeholder={
+                    item.key === "planning-pd"
+                      ? "The PD conditions you checked, or why an application or consent is needed"
+                      : item.key === "planning-consent"
+                        ? "e.g. 2026/1234/P granted 3 Nov 2026; condition 3: unit painted to match the brickwork"
+                        : "What you checked, or why"
+                  }
                   aria-describedby={`rh-${item.id}`}
                 />
                 <p id={`rh-${item.id}`} className="mt-1.5 text-xs text-ink-500">
-                  {item.statutory
-                    ? "Statutory: approval needs evidence or a written note of what you checked. It can't be overridden."
-                    : "Approval needs evidence or a note. A reason is needed to reject or mark it not applicable."}
+                  {item.key === "planning-consent"
+                    ? "Statutory: approval needs the decision notice attached (above, under Add evidence) and its reference, date and conditions here. It can't be overridden."
+                    : item.statutory
+                      ? "Statutory: approval needs evidence or a written note of what you checked. It can't be overridden."
+                      : "Approval needs evidence or a note. A reason is needed to reject or mark it not applicable."}
                 </p>
                 {canOverride && (
                   <div className="mt-3">

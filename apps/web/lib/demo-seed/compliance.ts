@@ -15,6 +15,7 @@ export const DEMO_CHECKLIST: Row[] = [
   { key: "planning-pd", label: "Permitted development assessment", category: "planning", statutory: true, gate: "ready-to-install" },
   { key: "designations", label: "Listed building, conservation area and Article 4 check", category: "planning", statutory: true, gate: "ready-to-install" },
   { key: "noise-assessment", label: "Noise at the nearest neighbour (MCS 020)", category: "planning", statutory: true, gate: "ready-to-install" },
+  { key: "planning-consent", label: "Planning permission or listed building consent granted", category: "planning", statutory: true, gate: "ready-to-install" },
   { key: "outdoor-siting", label: "Outdoor unit siting and clearances", category: "planning", statutory: false, gate: "ready-to-install" },
   { key: "structural-fixings", label: "Wall and bracket fixings", category: "safety", statutory: false, gate: "ready-to-install" },
   { key: "asbestos", label: "Asbestos check where we drill", category: "safety", statutory: true, gate: "ready-to-install" },
@@ -50,9 +51,24 @@ export function demoChecklist(
   makeId: (key: string) => string,
   states: Partial<Record<string, ChecklistState>>,
 ): ComplianceItem[] {
+  const pdApproved = states["planning-pd"]?.status === "approved";
   return DEMO_CHECKLIST.map((row) => {
-    const s = states[row.key];
+    // The DEMO homes aren't listed: once the technical lead records "PD checks passed", no consent is needed
+    // (as syncCompliance would mark it), and the approvals carry the answers they ask for.
+    const s: ChecklistState | undefined =
+      row.key === "planning-consent"
+        ? pdApproved
+          ? { status: "not-applicable", note: "Not needed: the technical lead recorded \"PD checks passed\", and no listed building is on record (DEMO)." }
+          : undefined
+        : states[row.key];
+    const answers =
+      s?.status === "approved" && row.key === "planning-pd"
+        ? { planningOutcome: "pd" as const }
+        : s?.status === "approved" && row.key === "designations"
+          ? { listedBuilding: "no" as const }
+          : {};
     return {
+      ...answers,
       id: makeId(row.key),
       projectId,
       key: row.key,
