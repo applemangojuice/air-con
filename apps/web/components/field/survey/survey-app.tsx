@@ -497,7 +497,7 @@ function SurveyFlow({
         }
         if (target.kind === "outdoor") {
           if (!m.outdoor.positions.some((p) => p.id === target.positionId)) return m;
-          return { ...m, outdoor: { positions: m.outdoor.positions.map((p) => (p.id === target.positionId ? { ...p, mediaId: item.id } : p)) } };
+          return { ...m, outdoor: { ...m.outdoor, positions: m.outdoor.positions.map((p) => (p.id === target.positionId ? { ...p, mediaId: item.id } : p)) } };
         }
         return { ...m, electrics: { ...m.electrics, mediaIds: [...new Set([...m.electrics.mediaIds, item.id])] } };
       });

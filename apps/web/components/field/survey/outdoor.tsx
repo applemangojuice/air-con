@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ACCESS_EQUIPMENT_HEIGHT_M, SURVEY_LABELS, surveyChecks, type OutdoorPosition } from "@aircon/domain";
+import { ACCESS_EQUIPMENT_HEIGHT_M, SURVEY_LABELS, ladderLimitM, ladderRefused, needsHeightAccess, surveyChecks, type OutdoorPosition } from "@aircon/domain";
 import { Callout, ChoiceGroup, FieldCard, NumberField, TextArea, TextField, Tick, choices } from "./controls";
 import { setOpt, useSurvey, withPosition } from "./context";
 import { NextButton } from "./sections";
@@ -30,7 +30,7 @@ export function OutdoorSection() {
       accessEquipment: "none",
       chosen: data.outdoor.positions.every((p) => !p.chosen),
     };
-    update((m) => ({ ...m, outdoor: { positions: [...m.outdoor.positions, position] } }));
+    update((m) => ({ ...m, outdoor: { ...m.outdoor, positions: [...m.outdoor.positions, position] } }));
     go({ s: "outdoor", o: position.id });
   };
   const guess = self?.outdoor?.location;
@@ -107,6 +107,8 @@ export function PositionEditor({ positionId }: { positionId: string }) {
   const miss = (field: string) => p.chosen && isMissing("outdoor", field, at);
   const set = (fn: (x: OutdoorPosition) => OutdoorPosition) => update((m) => withPosition(m, p.id, fn));
   const high = (p.heightM ?? 0) >= ACCESS_EQUIPMENT_HEIGHT_M;
+  const limit = ladderLimitM(data);
+  const aboveLadder = needsHeightAccess(p, limit);
   const close = p.distanceToNeighbourWindowM !== undefined && p.distanceToNeighbourWindowM < 3;
   return (
     <div className="space-y-4">
@@ -176,7 +178,8 @@ export function PositionEditor({ positionId }: { positionId: string }) {
         <ChoiceGroup field="base" legend="Base" value={p.base} options={choices(SURVEY_LABELS.base)} onChange={(base) => set((x) => ({ ...x, base }))} />
         <NumberField
           field="heightM"
-          label="Height of the unit off the ground"
+          label="Height to the bracket (or the unit's base) off the ground"
+          hint="0 on the ground. On a flat roof, the roof's height. On a balcony, leave it blank."
           unit="m"
           value={p.heightM}
           onChange={(v) => set((x) => setOpt(x, "heightM", v))}
@@ -188,13 +191,22 @@ export function PositionEditor({ positionId }: { positionId: string }) {
         <ChoiceGroup
           field="accessEquipment"
           legend="Access equipment needed"
-          hint={high ? "It's high: the crew needs at least a ladder, and a tower above about 3.5 m." : undefined}
+          hint={
+            aboveLadder
+              ? `Above ${limit} m a ladder isn't the access for installing it: pick a tower, podium steps, a scaffold or a MEWP. Its hire goes on the proposal.`
+              : high
+                ? "It's high: the crew needs at least a ladder."
+                : undefined
+          }
           value={p.accessEquipment}
           options={choices(SURVEY_LABELS.accessEquipment)}
           onChange={(accessEquipment) => set((x) => ({ ...x, accessEquipment }))}
-          columns={4}
+          columns={3}
           missing={miss("accessEquipment")}
         />
+        {p.chosen && ladderRefused(p, limit) && p.accessEquipment === "ladder" && (
+          <Callout tone="warn">A ladder isn&apos;t accepted for a bracket {p.heightM} m up (the limit is {limit} m): a two-handed lift of a heavy unit isn&apos;t ladder work.</Callout>
+        )}
       </FieldCard>
 
       <FieldCard title="Defrost water">
@@ -233,7 +245,7 @@ export function PositionEditor({ positionId }: { positionId: string }) {
               <button
                 type="button"
                 onClick={() => {
-                  update((m) => ({ ...m, outdoor: { positions: m.outdoor.positions.filter((x) => x.id !== p.id) } }));
+                  update((m) => ({ ...m, outdoor: { ...m.outdoor, positions: m.outdoor.positions.filter((x) => x.id !== p.id) } }));
                   go({ s: "outdoor" });
                 }}
                 className="min-h-12 rounded-full bg-red-700 font-semibold text-white"

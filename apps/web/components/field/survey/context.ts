@@ -50,7 +50,7 @@ export const withPosition = (
   fn: (p: MeasuredSurvey["outdoor"]["positions"][number]) => MeasuredSurvey["outdoor"]["positions"][number],
 ): MeasuredSurvey => ({
   ...m,
-  outdoor: { positions: m.outdoor.positions.map((p) => (p.id === id ? fn(p) : p)) },
+  outdoor: { ...m.outdoor, positions: m.outdoor.positions.map((p) => (p.id === id ? fn(p) : p)) },
 });
 
 /** Set or clear an optional key (an empty string or undefined clears it). */

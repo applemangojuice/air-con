@@ -763,3 +763,15 @@ test("limits reach the install day: each room's as-built run and the system's to
   assert.match(m.guidance ?? "", /at most 20 m for the run/);
 });
 
+
+test("access at height: a tower, podium, scaffold or MEWP is planned; a ladder above the survey's limit is sent back", () => {
+  const find = (d: DesignRecord) => standard(d).rules.find((r) => r.title === "Outdoor position & access")!;
+  const mewp = draft([ROOMS[0]!], { measured: { outdoor: { positions: [position({ base: "wall-bracket", heightM: 4, accessEquipment: "mewp" })] } } });
+  assert.equal(find(mewp).status, "review");
+  assert.match(find(mewp).detail, /needs a MEWP \(cherry picker\) \(bracket 4 m up\): its hire is a line on the proposal's costs/);
+  const ladder = draft([ROOMS[0]!], { measured: { outdoor: { positions: [position({ base: "wall-bracket", heightM: 4, accessEquipment: "ladder" })] } } });
+  assert.match(find(ladder).detail, /Above 2\.5 m a ladder isn't accepted/);
+  const lower = draft([ROOMS[0]!], { measured: { limits: { ladderMaxBracketM: 5 }, outdoor: { positions: [position({ base: "wall-bracket", heightM: 4, accessEquipment: "ladder" })] } } });
+  assert.doesNotMatch(find(lower).detail, /isn't accepted/, "the survey's own limit decides");
+  assert.ok(standard(mewp).installDays >= standard(draft([ROOMS[0]!])).installDays);
+});

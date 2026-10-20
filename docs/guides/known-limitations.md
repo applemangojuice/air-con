@@ -151,13 +151,29 @@ says what to do instead. Approvals that need a professional are in
    network operator's route on the checklist item **Supply capacity and the
    network operator (DNO)** before the booking; price any armoured cable or
    board work as a cost line.
-9f. **Access at height is the surveyor's and the technical lead's call.**
-   The survey accepts a ladder for a bracket at any height, a tower or
-   scaffold is priced only when the surveyor picks one, and nothing checks
-   that the crew has two people for the lift. *Instead:* the technical lead
-   decides the access on the **Working at height plan** item (no long tasks
-   off a ladder; a tower or podium for first-floor brackets) and adds any
-   hire to the proposal as a cost line.
+9f. **Access at height: the survey refuses a ladder above the limit**
+   (§K49; was "the surveyor's and the technical lead's call"). The survey
+   records each outdoor position's height to the bracket; above the ladder
+   limit (2.5 m, **Settings → Safety**) only a tower, podium steps, a
+   scaffold or a MEWP finishes it; the hire is a cost line on the proposal
+   (from the catalogue, else Settings, else unpriced, which holds the
+   proposal until a price is typed); it reaches the RAMS, the bracket step,
+   the job card and the tools list; and an outdoor unit over 25 kg in the
+   catalogue is a two-person lift on the crew's day. But: *the limits are
+   the company's, not the law's*. The Work at Height Regulations 2005 set
+   no height for a ladder (it's a risk assessment: low risk, short
+   duration), and HSE's ladder guidance (about 30 minutes, light work, a
+   load over 10 kg needing a manual handling assessment) and its 25 kg
+   guideline lifting weight were read through reproductions and extracts,
+   not hse.gov.uk or legislation.gov.uk (unreachable from here): to verify.
+   The app doesn't check who is on the crew for the lift (it says two; the
+   booking doesn't count heads), work on a flat roof (edge protection) or
+   at a balcony, or a ladder for other tasks (a core hole drilled from
+   outside). 37 of the 40 researched outdoor units have a weight in the
+   catalogue (32 of them over 25 kg; search-engine extracts); one without a
+   weight raises no lift flag. A survey started before this change is judged at 2.5 m. *Instead:* the
+   technical lead plans the rest on the **Working at height plan** item,
+   and the office books two people when the job card says so.
 9g. **Flats in blocks get no block questions.** The survey doesn't ask the
    block's height or storeys, its common parts or whether a pipe crosses a
    compartment wall or floor, and there's no fire-stopping photo for such a

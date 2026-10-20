@@ -20,7 +20,8 @@ import type {
  */
 
 export interface RiskFlag {
-  key: "height" | "asbestos" | "pets" | "services" | "survey-missing" | "pump";
+  /** One per kind; height and lift flags carry the position or unit: `height-<position>`, `lift-<n>`. */
+  key: "height" | "asbestos" | "pets" | "services" | "survey-missing" | "pump" | `height-${string}` | `lift-${number}`;
   label: string;
   tone: "warn" | "danger" | "neutral";
 }

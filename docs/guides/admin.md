@@ -185,7 +185,10 @@ The project → **Build the proposal** → **Start the proposal**.
    materials from the catalogue, labour days at your rates, delivery,
    contingency) and the **Gross margin**.
 2. Any cost line without a price must have one typed in, or an admin
-   override with a reason. Never guess: ask the supplier.
+   override with a reason. Never guess: ask the supplier. A bracket above
+   the ladder limit adds the hire the surveyor picked (tower, podium steps,
+   scaffold or MEWP) as a line: from the catalogue, else **Settings →
+   Safety**, else typed in.
 3. **Pilot discount** with its reason (shown to the family as its own
    line), the tax code, and **Valid until**.
 4. A price above their online estimate needs **Why it's more than the
@@ -572,6 +575,12 @@ Worth knowing:
   New pilot form both check against it.
 - **Warranty**: nothing about warranty years appears anywhere until it's
   set here.
+- **Safety**: **Ladder limit to the bracket (m)** (2.5 by default: above
+  it the survey won't take a ladder for installing an outdoor unit; it
+  applies to surveys started afterwards), and the hire price per job of a
+  tower, podium steps, a scaffold and a MEWP. A priced catalogue item comes
+  first; blank means not known, and a proposal that needs one can't go
+  until a price is typed on the cost line.
 - **Legal**: tick the solicitor boxes only once a solicitor has reviewed
   the terms and the cancellation wording.
 

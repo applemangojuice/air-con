@@ -2849,4 +2849,32 @@ changelog and the reasons, so nobody "fixes" a deliberate choice back.
       certificate). The step card shows `ChargePanel` and the slot a hint
       with the expected figure; the R32 room-size maximum is unchanged. The
       10 %/50 g tolerance is the company's, not a manufacturer figure.
+    - *Access at height* (was known limitation 9f): `AccessEquipmentKind`
+      gains "podium" and "mewp" (`SURVEY_LABELS.accessEquipment`,
+      `ACCESS_PHRASE`, `HEIGHT_ACCESS` = podium, tower, scaffold, MEWP; the
+      survey zod and the costing `AccessEquipment` follow).
+      `MeasuredSurvey.limits.ladderMaxBracketM` is stamped from the new
+      settings group `safety` (`ladderMaxBracketM`, default 2.5 =
+      `LADDER_MAX_BRACKET_M`, 1 to 10 m; `accessHirePence` per kind, null
+      until known) when a draft is made, and `ladderLimitM` reads it (the
+      default otherwise). `surveyChecks`: a chosen position above it
+      (`needsHeightAccess`) is done only with a `HEIGHT_ACCESS` kind
+      (`ladderRefused`); between 2 m and the limit any access as before.
+      `buildCostLines` adds `access:<kind>` for each of the four: a priced
+      catalogue tool/service item, else the settings' hire price (source
+      "Hire price in Settings → Safety"), else null (an unpriced line, so
+      the proposal needs the price typed or an admin override).
+      `siteFromSurvey` carries `ladderMaxBracketM`; the design's access rule
+      names the equipment and height, and reviews a ladder above the limit
+      on an older survey; `estimateInstallDays` counts all four. The
+      runsheet: the RAMS risk names the equipment and bracket height per
+      system and adds a two-person lift for an outdoor unit over
+      `TWO_PERSON_LIFT_KG` (25, catalogue `weightKg`); the bracket step's
+      check covers all four kinds; the **Outdoor unit** step gains a lift
+      check and guidance; the outdoor kit step's `equipment.weightKg`
+      feeds `heavyLifts`, which `riskFlags` (the job card and header:
+      `RiskFlag.key` `height-<position>`, `lift-<n>`) and the job pack's
+      tools list use. Limits are the company's; HSE INDG455 and INDG143
+      and the Work at Height Regulations were read through reproductions
+      (legislation.gov.uk and hse.gov.uk failed DNS): to verify.
 

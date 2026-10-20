@@ -17,8 +17,12 @@ import { estimateRoomLoadWatts, selectCapacityKw } from "./heatload.ts";
 import type { PropertyIntel } from "./intelligence.ts";
 import {
   DIRECTIVITY_Q,
+  ACCESS_PHRASE,
+  HEIGHT_ACCESS,
   PD_CHECKS,
   emptyMeasuredSurvey,
+  ladderLimitM,
+  ladderRefused,
   measuredToEngineSurvey,
   type MeasuredRoom,
   type MeasuredSurvey,
@@ -167,6 +171,8 @@ export interface DesignSite {
   };
   outdoorPositions: Pick<OutdoorPosition, "id" | "label" | "location" | "base" | "distanceToNeighbourWindowM" | "reflectingSurfaces" | "heightM" | "accessEquipment" | "mediaId" | "chosen">[];
   risks: Pick<MeasuredSurvey["risks"], "workingAtHeight" | "structuralConcern" | "concealedServicesConcern">;
+  /** Above this height to the bracket a ladder isn't accepted (the survey's limit; absent: the company default). */
+  ladderMaxBracketM?: number;
 }
 
 export interface DesignRecord {
@@ -308,6 +314,7 @@ export function siteFromSurvey(measured: MeasuredSurvey, intel?: PropertyIntel):
       structuralConcern: measured.risks.structuralConcern,
       concealedServicesConcern: measured.risks.concealedServicesConcern,
     },
+    ladderMaxBracketM: ladderLimitM(measured),
   };
 }
 
@@ -1793,9 +1800,12 @@ function designRules(x: RuleInput): RuleResult[] {
           status = worst([status, "review"]);
           notes.push(`"${p.label}" (${LOCATION_LABEL[p.location]}): airflow, clearances and safe service access need confirming.`);
         }
-        if (p.accessEquipment === "tower" || p.accessEquipment === "scaffold") {
+        if (HEIGHT_ACCESS.includes(p.accessEquipment)) {
           status = worst([status, "review"]);
-          notes.push(`"${p.label}" needs a ${p.accessEquipment}: plan it in the RAMS and the kit list.`);
+          notes.push(`"${p.label}" needs ${ACCESS_PHRASE[p.accessEquipment]}${typeof p.heightM === "number" ? ` (bracket ${p.heightM} m up)` : ""}: its hire is a line on the proposal's costs, and it's in the RAMS and on the crew's day.`);
+        } else if (ladderRefused(p, site.ladderMaxBracketM ?? ladderLimitM(null))) {
+          status = worst([status, "review"]);
+          notes.push(`"${p.label}": a bracket ${p.heightM} m up with ${ACCESS_PHRASE[p.accessEquipment]}. Above ${site.ladderMaxBracketM ?? ladderLimitM(null)} m a ladder isn't accepted for installing it: record a tower, podium, scaffold or MEWP on the survey (plan it in the RAMS).`);
         }
       }
       if (site.risks.workingAtHeight && !notes.some((n) => n.includes("RAMS"))) {
@@ -1845,7 +1855,7 @@ export function estimateInstallDays(rooms: RoomDesignInput[], systems: SystemSel
   let days = 1 + 0.5 * (rooms.length - 1) + 0.25 * Math.max(0, systems.length - 1);
   if (rooms.some((r) => r.condensate === "pump" || r.route === "via-loft" || r.route === "internal-concealed")) days += 0.5;
   const used = systems.map((s) => site?.outdoorPositions.find((p) => p.id === s.outdoorPositionId));
-  if (site?.risks.workingAtHeight || used.some((p) => p?.accessEquipment === "tower" || p?.accessEquipment === "scaffold")) days += 0.5;
+  if (site?.risks.workingAtHeight || used.some((p) => p && HEIGHT_ACCESS.includes(p.accessEquipment))) days += 0.5;
   return Math.max(1, Math.ceil(days));
 }
 

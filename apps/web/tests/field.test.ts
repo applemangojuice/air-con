@@ -952,3 +952,16 @@ test("outbox: a photo refused because the sign-in ran out (401) waits for sign-i
   await outbox.flush(true);
   assert.equal(outbox.state().items.length, 0);
 });
+
+test("the crew's day: access at height names the equipment and the bracket height; a heavy outdoor unit is a two-person lift", async () => {
+  const { emptyMeasuredSurvey } = await import("@aircon/domain");
+  const m = emptyMeasuredSurvey();
+  m.outdoor.positions = [{ id: "o1", label: "DEMO rear wall", location: "wall-bracket", base: "wall-bracket", heightM: 3.4, accessEquipment: "tower", chosen: true }];
+  const flags = field.riskFlags(m, { heavy: [{ model: "DEMO-RX50", weightKg: 38 }] });
+  assert.ok(flags.some((f) => f.label === "Working at height: tower, bracket 3.4 m up"), JSON.stringify(flags));
+  assert.ok(flags.some((f) => f.label === "Two-person lift: DEMO-RX50 weighs 38 kg"));
+  // No survey on file still carries the lift.
+  assert.ok(field.riskFlags(null, { heavy: [{ model: "DEMO-RX50", weightKg: 38 }] }).some((f) => /Two-person lift/.test(f.label)));
+  assert.deepEqual(field.heavyLifts({ runsheet: [{ id: "k", phase: 1, title: "Kit and serial check", evidence: [], equipment: { kind: "outdoor", room: "Outdoor", label: "DEMO", model: "DEMO-RX50", weightKg: 38 } }] }), [{ model: "DEMO-RX50", weightKg: 38 }]);
+  assert.deepEqual(field.heavyLifts({ runsheet: [{ id: "k", phase: 1, title: "Kit and serial check", evidence: [], equipment: { kind: "outdoor", room: "Outdoor", label: "DEMO", model: "DEMO-RX25", weightKg: 25 } }] }), []);
+});

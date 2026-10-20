@@ -189,6 +189,22 @@ test("buildCostLines: in-house electrician, access tower, install-only, overhead
   );
   assert.equal(priced.get("access:tower")!.totalPence, 9_500);
   assert.equal(priced.get("access:tower")!.catalogueItemId, "tower-hire");
+  // Podium steps and a MEWP are hire lines too; with no catalogue price the hire price in Settings → Safety is used, never a guess.
+  const hire = byId(build({ accessEquipment: ["podium", "mewp"], settings: mergeSettings({ safety: { ladderMaxBracketM: 2.5, accessHirePence: { podium: 4_500, tower: null, scaffold: null, mewp: null } } }) }));
+  assert.equal(hire.get("access:podium")!.totalPence, 4_500);
+  assert.match(hire.get("access:podium")!.source ?? "", /Settings → Safety/);
+  assert.equal(hire.get("access:mewp")!.totalPence, null, "no price anywhere: unpriced, so the proposal waits for one");
+  assert.match(hire.get("access:mewp")!.source ?? "", /No hire price yet/);
+  assert.equal(hire.has("access:tower"), false);
+  // A priced catalogue item comes before the settings' price.
+  const both = byId(
+    build({
+      accessEquipment: ["tower"],
+      catalogue: [...CATALOGUE, item({ id: "tower-hire", kind: "service", label: "DEMO tower hire, one week", category: "access", costPence: 9_500 })],
+      settings: mergeSettings({ safety: { ladderMaxBracketM: 2.5, accessHirePence: { podium: null, tower: 12_000, scaffold: null, mewp: null } } }),
+    }),
+  );
+  assert.equal(both.get("access:tower")!.totalPence, 9_500);
 
   const installOnly = build({ contractType: "install-only" });
   assert.equal(installOnly.some((l) => l.category === "equipment"), false, "the customer supplies the equipment");

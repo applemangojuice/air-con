@@ -4,6 +4,7 @@ import {
   DOCUMENT_KIND_LABEL,
   ISSUE_KIND_LABEL,
   PD_CHECKS,
+  SURVEY_LABELS,
   TAX_CODES,
   decayResultText,
   earlyStartWording,
@@ -957,7 +958,8 @@ export function SurveyReportDoc({ snap, ctx }: { snap: SurveyReportSnapshot; ctx
                 ["Mounting", plain(pos.base)],
                 ["Nearest neighbouring window", pos.distanceToNeighbourWindowM !== undefined ? `${num(pos.distanceToNeighbourWindowM, 1)} m` : ""],
                 ["Hard surfaces within 1 m", pos.reflectingSurfaces ? ({ one: "One (Q2)", two: "Two (Q4)", three: "Three (Q8)" } as const)[pos.reflectingSurfaces] : ""],
-                ["Access", pos.accessEquipment === "none" ? "No special access needed" : plain(pos.accessEquipment)],
+                ["Height to the bracket", pos.heightM !== undefined ? `${num(pos.heightM, 1)} m` : ""],
+                ["Access", pos.accessEquipment === "none" ? "No special access needed" : (SURVEY_LABELS.accessEquipment[pos.accessEquipment] ?? plain(pos.accessEquipment))],
                 ["Defrost water", pos.defrostDrainage ?? ""],
                 ["Notes", pos.note ?? ""],
               ]}

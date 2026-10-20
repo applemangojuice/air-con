@@ -181,6 +181,7 @@ export function SettingsEditor({
             ["scheduling", "Scheduling"],
             ["area", "Service area"],
             ["warranty", "Warranty"],
+            ["safety", "Safety"],
             ["legal", "Legal"],
             ["comms", "Messages"],
             ["other", "Finance and features"],
@@ -394,6 +395,30 @@ export function SettingsEditor({
             hint="0 means none offered; blank means not decided."
           />
           <Text label="Manufacturer warranty summary" value={s.warranty.manufacturerSummary ?? ""} onChange={(v) => patch("warranty", { manufacturerSummary: v })} wide area />
+        </Group>
+
+        <Group id="safety" title="Safety" intro="Working at height on outdoor brackets. Hire prices are used only when the catalogue has no priced item; blank means not known, and a proposal that needs it can't go until a price is typed.">
+          <Text
+            label="Ladder limit to the bracket (m)"
+            type="number"
+            min={1}
+            max={10}
+            step="0.1"
+            value={s.safety.ladderMaxBracketM}
+            onChange={(v) => patch("safety", { ladderMaxBracketM: Number(v) })}
+            hint="Above it, the survey won't take a ladder as the access for installing an outdoor unit: a tower, podium, scaffold or MEWP. 2.5 m (first-floor bracket height) by default; applies to surveys started afterwards."
+          />
+          {(["tower", "podium", "scaffold", "mewp"] as const).map((k) => (
+            <Text
+              key={k}
+              label={`${k === "mewp" ? "MEWP" : k === "podium" ? "Podium steps" : k[0]!.toUpperCase() + k.slice(1)} hire (£ per job, ex VAT)`}
+              type="number"
+              min={0}
+              step="0.01"
+              value={s.safety.accessHirePence[k] === null ? "" : pounds(s.safety.accessHirePence[k] ?? undefined)}
+              onChange={(v) => patch("safety", { accessHirePence: { ...s.safety.accessHirePence, [k]: v === "" ? null : toPence(v) } })}
+            />
+          ))}
         </Group>
 
         <Group id="legal" title="Legal" badge={!s.legal.termsReviewed || !s.legal.cancellationReviewed ? REVIEW : <Badge tone="success">Reviewed</Badge>}>

@@ -136,6 +136,33 @@ export type ReflectingSurfaces = "one" | "two" | "three";
 /** MCS 020(a) directivity from the reflecting surfaces counted at the survey. */
 export const DIRECTIVITY_Q: Record<ReflectingSurfaces, 2 | 4 | 8> = { one: 2, two: 4, three: 8 };
 
+export type AccessEquipmentKind = "none" | "ladder" | "podium" | "tower" | "scaffold" | "mewp";
+
+/** Access that isn't a ladder: what a bracket above the ladder limit needs (each a priced hire line on the proposal). */
+export const HEIGHT_ACCESS: readonly AccessEquipmentKind[] = ["podium", "tower", "scaffold", "mewp"];
+
+/** The access in a sentence ("needs a tower"). */
+export const ACCESS_PHRASE: Record<AccessEquipmentKind, string> = {
+  none: "no access equipment",
+  ladder: "a ladder",
+  podium: "podium steps",
+  tower: "a mobile tower",
+  scaffold: "a scaffold",
+  mewp: "a MEWP (cherry picker)",
+};
+
+/**
+ * Above this height to the bracket (m), a ladder isn't accepted as the way
+ * to install an outdoor unit: a heavy two-handed lift isn't the light,
+ * short work a ladder is for (HSE INDG455, read through reproductions: to
+ * verify). The company's default (first-floor bracket height); Settings →
+ * Safety changes it for surveys started afterwards.
+ */
+export const LADDER_MAX_BRACKET_M = 2.5;
+
+/** An outdoor unit heavier than this (kg) is a two-person lift on the crew's day (HSE's guideline weights, read through extracts: to verify). */
+export const TWO_PERSON_LIFT_KG = 25;
+
 export interface OutdoorPosition {
   id: string;
   label: string;
@@ -145,8 +172,10 @@ export interface OutdoorPosition {
   /** Hard surfaces within 1 m of the unit, the ground included: MCS 020(a)'s directivity (one Q2, two Q4, three Q8). */
   reflectingSurfaces?: ReflectingSurfaces;
   base: "ground-feet" | "wall-bracket" | "slab" | "roof-frame" | "other";
+  /** Height to the bracket (or the unit's base) off the ground, m: asked for a wall bracket or a roof frame. */
   heightM?: number;
-  accessEquipment: "none" | "ladder" | "tower" | "scaffold";
+  /** How the crew reaches it to install it. Above the ladder limit only a tower, podium, scaffold or MEWP will do. */
+  accessEquipment: AccessEquipmentKind;
   defrostDrainage?: string;
   chosen: boolean;
   note?: string;
@@ -183,6 +212,8 @@ export interface MeasuredSurvey {
   };
   rooms: MeasuredRoom[];
   outdoor: { positions: OutdoorPosition[] };
+  /** The company's limits this survey was started under (Settings → Safety), so the record says what applied. */
+  limits?: { ladderMaxBracketM?: number };
   electrics: {
     boardType: "modern-rcbo" | "modern-rcd" | "older-fuse-box" | "unknown";
     spareWays?: number;
@@ -377,8 +408,10 @@ export const SURVEY_LABELS = {
   accessEquipment: {
     none: "None",
     ladder: "Ladder",
+    podium: "Podium steps",
     tower: "Tower",
     scaffold: "Scaffold",
+    mewp: "MEWP (cherry picker)",
   } satisfies Record<OutdoorPosition["accessEquipment"], string>,
   wallConstruction: {
     "solid-brick": "Solid brick",
@@ -590,6 +623,22 @@ export interface SurveyCheck {
 /** A unit mounted at or above this height needs access equipment: a ladder at least. */
 export const ACCESS_EQUIPMENT_HEIGHT_M = 2;
 
+/** The ladder limit this survey is judged against: the one it was started under, else the company default. */
+export function ladderLimitM(m: Pick<MeasuredSurvey, "limits"> | null | undefined): number {
+  const v = m?.limits?.ladderMaxBracketM;
+  return typeof v === "number" && Number.isFinite(v) && v > 0 ? v : LADDER_MAX_BRACKET_M;
+}
+
+/** Is this position's bracket above the ladder limit, so a ladder (or nothing) won't do? */
+export function needsHeightAccess(p: Pick<OutdoorPosition, "heightM">, limitM: number): boolean {
+  return typeof p.heightM === "number" && Number.isFinite(p.heightM) && p.heightM > limitM;
+}
+
+/** Above the ladder limit with only a ladder (or nothing) picked: the survey can't be finished like that. */
+export function ladderRefused(p: Pick<OutdoorPosition, "heightM" | "accessEquipment">, limitM: number): boolean {
+  return needsHeightAccess(p, limitM) && !HEIGHT_ACCESS.includes(p.accessEquipment);
+}
+
 export const RISK_QUESTIONS: { id: RiskQuestionId; label: string; question: string; help: string }[] = [
   {
     id: "workingAtHeight",
@@ -686,7 +735,14 @@ export function surveyChecks(m: MeasuredSurvey): SurveyCheck[] {
       add("outdoor", `${name}: mounting height`, (num(p.heightM) ?? -1) >= 0, { ...at, field: "heightM" });
     }
     const height = num(p.heightM) ?? 0;
-    if (height >= ACCESS_EQUIPMENT_HEIGHT_M) {
+    const limit = ladderLimitM(m);
+    if (needsHeightAccess(p, limit)) {
+      // Above the ladder limit: a tower, podium, scaffold or MEWP, never a ladder.
+      add("outdoor", `${name}: access for a bracket ${round1(height)} m up (above ${round1(limit)} m a ladder won't do: a tower, podium, scaffold or MEWP)`, !ladderRefused(p, limit), {
+        ...at,
+        field: "accessEquipment",
+      });
+    } else if (height >= ACCESS_EQUIPMENT_HEIGHT_M) {
       add("outdoor", `${name}: access equipment for a unit ${round1(height)} m up`, !!p.accessEquipment && p.accessEquipment !== "none", {
         ...at,
         field: "accessEquipment",

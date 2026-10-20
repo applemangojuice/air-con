@@ -145,6 +145,11 @@ test("parseMeasuredSurvey: accepts the prefill, strips unknown keys, refuses jun
   assert.equal(survey.parseMeasuredSurvey({ ...m, permissions: { pd: { "heating-use": "maybe" } } }).ok, false);
   const many = survey.parseMeasuredSurvey({ ...m, rooms: Array.from({ length: 31 }, (_, i) => ({ ...m.rooms[0]!, id: `r${i}` })) });
   assert.equal(many.ok, false);
+  // The new access kinds and the ladder limit the survey started under are kept; a silly limit is refused.
+  const high = survey.parseMeasuredSurvey({ ...m, limits: { ladderMaxBracketM: 2.5 }, outdoor: { positions: [{ id: "o1", label: "DEMO", location: "wall-bracket", base: "wall-bracket", heightM: 4, accessEquipment: "mewp", chosen: true }] } });
+  assert.equal(high.ok, true);
+  if (high.ok) assert.deepEqual([high.data.limits?.ladderMaxBracketM, high.data.outdoor.positions[0]!.accessEquipment], [2.5, "mewp"]);
+  assert.equal(survey.parseMeasuredSurvey({ ...m, limits: { ladderMaxBracketM: 40 } }).ok, false);
 });
 
 test("keepMedia drops photos that aren't this project's; nextToken always moves forward", () => {

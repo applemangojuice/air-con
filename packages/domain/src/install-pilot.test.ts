@@ -136,7 +136,7 @@ function design(n: number, topology: "single" | "multi", opts: { pumpRoom?: numb
   };
 }
 
-function measured(over: Partial<MeasuredSurvey["house"]> = {}, access: "none" | "tower" = "none"): MeasuredSurvey {
+function measured(over: Partial<MeasuredSurvey["house"]> = {}, access: MeasuredSurvey["outdoor"]["positions"][number]["accessEquipment"] = "none", heightM?: number): MeasuredSurvey {
   return {
     version: 1,
     site: { confirmedAddress: true, ownerConfirmed: true, tenure: "owner", petsKids: "DEMO dog in the kitchen" },
@@ -152,7 +152,7 @@ function measured(over: Partial<MeasuredSurvey["house"]> = {}, access: "none" | 
       ...over,
     },
     rooms: [],
-    outdoor: { positions: [{ id: "pos-1", label: "Rear", location: "ground-rear", base: "ground-feet", accessEquipment: access, chosen: true }] },
+    outdoor: { positions: [{ id: "pos-1", label: "Rear", location: "ground-rear", base: "ground-feet", accessEquipment: access, chosen: true, ...(heightM !== undefined ? { heightM } : {}) }] },
     electrics: { boardType: "modern-rcbo", asbestosFlashGuard: "no", mediaIds: [] },
     permissions: { pd: {} },
     risks: { workingAtHeight: false, structuralConcern: false, concealedServicesConcern: false },
@@ -449,13 +449,36 @@ test("risks from the survey: asbestos check for older homes, access check at hei
   // No survey at all: check anyway.
   assert.ok(runsheetFromDesign(design(1, "single"), "v-std", CATALOGUE).some((s) => s.id === "d1-asbestos"));
   const high = runsheetFromDesign(design(1, "single"), "v-std", CATALOGUE, measured({}, "tower"));
-  assert.ok(high.find((s) => s.title === "Outdoor base or bracket")!.evidence.some((e) => /Tower inspected/.test(e.label)));
-  assert.match(high.find((s) => s.id === "d1-rams")!.guidance ?? "", /working at height/);
+  assert.ok(high.find((s) => s.title === "Outdoor base or bracket")!.evidence.some((e) => /Tower in place and checked/.test(e.label)));
+  assert.match(high.find((s) => s.id === "d1-rams")!.guidance ?? "", /working at height: a mobile tower for the outdoor unit/);
+  for (const a of ["podium", "scaffold", "mewp"] as const) {
+    const sheet = runsheetFromDesign(design(1, "single"), "v-std", CATALOGUE, measured({}, a));
+    assert.ok(sheet.find((s) => s.title === "Outdoor base or bracket")!.evidence.some((e) => /in place and checked/.test(e.label)), a);
+    assert.match(sheet.find((s) => s.id === "d1-rams")!.guidance ?? "", /working at height/, a);
+  }
   assert.match(high.find((s) => s.id === "d1-rams")!.guidance ?? "", /DEMO dog/);
   const pump = runsheetFromDesign(design(2, "multi", { pumpRoom: 2 }), "v-std", CATALOGUE);
   const cond = pump.filter((s) => s.title === "Condensate");
   assert.equal(cond[0]!.evidence.some((e) => /Pump test/.test(e.label)), false);
   assert.equal(cond[1]!.evidence.some((e) => /Pump test/.test(e.label)), true);
+});
+
+test("access at height and a heavy outdoor unit reach the RAMS, the bracket step, the lift and the kit check", () => {
+  const heavyCat = CATALOGUE.map((c) => (c.id === "out-1" ? { ...c, specs: { ...c.specs, weightKg: 38 } } : c));
+  const sheet = runsheetFromDesign(design(1, "single"), "v-std", heavyCat, measured({}, "mewp", 4.2));
+  const rams = sheet.find((s) => s.id === "d1-rams")!.guidance ?? "";
+  assert.match(rams, /a MEWP \(cherry picker\) for the outdoor unit \(bracket 4\.2 m up\)/);
+  assert.match(rams, /two-person lift: DEMO-RX25 weighs 38 kg/);
+  const base = sheet.find((s) => s.title === "Outdoor base or bracket")!;
+  assert.match(base.guidance ?? "", /a ladder isn't the access for it.*trained operator \(IPAF\)/);
+  const unit = sheet.find((s) => s.title === "Outdoor unit")!;
+  assert.match(unit.guidance ?? "", /38 kg: a two-person lift/);
+  assert.ok(unit.evidence.some((e) => e.kind === "check" && /Lifted by two people .*38 kg/.test(e.label)));
+  assert.equal(sheet.find((s) => s.equipment?.kind === "outdoor")!.equipment!.weightKg, 38);
+  // 25 kg or less: no lift step, no lift line.
+  const light = runsheetFromDesign(design(1, "single"), "v-std", CATALOGUE.map((c) => (c.id === "out-1" ? { ...c, specs: { ...c.specs, weightKg: 25 } } : c)), measured());
+  assert.ok(!light.find((s) => s.title === "Outdoor unit")!.evidence.some((e) => /Lifted by two/.test(e.label)));
+  assert.doesNotMatch(light.find((s) => s.id === "d1-rams")!.guidance ?? "", /two-person lift/);
 });
 
 test("unknown variant or empty design is refused loudly", () => {

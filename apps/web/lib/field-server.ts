@@ -39,6 +39,9 @@ import {
   decayRetestMarkers,
   withRetestMarkers,
   DECAY_ROLES,
+  HEIGHT_ACCESS,
+  SURVEY_LABELS,
+  TWO_PERSON_LIFT_KG,
   transitionIssue,
   variationStart,
   withExceptionReview,
@@ -57,6 +60,7 @@ import {
   type Learning,
   type MeasuredSurvey,
   type MediaItem,
+  type OutdoorPosition,
   type PilotSettings,
   type Project,
   type ProposalRecord,
@@ -218,16 +222,24 @@ export function kitBadge(p: Project): { label: string; tone: NonNullable<JobCard
 
 const PRE_2000 = new Set(["pre-1930", "1930-1950", "1950-2000"]);
 
-/** The flags crews care about before they leave: height, asbestos, pets, hidden services. */
-export function riskFlags(measured: MeasuredSurvey | null | undefined, opts: { pump?: boolean } = {}): RiskFlag[] {
-  if (!measured) return [{ key: "survey-missing", label: "No survey on file: check risks on arrival", tone: "warn" }];
+/** The outdoor units on a runsheet heavier than a one-person lift (the catalogue's weight on the kit check step). */
+export function heavyLifts(job: Pick<InstallJobV2, "runsheet"> | null | undefined): { model: string; weightKg: number }[] {
+  return (job?.runsheet ?? [])
+    .filter((s) => s.equipment?.kind === "outdoor" && (s.equipment.weightKg ?? 0) > TWO_PERSON_LIFT_KG)
+    .map((s) => ({ model: s.equipment!.model, weightKg: s.equipment!.weightKg! }));
+}
+
+/** The flags crews care about before they leave: height, a heavy lift, asbestos, pets, hidden services. */
+export function riskFlags(measured: MeasuredSurvey | null | undefined, opts: { pump?: boolean; heavy?: { model: string; weightKg: number }[] } = {}): RiskFlag[] {
+  const lifts: RiskFlag[] = (opts.heavy ?? []).map((h, i) => ({ key: `lift-${i}` as const, label: `Two-person lift: ${h.model} weighs ${h.weightKg} kg`, tone: "warn" as const }));
+  if (!measured) return [{ key: "survey-missing", label: "No survey on file: check risks on arrival", tone: "warn" }, ...lifts];
   const out: RiskFlag[] = [];
-  const height =
-    measured.risks.workingAtHeight || measured.outdoor.positions.some((p) => p.chosen && (p.accessEquipment === "tower" || p.accessEquipment === "scaffold"));
-  if (height) {
-    const eq = measured.outdoor.positions.find((p) => p.chosen && p.accessEquipment !== "none")?.accessEquipment;
-    out.push({ key: "height", label: eq && eq !== "ladder" ? `Working at height: ${eq}` : "Working at height", tone: "warn" });
+  const access = measured.outdoor.positions.filter((p) => p.chosen && HEIGHT_ACCESS.includes(p.accessEquipment));
+  for (const p of access) {
+    out.push({ key: `height-${p.id}` as const, label: `Working at height: ${SURVEY_LABELS.accessEquipment[p.accessEquipment].toLowerCase()}${typeof p.heightM === "number" ? `, bracket ${p.heightM} m up` : ""}`, tone: "warn" });
   }
+  if (!access.length && measured.risks.workingAtHeight) out.push({ key: "height", label: "Working at height", tone: "warn" });
+  out.push(...lifts);
   const asbestos =
     measured.house.asbestosRisk === "suspected"
       ? "Asbestos suspected: don't drill until cleared"
@@ -503,7 +515,7 @@ async function installCard(p: Project, today: string, date: string): Promise<Job
     ...(p.customer.accessNotes ? { accessNotes: p.customer.accessNotes } : {}),
     ...(p.customer.parkingNotes ? { parkingNotes: p.customer.parkingNotes } : {}),
     crew: p.booking.crew,
-    risks: riskFlags(survey?.data, { pump }),
+    risks: riskFlags(survey?.data, { pump, heavy: heavyLifts(job) }),
     kitLabel: kit.label,
     kitTone: kit.tone,
     ...(progressPct !== undefined ? { progressPct } : {}),
@@ -698,7 +710,7 @@ export async function loadFieldJob(projectId: string, staff: StaffMember): Promi
   const pump = Boolean(job?.runsheet.some((s) => s.title === "Condensate" && /pump/.test(s.item ?? "")));
   const mode = appMode();
   return {
-    header: headerOf(project, riskFlags(survey?.data, { pump }), today),
+    header: headerOf(project, riskFlags(survey?.data, { pump, heavy: heavyLifts(job) }), today),
     job,
     ...(ensured.ok ? {} : { jobProblem: ensured.reason }),
     me: meOf(staff, today),
@@ -750,9 +762,14 @@ function toolsFor(job: InstallJobV2 | null, measured: MeasuredSurvey | null | un
     out.push({ label: "Fire extinguisher and fire blanket", why: "Hot work: a brazed joint" });
   }
   if (steps.some((s) => s.title === "Condensate" && /pump/.test(s.item ?? ""))) out.push({ label: "Condensate pump and its alarm wiring", why: "A room on this job can't drain by gravity" });
-  const access = measured?.outdoor.positions.find((p) => p.chosen && p.accessEquipment !== "none")?.accessEquipment;
-  if (access === "tower" || access === "scaffold") out.push({ label: access === "tower" ? "Mobile tower (PASMA)" : "Scaffold, booked", why: "The outdoor position is at height" });
-  else if (access === "ladder") out.push({ label: "Ladder with stand-off", why: "The outdoor position needs a ladder" });
+  const chosen = measured?.outdoor.positions.filter((p) => p.chosen) ?? [];
+  const HIRE: Partial<Record<OutdoorPosition["accessEquipment"], string>> = { tower: "Mobile tower (PASMA), booked", podium: "Podium steps", scaffold: "Scaffold, booked", mewp: "MEWP, booked, with a trained operator (IPAF)" };
+  for (const kind of new Set(chosen.map((p) => p.accessEquipment))) {
+    const p = chosen.find((x) => x.accessEquipment === kind)!;
+    if (HIRE[kind]) out.push({ label: HIRE[kind]!, why: `The outdoor unit's bracket is at height${typeof p.heightM === "number" ? ` (${p.heightM} m)` : ""}: no ladder for it` });
+    else if (kind === "ladder") out.push({ label: "Ladder with stand-off", why: "The outdoor position needs a ladder" });
+  }
+  for (const h of heavyLifts({ runsheet: steps })) out.push({ label: "Two people for the outdoor unit's lift (or a lifting aid)", why: `${h.model} weighs ${h.weightKg} kg` });
   return out;
 }
 

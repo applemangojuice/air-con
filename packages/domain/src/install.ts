@@ -15,7 +15,7 @@ import {
 import { R32_GWP, fgasRecord, type FgasRecord, type InstalledEquipmentRow } from "./documents.ts";
 import type { PhotoTag } from "./media.ts";
 import { can, meetsRequirement, qualificationStatus, type StaffMember, type StepRequirement } from "./staff.ts";
-import type { MeasuredSurvey } from "./survey-visit.ts";
+import { ACCESS_PHRASE, HEIGHT_ACCESS, SURVEY_LABELS, TWO_PERSON_LIFT_KG, type AccessEquipmentKind, type MeasuredSurvey } from "./survey-visit.ts";
 
 /**
  * The Installation Operating System.
@@ -117,8 +117,8 @@ export interface InstallStep {
   /** The design room or system this step instance is for. */
   roomId?: string;
   systemId?: string;
-  /** Kit check steps: the unit whose serial this step captures. */
-  equipment?: { kind: "indoor" | "outdoor"; room: string; label: string; model: string };
+  /** Kit check steps: the unit whose serial this step captures (an outdoor unit's weight from the catalogue, for the two-person lift). */
+  equipment?: { kind: "indoor" | "outdoor"; room: string; label: string; model: string; weightKg?: number };
   /**
    * The strength/tightness test or the vacuum decay test: the step's
    * readings are judged together (decay.ts), never one by one, and a failed
@@ -1077,10 +1077,18 @@ interface SystemCtx {
   label: string;
   outdoor?: CatalogueItem;
   rooms: RoomCtx[];
-  accessEquipment?: "none" | "ladder" | "tower" | "scaffold";
+  accessEquipment?: AccessEquipmentKind;
+  /** Height to the bracket, m, from the survey. */
+  heightM?: number;
 }
 
 const ERA_NEEDS_ASBESTOS_CHECK = new Set(["pre-1930", "1930-1950", "1950-2000"]);
+
+/** A catalogue item's weight, kg, when it has one. */
+function weightOf(item: CatalogueItem | undefined): number | undefined {
+  const w = item?.specs?.weightKg;
+  return typeof w === "number" && Number.isFinite(w) && w > 0 ? w : undefined;
+}
 
 function specFromSlot(stepKey: string, s: SlotDef): EvidenceSpec {
   const spec: EvidenceSpec = { id: `${stepKey}.${s.key}`, kind: s.kind, label: s.label };
@@ -1338,6 +1346,7 @@ export function runsheetFromDesign(
       outdoor: byId.get(sel.outdoorItemId),
       rooms: rooms.filter((r) => r.systemId === sel.id),
       accessEquipment: pos?.accessEquipment,
+      ...(typeof pos?.heightM === "number" ? { heightM: pos.heightM } : {}),
     };
   });
 
@@ -1369,9 +1378,14 @@ export function runsheetFromDesign(
   const brazedRooms = new Set(
     (variant.bom ?? []).filter((l) => /needs a brazed joint/.test(l.note ?? "")).map((l) => (l.note ?? "").split(":")[0]!.trim()),
   );
-  const atHeight = systems.some((s) => s.accessEquipment === "tower" || s.accessEquipment === "scaffold") || Boolean(measured?.risks.workingAtHeight);
+  const heightAccess = systems.filter((s) => s.accessEquipment && HEIGHT_ACCESS.includes(s.accessEquipment));
+  const heavy = systems.filter((s) => (weightOf(s.outdoor) ?? 0) > TWO_PERSON_LIFT_KG);
   const risks: string[] = [];
-  if (atHeight) risks.push("working at height (access equipment on the job)");
+  for (const s of heightAccess) {
+    risks.push(`working at height: ${ACCESS_PHRASE[s.accessEquipment!]} for the outdoor unit${typeof s.heightM === "number" ? ` (bracket ${s.heightM} m up)` : ""}${systems.length > 1 ? `, ${s.label}` : ""}: checked before use, no work off a ladder there`);
+  }
+  if (!heightAccess.length && measured?.risks.workingAtHeight) risks.push("working at height (flagged at the survey)");
+  for (const s of heavy) risks.push(`two-person lift: ${modelOf(s.outdoor)} weighs ${weightOf(s.outdoor)} kg (two people, or a lifting aid, for every lift)`);
   if (needsAsbestosCheck) risks.push(house ? `possible asbestos (house era ${house.era}, survey says ${house.asbestosRisk})` : "asbestos not assessed in the survey");
   if (measured?.site.petsKids) risks.push(`pets or children: ${measured.site.petsKids}`);
   if (measured?.risks.concealedServicesConcern) risks.push("concealed services flagged at survey");
@@ -1459,7 +1473,13 @@ export function runsheetFromDesign(
       item: `${s.label}: ${modelOf(s.outdoor)}`,
       systemId: s.sel.id,
       guidance: "Scan or type the serial from the box, and check the model against the design. Damaged or the wrong model: mark Blocked.",
-      equipment: { kind: "outdoor", room: systems.length > 1 ? `Outdoor (${s.label})` : "Outdoor", label: labelOf(s.outdoor, "Outdoor unit"), model: modelOf(s.outdoor) },
+      equipment: {
+        kind: "outdoor",
+        room: systems.length > 1 ? `Outdoor (${s.label})` : "Outdoor",
+        label: labelOf(s.outdoor, "Outdoor unit"),
+        model: modelOf(s.outdoor),
+        ...(weightOf(s.outdoor) !== undefined ? { weightKg: weightOf(s.outdoor)! } : {}),
+      },
       slots: [
         { key: "serial", kind: "barcode-scan", label: "Outdoor unit serial", tag: "serial", role: "serial-outdoor" },
         { key: "model", kind: "check", label: `Box reads ${modelOf(s.outdoor)} and is undamaged` },
@@ -1526,7 +1546,7 @@ export function runsheetFromDesign(
     });
   }
   for (const s of systems) {
-    const access = s.accessEquipment === "tower" || s.accessEquipment === "scaffold";
+    const access = s.accessEquipment && HEIGHT_ACCESS.includes(s.accessEquipment) ? s.accessEquipment : null;
     add({
       key: `d1-base-${s.key}`,
       phase: 5,
@@ -1535,10 +1555,12 @@ export function runsheetFromDesign(
       item: sysItem(s),
       systemId: s.sel.id,
       allowNa: true,
-      guidance: access ? `This position needs a ${s.accessEquipment}: inspect it before anyone goes up.` : undefined,
+      guidance: access
+        ? `This position needs ${ACCESS_PHRASE[access]}${typeof s.heightM === "number" ? ` (bracket ${s.heightM} m up)` : ""}: a ladder isn't the access for it. Check it before anyone goes up${access === "mewp" ? ", by a trained operator (IPAF)" : access === "tower" ? " (built by someone trained, PASMA)" : ""}.`
+        : undefined,
       slots: [
         { key: "base", kind: "photo", label: "Base or bracket level, fixings and anti-vibration pads in", tag: "outdoor-location" },
-        ...(access ? [{ key: "access", kind: "check" as const, label: `${s.accessEquipment === "tower" ? "Tower" : "Scaffold"} inspected and tagged before use` }] : []),
+        ...(access ? [{ key: "access", kind: "check" as const, label: `${SURVEY_LABELS.accessEquipment[access]} in place and checked (tagged or inspected) before use` }] : []),
       ],
     });
   }
@@ -1567,9 +1589,13 @@ export function runsheetFromDesign(
       title: "Outdoor unit",
       item: sysItem(s),
       systemId: s.sel.id,
+      ...((weightOf(s.outdoor) ?? 0) > TWO_PERSON_LIFT_KG
+        ? { guidance: `${modelOf(s.outdoor)} weighs ${weightOf(s.outdoor)} kg: a two-person lift (or a lifting aid), never one person, and never carried up a ladder.` }
+        : {}),
       slots: [
         { key: "set", kind: "photo", label: "Unit level on its mounts, clear of standing water", tag: "progress" },
         { key: "clearance", kind: "check", label: "Service clearances kept, as the manual says" },
+        ...((weightOf(s.outdoor) ?? 0) > TWO_PERSON_LIFT_KG ? [{ key: "lift", kind: "check" as const, label: `Lifted by two people (or a lifting aid): ${weightOf(s.outdoor)} kg` }] : []),
       ],
     });
   }

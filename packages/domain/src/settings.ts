@@ -54,6 +54,12 @@ export interface DiscountCode {
   active: boolean;
 }
 
+export type AccessHireKind = "podium" | "tower" | "scaffold" | "mewp";
+export const ACCESS_HIRE_KINDS: readonly AccessHireKind[] = ["podium", "tower", "scaffold", "mewp"];
+/** The ladder limit's bounds in Settings, m. */
+export const LADDER_LIMIT_MIN_M = 1;
+export const LADDER_LIMIT_MAX_M = 10;
+
 export interface PilotSettings {
   company: {
     legalName: string;
@@ -131,6 +137,13 @@ export interface PilotSettings {
   serviceArea: { outcodes: string[] };
   sla: { enabled: boolean };
   warranty: { workmanshipYears: number | null; manufacturerSummary: string | null };
+  /** Site safety: the ladder limit for outdoor brackets, and what access hire costs when the catalogue has no price. */
+  safety: {
+    /** Above this height to the bracket (m), a ladder isn't accepted for installing an outdoor unit: a tower, podium, scaffold or MEWP is. */
+    ladderMaxBracketM: number;
+    /** Hire per job, pence ex VAT, used when the catalogue has no priced item: null until the office knows it (the proposal can't go without a price). */
+    accessHirePence: Record<AccessHireKind, number | null>;
+  };
   legal: { termsVersion: string; termsReviewed: boolean; cancellationReviewed: boolean };
   comms: { smsSenderId: string; disabledEvents: string[] };
   finance: FinanceSettings;
@@ -240,6 +253,8 @@ export const DEFAULT_SETTINGS: PilotSettings = {
   sla: { enabled: false },
   // No warranty claims anywhere until these are set.
   warranty: { workmanshipYears: null, manufacturerSummary: null },
+  // First-floor bracket height; no hire price is guessed.
+  safety: { ladderMaxBracketM: 2.5, accessHirePence: { podium: null, tower: null, scaffold: null, mewp: null } },
   legal: { termsVersion: "pilot-draft-2", termsReviewed: false, cancellationReviewed: false },
   comms: { smsSenderId: "DangItsHot", disabledEvents: [] },
   finance: {},
@@ -339,6 +354,12 @@ function sanitise(s: PilotSettings): PilotSettings {
   if (s.warranty.workmanshipYears !== null && typeof s.warranty.workmanshipYears !== "number") s.warranty.workmanshipYears = null;
   if (s.warranty.manufacturerSummary !== null && typeof s.warranty.manufacturerSummary !== "string") {
     s.warranty.manufacturerSummary = null;
+  }
+  const ladder = s.safety.ladderMaxBracketM;
+  if (typeof ladder !== "number" || !Number.isFinite(ladder) || ladder < LADDER_LIMIT_MIN_M || ladder > LADDER_LIMIT_MAX_M) s.safety.ladderMaxBracketM = d.safety.ladderMaxBracketM;
+  for (const k of ACCESS_HIRE_KINDS) {
+    const v = s.safety.accessHirePence[k];
+    if (v !== null && !(typeof v === "number" && Number.isInteger(v) && v >= 0)) s.safety.accessHirePence[k] = null;
   }
   // Optional text the defaults leave out passes through mergeValue unchecked:
   // keep a real, non-blank string or nothing (a stored null means "not set").

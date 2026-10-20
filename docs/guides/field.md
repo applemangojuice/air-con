@@ -146,7 +146,13 @@ loft hatch, and a torch for the fuse board.
       habitable-room window or glazed door: MCS 020(a)'s assessment
       position), **Hard surfaces within 1 m of the unit** (the ground counts:
       one, two against a wall, three in a corner or side return), base or
-      bracket, access equipment, where defrost water will go.
+      bracket, the **height to the bracket** (0 on the ground; on a flat roof
+      the roof's height; blank on a balcony), access equipment, where
+      defrost water will go. **Above 2.5 m to the bracket** (the company's
+      limit, in Settings) a ladder isn't accepted as the way to install it:
+      pick **Tower**, **Podium steps**, **Scaffold** or **MEWP (cherry
+      picker)**. Its hire goes on the proposal's costs, and it's in the RAMS
+      and on the crew's day.
    6. **Electrics**: fuse board photo, spare ways, earthing, cable route and
       length, and the old-board asbestos check.
    7. **Permissions**: the permitted-development questions for the outdoor
@@ -175,7 +181,11 @@ The big **Actions** button (bottom right on every job) does most of it.
 1. **Today** or **Jobs** → the job → **Job pack**: the address, parking and
    access, the crew, the kit status, and:
    - **RAMS**: read them and tap **I've read the RAMS and the risks**.
-     Everyone on site does this.
+     Everyone on site does this. Access at height names the equipment and
+     the bracket's height (no work off a ladder there), and an outdoor unit
+     over 25 kg is a **two-person lift**: it's on the job card, in the
+     tools list and on the **Outdoor unit** step (lifted by two, or with a
+     lifting aid, never carried up a ladder).
    - **The approved layout**: each room's photo with the unit, core hole,
      pipe route and condensate drawn on it, signed off by the technical
      lead. Follow it. If the wall isn't what the drawing shows, raise an

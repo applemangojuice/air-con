@@ -149,7 +149,15 @@ export function defaultLabourPlan(variant: DesignVariant, settings: PilotSetting
 /* Cost build-up                                                       */
 /* ------------------------------------------------------------------ */
 
-export type AccessEquipment = "none" | "ladder" | "tower" | "scaffold";
+export type AccessEquipment = "none" | "ladder" | "podium" | "tower" | "scaffold" | "mewp";
+
+/** Hire that goes on the cost build-up when a chosen outdoor position needs it (a ladder is the crew's own). */
+const ACCESS_HIRE: { kind: "podium" | "tower" | "scaffold" | "mewp"; re: RegExp; label: string }[] = [
+  { kind: "tower", re: /tower/i, label: "Access tower hire" },
+  { kind: "podium", re: /podium/i, label: "Podium steps hire" },
+  { kind: "scaffold", re: /scaffold/i, label: "Scaffold hire" },
+  { kind: "mewp", re: /\bmewp\b|cherry picker|boom lift|scissor lift/i, label: "MEWP hire" },
+];
 
 /** A cost typed in on the proposal for a line the catalogue can't price (ex VAT). */
 export interface CostOverride {
@@ -348,24 +356,27 @@ export function buildCostLines(input: {
     });
   }
 
-  // Access hire, when an outdoor position needs more than a ladder.
-  for (const kind of ["tower", "scaffold"] as const) {
+  // Access hire, when an outdoor position needs more than a ladder: a priced catalogue item first, then the
+  // hire price in Settings → Safety; with neither, the line stays unpriced and the proposal waits for a price.
+  for (const { kind, re, label } of ACCESS_HIRE) {
     if (!(input.accessEquipment ?? []).includes(kind)) continue;
-    const re = kind === "tower" ? /tower/i : /scaffold/i;
-    const item = serviceItem(catalogue, (i) => (i.kind === "tool" || i.kind === "service") && re.test(`${i.label} ${i.model ?? ""} ${cat(i)}`));
+    const matches = catalogue.filter((i) => i.active && (i.kind === "tool" || i.kind === "service") && re.test(`${i.label} ${i.model ?? ""} ${cat(i)}`));
+    const item = matches.find((i) => i.costPence !== null) ?? matches[0];
+    const setting = settings.safety?.accessHirePence?.[kind];
+    const fromSettings = (!item || item.costPence === null) && typeof setting === "number";
     push(
       {
         id: `access:${kind}`,
         category: "access",
-        label: item?.label ?? (kind === "tower" ? "Access tower hire" : "Scaffold hire"),
+        label: item?.label ?? label,
         qty: 1,
         unit: "hire",
-        unitCostPence: item?.costPence ?? null,
-        source: item ? sourceOf(item) : "No catalogue price yet",
-        ...(item ? { catalogueItemId: item.id } : {}),
-        verified: Boolean(item && item.confidence === "verified" && item.costPence !== null),
+        unitCostPence: fromSettings ? setting : (item?.costPence ?? null),
+        source: fromSettings ? "Hire price in Settings → Safety" : item ? sourceOf(item) : "No hire price yet: type it in, or set it in Settings → Safety",
+        ...(item && !fromSettings ? { catalogueItemId: item.id } : {}),
+        verified: Boolean(!fromSettings && item && item.confidence === "verified" && item.costPence !== null),
       },
-      { gross: Boolean(item?.costSource?.vatIncluded && !vatRegistered && item.costPence !== null) },
+      { gross: Boolean(!fromSettings && item?.costSource?.vatIncluded && !vatRegistered && item.costPence !== null) },
     );
   }
 

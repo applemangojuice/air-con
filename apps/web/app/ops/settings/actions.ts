@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { INSTALL_WITHIN_WEEKS_MAX, INSTALL_WITHIN_WEEKS_MIN, TAX_CODES, mergeSettings, schedule2Missing, type PilotSettings, type TaxCodeId } from "@aircon/domain";
+import { INSTALL_WITHIN_WEEKS_MAX, INSTALL_WITHIN_WEEKS_MIN, LADDER_LIMIT_MAX_M, LADDER_LIMIT_MIN_M, TAX_CODES, mergeSettings, schedule2Missing, type PilotSettings, type TaxCodeId } from "@aircon/domain";
 import { done, refused, type ActionResult } from "@/components/ops/command/types";
 import { requireStaff } from "@/lib/auth/server";
 import * as settingsRepo from "@/lib/repo/settings";
@@ -93,6 +93,10 @@ const schema = z.object({
   serviceArea: z.object({ outcodes: z.array(z.string().trim().toUpperCase().regex(/^[A-Z]{1,2}\d[A-Z\d]?$/, "Outcodes look like SW16 or CR0")).max(400) }),
   sla: z.object({ enabled: z.boolean() }),
   warranty: z.object({ workmanshipYears: z.number().int().min(0).max(25).nullable(), manufacturerSummary: z.string().trim().max(1000).nullable() }),
+  safety: z.object({
+    ladderMaxBracketM: z.number().min(LADDER_LIMIT_MIN_M, `The ladder limit is at least ${LADDER_LIMIT_MIN_M} m`).max(LADDER_LIMIT_MAX_M, `The ladder limit is at most ${LADDER_LIMIT_MAX_M} m`),
+    accessHirePence: z.object({ podium: money.nullable(), tower: money.nullable(), scaffold: money.nullable(), mewp: money.nullable() }),
+  }),
   legal: z.object({ termsVersion: text(40).min(1, "Name the terms version"), termsReviewed: z.boolean(), cancellationReviewed: z.boolean() }),
   comms: z.object({ smsSenderId: z.string().trim().regex(/^[A-Za-z0-9 ]{1,11}$/, "SMS sender: up to 11 letters or digits"), disabledEvents: z.array(z.string()).max(50) }),
   finance: z.object({

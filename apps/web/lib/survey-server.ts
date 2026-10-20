@@ -1,5 +1,7 @@
 import { z } from "zod";
 import {
+  LADDER_LIMIT_MAX_M,
+  LADDER_LIMIT_MIN_M,
   PD_CHECKS,
   can,
   diffSelfSurvey,
@@ -118,7 +120,7 @@ const positionSchema = z.object({
   reflectingSurfaces: z.enum(["one", "two", "three"]).optional(),
   base: z.enum(["ground-feet", "wall-bracket", "slab", "roof-frame", "other"]),
   heightM: measure(0, 30),
-  accessEquipment: z.enum(["none", "ladder", "tower", "scaffold"]),
+  accessEquipment: z.enum(["none", "ladder", "podium", "tower", "scaffold", "mewp"]),
   defrostDrainage: optText(500),
   chosen: z.boolean(),
   note: optText(500),
@@ -160,6 +162,7 @@ export const measuredSurveySchema = z.object({
   }),
   rooms: z.array(roomSchema).max(MAX_ROOMS),
   outdoor: z.object({ positions: z.array(positionSchema).max(MAX_POSITIONS) }),
+  limits: z.object({ ladderMaxBracketM: z.number().min(LADDER_LIMIT_MIN_M).max(LADDER_LIMIT_MAX_M).optional() }).optional(),
   electrics: z.object({
     boardType: z.enum(["modern-rcbo", "modern-rcd", "older-fuse-box", "unknown"]),
     spareWays: z.number().int().min(0).max(60).optional(),
@@ -416,6 +419,9 @@ async function freshDraftData(project: Project) {
   if (project.customer.accessNotes) data.site.accessNotes = project.customer.accessNotes;
   if (project.customer.parkingNotes) data.site.parkingNotes = project.customer.parkingNotes;
   if (project.customer.phone) data.site.siteContactPhone = project.customer.phone;
+  // The company's ladder limit when the survey started: the record keeps the one it was judged against.
+  const settings = await getSettings().catch(() => null);
+  if (settings) data.limits = { ladderMaxBracketM: settings.safety.ladderMaxBracketM };
   return data;
 }
 

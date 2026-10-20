@@ -142,6 +142,16 @@ export default async function FieldHelpPage() {
           </p>
         </Fold>
 
+        <Fold id="lift" title="Height and heavy lifts">
+          <p>
+            The job card and the RAMS name any access at height and the bracket&apos;s height: no work off a ladder there. Check the tower, podium, scaffold or MEWP
+            before anyone goes up (a MEWP by a trained operator).
+          </p>
+          <p>
+            An outdoor unit over 25 kg is a <B>two-person lift</B> (or a lifting aid), never carried up a ladder. The <B>Outdoor unit</B> step asks you to confirm it.
+          </p>
+        </Fold>
+
         <Fold id="charge" title="The charge">
           <p>
             On the <B>F-gas label and charge record</B> step, type the as-built length first. The step works out the charge it needs from the catalogue (max(0, as-built
@@ -274,6 +284,10 @@ export default async function FieldHelpPage() {
             </li>
             <li>Every room needs its measurements and a tagged photo, with the unit drawn where it would go.</li>
             <li>Older homes: answer the asbestos questions. Suspected asbestos means stop and raise it.</li>
+            <li>
+              Outdoor: the height to the bracket. Above 2.5 m (the company&apos;s limit) a ladder won&apos;t do for installing it: pick <B>Tower</B>, <B>Podium steps</B>,{" "}
+              <B>Scaffold</B> or <B>MEWP</B>. Its hire goes on the proposal and into the RAMS.
+            </li>
             <li>
               Before you leave, ask about <B>Documents by email</B>. Without it no proposal can go: the pilot can&apos;t send documents on paper. If they&apos;d rather not, the office gets in touch.
             </li>

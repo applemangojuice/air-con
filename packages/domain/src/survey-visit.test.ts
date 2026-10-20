@@ -1,9 +1,14 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { generateQuote } from "./pricing.ts";
+import { DEFAULT_SETTINGS } from "./settings.ts";
 import {
   ACCESS_EQUIPMENT_HEIGHT_M,
+  HEIGHT_ACCESS,
+  LADDER_MAX_BRACKET_M,
   PD_CHECKS,
+  ladderLimitM,
+  ladderRefused,
   RISK_QUESTIONS,
   SURVEY_SECTIONS,
   diffAccuracyPct,
@@ -339,9 +344,25 @@ test("outdoor: a chosen position needs its photo, neighbour distance and drainag
     ["Rear patio: mounting height"],
   );
   assert.deepEqual(
-    missingItems({ ...m, outdoor: { positions: [chosenPosition({ base: "wall-bracket", heightM: 3.5 })] } }),
-    ["Rear patio: access equipment for a unit 3.5 m up"],
+    missingItems({ ...m, outdoor: { positions: [chosenPosition({ base: "wall-bracket", heightM: 2.2 })] } }),
+    ["Rear patio: access equipment for a unit 2.2 m up"],
   );
+  // Above the ladder limit (2.5 m by default): a ladder isn't accepted, only a tower, podium, scaffold or MEWP.
+  const above = "Rear patio: access for a bracket 3.5 m up (above 2.5 m a ladder won't do: a tower, podium, scaffold or MEWP)";
+  assert.deepEqual(missingItems({ ...m, outdoor: { positions: [chosenPosition({ base: "wall-bracket", heightM: 3.5 })] } }), [above]);
+  assert.deepEqual(missingItems({ ...m, outdoor: { positions: [chosenPosition({ base: "wall-bracket", heightM: 3.5, accessEquipment: "ladder" })] } }), [above]);
+  for (const a of HEIGHT_ACCESS) {
+    assert.equal(surveyCompleteness({ ...m, outdoor: { positions: [chosenPosition({ base: "wall-bracket", heightM: 3.5, accessEquipment: a })] } }).pct, 100, a);
+  }
+  assert.equal(surveyCompleteness({ ...m, outdoor: { positions: [chosenPosition({ base: "wall-bracket", heightM: 2.5, accessEquipment: "ladder" })] } }).pct, 100, "at the limit a ladder still does");
+  // The limit the survey started under (Settings → Safety) is the one it's judged against.
+  assert.equal(ladderLimitM({ limits: { ladderMaxBracketM: 2 } }), 2);
+  assert.equal(ladderLimitM({}), LADDER_MAX_BRACKET_M);
+  assert.equal(LADDER_MAX_BRACKET_M, DEFAULT_SETTINGS.safety.ladderMaxBracketM, "the domain default and the settings default agree");
+  assert.match(missingItems({ ...m, limits: { ladderMaxBracketM: 2 }, outdoor: { positions: [chosenPosition({ base: "wall-bracket", heightM: 2.2, accessEquipment: "ladder" })] } })[0] ?? "", /above 2 m a ladder won't do/);
+  assert.equal(ladderRefused({ heightM: 4, accessEquipment: "none" }, 2.5), true);
+  assert.equal(ladderRefused({ heightM: 4, accessEquipment: "mewp" }, 2.5), false);
+  assert.equal(ladderRefused({ accessEquipment: "ladder" }, 2.5), false, "no height recorded: nothing to judge (the height is asked for a bracket)");
   assert.equal(surveyCompleteness({ ...m, outdoor: { positions: [chosenPosition({ base: "wall-bracket", heightM: 3.5, accessEquipment: "tower" })] } }).pct, 100);
   assert.equal(
     surveyCompleteness({ ...m, outdoor: { positions: [chosenPosition({ base: "wall-bracket", heightM: ACCESS_EQUIPMENT_HEIGHT_M - 0.5 })] } }).pct,

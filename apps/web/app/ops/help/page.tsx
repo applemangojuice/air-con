@@ -92,7 +92,7 @@ const ROUTINES: Routine[] = [
       <>
         On the project, <B>Build the proposal</B>: one option, or two (Standard and Quiet).
       </>,
-      <>Check the cost build-up and the margin. A line without a cost needs one typed in (or an admin override, with a reason).</>,
+      <>Check the cost build-up and the margin. A line without a cost needs one typed in (or an admin override, with a reason): access hire for a high bracket (tower, podium, scaffold or MEWP) is one, unless the catalogue or Settings → Safety has its price.</>,
       <>Pilot discount with its reason, the tax code, the date it&apos;s valid until.</>,
       <>A price above the customer&apos;s instant quote must say why, in words they&apos;ll read (&ldquo;you added a room&rdquo;).</>,
       <>
