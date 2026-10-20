@@ -3,7 +3,9 @@
 import { z } from "zod";
 import { INVOICE_KINDS, type InvoiceKind, type StaffMember } from "@aircon/domain";
 import { requireProjectAccess, requireStaff } from "@/lib/auth/server";
+import { recordCancellationCharge } from "@/lib/cancellation-server";
 import { finishIssue, finishPayment, issueInvoice, recordManualPayment, recordRefund } from "@/lib/money-server";
+import { fmtDate, money } from "@/lib/format";
 import { isUuid } from "@/lib/repo/base";
 import * as invoicesRepo from "@/lib/repo/invoices";
 import { invalid, poundsToPence, text, toState, type ActionState } from "../booking/_f5/action-state";
@@ -30,7 +32,8 @@ export async function issueAction(projectId: string, _prev: ActionState, form: F
   if (!staff) return NOT_FOUND;
   const kind = z.enum(INVOICE_KINDS as [InvoiceKind, ...InvoiceKind[]]).safeParse(form.get("kind"));
   const requestId = requestIdOf(form);
-  if (!kind.success || kind.data === "credit-note" || !requestId.success) return invalid();
+  // Credit notes and the cancellation charge have their own forms (and checks).
+  if (!kind.success || kind.data === "credit-note" || kind.data === "cancellation-charge" || !requestId.success) return invalid();
   const expected = poundsToPence(form.get("expectedTotal"));
   const issueId = form.get("issueId");
   return toState(
@@ -155,4 +158,35 @@ export async function finishAction(projectId: string, _prev: ActionState, form: 
   if (!invoice || invoice.projectId !== projectId) return invalid("That invoice isn't on this project.");
   const done = await finishIssue(invoice, staff);
   return done.warning ? { ok: true, message: "Tried again.", warning: done.warning } : { ok: true, message: "All done: document, totals and email." };
+}
+
+/**
+ * The charge for the work done before a cancellation (CCR reg 36(4)): the
+ * amount and how it was worked out. The reducer refuses it without an
+ * evidenced early start, after the period, with no work done, or above the
+ * contract total; the same request id finishes whatever a failure left.
+ */
+export async function cancellationChargeAction(projectId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
+  const staff = await guard(projectId);
+  if (!staff) return NOT_FOUND;
+  // Finishing a recorded charge carries its own request id; a new one, the form's.
+  const requestId = form.get("chargeRequestId") ? z.string().min(8).max(64).safeParse(form.get("chargeRequestId")) : requestIdOf(form);
+  const amount = poundsToPence(form.get("amount"));
+  const basis = String(form.get("basis") ?? "").trim().slice(0, 1001);
+  if (!requestId.success) return invalid();
+  if (!amount) return invalid("Enter the charge in pounds.");
+  const result = await recordCancellationCharge(projectId, { amountPence: amount, basis, requestId: requestId.data }, staff);
+  if (!result.ok) return { error: result.error };
+  const s = result.settlement;
+  const what =
+    s.refundDuePence > 0
+      ? `Refund ${money(s.refundDuePence)} by ${fmtDate(s.refundDueBy)}: the refund task says so.`
+      : s.owedPence > 0
+        ? `They owe ${money(s.owedPence)}: it's on their pay page.`
+        : "Nothing to refund or collect.";
+  return {
+    ok: true,
+    message: `Charge recorded${result.invoice ? ` on invoice ${result.invoice.number}` : ""}, and the family emailed. ${what}`,
+    ...(result.warnings.length ? { warning: result.warnings.join(" ") } : {}),
+  };
 }

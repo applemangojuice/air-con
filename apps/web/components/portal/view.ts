@@ -1,4 +1,5 @@
 import {
+  cancellationSettlement,
   PROJECT_STAGES,
   QUALIFICATION_LABEL,
   ROLE_LABEL,
@@ -407,7 +408,20 @@ export function cancelledCopy(p: Project): { title: string; body: string } | nul
   const workedEarly = cancelledAfterEarlyWork(p);
   // A refund recorded since the cancellation: what they've paid is now what we've kept, never "we'll refund it".
   const refundSent = p.events.some((e) => e.type === "payment-recorded" && e.at >= c.recordedAt && e.label.startsWith("Refund of"));
-  const moneyLine = refundSent
+  // With the charge for the work done recorded (reg 36(4)): its numbers, as the email and the pay page give them.
+  const s = cancellationSettlement(p);
+  const chargeLine = s
+    ? `The charge for the work done before you cancelled is ${money(s.chargePence)} (${s.basis.replace(/[.\s]+$/, "")}). ${
+        s.refundDuePence > 0
+          ? `You've paid ${money(s.paidPence)}${refundSent ? " after the refund so far" : ""}, so we'll refund ${money(s.refundDuePence)} by ${fmtDay(s.refundDueBy)} at the latest, the same way you paid.`
+          : s.owedPence > 0
+            ? `You've paid ${money(s.paidPence)}, so ${money(s.owedPence)} is left to pay.`
+            : `You've paid ${money(s.paidPence)}${refundSent ? " after our refund" : ""}, which covers it: there's nothing more to pay or refund.`
+      }`
+    : null;
+  const moneyLine = chargeLine
+    ? chargeLine
+    : refundSent
     ? `We've sent a refund, the same way you paid.${paid > 0 ? ` ${money(paid)} of what you paid hasn't been refunded: we'll explain why in writing.` : ""}`
     : paid > 0
       ? `We'll refund the ${money(paid)} you've paid by ${fmtDay(c.refundDueBy)} at the latest, the same way you paid.${
@@ -421,7 +435,9 @@ export function cancelledCopy(p: Project): { title: string; body: string } | nul
     body: [
       `We received your cancellation on ${on}.`,
       moneyLine,
-      collect ? "We'll collect the equipment we supplied, at our cost, at a time that suits you." : "",
+      collect
+        ? `We'll collect the equipment we supplied, at our cost, at a time that suits you.${s ? " It isn't part of the charge." : ""}`
+        : "",
       "Your contract and any invoices stay in your documents.",
     ]
       .filter(Boolean)

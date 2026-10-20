@@ -447,12 +447,14 @@ const INVOICE_KIND: Record<string, string> = {
   variation: "Variation",
   "survey-fee": "Survey fee",
   "change-fee": "Date change fee",
+  "cancellation-charge": "Work done before cancelling",
   "credit-note": "Credit note",
 };
 
 export function InvoiceDoc({ snap }: { snap: InvoiceSnapshot }) {
   const inv = snap.invoice;
   const creditNote = inv.kind === "credit-note";
+  const charge = inv.kind === "cancellation-charge";
   // What it asks for: after credit already on the account, as worked out at issue (the pay page's figure).
   const due = creditNote ? 0 : Math.max(0, snap.toPayPence ?? inv.totalPence - inv.paidPence);
   // VAT columns follow the tax code, never the amounts: a VAT-registered business's 0% (energy-saving
@@ -461,15 +463,32 @@ export function InvoiceDoc({ snap }: { snap: InvoiceSnapshot }) {
   const credit = snap.accountCredit && snap.accountCredit.pence > 0 ? snap.accountCredit : null;
   return (
     <>
-      <DocSection title={creditNote ? `Credit note ${inv.number}` : `${INVOICE_KIND[inv.kind] ?? plain(inv.kind)} invoice ${inv.number}`}>
+      <DocSection
+        title={
+          creditNote
+            ? `Credit note ${inv.number}`
+            : charge
+              ? `Invoice ${inv.number}: the work done before you cancelled`
+              : `${INVOICE_KIND[inv.kind] ?? plain(inv.kind)} invoice ${inv.number}`
+        }
+      >
         <Facts
           rows={[
             [creditNote ? "Credit note number" : "Invoice number", inv.number],
             ["Issued", inv.issuedAt ? fmtDate(inv.issuedAt) : ""],
             ["Due", inv.dueOn && !creditNote ? fmtDate(inv.dueOn) : ""],
             ...(creditNote && inv.reason ? ([["Reason", inv.reason]] as [string, ReactNode][]) : []),
+            ...(charge && inv.reason ? ([["How we worked it out", inv.reason]] as [string, ReactNode][]) : []),
           ]}
         />
+        {charge && (
+          <p className="text-sm text-ink-700">
+            You cancelled inside your cancellation period after asking us to start early, so you pay for the work done up to the time you
+            told us (Consumer Contracts Regulations 2013, regulation 36). Any equipment we supplied isn&apos;t part of this charge: it&apos;s
+            dealt with separately under your cancellation rights. What you&apos;d paid us is credit against this invoice, and anything over it
+            is refunded the same way you paid.
+          </p>
+        )}
         <Table
           head={anyTax ? ["Item", "Net", "VAT", "Total"] : ["Item", "Amount"]}
           align={anyTax ? ["left", "right", "right", "right"] : ["left", "right"]}

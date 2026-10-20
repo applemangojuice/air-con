@@ -349,6 +349,30 @@ refunds and credit notes. The family's page says the contract is
 cancelled (with the refund and its date), and the install, handover and
 aftercare stages show as cancelled.
 
+**They'd asked us to start early and work had begun.** Inside the period,
+after their early-start request is on file (their email or signed form on
+the booking page), they pay for the work done up to the time they told us
+(CCR regulation 36(4)), and nothing for the equipment. Work it out (what
+was done, against the whole job), then the project → **Money** → **The
+charge for the work done before they cancelled**: the charge in pounds
+(VAT included, never more than the contract) and how you worked it out
+(printed on the invoice and in their email) → **Record the charge, invoice
+it and email them**. What they paid on the contract's invoices becomes
+credit against it (a credit note on each), the charge is invoiced (**Work
+done before cancelling**), and the family is emailed the charge, the basis,
+what they've paid and either the refund and its date or what's left to pay.
+The refund task changes to the new figure (or becomes a task to collect
+what's owed). Refund the rest on the invoice they paid, the same way they
+paid, by the cancellation's 14-day date. If what they paid doesn't cover
+it, the rest is on their pay page and is their next step. The section says
+why when it can't be charged: no evidenced early-start request (they owe
+nothing for the work), a cancellation after the period, no install day
+started before it reached us, or one already recorded (credit its invoice
+to change it). Take advice on the figure if it's disputed (solicitor
+question 2 in `docs/research/uk-consumer-legal.md`). The equipment we
+supplied is dealt with under their cancellation rights: we collect it, at
+our cost; nothing is deducted for it here.
+
 If it reached us **after the cancellation period ended**, the form warns
 you before you record it. Then the family is only told we've received it
 and will be in touch in writing: no refund or collection is promised, and

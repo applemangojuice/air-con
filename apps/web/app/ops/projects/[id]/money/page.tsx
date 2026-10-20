@@ -2,8 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
+  CANCELLATION_CHARGE_BASIS_MAX,
   CREDIT_PURPOSE_LABEL,
   INVOICE_KIND_LABEL,
+  cancellationChargeProblem,
+  cancellationSettlement,
   creditPurposeOf,
   invoiceOutstanding,
   isInvoiceOverdue,
@@ -11,6 +14,7 @@ import {
   type CreditPurpose,
   type Invoice,
   type Payment,
+  type Project,
 } from "@aircon/domain";
 import { Badge, Card, EmptyState, Money, Section, Stat, StatusChip } from "@/components/kit";
 import { requireProjectAccess, requireStaff } from "@/lib/auth/server";
@@ -19,7 +23,7 @@ import { billingStopped, loadMoney, type InvoicePlan } from "@/lib/money-server"
 import { isUuid } from "@/lib/repo/base";
 import { ActionForm } from "../booking/_f5/action-form";
 import { JobHeader } from "../booking/_f5/job-header";
-import { creditAction, finishAction, finishPaymentAction, issueAction, paymentAction, refundAction } from "./actions";
+import { cancellationChargeAction, creditAction, finishAction, finishPaymentAction, issueAction, paymentAction, refundAction } from "./actions";
 
 export const metadata: Metadata = { title: "Money · ops", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -111,6 +115,8 @@ export default async function MoneyPage({ params }: { params: Promise<{ id: stri
         )}
       </Section>
 
+      {p.cancellation && <CancellationChargeSection project={p} invoices={invoices} />}
+
       {/* New invoice */}
       <Section className="mt-10" title="New invoice" description="Each one is issued at the figure shown, numbered from settings, emailed, and put in the customer's documents.">
         {available.length === 0 ? (
@@ -197,6 +203,108 @@ export default async function MoneyPage({ params }: { params: Promise<{ id: stri
         )}
       </Section>
     </main>
+  );
+}
+
+/**
+ * After a cancellation inside the period that followed the family's
+ * evidenced early start: the charge for the work done up to the time they
+ * told us (CCR reg 36(4)), and what it leaves to refund or to pay. Shown
+ * with the reason when it can't be charged, so nobody invoices it some other way.
+ */
+function CancellationChargeSection({ project: p, invoices }: { project: Project; invoices: Invoice[] }) {
+  const s = cancellationSettlement(p);
+  const chargeInvoice = invoices.find((i) => i.kind === "cancellation-charge" && i.status !== "void" && i.status !== "draft");
+  // Whether it can be charged at all, before any amount is typed (a placeholder amount and basis).
+  const blocked = s ? null : cancellationChargeProblem(p, { amountPence: 1, basis: "x".repeat(40) });
+  const supplied = p.proposal.contractType !== "install-only";
+  return (
+    <Section className="mt-10" title="The charge for the work done before they cancelled" description="Consumer Contracts Regulations 2013, regulation 36(4): only after their express early-start request, inside the period.">
+      <Card>
+        {s ? (
+          <>
+            <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
+              <div className="flex justify-between gap-3">
+                <dt className="text-ink-700">Charge for the work done</dt>
+                <dd className="font-semibold tabular-nums text-ink-900"><Money pence={s.chargePence} /></dd>
+              </div>
+              <div className="flex justify-between gap-3">
+                <dt className="text-ink-700">They&apos;ve paid (after refunds)</dt>
+                <dd className="tabular-nums text-ink-900"><Money pence={s.paidPence} /></dd>
+              </div>
+              <div className="flex justify-between gap-3">
+                <dt className="text-ink-700">{s.owedPence > 0 ? "Left for them to pay" : "Still to refund"}</dt>
+                <dd className="font-semibold tabular-nums text-ink-900"><Money pence={s.owedPence > 0 ? s.owedPence : s.refundDuePence} /></dd>
+              </div>
+              <div className="flex justify-between gap-3">
+                <dt className="text-ink-700">Refund due by</dt>
+                <dd className="text-ink-900">{fmtDate(s.refundDueBy)}</dd>
+              </div>
+            </dl>
+            <p className="mt-3 text-sm text-ink-700">
+              <span className="font-semibold text-ink-900">How it was worked out:</span> {s.basis}
+            </p>
+            <p className="mt-2 text-xs text-ink-500">
+              {chargeInvoice ? `Invoice ${chargeInvoice.number}. ` : ""}What they paid on the contract&apos;s invoices is credit against it; refund the rest the same way
+              they paid (on the invoice they paid, below). The family has the same numbers on their page and by email.
+            </p>
+            {!chargeInvoice && (
+              <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                The charge is recorded but its invoice wasn&apos;t issued. Finishing never doubles anything.
+                <ActionForm flash action={cancellationChargeAction.bind(null, p.id)} submitLabel="Finish: credit and invoice it" variant="secondary">
+                  <input type="hidden" name="chargeRequestId" value={p.cancellation?.charge?.requestId ?? ""} />
+                  <input type="hidden" name="amount" value={(s.chargePence / 100).toFixed(2)} />
+                  <input type="hidden" name="basis" value={s.basis} />
+                </ActionForm>
+              </div>
+            )}
+          </>
+        ) : blocked ? (
+          <p className="text-sm text-ink-700">{blocked}</p>
+        ) : (
+          <>
+            <p className="text-sm text-ink-700">
+              They asked us to start early (it&apos;s on file) and cancelled inside the period after work began, so they pay for the work done up to the
+              time they told us: a fair share of the contract price for what was done, never more than the contract. Everything else they paid is refunded
+              by {fmtDate(p.cancellation!.refundDueBy)}, the same way they paid.
+              {supplied
+                ? " Charge for the work only: the equipment we supplied isn't part of it (we collect it, at our cost) and nothing is deducted for it here."
+                : ""}
+            </p>
+            <ActionForm
+              flash
+              action={cancellationChargeAction.bind(null, p.id)}
+              submitLabel="Record the charge, invoice it and email them"
+              busyLabel="Recording…"
+              confirm="Record this charge? Their payments become credit against it, the charge is invoiced, and they're emailed the charge, how it was worked out and the refund."
+            >
+              <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                <div>
+                  <label className={label}>
+                    Charge, VAT included (£)
+                    <input name="amount" inputMode="decimal" required className={`${field} mt-1.5 font-normal`} />
+                  </label>
+                </div>
+                <div className="sm:col-span-2">
+                  <label className={label}>
+                    How you worked it out (printed on the invoice and in their email)
+                    <textarea
+                      name="basis"
+                      required
+                      minLength={20}
+                      maxLength={CANCELLATION_CHARGE_BASIS_MAX}
+                      rows={3}
+                      placeholder="Day 1 of 3 done: holes drilled and sealed, brackets fixed. A third of the labour."
+                      className="mt-1.5 w-full rounded-2xl border border-line bg-white px-4 py-3 text-base font-normal text-ink-900 outline-none focus:border-accent-500 focus:ring-2 focus:ring-accent-100"
+                    />
+                  </label>
+                </div>
+              </div>
+            </ActionForm>
+          </>
+        )}
+      </Card>
+    </Section>
   );
 }
 

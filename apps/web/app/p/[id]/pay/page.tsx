@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { INVOICE_KIND_LABEL, isInvoiceOverdue, type Invoice } from "@aircon/domain";
+import { INVOICE_KIND_LABEL, cancellationSettlement, isInvoiceOverdue, type Invoice } from "@aircon/domain";
 import { Badge, LinkButton } from "@/components/kit";
 import { Logo } from "@/components/site/logo";
 import { getSession, requireProjectAccess } from "@/lib/auth/server";
@@ -87,9 +87,10 @@ export default async function PayPage({
     listDocuments(id, { customerVisibleOnly: true }),
   ]);
   const today = londonToday();
-  // A cancelled contract asks for nothing (reg 34): what's paid is refunded, nothing more is due.
+  // A cancelled contract asks for nothing (reg 34): what's paid is refunded. The one exception is the
+  // charge for work done after an evidenced early start (reg 36(4)), when what they paid doesn't cover it.
   const cancelled = project.closure.reason === "cancelled";
-  const payable = cancelled ? [] : payableInvoices(invoices);
+  const payable = cancelled ? payableInvoices(invoices).filter((i) => i.kind === "cancellation-charge") : payableInvoices(invoices);
   const settled = invoices.filter((i) => (i.status === "paid" || i.status === "part-paid") && !payable.some((p) => p.id === i.id));
   const card = await cardAvailability();
   const bank = settings.payments.methods.includes("bank-transfer") ? settings.company.bank : undefined;
@@ -107,6 +108,7 @@ export default async function PayPage({
     paidSomething: invoices.some((i) => i.paidPence > 0),
     ...(project.cancellation ? { cancellation: project.cancellation } : {}),
     workedEarly: cancelledAfterEarlyWork(project),
+    settlement: cancellationSettlement(project),
   });
 
   return (
@@ -155,6 +157,7 @@ export default async function PayPage({
           </section>
         ) : (
           <>
+            {headline.note && <p className="mt-3 text-ink-700">{headline.note}</p>}
             {payable.length > 1 && (
               <p className="mt-3 text-ink-700">
                 {payable.length} invoices, <span className="font-semibold text-ink-900">{formatMoney(totalOwed)}</span> in total.

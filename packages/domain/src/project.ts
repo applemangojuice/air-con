@@ -253,6 +253,26 @@ export interface CancellationRecord {
   withinPeriod: boolean;
   /** The last day for the refund: 14 days after the day the notice reached us. */
   refundDueBy: string;
+  /**
+   * What the family pays for the work done before they cancelled, after
+   * they'd expressly asked us to start early (CCR reg 36(4)): recorded by the
+   * office (`cancellation-charge-recorded`, cancellationChargeProblem), and
+   * billed on a `cancellation-charge` invoice. The rest of what they paid is
+   * refunded (cancellationSettlement).
+   */
+  charge?: CancellationCharge;
+}
+
+/** The proportionate charge for services supplied before a cancellation (reg 36(4)-(6)). */
+export interface CancellationCharge {
+  /** VAT included, as every customer figure: never more than the contract total. */
+  amountPence: number;
+  /** How it was worked out, in writing: printed on the invoice and in the email. */
+  basis: string;
+  recordedAt: string;
+  recordedBy: string;
+  /** The form's one-off id: recording it again (a double click, a retry) changes nothing. */
+  requestId?: string;
 }
 
 export interface CrewMember {
@@ -1970,6 +1990,8 @@ export type ProjectAction =
   | { type: "project-closed"; reason?: string }
   /** Ops: the customer's cancellation reached us (when, how, where it's on file). Closes the project as cancelled. */
   | { type: "cancellation-received"; receivedAt: string; channel: CancellationChannel; evidenceRef: string }
+  /** Ops: the charge for work done before a cancellation, after an evidenced early start (reg 36(4)). */
+  | { type: "cancellation-charge-recorded"; amountPence: number; basis: string; requestId?: string }
   | { type: "note"; text: string };
 
 export type ApplyResult = { ok: true; project: Project } | { ok: false; error: string; blockers?: Blocker[] };
@@ -1994,6 +2016,7 @@ const AFTER_CLOSE: ReadonlySet<ProjectAction["type"]> = new Set<ProjectAction["t
   "aftercare-opt-out",
   "contract-confirmation-sent",
   "pre-contract-info-sent",
+  "cancellation-charge-recorded",
 ]);
 
 const KIT_STATUSES: readonly KitStatus[] = ["not-ordered", "ordered", "confirmed", "dispatched", "delivered", "inspected"];
@@ -3115,6 +3138,39 @@ export function applyProjectAction(project: Project, action: ProjectAction, now:
       return ok();
     }
 
+    case "cancellation-charge-recorded": {
+      if (!staff) return err("Recording a charge needs a signed-in staff member.");
+      const held = p.cancellation?.charge;
+      // The same form again (a double click, a retry): already done.
+      if (held && action.requestId && held.requestId === action.requestId) return ok();
+      const problem = cancellationChargeProblem(p, action);
+      if (problem) return err(problem);
+      const basis = action.basis.trim();
+      p.cancellation = {
+        ...p.cancellation!,
+        charge: {
+          amountPence: action.amountPence,
+          basis,
+          recordedAt: now,
+          recordedBy: staff.name,
+          ...(action.requestId ? { requestId: action.requestId } : {}),
+        },
+      };
+      const s = cancellationSettlement(p)!;
+      log(
+        "cancellation-charge-recorded",
+        `The charge for the work done before you cancelled is ${fmtPence(s.chargePence)}. ${
+          s.refundDuePence > 0
+            ? `You've paid ${fmtPence(s.paidPence)}, so we'll refund ${fmtPence(s.refundDuePence)} by ${fmtDate(p.cancellation.refundDueBy)}, the same way you paid.`
+            : s.owedPence > 0
+              ? `You've paid ${fmtPence(s.paidPence)}, so ${fmtPence(s.owedPence)} is left to pay.`
+              : "What you've paid covers it exactly, so there's nothing to refund."
+        }`,
+        "ops",
+      );
+      return ok();
+    }
+
     case "note": {
       const text = action.text.trim();
       if (!text) return err("Write something first.");
@@ -3202,6 +3258,97 @@ export const CANCELLATION_RULE_STATUS =
 /** Did the customer ask to start inside the cancellation period? (Older snapshots only have the boolean.) */
 export function earlyStartRequestedOf(project: Project): boolean {
   return project.proposal.earlyStart?.requested ?? project.proposal.earlyStartRequested ?? false;
+}
+
+/* ------------------------------------------------------------------ */
+/* The charge for work done before a cancellation (CCR reg 36(4)-(6))  */
+/* ------------------------------------------------------------------ */
+
+/** The basis is printed for the family: say what was done and how it compares with the whole job. */
+export const CANCELLATION_CHARGE_BASIS_MIN = 20;
+export const CANCELLATION_CHARGE_BASIS_MAX = 1000;
+/** The family's next step while part of the charge is unpaid. */
+export const CANCELLATION_CHARGE_PAY_LABEL = "Pay for the work done before you cancelled";
+
+/** Did any install day start before the cancellation reached us? Only then was any service supplied. */
+export function workDoneBeforeCancellation(p: Pick<Project, "install" | "cancellation">): boolean {
+  const at = p.cancellation ? Date.parse(p.cancellation.receivedAt) : NaN;
+  if (!Number.isFinite(at)) return false;
+  return p.install.days.some((d) => d.startedAt !== undefined && Date.parse(d.startedAt) <= at);
+}
+
+/**
+ * Why the office can't charge for work done before this cancellation, or
+ * null when it can (LEGAL REVIEW REQUIRED: our reading of CCR 2013 reg 36,
+ * docs/research/uk-consumer-legal.md, not legal advice):
+ *  * only a cancellation inside the period: after it, the contract's own
+ *    terms apply, not reg 36 (the late-cancellation review task);
+ *  * only after the family's express request to start early, on a durable
+ *    medium, in the words we gave them, which say they'll pay for the work
+ *    done if they then cancel (`earlyStart.evidencedAt`; reg 36(1), (6)(b));
+ *  * only when the cancellation information, including that, went before
+ *    the contract (`preContractInfoSentAt`; reg 36(6)(a));
+ *  * only for work actually done before the cancellation reached us (an
+ *    install day started by then);
+ *  * once; a whole-pence amount above zero and never more than the contract
+ *    total; and a written basis, which the family sees.
+ */
+export function cancellationChargeProblem(
+  p: Pick<Project, "cancellation" | "proposal" | "install" | "money">,
+  input: { amountPence: number; basis: string },
+): string | null {
+  const c = p.cancellation;
+  if (!c) return "There's no cancellation recorded on this project.";
+  if (c.charge) return `A charge for the work done is already recorded (${fmtPence(c.charge.amountPence)}). To change it, credit its invoice and explain why in writing.`;
+  if (!c.withinPeriod) {
+    return "The cancellation reached us after the cancellation period ended, so this isn't a charge for work done under the cancellation rules: the contract's own terms apply. Take advice (see the late-cancellation task).";
+  }
+  const early = p.proposal.earlyStart;
+  if (!(early?.requested ?? p.proposal.earlyStartRequested) || !early?.evidencedAt) {
+    return "Nothing can be charged: there's no evidenced request from them to start early (their email or signed form, recorded on the booking page). Without it they owe nothing for the work (CCR reg 36(6)).";
+  }
+  if (!p.proposal.preContractInfoSentAt) {
+    return "Nothing can be charged: the cancellation information wasn't sent to them before the contract, so they owe nothing for the work (CCR reg 36(6)).";
+  }
+  if (!workDoneBeforeCancellation(p)) return "No install day had started when the cancellation reached us, so no work was done to charge for.";
+  if (!Number.isInteger(input.amountPence) || input.amountPence <= 0) return "Enter the charge in pounds and pence, above zero.";
+  const contract = p.proposal.contractTotalPence ?? p.money.contractTotalPence ?? 0;
+  if (input.amountPence > contract) return `That's more than the contract total (${fmtPence(contract)}): the charge can only be for part of it.`;
+  const basis = (input.basis ?? "").trim();
+  if (basis.length < CANCELLATION_CHARGE_BASIS_MIN) {
+    return "Write how you worked it out (what was done before they cancelled, and how that compares with the whole job): it's printed on the invoice and in their email.";
+  }
+  if (basis.length > CANCELLATION_CHARGE_BASIS_MAX) return `Keep the basis to ${CANCELLATION_CHARGE_BASIS_MAX} characters.`;
+  return null;
+}
+
+/**
+ * The money after a cancellation with a charge for work done: the charge,
+ * what they've paid us (net of refunds so far), and the difference, either
+ * to refund (by the cancellation's 14-day date, the same way they paid) or
+ * left for them to pay. Null without a charge. The hub, the pay page, the
+ * email and the money page all show these numbers.
+ */
+export function cancellationSettlement(p: Pick<Project, "cancellation" | "money">): {
+  chargePence: number;
+  basis: string;
+  paidPence: number;
+  refundDuePence: number;
+  owedPence: number;
+  refundDueBy: string;
+} | null {
+  const c = p.cancellation;
+  if (!c?.charge) return null;
+  const paidPence = Math.max(0, p.money.paidPence);
+  const chargePence = c.charge.amountPence;
+  return {
+    chargePence,
+    basis: c.charge.basis,
+    paidPence,
+    refundDuePence: Math.max(0, paidPence - chargePence),
+    owedPence: Math.max(0, chargePence - paidPence),
+    refundDueBy: c.refundDueBy,
+  };
 }
 
 export interface CancellationStatus {
@@ -3498,6 +3645,8 @@ export function customerNextAction(project: Project, issues: readonly NextAction
   const feedbackDue = Boolean(p.aftercare.feedbackRequestedAt) && !p.aftercare.feedback;
 
   if (p.closure.closed) {
+    // Cancelled after an early start: what's left of the charge for the work done is theirs to pay (reg 36(4)).
+    if ((cancellationSettlement(p)?.owedPence ?? 0) > 0) return { label: CANCELLATION_CHARGE_PAY_LABEL, href: `${base}/pay` };
     return p.closure.reason !== "cancelled" && feedbackDue
       ? { label: "Tell us how it's going", href: `${base}#aftercare` }
       : null;

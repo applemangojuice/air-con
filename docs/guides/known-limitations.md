@@ -142,14 +142,17 @@ says what to do instead. Approvals that need a professional are in
       count it twice): ask the developer to reverse the two records in the
       database, then sort it out with the customer. The urgent alert says so.
     - *A cancellation after work began at the family's request* inside the
-      period: nothing can be billed after a cancellation, so a proportionate
-      charge for that work (CCR reg 36(4)) can't be invoiced in the app.
-      Their page and the email no longer say "nothing more is due" in that
-      case; keep any deduction by recording a partial refund with the reason
-      (it stays on the deposit invoice), and for a charge above what they
-      paid take advice and invoice it outside the app (solicitor question 2
-      in `docs/research/uk-consumer-legal.md`). The unpaid part of a
-      part-paid invoice is credited when the cancellation is recorded.
+      period: the office records the charge for that work on the money page
+      (CCR reg 36(4); admin guide §5) and the app invoices it, holds what
+      they paid against it and works out the refund or what's left to pay.
+      The figure itself is yours to work out (a fair share of the price for
+      what was done); nothing checks it beyond "more than zero and no more
+      than the contract", so take advice if it's disputed (solicitor
+      question 2 in `docs/research/uk-consumer-legal.md`). One charge per
+      cancellation: to change it, credit its invoice. Goods aren't part of
+      it: the app makes no deduction for the equipment (reg 34(9)-(10)
+      would need advice first). The unpaid part of a part-paid invoice is
+      credited when the cancellation is recorded.
     - *The 0% VAT rate for energy-saving materials* can't be put on a
       proposal issued after 31 March 2027; a job that straddles the date
       (issued before, installed after) goes to the accountant (approvals

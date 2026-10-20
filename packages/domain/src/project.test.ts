@@ -11,8 +11,12 @@ import {
   REVIEW_REQUEST_DAYS,
   applyProjectAction,
   blockersFor,
+  cancellationChargeProblem,
   cancellationCopy,
+  cancellationSettlement,
   cancellationStatus,
+  CANCELLATION_CHARGE_PAY_LABEL,
+  workDoneBeforeCancellation,
   createProject,
   currentStage,
   customerNextAction,
@@ -2180,4 +2184,88 @@ test("cancellation-received across the clocks going back (25 Oct 2026): the Lond
   assert.match(lateLine.label, /We received your cancellation on Sun 25 Oct, after your cancellation period had ended\. We'll be in touch in writing/);
   assert.doesNotMatch(lateLine.label, /refund/i);
   assert.deepEqual(afterMidnight.closure, { closed: true, closedAt: at, reason: "cancelled" });
+});
+
+/* ------------------------------------------------------------------ */
+/* The charge for work done before a cancellation (CCR reg 36(4))      */
+/* ------------------------------------------------------------------ */
+
+/** Cancelled on Wed 18 Nov, after day 1 of an evidenced early start (the period runs to 27 Nov, from the kit's delivery). */
+function cancelledAfterDay1(paidPence = 180_000, opts: { at?: string } = {}): Project {
+  let p = walk("day-1-end");
+  if (paidPence) p = step(p, { type: "payment-recorded", amountPence: paidPence }, "2026-11-17T18:00:00.000Z");
+  return step(p, { type: "cancellation-received", receivedAt: opts.at ?? "2026-11-18T07:30:00.000Z", channel: "email", evidenceRef: "DEMO email 18 Nov, 'Please stop'" }, "2026-11-18T09:00:00.000Z", { actor: ADMIN });
+}
+const BASIS = "Day 1 of 3 done: holes drilled and sealed, brackets fixed. A third of the labour, none of the equipment.";
+const charge = (amountPence: number, requestId = "req-charge-1"): ProjectAction => ({ type: "cancellation-charge-recorded", amountPence, basis: BASIS, requestId });
+
+test("cancellation charge: only inside the period, after an evidenced early start, the information sent first, and work done", () => {
+  const ok = cancelledAfterDay1();
+  assert.equal(workDoneBeforeCancellation(ok), true);
+  assert.equal(cancellationChargeProblem(ok, { amountPence: 90_000, basis: BASIS }), null);
+
+  assert.match(cancellationChargeProblem(walk("day-1-end"), { amountPence: 90_000, basis: BASIS })!, /no cancellation recorded/);
+  const late = structuredClone(ok);
+  late.cancellation!.withinPeriod = false;
+  assert.match(cancellationChargeProblem(late, { amountPence: 90_000, basis: BASIS })!, /after the cancellation period ended.*contract's own terms/);
+  const noEvidence = structuredClone(ok);
+  delete noEvidence.proposal.earlyStart!.evidencedAt;
+  assert.match(cancellationChargeProblem(noEvidence, { amountPence: 90_000, basis: BASIS })!, /no evidenced request.*owe nothing.*reg 36\(6\)/);
+  const notAsked = structuredClone(ok);
+  notAsked.proposal.earlyStart = { requested: false, wordingVersion: EARLY_START_WORDING_VERSION, evidencedAt: "2026-10-28T11:00:00.000Z" };
+  notAsked.proposal.earlyStartRequested = false;
+  assert.match(cancellationChargeProblem(notAsked, { amountPence: 90_000, basis: BASIS })!, /no evidenced request/);
+  const noInfo = structuredClone(ok);
+  delete noInfo.proposal.preContractInfoSentAt;
+  assert.match(cancellationChargeProblem(noInfo, { amountPence: 90_000, basis: BASIS })!, /cancellation information wasn't sent/);
+
+  // Cancelled before day 1 began: nothing was supplied.
+  let early = walk("installer-on-my-way");
+  early = step(early, { type: "cancellation-received", receivedAt: "2026-11-17T07:00:00.000Z", channel: "phone", evidenceRef: "DEMO call note 17 Nov" }, "2026-11-17T07:10:00.000Z", { actor: ADMIN });
+  assert.equal(workDoneBeforeCancellation(early), false);
+  assert.match(cancellationChargeProblem(early, { amountPence: 90_000, basis: BASIS })!, /No install day had started/);
+
+  assert.match(cancellationChargeProblem(ok, { amountPence: 0, basis: BASIS })!, /above zero/);
+  assert.match(cancellationChargeProblem(ok, { amountPence: 900.5, basis: BASIS })!, /pounds and pence/);
+  assert.match(cancellationChargeProblem(ok, { amountPence: 645_001, basis: BASIS })!, /more than the contract total \(£6,450\)/);
+  assert.equal(cancellationChargeProblem(ok, { amountPence: 645_000, basis: BASIS }), null, "the whole contract at most");
+  assert.match(cancellationChargeProblem(ok, { amountPence: 90_000, basis: "  a third " })!, /how you worked it out/);
+  assert.match(cancellationChargeProblem(ok, { amountPence: 90_000, basis: "x".repeat(1001) })!, /1000 characters/);
+});
+
+test("cancellation charge: recorded once by a signed-in person, with the refund or what's left to pay worked out", () => {
+  const p = cancelledAfterDay1(180_000);
+  refuses(p, charge(90_000), "2026-11-19T10:00:00.000Z", {}, /signed-in staff member/);
+  const charged = step(p, charge(90_000), "2026-11-19T10:00:00.000Z", { actor: ADMIN });
+  assert.deepEqual(charged.cancellation?.charge, { amountPence: 90_000, basis: BASIS, recordedAt: "2026-11-19T10:00:00.000Z", recordedBy: ADMIN.name, requestId: "req-charge-1" });
+  assert.deepEqual(cancellationSettlement(charged), { chargePence: 90_000, basis: BASIS, paidPence: 180_000, refundDuePence: 90_000, owedPence: 0, refundDueBy: "2026-12-02" });
+  const line = charged.events.at(-1)!;
+  assert.equal(line.internal, undefined, "the family sees it");
+  assert.match(line.label, /charge for the work done before you cancelled is £900\. You've paid £1,800, so we'll refund £900 by .*2 Dec/);
+  assert.equal(customerNextAction(charged), null, "nothing for them to pay");
+
+  // The same form again changes nothing; another charge is refused.
+  assert.equal(step(charged, charge(90_000), "2026-11-19T10:01:00.000Z", { actor: ADMIN }).events.length, charged.events.length);
+  refuses(charged, charge(50_000, "req-charge-2"), "2026-11-19T10:02:00.000Z", { actor: ADMIN }, /already recorded \(£900\)/);
+
+  // Paid less than the charge: the rest is theirs to pay, and it's their next step.
+  const short = step(cancelledAfterDay1(50_000), charge(90_000), "2026-11-19T10:00:00.000Z", { actor: ADMIN });
+  assert.deepEqual(
+    { refund: cancellationSettlement(short)!.refundDuePence, owed: cancellationSettlement(short)!.owedPence },
+    { refund: 0, owed: 40_000 },
+  );
+  assert.match(short.events.at(-1)!.label, /You've paid £500, so £400 is left to pay/);
+  assert.deepEqual(customerNextAction(short), { label: CANCELLATION_CHARGE_PAY_LABEL, href: "/p/proj-1/pay" });
+  // Paid it: nothing more to do.
+  const settled = step(short, { type: "payment-recorded", amountPence: 40_000 }, "2026-11-20T10:00:00.000Z");
+  assert.equal(cancellationSettlement(settled)!.owedPence, 0);
+  assert.equal(customerNextAction(settled), null);
+
+  // Nothing paid at all: the whole charge.
+  const unpaid = step(cancelledAfterDay1(0), charge(90_000), "2026-11-19T10:00:00.000Z", { actor: ADMIN });
+  assert.equal(cancellationSettlement(unpaid)!.owedPence, 90_000);
+  // A refund already made counts: they've paid less now.
+  const refunded = step(step(cancelledAfterDay1(180_000), { type: "payment-recorded", amountPence: -180_000 }, "2026-11-18T12:00:00.000Z"), charge(90_000), "2026-11-19T10:00:00.000Z", { actor: ADMIN });
+  assert.equal(cancellationSettlement(refunded)!.owedPence, 90_000);
+  assert.equal(cancellationSettlement(p), null, "no charge, no settlement");
 });

@@ -177,6 +177,9 @@ const ROUTINES: Routine[] = [
       <>Card payments record themselves from Stripe. Refund a card payment in Stripe&apos;s dashboard: it&apos;s recorded here by itself, so don&apos;t record it by hand too.</>,
       <>Never change bank details because an email asks. Customers only ever see them in their portal and on the invoice.</>,
       <>
+        A family cancelled inside the period after asking us to start early, and work had begun: on <B>Money</B>, <B>The charge for the work done before they cancelled</B>. Type the charge and how you worked it out (the work only, never the equipment), then <B>Record the charge, invoice it and email them</B>. It says the refund, or what&apos;s left for them to pay.
+      </>,
+      <>
         <B>Close the project</B> once it&apos;s paid, the warranty&apos;s registered, the electrical certificate is in and no serious defect is open.
       </>,
     ],

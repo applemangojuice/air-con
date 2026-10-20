@@ -1,8 +1,19 @@
-import { advancePo, createIssue, invoiceOutstanding, type CancellationChannel, type Issue, type Project, type StaffMember } from "@aircon/domain";
+import {
+  advancePo,
+  cancellationSettlement,
+  createIssue,
+  invoiceOutstanding,
+  transitionIssue,
+  type CancellationChannel,
+  type Invoice,
+  type Issue,
+  type Project,
+  type StaffMember,
+} from "@aircon/domain";
 import { audit } from "./audit";
 import { notify } from "./comms/outbox";
 import { money } from "./format";
-import { issueInvoice } from "./money-server";
+import { equipmentToCollect, issueInvoice } from "./money-server";
 import { dispatch, loadProject } from "./project-service";
 import { isUuid } from "./repo/base";
 import * as invoicesRepo from "./repo/invoices";
@@ -221,4 +232,177 @@ export async function recordCancellation(projectId: string, input: CancellationI
   });
   const reloaded = (await loadProject(projectId)) ?? project;
   return { ok: true, project: reloaded, voided, tasks, warnings };
+}
+
+/* ------------------------------------------------------------------ */
+/* The charge for work done before the cancellation (CCR reg 36(4))    */
+/* ------------------------------------------------------------------ */
+
+export interface CancellationChargeInput {
+  /** VAT included. */
+  amountPence: number;
+  /** How it was worked out: printed on the invoice and in the email. */
+  basis: string;
+  /** The form's one-off id: a double click or a retry records it once and finishes what's left. */
+  requestId: string;
+}
+
+export type CancellationChargeResult =
+  | {
+      ok: true;
+      project: Project;
+      invoice?: Invoice;
+      credits: Invoice[];
+      settlement: NonNullable<ReturnType<typeof cancellationSettlement>>;
+      warnings: string[];
+    }
+  | { ok: false; error: string; status: number };
+
+const live = (i: Invoice) => i.status !== "void" && i.status !== "draft";
+
+/**
+ * Record what the family pays for the work done before they cancelled
+ * (after an evidenced early start, inside the period: the reducer applies
+ * `cancellationChargeProblem`), then put the money right, each step safe to
+ * repeat with the same `requestId`:
+ *
+ *  1. the project records the charge (its timeline tells the family);
+ *  2. what they paid on the cancelled contract's invoices becomes credit on
+ *     their account (a reduction credit note for the part of each invoice not
+ *     already credited), so the contract earns nothing;
+ *  3. the charge is invoiced (`cancellation-charge`), and that credit is used
+ *     against it first: what's left over is the refund, what's short is
+ *     theirs to pay (cancellationSettlement, the same numbers everywhere);
+ *  4. the refund task raised at the cancellation is replaced by one with the
+ *     new figure (or a task to collect what's owed);
+ *  5. the family's email (finishIssue: `cancellation-confirmed` with the
+ *     charge) and the team's alert.
+ *
+ * Goods are never part of it: the charge is for the work (reg 36(4)); the
+ * equipment follows reg 34 (we collect it) and nothing is deducted for it.
+ */
+export async function recordCancellationCharge(projectId: string, input: CancellationChargeInput, staff: StaffMember): Promise<CancellationChargeResult> {
+  if (!isUuid(projectId)) return { ok: false, error: "Project not found.", status: 404 };
+  const recorded = await dispatch(
+    projectId,
+    { type: "cancellation-charge-recorded", amountPence: input.amountPence, basis: input.basis, requestId: input.requestId },
+    staff,
+  );
+  if ("error" in recorded) return { ok: false, error: recorded.error, status: recorded.status };
+  const project = recorded.project;
+  const charge = project.cancellation?.charge;
+  if (!charge || charge.requestId !== input.requestId) return { ok: false, error: "Another charge is already recorded on this project.", status: 409 };
+  const warnings: string[] = [];
+
+  // 2. What they paid becomes credit on their account, against the charge.
+  const credits: Invoice[] = [];
+  try {
+    const all = await invoicesRepo.listForProject(projectId);
+    for (const inv of all) {
+      if (!live(inv) || inv.kind === "credit-note" || inv.kind === "cancellation-charge" || inv.paidPence <= 0) continue;
+      const credited = all.filter((c) => live(c) && c.kind === "credit-note" && c.creditsInvoiceId === inv.id).reduce((sum, c) => sum + c.totalPence, 0);
+      const left = inv.totalPence + credited;
+      if (left <= 0) continue;
+      const cn = await issueInvoice(
+        projectId,
+        {
+          kind: "credit-note",
+          amountPence: left,
+          reason: "The contract was cancelled: what you paid on this invoice is held against the charge for the work done, and anything over it refunded",
+          creditsInvoiceId: inv.id,
+          creditPurpose: "reduction",
+          releasePaid: true,
+          requestId: `charge-credit:${inv.id}:${input.requestId}`,
+        },
+        staff,
+      );
+      if (cn.ok) credits.push(cn.value);
+      else warnings.push(`${inv.number} wasn't credited (${cn.error}): credit what was paid on it, so it counts against the charge.`);
+    }
+  } catch (err) {
+    console.error(`[cancellation] crediting the contract invoices on ${projectId} failed:`, err);
+    warnings.push("The contract's invoices couldn't all be credited: record the charge again to finish.");
+  }
+
+  // 3. The charge's invoice (its email is finishIssue's: the charge, the basis, the refund or what's left).
+  let invoice: Invoice | undefined;
+  const issued = await issueInvoice(projectId, { kind: "cancellation-charge", requestId: `charge:${input.requestId}` }, staff);
+  if (issued.ok) {
+    invoice = issued.value;
+    if (issued.warning) warnings.push(issued.warning);
+  } else {
+    warnings.push(`The charge is recorded but its invoice wasn't issued (${issued.error}): record it again to finish.`);
+  }
+
+  const latest = (await loadProject(projectId)) ?? project;
+  const settlement = cancellationSettlement(latest)!;
+  const c = latest.cancellation!;
+
+  // 4. The refund task now has a different figure (or there's money to collect instead).
+  try {
+    const open = (await issuesRepo.listForProject(projectId, { openOnly: true })).filter(
+      (i) => i.kind === "customer-instruction" && /^Refund £/.test(i.title) && !i.title.includes("(after the charge"),
+    );
+    for (const old of open) {
+      await issuesRepo.update(
+        transitionIssue(old, "closed", staff.name, `Replaced: the charge for the work done (${money(settlement.chargePence)}) changes what's refunded.`, new Date().toISOString()),
+      );
+    }
+    const mine = (await issuesRepo.listForProject(projectId, { openOnly: true })).some((i) => i.title.includes("(after the charge"));
+    if (!mine && settlement.refundDuePence > 0) {
+      await task(
+        latest,
+        staff,
+        `Refund ${money(settlement.refundDuePence)} by ${c.refundDueBy} (after the charge for the work done)`,
+        `They paid ${money(settlement.paidPence)}; the charge for the work done before they cancelled is ${money(settlement.chargePence)} (invoice ${invoice?.number ?? "to issue"}). Refund the rest, ${money(settlement.refundDuePence)}, by the same method, within 14 days of the notice. Record it on the money page against what they paid (or the credit note).`,
+        c.refundDueBy,
+        "admin",
+      );
+    } else if (!mine && settlement.owedPence > 0) {
+      await task(
+        latest,
+        staff,
+        `Collect ${money(settlement.owedPence)} for the work done (after the charge for the work done)`,
+        `The charge for the work done before they cancelled is ${money(settlement.chargePence)}; they'd paid ${money(settlement.paidPence)}. ${money(settlement.owedPence)} is on invoice ${invoice?.number ?? "to issue"}, payable from their project page. Nothing to refund.`,
+        invoice?.dueOn ?? c.refundDueBy,
+        "admin",
+      );
+    }
+  } catch (err) {
+    console.error(`[cancellation] updating the refund task on ${projectId} failed:`, err);
+    warnings.push("The refund task couldn't be updated: change its figure by hand.");
+  }
+
+  // 5. The team.
+  try {
+    await notify("team-alert", {
+      projectId,
+      data: {
+        title: `Charge for work done recorded: ${latest.customer.name || "a customer"}`,
+        lines: [
+          `Charge: ${money(settlement.chargePence)} (${charge.basis}).`,
+          `Paid: ${money(settlement.paidPence)}. ${
+            settlement.refundDuePence > 0
+              ? `Refund ${money(settlement.refundDuePence)} by ${c.refundDueBy}, the same way they paid.`
+              : settlement.owedPence > 0
+                ? `They owe ${money(settlement.owedPence)}: it's on their pay page.`
+                : "Nothing to refund or collect."
+          }`,
+          ...(equipmentToCollect(latest) ? ["The equipment isn't part of the charge: collect it, at our cost."] : []),
+          ...warnings,
+        ],
+      },
+      discriminator: `charge:${input.requestId}`,
+    });
+  } catch (err) {
+    console.error(`[cancellation] the charge alert on ${projectId} failed:`, err);
+  }
+  await audit({
+    actor: staff,
+    action: "project.cancellation-charge",
+    entity: "project",
+    entityId: projectId,
+    detail: { ...settlement, amountPence: charge.amountPence, invoice: invoice?.number, credits: credits.map((i) => i.number) },
+  });
+  return { ok: true, project: latest, ...(invoice ? { invoice } : {}), credits, settlement, warnings };
 }

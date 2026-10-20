@@ -230,6 +230,19 @@ export interface CommsData {
     withinPeriod?: boolean;
     /** Work began at their request before the period ended: an amount may be due for it (CCR reg 36(4)). */
     workStartedEarly?: boolean;
+    /**
+     * The charge for that work, once recorded (cancellationSettlement): a
+     * second email, keyed `charge:<invoice>`, with the hub's numbers.
+     */
+    charge?: {
+      chargePence: number;
+      basis: string;
+      refundDuePence: number;
+      owedPence: number;
+      invoiceNumber: string;
+      /** We supplied equipment: it's dealt with under the cancellation rules, never charged here. */
+      supplied?: boolean;
+    };
   };
   "issue-update": { title: string; update: string; nextStep?: string; dueOn?: string; issueNumber?: number };
   "handover-ready": { electricalCertPending?: boolean };
@@ -468,6 +481,7 @@ function vatLine(settings: PilotSettings): string {
 }
 
 const INVOICE_KIND: Record<InvoiceKind, string> = {
+  "cancellation-charge": "charge for the work done",
   deposit: "deposit",
   balance: "balance",
   variation: "variation",
@@ -1412,6 +1426,41 @@ const TEMPLATES: { [E in CommsEventId]: Renderer<E> } = {
   "cancellation-confirmed": (ctx, d) => {
     const how = d.channel ? ` (by ${d.channel === "in-person" ? "telling us in person" : d.channel})` : "";
     const on = dayLong(d.receivedAt.slice(0, 10));
+    if (d.charge && d.withinPeriod !== false) {
+      const c = d.charge;
+      return {
+        subject: `Your cancellation: the charge for the work done (${money(c.chargePence)})`,
+        body: [
+          {
+            p: `You cancelled your contract for the work at ${place(ctx)} on ${on}, after asking us to start before your cancellation period ended. As the words you sent us said, if you cancel after that you pay for the work done up to the time you told us.`,
+          },
+          {
+            facts: [
+              ["Charge for the work done", money(c.chargePence)],
+              ["How we worked it out", c.basis],
+              ["You've paid us", money(d.paidPence)],
+              ...(c.refundDuePence > 0
+                ? ([["We'll refund", `${money(c.refundDuePence)}, by ${dayLong(d.refundDueBy)}, the same way you paid`]] as [string, string][])
+                : c.owedPence > 0
+                  ? ([["Left to pay", money(c.owedPence)]] as [string, string][])
+                  : ([["To refund or pay", "Nothing: what you've paid covers it exactly"]] as [string, string][])),
+            ],
+          },
+          {
+            p: `It's on invoice ${c.invoiceNumber}, in your documents.${c.owedPence > 0 ? " You can pay it from your project page." : ""}`,
+          },
+          ...(c.supplied
+            ? [
+                {
+                  p: `This charge is for the work only, not the equipment. The equipment we supplied is dealt with separately under your cancellation rights${d.collectEquipment ? ": we'll collect it, at our cost, at a time that suits you" : ""}.`,
+                } as Block,
+              ]
+            : []),
+          { p: `If anything here doesn't look right to you, ${reach(ctx.settings)} and we'll go through it.` },
+        ],
+        cta: c.owedPence > 0 ? "Pay from your project page" : "Open your project",
+      };
+    }
     if (d.withinPeriod === false) {
       return {
         subject: "We've received your cancellation",

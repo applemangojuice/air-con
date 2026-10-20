@@ -54,8 +54,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ inv
   if (owed <= 0) return back("nothing-due");
 
   const project = await loadProject(invoice.projectId);
-  // A cancelled contract takes no more money (reg 34): anything paid is refunded.
-  if (project?.closure.reason === "cancelled") return back("cancelled-contract");
+  // A cancelled contract takes no more money (reg 34): anything paid is refunded. Only the charge for the
+  // work done after an evidenced early start (reg 36(4)) can still be paid, for what's left of it.
+  if (project?.closure.reason === "cancelled" && invoice.kind !== "cancellation-charge") return back("cancelled-contract");
   const prior = invoice.checkoutSessionId;
   if (prior) {
     const seen = await retrieveCheckoutSession(prior);

@@ -5,6 +5,7 @@ import {
   acceptedVariationsPence,
   balanceLinesFor,
   balanceTimingProblem,
+  cancellationSettlement,
   creditNoteLines,
   creditPurposeOf,
   depositPence,
@@ -99,7 +100,8 @@ export interface MoneyView {
   payments: Payment[];
   documents: DocumentRecord[];
   summary: ReturnType<typeof moneySummary>;
-  plans: Record<Exclude<InvoiceKind, "credit-note">, InvoicePlan>;
+  /** A cancellation charge is never planned: it's recorded (cancellation-server recordCancellationCharge). */
+  plans: Record<Exclude<InvoiceKind, "credit-note" | "cancellation-charge">, InvoicePlan>;
   taxCode: TaxCodeId;
   card: { available: boolean; mode: "live" | "test" | "demo"; simulate: boolean };
   today: string;
@@ -339,6 +341,14 @@ export interface IssueInput {
   creditsInvoiceId?: string;
   /** Default: a correction when it's against an invoice, money off the price when it isn't. */
   creditPurpose?: CreditPurpose;
+  /**
+   * Server only (never from a form): after a cancellation with a charge for
+   * the work done, credit what was *paid* on a contract invoice too, so the
+   * money they paid is credit on their account, held against the charge and
+   * refunded beyond it (recordCancellationCharge). Never more than the part
+   * of the invoice not already credited.
+   */
+  releasePaid?: boolean;
   /** The form's one-off id: a double click returns the first invoice. */
   requestId?: string;
   notes?: string;
@@ -355,6 +365,7 @@ const KIND_TITLE: Record<InvoiceKind, string> = {
   variation: "variation",
   "survey-fee": "survey fee",
   "change-fee": "date change fees",
+  "cancellation-charge": "work done before cancelling",
   "credit-note": "credit note",
 };
 
@@ -363,6 +374,11 @@ const KIND_TITLE: Record<InvoiceKind, string> = {
  * issues by itself (the credit note that goes with a refund made in Stripe).
  */
 export type Issuer = StaffMember | { kind: "system"; name: string };
+
+/** What's been credited against an invoice so far (zero or negative): its live credit notes' totals. */
+function creditedAgainst(target: Invoice, all: Invoice[]): number {
+  return all.filter((c) => live(c) && c.kind === "credit-note" && c.creditsInvoiceId === target.id).reduce((sum, c) => sum + c.totalPence, 0);
+}
 
 /** Raise and issue an invoice (or a credit note) in one step. */
 export async function issueInvoice(projectId: string, input: IssueInput, staff: Issuer): Promise<Outcome<Invoice>> {
@@ -386,8 +402,12 @@ export async function issueInvoice(projectId: string, input: IssueInput, staff: 
     if (again) return { ok: true, value: again, message: `Invoice ${again.number} is issued.` };
   }
   const taxCode = taxCodeFor(proposal, settings);
-  // After a cancellation only money going back: never an invoice, nor a variation's credit.
-  if (billingStopped(project) && input.kind !== "credit-note") return fail(CANCELLED_NOTHING_TO_BILL);
+  // After a cancellation only money going back (never an invoice, nor a variation's credit), and the
+  // one charge the cancellation rules allow for work done after an evidenced early start (reg 36(4)).
+  if (billingStopped(project) && input.kind !== "credit-note" && input.kind !== "cancellation-charge") return fail(CANCELLED_NOTHING_TO_BILL);
+  if (input.releasePaid && (input.kind !== "credit-note" || !billingStopped(project) || !project.cancellation?.charge)) {
+    return fail("Only a cancelled contract with a charge for the work done releases what was paid as credit.");
+  }
   let lines: InvoiceLine[];
   let extra: Partial<Invoice> = {};
   // What it's issued as: a variation that takes money off becomes a credit note (never a negative invoice).
@@ -401,7 +421,8 @@ export async function issueInvoice(projectId: string, input: IssueInput, staff: 
     if (input.creditsInvoiceId) {
       const target = invoices.find((i) => i.id === input.creditsInvoiceId);
       if (!target || !live(target) || target.kind === "credit-note") return fail("That invoice can't be credited.");
-      const left = invoiceOutstanding(target, invoices);
+      // Normally only what's unpaid; releasing a cancelled contract's paid money, the part not yet credited.
+      const left = input.releasePaid ? target.totalPence + creditedAgainst(target, invoices) : invoiceOutstanding(target, invoices);
       if (amount > left) {
         return fail(`${left > 0 ? `Only ${money(left)} is` : "Nothing is"} left unpaid on ${target.number}. For money already paid, record a refund instead.`);
       }
@@ -424,6 +445,14 @@ export async function issueInvoice(projectId: string, input: IssueInput, staff: 
     const purpose: CreditPurpose = input.creditPurpose ?? (input.creditsInvoiceId ? "correction" : "reduction");
     lines = creditNoteLines(input.creditsInvoiceId ? `Credit against invoice ${invoices.find((i) => i.id === input.creditsInvoiceId)!.number}: ${reason}` : reason, amount, taxCode);
     extra = { ...extra, reason, creditPurpose: purpose };
+  } else if (input.kind === "cancellation-charge") {
+    // Only the charge the project records (the reducer checked the law's conditions:
+    // cancellationChargeProblem), and only once.
+    const c = project.cancellation?.charge;
+    if (!c) return fail("Record the charge for the work done first: there's none on this project.");
+    if (invoices.some((i) => live(i) && i.kind === "cancellation-charge")) return fail("The charge for the work done is already invoiced.");
+    lines = [invoiceLineFromTotal(`Work done before you cancelled: ${c.basis}`, c.amountPence, taxCode)];
+    extra = { reason: c.basis };
   } else if (input.kind === "variation") {
     const plans = planned();
     const v = plans.variation.variations?.find((x) => x.id === input.issueId);
@@ -598,7 +627,38 @@ export async function finishIssue(invoice: Invoice, actor: Issuer): Promise<{ in
     }
   }
 
-  if (inv.kind !== "credit-note" && inv.totalPence > 0) {
+  if (inv.kind === "cancellation-charge") {
+    // Its own email: the charge, how it was worked out, and the refund or what's left (the hub's numbers).
+    const latest = (await loadProject(inv.projectId)) ?? project;
+    const settlement = cancellationSettlement(latest);
+    const c = latest.cancellation;
+    if (settlement && c) {
+      const sent = await notify("cancellation-confirmed", {
+        projectId: inv.projectId,
+        data: {
+          receivedAt: c.receivedAt,
+          channel: c.channel,
+          refundDueBy: c.refundDueBy,
+          paidPence: settlement.paidPence,
+          withinPeriod: c.withinPeriod,
+          workStartedEarly: true,
+          collectEquipment: equipmentToCollect(latest),
+          charge: {
+            chargePence: settlement.chargePence,
+            basis: settlement.basis,
+            refundDuePence: settlement.refundDuePence,
+            owedPence: settlement.owedPence,
+            invoiceNumber: inv.number,
+            supplied: latest.proposal.contractType !== "install-only",
+          },
+        },
+        discriminator: `charge:${inv.id}`,
+      });
+      if (sent.status === "error" || sent.status === "no-recipient" || sent.status === "failed") {
+        warnings.push(sent.status === "no-recipient" ? "there's no email address to send it to" : "the email didn't go (see Messages)");
+      }
+    }
+  } else if (inv.kind !== "credit-note" && inv.totalPence > 0) {
     const owing = await asIssued();
     const sent = await notify("invoice-issued", {
       projectId: inv.projectId,
@@ -626,6 +686,11 @@ export async function finishIssue(invoice: Invoice, actor: Issuer): Promise<{ in
     if (saved.ok) inv = saved.value;
   }
   return { invoice: inv, ...(warnings.length ? { warning: `Issued, but ${warnings.join("; ")}.` } : {}) };
+}
+
+/** Supplied kit with the family (or the install begun): we collect it after a cancellation (cancellation-server's rule). */
+export function equipmentToCollect(p: Pick<Project, "proposal" | "kit" | "install">): boolean {
+  return p.proposal.contractType !== "install-only" && (["dispatched", "delivered", "inspected"].includes(p.kit.status) || p.install.status !== "not-started");
 }
 
 /** An invoice as the customer's document shows it: no internal bookkeeping. */

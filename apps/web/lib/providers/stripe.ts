@@ -91,6 +91,7 @@ const INVOICE_KIND_LABEL: Record<Invoice["kind"], string> = {
   variation: "Variation",
   "survey-fee": "Survey fee",
   "change-fee": "Date change fee",
+  "cancellation-charge": "Work done before cancelling",
   "credit-note": "Credit note",
 };
 

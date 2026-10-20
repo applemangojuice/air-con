@@ -2481,3 +2481,40 @@ changelog and the reasons, so nobody "fixes" a deliberate choice back.
       signal). Break-glass sessions (12 hours, shorter than a normal life)
       and customer sessions never renew. **Me** shows the end and the
       90-day limit; amber only for one that can't renew.
+    - *The charge for work done before a cancellation* (CCR reg 36(4); was
+      known limitation 23's "nothing can be billed after a cancellation"):
+      `CancellationRecord.charge` (`CancellationCharge`: amount, written
+      basis, who, when, request id) is recorded by the reducer action
+      `cancellation-charge-recorded` (allowed after close), which applies
+      `cancellationChargeProblem`: a cancellation inside the period; an
+      early start requested *and* evidenced (the durable request in the
+      wording that says they'll pay for the work: reg 36(1), (6)(b)); the
+      pre-contract information sent (reg 36(6)(a)); an install day started
+      before the notice reached us (`workDoneBeforeCancellation`); once; whole
+      pence above zero, never above the contract total; a basis of 20 to
+      1,000 characters. `cancellationSettlement` gives the numbers every
+      surface shows: the charge, `money.paidPence` (net of refunds), the
+      refund due (paid − charge, by `refundDueBy`, 14 days from the notice)
+      or what's owed. A new `InvoiceKind`, `cancellation-charge` (free-text
+      column: no migration), is never planned (`MoneyView.plans` excludes it)
+      and is issued only from the recorded charge. `recordCancellationCharge`
+      (cancellation-server) records it, then credits what was paid on each
+      live contract invoice (a reduction credit note for the part not yet
+      credited, through `IssueInput.releasePaid`, server-only and refused
+      unless the contract is cancelled with a charge), so the contract earns
+      nothing and the payments are account credit; issues the charge, which
+      that credit covers first (`invoiceOutstanding`), so what's left over is
+      `-outstandingPence` (the refund) and what's short is owed; closes the
+      cancellation's "Refund £X" task for one with the new figure (or a
+      collect task); alerts the team. `finishIssue` sends the family
+      `cancellation-confirmed` with `charge` data (keyed `charge:<invoice>`)
+      instead of the generic invoice email. The hub (`cancelledCopy`), the
+      pay page (`payHeadline` with `settlement`; when cancelled only a
+      `cancellation-charge` invoice is payable, and `/api/pay` takes only
+      that) and `customerNextAction` (**Pay for the work done before you
+      cancelled** while owed) use the settlement. The invoice document says
+      what it's for and that the equipment isn't part of it. Pilot metrics:
+      a cancelled contract with a charge earns the charge, net of VAT and of
+      credit against it. Goods: supply-and-install's equipment follows reg
+      34 (we collect it, at our cost); no deduction for goods is made or
+      suggested.

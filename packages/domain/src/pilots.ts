@@ -271,8 +271,19 @@ export function pilotMetrics(input: {
   );
   let revenuePence = 0;
   // A cancelled contract earns only what we kept (paid, less refunds), net of VAT: never the contract price.
+  // With a charge for the work done before the cancellation (reg 36(4)), that invoice is the revenue, net
+  // of VAT and of any credit against it, whatever is still to be refunded or paid.
   const cancelled = Boolean(p.cancellation) || (p.closure.closed && p.closure.reason === "cancelled");
-  if (cancelled && accepted) {
+  const charges = (input.invoices ?? []).filter((i) => i.kind === "cancellation-charge" && i.status !== "void" && i.status !== "draft");
+  if (cancelled && accepted && charges.length) {
+    const chargeIds = new Set(charges.map((i) => i.id));
+    const creditedNet = sum(
+      (input.invoices ?? [])
+        .filter((i) => i.kind === "credit-note" && i.status !== "void" && i.status !== "draft" && i.creditsInvoiceId && chargeIds.has(i.creditsInvoiceId))
+        .map((i) => i.netPence || 0),
+    );
+    revenuePence = Math.max(0, sum(charges.map((i) => i.netPence)) + creditedNet);
+  } else if (cancelled && accepted) {
     const rate = pricing ? (TAX_CODES[pricing.taxCode]?.ratePct ?? 0) : 0;
     revenuePence = Math.round(Math.max(0, p.money.paidPence) / (1 + rate / 100));
   } else if (contractPricePence !== null) {

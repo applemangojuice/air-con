@@ -1,5 +1,5 @@
-import type { Project } from "@aircon/domain";
-import { fmtDate } from "@/lib/format";
+import type { Project, cancellationSettlement } from "@aircon/domain";
+import { fmtDate, money } from "@/lib/format";
 
 /**
  * The pay page's greeting and what it says when nothing is due. "All paid
@@ -19,10 +19,24 @@ export function payHeadline(input: {
   cancellation?: Pick<NonNullable<Project["cancellation"]>, "receivedAt" | "refundDueBy" | "withinPeriod">;
   /** Work began at their request before the period ended (cancelledAfterEarlyWork): an amount may be due for it. */
   workedEarly?: boolean;
-}): { title: string; nothingDue: string } {
+  /** The charge for that work, once recorded (cancellationSettlement): the hub's and the email's numbers. */
+  settlement?: ReturnType<typeof cancellationSettlement>;
+}): { title: string; nothingDue: string; note?: string } {
   const { first } = input;
   if (input.cancelled) {
     const c = input.cancellation;
+    const s = input.settlement;
+    if (s && c?.withinPeriod) {
+      const charge = `The charge for the work done before you cancelled is ${money(s.chargePence)}, and you've paid ${money(s.paidPence)}.`;
+      return {
+        title: `Your contract is cancelled, ${first}`,
+        nothingDue:
+          s.refundDuePence > 0
+            ? `Nothing can be paid here. ${charge} We'll refund the other ${money(s.refundDuePence)} by ${fmtDate(s.refundDueBy)}, the same way you paid.`
+            : `Nothing more is due. ${charge} That covers it, so there's nothing to pay or refund.`,
+        ...(s.owedPence > 0 ? { note: `${charge} ${money(s.owedPence)} is left to pay, on the invoice below.` } : {}),
+      };
+    }
     if (c && !c.withinPeriod) {
       return {
         title: `We've received your cancellation, ${first}`,

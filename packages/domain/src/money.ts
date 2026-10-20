@@ -15,9 +15,15 @@ import { TAX_CODES, type PilotSettings, type TaxCodeId } from "./settings.ts";
  * edited or deleted: a mistake is put right with a credit note.
  */
 
-export type InvoiceKind = "deposit" | "balance" | "variation" | "survey-fee" | "change-fee" | "credit-note";
+/**
+ * `cancellation-charge`: what the family pays for the work done before they
+ * cancelled inside the period, after an evidenced early start (CCR reg
+ * 36(4); project.ts cancellationChargeProblem). The only invoice a cancelled
+ * contract can carry; never billed from a plan, only recorded.
+ */
+export type InvoiceKind = "deposit" | "balance" | "variation" | "survey-fee" | "change-fee" | "cancellation-charge" | "credit-note";
 
-export const INVOICE_KINDS: readonly InvoiceKind[] = ["deposit", "balance", "variation", "survey-fee", "change-fee", "credit-note"];
+export const INVOICE_KINDS: readonly InvoiceKind[] = ["deposit", "balance", "variation", "survey-fee", "change-fee", "cancellation-charge", "credit-note"];
 
 export const INVOICE_KIND_LABEL: Record<InvoiceKind, string> = {
   deposit: "Deposit",
@@ -25,6 +31,7 @@ export const INVOICE_KIND_LABEL: Record<InvoiceKind, string> = {
   variation: "Variation",
   "survey-fee": "Survey fee",
   "change-fee": "Date change fee",
+  "cancellation-charge": "Work done before cancelling",
   "credit-note": "Credit note",
 };
 
@@ -73,7 +80,7 @@ export interface Invoice {
   issueId?: string;
   /** Credit notes: the invoice this one credits, when it's against one. */
   creditsInvoiceId?: string;
-  /** Credit notes: why. */
+  /** Credit notes: why. A cancellation charge: how it was worked out (printed). */
   reason?: string;
   /** Credit notes: what it's for (creditPurposeOf reads older ones without it). */
   creditPurpose?: CreditPurpose;
@@ -279,7 +286,7 @@ export function creditPurposeOf(inv: Pick<Invoice, "kind" | "creditPurpose" | "c
  */
 export function invoicedTowardsPricePence(invoices: Invoice[]): number {
   return invoices
-    .filter((i) => counts(i) && i.kind !== "survey-fee" && creditPurposeOf(i) !== "reduction")
+    .filter((i) => counts(i) && i.kind !== "survey-fee" && i.kind !== "cancellation-charge" && creditPurposeOf(i) !== "reduction")
     .reduce((sum, i) => sum + i.totalPence, 0);
 }
 

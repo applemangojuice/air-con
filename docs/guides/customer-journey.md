@@ -212,6 +212,7 @@ to a family who pressed **Stop follow-up emails** or who cancelled.
 | Message | Channel | When |
 | --- | --- | --- |
 | **We've received your cancellation** | Email | When you record their cancellation: when it reached us, the refund and its deadline, collecting any equipment |
+| **Your cancellation: the charge for the work done (£…)** | Email | When you record the charge for work done before they cancelled (only after their evidenced early-start request, inside the period): the charge, how you worked it out, what they've paid, and the refund with its date or what's left to pay. That the equipment isn't part of it. Their page and pay page show the same numbers |
 | **Update: \<title\>** | Email | When you send an issue update by hand |
 | A fresh sign-in link | Email | When they ask for one on `/portal`, or you press **Email them a sign-in link** on their project |
 
