@@ -28,6 +28,7 @@ export type CommsEventId =
   | "payment-received"
   | "install-booked"
   | "kit-update"
+  | "cancellation-period"
   | "install-prep"
   | "install-day-before"
   | "installer-on-my-way"
@@ -172,6 +173,15 @@ export const COMMS_EVENTS: Record<CommsEventId, CommsEventDef> = {
     audience: "customer",
     trigger: "auto",
     description: "Kit confirmed by the supplier, delivered, or checked by the installer. Never sent on an estimate.",
+    templateVersion: 1,
+  },
+  "cancellation-period": {
+    id: "cancellation-period",
+    channels: ["email"],
+    audience: "customer",
+    trigger: "auto",
+    description:
+      "Supply and install: the day their cancellation period starts (the kit reached their home, or arrived with the crew on install day 1), with the exact last day they can cancel without giving a reason. Email only, never a text.",
     templateVersion: 1,
   },
   "install-prep": {

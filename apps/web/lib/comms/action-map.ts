@@ -3,6 +3,7 @@ import {
   baseIdempotencyKey,
   cancellationStatus,
   documentsConsentCovers,
+  earlyStartRequestedOf,
   type CommsEventId,
   type MessageRecord,
   type Project,
@@ -72,6 +73,33 @@ export function crewLead(p: Project, actor?: ActorLike | null): Project["booking
     (actor?.staffId ? crew.find((c) => c.staffId === actor.staffId) : undefined) ??
     crew.find((c) => c.role === "installer" && !c.external)
   );
+}
+
+/**
+ * Supply and install: the goods are in their possession, so the
+ * cancellation period has started (startGoodsPeriod in the reducer): one
+ * email with the exact last day they can cancel without a reason, the date
+ * the contract email promised to tell them. Keyed on the day it started, so
+ * a later kit update or a retry never sends it twice, and a period held open
+ * for more kit and restarted later gets its own.
+ */
+function goodsPeriodStarted(p: Project): AnyNotice[] {
+  const on = p.proposal.goodsReceivedOn;
+  if (p.proposal.status !== "accepted" || p.proposal.contractType !== "supply-and-install" || !on) return [];
+  const cs = cancellationStatus(p, on);
+  if (!cs.endsOn) return [];
+  return [
+    notice(
+      "cancellation-period",
+      {
+        startedOn: on,
+        endsOn: cs.endsOn,
+        ...(p.kit.deliveredTo === "elsewhere" ? { withCrew: true } : {}),
+        ...(earlyStartRequestedOf(p) ? { earlyStart: true } : {}),
+      },
+      `goods:${on}`,
+    ),
+  ];
 }
 
 export function commsForAction(project: Project, action: ProjectAction, actor?: ActorLike | null): AnyNotice[] {
@@ -241,7 +269,7 @@ export function commsForAction(project: Project, action: ProjectAction, actor?: 
     // Delivered before the booking was confirmed: the same "delivered" email
     // (one discriminator, so the later kit-updated never sends it twice).
     case "goods-received":
-      return [notice("kit-update", { status: "delivered", shortages: 0 }, "delivered:0")];
+      return [notice("kit-update", { status: "delivered", shortages: 0, deliveredTo: "customer", supplied: true }, "delivered:0"), ...goodsPeriodStarted(p)];
 
     case "kit-updated": {
       if (action.status !== "confirmed" && action.status !== "delivered" && action.status !== "inspected") return [];
@@ -250,11 +278,23 @@ export function commsForAction(project: Project, action: ProjectAction, actor?: 
       return [
         notice(
           "kit-update",
-          { status: action.status, expectedDate: p.kit.expectedDate, shortages: action.shortages },
+          {
+            status: action.status,
+            expectedDate: p.kit.expectedDate,
+            shortages: action.shortages,
+            // At their home, or with us until the crew brings it: the email never says "delivered" for the second.
+            ...(action.status !== "confirmed" && p.kit.deliveredTo ? { deliveredTo: p.kit.deliveredTo } : {}),
+            supplied: p.proposal.contractType !== "install-only",
+          },
           discriminator,
         ),
+        ...goodsPeriodStarted(p),
       ];
     }
+
+    // Kit we held (our store, the installer, a subcontractor) reaches them with the crew on day 1: the period starts.
+    case "install-day-started":
+      return action.n === 1 ? goodsPeriodStarted(p) : [];
 
     case "installer-on-my-way": {
       const at = p.install.onMyWay?.at ?? "";

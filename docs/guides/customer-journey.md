@@ -120,7 +120,11 @@ confirm your early start**, with the exact words to send.
 **The cancellation period.** Because we supply the equipment, they can
 cancel until 14 days after the last of it arrives. We don't start inside
 that time unless they've asked in writing (their reply to the contract
-email). Their page shows the exact end date once the kit is delivered.
+email). Their page shows the exact end date once the kit is delivered,
+and an email (**Your cancellation period: you can cancel until …**) gives it
+to them that day. Kit we hold ourselves (our store, the installer, a
+subcontractor) reaches them with the crew, so for that kit the period starts
+on install day 1.
 
 ### 5. Kit
 
@@ -130,8 +134,10 @@ delivery date.
 | Message | Channel | When |
 | --- | --- | --- |
 | **Your equipment is confirmed by the supplier** | Email | When the supplier confirms a date |
-| **Your equipment has been delivered** | Email | When the delivery is recorded. Their cancellation period now has an end date |
+| **Your equipment has been delivered** | Email | When the delivery to their home is recorded. Their cancellation period now has an end date |
+| **Your equipment has arrived with our team** | Email | When the kit reaches our store, the installer or a subcontractor instead (never "delivered"). It says their cancellation period starts on the day the kit is brought to their home |
 | **Your equipment has been checked** | Email | When the kit is checked against the design (by the office or the installer) |
+| **Your cancellation period: you can cancel until \<date\>** | Email only, never a text | Supply and install, on the day the period starts: the kit is delivered to their home, or (kit we held) install day 1. The exact last day they can cancel without a reason, how to cancel, and (if they asked us to start early) that work done may be charged for. Sent once; not after that last day, nor on a closed or cancelled project |
 
 ### 6. Install
 

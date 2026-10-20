@@ -166,6 +166,7 @@ const FULL: { [E in CommsEventId]: CommsData[E] } = {
     moved: false,
   },
   "kit-update": { status: "confirmed", expectedDate: "2026-11-28", shortages: 1 },
+  "cancellation-period": { startedOn: "2026-11-20", endsOn: "2026-12-04", earlyStart: true },
   "install-prep": { startDate: "2026-12-01", prep: ["Clear a metre under each unit's wall"] },
   "install-day-before": { startDate: "2026-12-01", crewNames: ["Jo Demo", "Pat Demo"], arrival: "8:30", parkingNotes: "Permit in the hall" },
   "installer-on-my-way": { etaMinutes: 25, at: "2026-12-01T08:05:00.000Z", name: "Jo Demo" },
@@ -210,6 +211,7 @@ const MIN: { [E in CommsEventId]: CommsData[E] } = {
   "payment-received": { amountPence: 45_000, receivedAt: "2026-11-13T09:00:00.000Z" },
   "install-booked": { dates: ["2026-12-01"] },
   "kit-update": { status: "delivered" },
+  "cancellation-period": { startedOn: "2026-11-20", endsOn: "2026-12-04" },
   "install-prep": { startDate: "2026-12-01" },
   "install-day-before": { startDate: "2026-12-01" },
   "installer-on-my-way": { etaMinutes: 10, at: "" },
@@ -1619,4 +1621,51 @@ test("a reminder written after its appointment started, or for a closed or cance
   const booked = await hx.outbox.notify("survey-booked", { projectId: PROJECT_ID, data: surveyBooked, discriminator: "closed" });
   assert.equal(booked.status, "skipped");
   assert.match(booked.results[0]!.error ?? "", /project is closed/);
+});
+
+test("kit held by us never reads as delivered, and the day the goods period starts the family is told the exact last day to cancel (email only)", () => {
+  // Kit at our store (or the installer's, a subcontractor's): "arrived with our team", and when their period starts.
+  const held = render("kit-update", { status: "delivered", shortages: 0, deliveredTo: "elsewhere", supplied: true });
+  assert.equal(held.subject, "Your equipment has arrived with our team");
+  assert.doesNotMatch(held.text, /has been delivered/);
+  assert.match(held.text, /starts on the day the equipment is brought to your home/);
+  const heldChecked = render("kit-update", { status: "inspected", shortages: 0, deliveredTo: "elsewhere", supplied: true });
+  assert.doesNotMatch(heldChecked.text, /has been delivered/);
+  assert.match(render("kit-update", { status: "delivered", shortages: 0, deliveredTo: "customer" }).subject, /has been delivered/);
+
+  // The period's own email: the exact last day, how to cancel, the early-start caveat.
+  const period = render("cancellation-period", { startedOn: "2026-11-20", endsOn: "2026-12-04", earlyStart: true });
+  assert.match(period.subject, /you can cancel until Fri 4 Dec/);
+  assert.match(period.text, /up to and including Friday 4 December/);
+  assert.match(period.text, /pay for the work done/);
+  assert.doesNotMatch(period.text, /14-day|14 days/, "the number of days is settings', never hard-coded");
+  assert.deepEqual(COMMS_EVENTS["cancellation-period"].channels, ["email"], "never a text");
+
+  // Fired from the reducer's own start of the period: delivery to the home, or day 1 for kit we held.
+  const p = baseProject();
+  p.proposal = { ...p.proposal, status: "accepted", acceptedAt: "2026-11-02T10:00:00.000Z", contractType: "supply-and-install", preContractInfoSentAt: "2026-11-01T10:00:00.000Z" };
+  p.booking.status = "booked";
+  p.kit.deliveredTo = "customer";
+  p.proposal.goodsReceivedOn = "2026-11-20";
+  p.proposal.cancellationEndsOn = "2026-12-04";
+  const delivered = commsForAction(p, { type: "kit-updated", status: "delivered", shortages: 0 });
+  const started = delivered.find((n) => n.event === "cancellation-period")!;
+  assert.deepEqual(started.data, { startedOn: "2026-11-20", endsOn: "2026-12-04" });
+  assert.equal(started.discriminator, "goods:2026-11-20", "a later update (checked, day 1) maps to the same message: sent once");
+  assert.equal(commsForAction(p, { type: "kit-updated", status: "inspected", shortages: 0 }).find((n) => n.event === "cancellation-period")?.discriminator, "goods:2026-11-20");
+  // Delivered to our store: no period yet, so no email; it comes with the crew on day 1.
+  const store = structuredClone(p);
+  store.kit.deliveredTo = "elsewhere";
+  delete store.proposal.goodsReceivedOn;
+  delete store.proposal.cancellationEndsOn;
+  assert.equal(commsForAction(store, { type: "kit-updated", status: "delivered", shortages: 0 }).some((n) => n.event === "cancellation-period"), false);
+  store.proposal.goodsReceivedOn = "2026-12-01";
+  store.proposal.cancellationEndsOn = "2026-12-15";
+  const day1 = commsForAction(store, { type: "install-day-started", n: 1, by: "DEMO Joe" } as ProjectAction).find((n) => n.event === "cancellation-period")!;
+  assert.deepEqual(day1.data, { startedOn: "2026-12-01", endsOn: "2026-12-15", withCrew: true });
+  assert.deepEqual(commsForAction(store, { type: "install-day-started", n: 2, by: "DEMO Joe" } as ProjectAction), []);
+  // Install only: the period ran from acceptance, and the contract email gave it.
+  const own = structuredClone(p);
+  own.proposal.contractType = "install-only";
+  assert.equal(commsForAction(own, { type: "kit-updated", status: "delivered", shortages: 0 }).some((n) => n.event === "cancellation-period"), false);
 });

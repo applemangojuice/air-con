@@ -159,7 +159,25 @@ export interface CommsData {
     outstandingPence?: number;
   };
   "install-booked": { dates: string[]; crew?: { name: string; role: StaffRole }[]; prep?: string[]; moved?: boolean };
-  "kit-update": { status: "confirmed" | "delivered" | "inspected"; expectedDate?: string; shortages?: number };
+  "kit-update": {
+    status: "confirmed" | "delivered" | "inspected";
+    expectedDate?: string;
+    shortages?: number;
+    /** Delivered or checked: at their home, or with us (our store, the installer, a subcontractor) until the crew brings it. */
+    deliveredTo?: "customer" | "elsewhere";
+    /** Supply and install (their cancellation period runs from the goods reaching them). */
+    supplied?: boolean;
+  };
+  "cancellation-period": {
+    /** yyyy-mm-dd: the day the goods came into their possession (the period's first day). */
+    startedOn: string;
+    /** yyyy-mm-dd: the last day they can cancel without giving a reason (cancellationStatus). */
+    endsOn: string;
+    /** It arrived with the crew on install day 1 (kit we held), not by delivery. */
+    withCrew?: boolean;
+    /** They asked us to start inside the period (evidenced): work done may be charged for if they cancel. */
+    earlyStart?: boolean;
+  };
   "install-prep": { startDate: string; prep?: string[] };
   "install-day-before": { startDate: string; crewNames?: string[]; arrival?: string; parkingNotes?: string };
   "installer-on-my-way": { etaMinutes: number; at: string; name?: string };
@@ -308,6 +326,7 @@ const PORTAL_PATH: Record<CommsEventId, string | null> = {
   "payment-received": "/pay",
   "install-booked": "#booking",
   "kit-update": "#kit",
+  "cancellation-period": "#kit",
   "install-prep": "#booking",
   "install-day-before": "#install",
   "installer-on-my-way": "#install",
@@ -1179,19 +1198,57 @@ const TEMPLATES: { [E in CommsEventId]: Renderer<E> } = {
             subject: "Your equipment is confirmed by the supplier",
             p: `The supplier has confirmed the equipment for ${place(ctx)}${d.expectedDate ? `, due ${dayLong(d.expectedDate)}` : ""}.`,
           }
-        : d.status === "delivered"
-          ? { subject: "Your equipment has been delivered", p: `The equipment for ${place(ctx)} has been delivered.` }
-          : {
-              subject: "Your equipment has been checked",
-              // Whoever did it (office or crew): the same honest wording as the portal and the timeline.
-              p: `Our team has checked the equipment for ${place(ctx)} against the design.`,
-            };
+        : d.deliveredTo === "elsewhere"
+          ? // With us (our store, the installer, a subcontractor), not at their home: never "delivered".
+            {
+              subject: d.status === "inspected" ? "Your equipment has arrived with our team and been checked" : "Your equipment has arrived with our team",
+              p: `The equipment for ${place(ctx)} has arrived with our team${d.status === "inspected" ? ", and we've checked it against the design" : ""}. We'll bring it with us on your first install day.`,
+            }
+          : d.status === "delivered"
+            ? { subject: "Your equipment has been delivered", p: `The equipment for ${place(ctx)} has been delivered.` }
+            : {
+                subject: "Your equipment has been checked",
+                // Whoever did it (office or crew): the same honest wording as the portal and the timeline.
+                p: `Our team has checked the equipment for ${place(ctx)} against the design.`,
+              };
+    const held =
+      d.deliveredTo === "elsewhere" && d.supplied !== false && d.status !== "confirmed"
+        ? "Your cancellation period starts on the day the equipment is brought to your home, not today. We'll email you the exact last day then."
+        : null;
     return {
       subject: head.subject,
-      body: [{ p: head.p }, ...(toCome ? [{ p: toCome } as Block] : []), { p: "Nothing for you to do: we'll keep you posted on your project page." }],
+      body: [
+        { p: head.p },
+        ...(toCome ? [{ p: toCome } as Block] : []),
+        ...(held ? [{ p: held } as Block] : []),
+        { p: "Nothing for you to do: we'll keep you posted on your project page." },
+      ],
       cta: "See your project",
     };
   },
+
+  "cancellation-period": (ctx, d) => ({
+    subject: `Your cancellation period: you can cancel until ${shortDay(d.endsOn)}`,
+    body: [
+      {
+        p: d.withCrew
+          ? `Your equipment arrived at ${place(ctx)} with our team on ${dayLong(d.startedOn)}, so your cancellation period started then.`
+          : `Your equipment reached ${place(ctx)} on ${dayLong(d.startedOn)}, so your cancellation period has started.`,
+      },
+      { p: ["You can cancel your contract without giving a reason up to and including ", { strong: dayLong(d.endsOn) }, "."] },
+      {
+        p: `To cancel, tell us clearly before the end of that day: ${reach(ctx.settings)}, or use the model cancellation form in your contract email. You don't have to use the form.`,
+      },
+      ...(d.earlyStart
+        ? [
+            {
+              p: "You asked us to start before the period ends. If you cancel after we've started, you may have to pay for the work done up to then; we'd explain any amount in writing first.",
+            } as Block,
+          ]
+        : []),
+    ],
+    cta: "See your project",
+  }),
 
   "install-prep": (ctx, d) => ({
     subject: `Getting ready for your install on ${shortDay(d.startDate)}`,

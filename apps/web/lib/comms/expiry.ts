@@ -27,6 +27,7 @@ export const TIME_SENSITIVE_EVENTS: ReadonlySet<CommsEventId> = new Set<CommsEve
   "install-day-before",
   "survey-booked",
   "install-booked",
+  "cancellation-period",
 ]);
 
 const MINUTE = 60_000;
@@ -61,6 +62,7 @@ const iso = (ms: number | null): string | undefined => (ms !== null && Number.is
  *   install prep, day before   when the first install day begins (London midnight)
  *   survey booked      when the survey is over
  *   install booked     when the last install day is over
+ *   cancellation period  when its last day is over (it would give a date that's passed)
  */
 export function messageExpiry<E extends CommsEventId>(event: E, data: CommsData[E], createdAt: string): string | undefined {
   const created = Date.parse(createdAt);
@@ -88,6 +90,10 @@ export function messageExpiry<E extends CommsEventId>(event: E, data: CommsData[
       const last = dates[dates.length - 1];
       return last ? iso(londonDayStart(nextDate(last))) : undefined;
     }
+    case "cancellation-period": {
+      const ends = (data as CommsData["cancellation-period"]).endsOn;
+      return /^\d{4}-\d{2}-\d{2}/.test(ends ?? "") ? iso(londonDayStart(nextDate(ends))) : undefined;
+    }
     default:
       return undefined;
   }
@@ -109,6 +115,7 @@ const LATE_REASON: Partial<Record<CommsEventId, string>> = {
   "install-day-before": "the install it's about has already started",
   "survey-booked": "the survey it confirms is already over",
   "install-booked": "the install days it confirms are already over",
+  "cancellation-period": "the last day it gives for cancelling has passed",
 };
 
 /**

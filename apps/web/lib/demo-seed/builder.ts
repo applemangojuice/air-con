@@ -1730,6 +1730,18 @@ function buildProject(sc: Scenario, today: string, settings: PilotSettings, invo
   message("kit-update", "email", "confirmed", at(cal.kitConfirmed!, "14:06"), "Your kit is confirmed", `The supplier has confirmed your kit for ${cal.kitDelivered}.`);
   story.act({ type: "kit-updated", status: "delivered", shortages: 0 }, deliveredAt, ADMIN);
   message("kit-update", "email", "delivered", deliveredAt, "Your kit has arrived", "Your kit has been delivered. Your installer will check every box.");
+  // Supply and install: the delivery started their cancellation period, and the email gave the last day (comms "cancellation-period").
+  const goods = story.project.proposal;
+  if (goods.contractType === "supply-and-install" && goods.goodsReceivedOn && goods.cancellationEndsOn) {
+    message(
+      "cancellation-period",
+      "email",
+      `goods:${goods.goodsReceivedOn}`,
+      deliveredAt,
+      `Your cancellation period: you can cancel until ${fmtDate(goods.cancellationEndsOn)}`,
+      `Your equipment reached your home on ${fmtDate(goods.goodsReceivedOn)}, so your cancellation period has started. You can cancel without giving a reason up to and including ${fmtDate(goods.cancellationEndsOn)}.`,
+    );
+  }
 
   /* ---------------- compliance for ready-to-install ---------------- */
 
