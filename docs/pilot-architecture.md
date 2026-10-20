@@ -2705,7 +2705,8 @@ changelog and the reasons, so nobody "fixes" a deliberate choice back.
       legislation.gov.uk, hse.gov.uk and every other host failed DNS from
       here, so no limit is asserted as verified; the 500 micron standard and
       the gauge-resolution allowance are the company's, stricter than what
-      they replace.
+      they replace. `targetError` refuses a `vacuum.target` above 500 micron
+      (it would change nothing); one already stored is kept as it is.
     - *Manufacturer minimums* (was known limitation 9a, "aren't modelled"):
       `EquipmentSpecs` gains `minPipeM` (per indoor unit), and for
       multi-splits `maxPipePerBranchM`, `minTotalPipeM`, `maxTotalPipeM`,

@@ -1,11 +1,14 @@
 # Test results
 
 The latest real results of every automatic check, run on the afternoon of
-**20 October 2026** on branch `claude/pilot-ops` at commit `f181ae5`: round
-8 of the pre-launch review ([below](#what-round-8-found)), on top of the five
-gaps round 7 left, now built ([below](#the-five-gaps-round-7-left), checked
-again here), round 7's fixes (`1f8f0da`, [below](#what-round-7-found)),
-round 6's (`ed1732e`, [below](#what-round-6-found)), round 5's (`a04cc53`,
+**20 October 2026** on branch `claude/pilot-ops` at commit `cd92532`: the
+two engineering gaps round 8 left, now built ([below](#the-two-gaps-round-8-left):
+the pressure and vacuum decay tests, and the manufacturer's minimums), on
+top of round 8 of the pre-launch review (`f181ae5`,
+[below](#what-round-8-found)), the five gaps round 7 left
+([below](#the-five-gaps-round-7-left)), round 7's fixes (`1f8f0da`,
+[below](#what-round-7-found)), round 6's (`ed1732e`,
+[below](#what-round-6-found)), round 5's (`a04cc53`,
 [below](#what-round-5-found)), the handover fix (`454c8d1`,
 [below](#the-handover-flake-fixed)), the go-live pack, the Supabase
 compatibility work and the fixes from the final pre-launch review and
@@ -13,53 +16,53 @@ rounds 3 and 4. Everything was run **twice, start to finish, and passed
 both times**, on both databases. Every person, home and price the browser
 walks use is fictional and labelled DEMO.
 
-**Summary: everything passed, on both databases.** 1,012 unit tests, the
+**Summary: everything passed, on both databases.** 1,037 unit tests, the
 type check (the iOS scaffold included), the production build (Next.js
-15.5.28), every database migration check (110 assertions) and the upgrade
-file check; then the browser walks on **both** backends: on the local file
-database, 224 end-to-end pilot checks and 24 quote-form checks; on a
-Supabase-shaped stack (Postgres 16, PostgREST and the Storage API, as a real
-Supabase project serves them, with the database's default grants as a
-project created today has them), the same 224 and 24, the property book
-importers over 3,000 homes, and 443 checks across 285 screens with no
-statement refused by the database.
+15.5.28), every database migration check and the upgrade file check; then
+the browser walks on **both** backends: on the local file database, 228
+end-to-end pilot checks and 24 quote-form checks; on a Supabase-shaped
+stack (Postgres 16, PostgREST and the Storage API, as a real Supabase
+project serves them, with the database's default grants as a project
+created today has them), the same 228 and 24, the property book importers
+over 3,000 homes, and 443 checks across the screens with no statement
+refused by the database.
 
 | Check | Command | Result | Round 1 (UTC, 20 Oct) | Round 2 (UTC, 20 Oct) |
 | --- | --- | --- | --- | --- |
-| Type check (domain, web, mobile) | `pnpm -r typecheck` | **Pass** (3 of 3 projects) | 15:12 | 15:28 |
-| Domain unit tests | `pnpm test` | **483 of 483 pass**, 0 fail (30 test files) | 15:12 to 15:13 | 15:29 |
-| Web unit tests | `pnpm test` | **529 of 529 pass**, 0 fail (58 test files) | 15:12 to 15:13 | 15:29 |
-| Production build | `pnpm --filter @aircon/web build` | **Pass**: Next.js 15.5.28, compiled, 35 of 35 static pages generated | 15:13 to 15:14 | 15:29 to 15:30 |
-| Database migrations | `bash supabase/tests/run-migrations.sh` | **Pass**: 15 migrations and the pilot upgrade bundle (none new: every round 8 change lives in JSON columns); the local backend's schema matches; 110 sanity assertions | 15:14 | 15:30 |
-| Upgrade file is current | `bash supabase/build-pilot-upgrade.sh --check` | **Pass**: `pilot-upgrade.sql` is current (0010 to 0014) | 15:14 | 15:30 |
-| Pilot walk, **local file database** | `node scripts/e2e-pilot.mjs` | **224 of 224 pass** | 15:14 to 15:18 | 15:30 to 15:35 |
-| Quote form walk, **local file database** | `node scripts/e2e-funnel.mjs` | **24 of 24 pass** | 15:19 | 15:35 |
-| Pilot walk, **Supabase-shaped** | `bash supabase/tests/compat/run-compat-e2e.sh` | **224 of 224 pass** | 15:19 to 15:28 | 15:35 to 15:44 |
+| Type check (domain, web, mobile) | `pnpm -r typecheck` | **Pass** (3 of 3 projects) | 17:08 | 17:25 |
+| Domain unit tests | `pnpm test` | **505 of 505 pass**, 0 fail (31 test files) | 17:09 | 17:25 to 17:26 |
+| Web unit tests | `pnpm test` | **532 of 532 pass**, 0 fail (58 test files) | 17:09 | 17:25 to 17:26 |
+| Production build | `pnpm --filter @aircon/web build` | **Pass**: Next.js 15.5.28, compiled, 35 of 35 static pages generated | 17:09 to 17:10 | 17:26 to 17:27 |
+| Database migrations | `bash supabase/tests/run-migrations.sh` | **Pass**: 15 migrations and the pilot upgrade bundle (none new: both gaps live in JSON columns, the runsheet and the catalogue item); the local backend's schema matches | 17:10 | 17:27 |
+| Upgrade file is current | `bash supabase/build-pilot-upgrade.sh --check` | **Pass**: `pilot-upgrade.sql` is current (0010 to 0014) | 17:10 | 17:27 |
+| Pilot walk, **local file database** | `node scripts/e2e-pilot.mjs` | **228 of 228 pass** | 17:10 to 17:15 | 17:27 to 17:32 |
+| Quote form walk, **local file database** | `node scripts/e2e-funnel.mjs` | **24 of 24 pass** | 17:15 | 17:32 |
+| Pilot walk, **Supabase-shaped** | `bash supabase/tests/compat/run-compat-e2e.sh` | **228 of 228 pass** | 17:15 to 17:25 | 17:32 to 17:42 |
 | Quote form walk, **Supabase-shaped** | (same run) | **24 of 24 pass** | (same run) | (same run) |
 | Property book import, **Supabase-shaped** | (same run) | **Pass**: 3,000 homes, 900 in a conservation area, 3,000 classified (three times Max Rows) | (same run) | (same run) |
-| Every screen, **Supabase-shaped** | (same run) | **443 of 443 pass**: 285 pages over 213 routes, 141 requests with ids that aren't there, a NUL in the quote form, 7 CSV exports (the accountant's three included), 4 daily jobs | (same run) | (same run) |
+| Every screen, **Supabase-shaped** | (same run) | **443 of 443 pass** | (same run) | (same run) |
 | Database and app logs, **Supabase-shaped** | (same run) | **Clean**: no statement refused by Postgres, no PostgREST or Storage error in the app's log | (same run) | (same run) |
 
-Both rounds ran on commit `f181ae5`, each from a fresh build and fresh,
-empty data, straight through, on ports 3990 and 3991 (the local walks) and
-3993 to 3995 and 55990 (the Supabase-shaped stack). The pilot walk has four
-more checks than before, all in phase H: the family's agree step says a
-change over £42 has its own 14 days to cancel; the office's Issues page
-shows the change's own period and that the crew waits; the office records
-the family's written request to start; and the crew's phone then says the
-change is a go. Phase C now counts the hard surfaces round the outdoor
-unit, and phase D's "no check is blocked" covers the new room-size check.
-Before the two rounds, one trial pass of each walk on each database passed,
-and a full round passed on `2edb11c`; its second round was stopped on
-purpose when one factory charge was found missing from the researched seed
-(the MUZ-LN25VG2's 0.80 kg, in its own notes), and both rounds were run
-again on the commit that adds it. One earlier attempt stopped after its
-pilot walk had passed, on the test runner's own clean-up (it shut down its
-own process group with the server's; the runner now records the server's
-group itself). Nothing flaked: every walk passed first time in every
-round. The handover isn't touched, so the 30-handover loops were not
-repeated (their results are with the handover fix
-[below](#the-handover-flake-fixed)).
+Both rounds ran on commit `cd92532`, each from a fresh build and fresh,
+empty data, straight through, on ports 3901 and 3902 (the local walks) and
+3904 to 3906 and 55901 (the Supabase-shaped stack). The pilot walk has four
+more checks than before: in phase D, the design's pipe-limits check reads
+the outdoor unit's minimum run from the catalogue (3 m a room on the
+Panasonic CU-2Z50CBE); in phase I, the Commission tab judges the strength
+test from its readings and the vacuum decay test against the rise limit,
+and the commissioning certificate shows the tests as measured (the
+readings, the temperature correction, the allowance and the result). The
+walk now also sets the four new targets (both hold times, the allowed fall
+and the rise limit) and types the gauge's resolution. Before the two
+rounds, a trial pass of each walk passed on each gap's own commit
+(`92c823c`, `e070846`), and a first full round passed everything on the
+local database; its Supabase-shaped run never started (the stack's
+Postgres can't reach a data folder inside the session's private scratch
+directory) and was not counted; the runner now uses the stack's own
+folder in `/tmp` again. One earlier trial walk failed in phase D because
+its data folder wasn't fresh (a folder name another run had already used,
+holding a catalogue from before round 8): every walk since starts on a
+newly made folder. Nothing flaked.
 
 Set-up for the local walks: a production build (`next start`) on the local
 file database (which enforces the same schema Postgres does), a fresh
@@ -70,6 +73,50 @@ supabase-js with the service-role key, as a demo deployment
 (`ALLOW_DEMO_LOGIN=1 DEMO_DEPLOYMENT=1`), the route walk signing in by
 **Admin break-glass**. Node 22.22.0, pnpm 10.12.1, PostgreSQL 16.15,
 PostgREST 12.2.3.
+
+## The two gaps round 8 left
+
+Round 8 wrote two engineering gaps up as known limitations (7 and 9a). Both
+are now built (architecture §K47), each with its own tests, and the pilot
+walk checks both in a browser:
+
+- **Decay tests.** The strength and tightness test now asks for the
+  ambient temperature when the nitrogen is applied and at the end of the
+  hold, how long it held and the gauge's resolution. The app corrects the
+  end pressure to the start temperature (absolute pressure × the kelvin
+  ratio) and fails the test on any fall beyond the gauge's resolution (or
+  the manual's allowance, once the technical lead sets it), on a test above
+  the nameplate PS or below the manual's pressure, or on a short hold. The
+  vacuum is judged against 500 micron (66.7 Pa), or the manual's figure if
+  stricter, and its rise over the decay hold against the job's limit. The
+  readings are judged together as runs: typing one again starts a retest,
+  and a failed test can't be cleared by Pass, by accepting a reading, or by
+  a target changed afterwards: only a retest with every reading taken
+  again. The step, the Commission tab, the certificate and the family's
+  handover pack show the readings, the correction, the allowance and the
+  result. (Tests: real-shaped readings: 30.0 bar g at 20 °C reading 29.4 at
+  15 °C passes, the same fall at a steady temperature fails, a warming
+  afternoon that hides a 1 bar loss is caught; the run logic, the retest,
+  the target-change guard, a runsheet from before the tests upgraded with
+  its ids and targets kept, the server refusing to accept a decay reading
+  and keeping a retest owed; in the walk, the tests judged on the
+  Commission tab and printed on the certificate.)
+- **Manufacturer minimums.** The catalogue has the manual's minimum run
+  per indoor unit and, for multi-splits, the longest branch, the minimum
+  and maximum total, the height between indoor units, the fewest indoor
+  units and the least connected capacity; the researched seed fills them
+  for 22 outdoor units only where each item's own notes give them. The
+  design checks them: outside a limit on record blocks approval with the
+  figures, a limit not on record is a CHECK, and the engine never suggests a
+  multi-split outside one. The install day checks each room's as-built run
+  and the system's total against the same figures. (Tests: the seed's
+  figures and blanks, the CSV and the editor's schema, a 2.5 m run, a
+  5.5 m total and a lone room on a two-room unit refused, the height
+  between indoor units from the survey's unsigned heights, a Mitsubishi
+  single split read as a CHECK, a short run blocking approval, the engine
+  splitting rather than suggesting a multi-split a run is too short for,
+  the runsheet's windows; in the walk, the design's check reads the 3 m
+  minimum from the catalogue.)
 
 ## What round 8 found
 
