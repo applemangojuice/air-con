@@ -1,53 +1,57 @@
 # Test results
 
 The latest real results of every automatic check, run on the morning of
-**20 October 2026** on branch `claude/pilot-ops` at commit `a04cc53`: the
-fixes from round 5 of the pre-launch review [below](#what-round-5-found),
-on top of the handover fix (`454c8d1`, [below](#the-handover-flake-fixed)),
-the go-live pack, the Supabase compatibility work and the fixes from the
-final pre-launch review and rounds 3 and 4. Everything was run **twice,
-start to finish, and passed both times**, on both databases. Every person,
-home and price the browser walks use is fictional and labelled DEMO.
+**20 October 2026** on branch `claude/pilot-ops` at commit `ed1732e`: the
+fixes from round 6 of the pre-launch review [below](#what-round-6-found),
+on top of round 5's (`a04cc53`, [below](#what-round-5-found)), the handover
+fix (`454c8d1`, [below](#the-handover-flake-fixed)), the go-live pack, the
+Supabase compatibility work and the fixes from the final pre-launch review
+and rounds 3 and 4. Everything was run **twice, start to finish, and passed
+both times**, on both databases. Every person, home and price the browser
+walks use is fictional and labelled DEMO.
 
-**Summary: everything passed, on both databases.** 935 unit tests, the type
+**Summary: everything passed, on both databases.** 944 unit tests, the type
 check, the production build (Next.js 15.5.28), every database migration
 check (110 assertions) and the upgrade file check; then the browser walks on
-**both** backends: on the local file database, 197 end-to-end pilot checks
-and 23 quote-form checks; on a Supabase-shaped stack (Postgres 16,
+**both** backends: on the local file database, 200 end-to-end pilot checks
+and 24 quote-form checks; on a Supabase-shaped stack (Postgres 16,
 PostgREST and the Storage API, as a real Supabase project serves them, with
 the database's default grants as a project created today has them), the
-same 197 and 23, the property book importers over 3,000 homes, and 439
+same 200 and 24, the property book importers over 3,000 homes, and 439
 checks across 284 screens with no statement refused by the database.
 
 | Check | Command | Result | Round 1 (UTC, 20 Oct) | Round 2 (UTC, 20 Oct) |
 | --- | --- | --- | --- | --- |
-| Type check (domain, web, mobile) | `pnpm -r typecheck` | **Pass** (3 of 3 projects) | 04:12 | 04:27 |
-| Domain unit tests | `pnpm test` | **461 of 461 pass**, 0 fail (29 test files) | 04:12 | 04:27 |
-| Web unit tests | `pnpm test` | **474 of 474 pass**, 0 fail (52 test files) | 04:12 | 04:27 |
-| Production build | `pnpm --filter @aircon/web build` | **Pass**: Next.js 15.5.28, compiled, 34 of 34 static pages generated | 04:12 to 04:13 | 04:27 to 04:28 |
-| Database migrations | `bash supabase/tests/run-migrations.sh` | **Pass**: 15 migrations and the pilot upgrade bundle; the local backend's schema matches; 110 sanity assertions | 04:13 | 04:28 |
-| Upgrade file is current | `bash supabase/build-pilot-upgrade.sh --check` | **Pass**: `pilot-upgrade.sql` is current (0010 to 0014) | 04:13 | 04:28 |
-| Pilot walk, **local file database** | `node scripts/e2e-pilot.mjs` | **197 of 197 pass** | 04:13 to 04:18 | 04:28 to 04:33 |
-| Quote form walk, **local file database** | `node scripts/e2e-funnel.mjs` | **23 of 23 pass** | 04:18 | 04:33 |
-| Pilot walk, **Supabase-shaped** | `bash supabase/tests/compat/run-compat-e2e.sh` | **197 of 197 pass** | 04:18 to 04:26 | 04:33 to 04:41 |
-| Quote form walk, **Supabase-shaped** | (same run) | **23 of 23 pass** | (same run) | (same run) |
+| Type check (domain, web, mobile) | `pnpm -r typecheck` | **Pass** (3 of 3 projects) | 07:23 | 07:39 |
+| Domain unit tests | `pnpm test` | **463 of 463 pass**, 0 fail (29 test files) | 07:23 | 07:39 |
+| Web unit tests | `pnpm test` | **481 of 481 pass**, 0 fail (53 test files) | 07:23 | 07:39 |
+| Production build | `pnpm --filter @aircon/web build` | **Pass**: Next.js 15.5.28, compiled, 34 of 34 static pages generated | 07:23 to 07:25 | 07:39 to 07:40 |
+| Database migrations | `bash supabase/tests/run-migrations.sh` | **Pass**: 15 migrations and the pilot upgrade bundle; the local backend's schema matches; 110 sanity assertions | 07:25 | 07:40 to 07:41 |
+| Upgrade file is current | `bash supabase/build-pilot-upgrade.sh --check` | **Pass**: `pilot-upgrade.sql` is current (0010 to 0014) | 07:25 | 07:41 |
+| Pilot walk, **local file database** | `node scripts/e2e-pilot.mjs` | **200 of 200 pass** | 07:25 to 07:29 | 07:41 to 07:45 |
+| Quote form walk, **local file database** | `node scripts/e2e-funnel.mjs` | **24 of 24 pass** | 07:29 | 07:45 |
+| Pilot walk, **Supabase-shaped** | `bash supabase/tests/compat/run-compat-e2e.sh` | **200 of 200 pass** | 07:29 to 07:38 | 07:45 to 07:54 |
+| Quote form walk, **Supabase-shaped** | (same run) | **24 of 24 pass** | (same run) | (same run) |
 | Property book import, **Supabase-shaped** | (same run) | **Pass**: 3,000 homes, 900 in a conservation area, 3,000 classified (three times Max Rows) | (same run) | (same run) |
 | Every screen, **Supabase-shaped** | (same run) | **439 of 439 pass**: 284 pages over 212 routes, 141 requests with ids that aren't there, a NUL in the quote form, 4 CSV exports, 4 daily jobs | (same run) | (same run) |
 | Database and app logs, **Supabase-shaped** | (same run) | **Clean**: no statement refused by Postgres, no PostgREST or Storage error in the app's log | (same run) | (same run) |
 
-Both rounds ran on commit `a04cc53` itself (only this document changed
+Both rounds ran on commit `ed1732e` itself (only this document changed
 after it), each from a fresh build and fresh, empty data, straight through.
-The pilot walk has four more checks than before (phase H: the next-step card
-names the change waiting for the family's OK, its button opens the change,
-**Your homes** says the same, and it's gone once they've answered). Round 5
-changes nothing in the handover, so the 30-handover loops were not repeated:
-their results (30 of 30 on each database, the Supabase-shaped one slowed
-down) are with the handover fix [below](#the-handover-flake-fixed).
+The pilot walk has three more checks than before (phase A: a next action
+due today on the household's quote shows under **Website leads due today**
+on **Today** and as **Due today** in the quote inbox) and the quote form
+walk one more (the reminder box under the email). Round 6 changes nothing
+in the handover, so the 30-handover loops were not repeated: their results
+(30 of 30 on each database, the Supabase-shaped one slowed down) are with
+the handover fix [below](#the-handover-flake-fixed). Before the two rounds,
+one trial pass of both walks on each database (on the commit before the
+inbox column moved next to the customer's name) also passed: 200, 24, 439.
+Nothing flaked: every walk passed first time in all three passes.
 
 Separately, the web unit tests were run with the clock moved 60 and 400
-days ahead (a preloaded stand-in for `Date`): all 474 still passed, so no
-test depends on a fixed date in the next year that the new message expiries
-would pass.
+days ahead (a preloaded stand-in for `Date`): all 481 still passed, so the
+new reminder and chase-list tests don't depend on today's date.
 
 Set-up for the local walks: a production build (`next start`) on the local
 file database (which enforces the same schema Postgres does), a fresh
@@ -60,6 +64,64 @@ supabase-js with the service-role key, as a demo deployment
 (commissioning signed) at full speed, then put the job back to that point
 before each round (the project row only, written directly: test-only).
 Node 22.22.0, pnpm 10.12.1, PostgreSQL 16.15, PostgREST 12.2.3.
+
+## What round 6 found
+
+A sixth pass of the pre-launch review found three problems, all with data
+or emails that reach real people. All three are fixed in `ed1732e` (on top
+of the work saved mid-run in `a8d991a`), each with tests that fail without
+the fix (architecture §K43):
+
+- **A household that clicked "accept" on the old site was stuck for good.**
+  The old site issued a high-confidence quote's "final quote" automatically
+  and let the family accept it with two clicks, saying it didn't tie them
+  in. After the upgrade that became an accepted contract with a contract
+  total, so the office could never save a design, record their documents
+  agreement or issue a proposal ("The proposal is accepted. Changes now go
+  through a variation."), and kit and the install could never go ahead
+  either; the family's page showed a contract total for a contract nobody
+  formed. Now an old project is a contract only if work really went ahead
+  on the old site (kit sent or the install finished). Otherwise it starts
+  at **Price** like any household: no proposal, an old site visit is a
+  home survey still to book (it left nothing to design from), an old
+  install date isn't a booking, and an internal note in its history says
+  what the old site had (price, dates). An old *issued* final quote no
+  longer shows "Review your proposal" with no proposal behind it. (New
+  test: every old state before work went ahead, from "created" to "install
+  booked", goes through the survey, the design, the documents agreement,
+  a real proposal and acceptance; old projects where work went ahead keep
+  their contract.) Known limitations 43; START-HERE step 3 says so.
+- **The follow-ups scheduled on website quotes surfaced nowhere.** The
+  console had lost the old "Due today" list, the only place a quote's
+  **Next action** showed outside its own page. **Today** (`/ops`) now lists
+  **Website leads due today** (due today or overdue, by London day,
+  declined quotes left out, with "overdue since"), the morning email lists
+  the same, and **Quote requests** has a **Next action** column with the
+  due date, sortable soonest first; the CSV carries it. The morning
+  routines (admin guide §2, the ops help page) include it. (New tests: the
+  London-midnight cut-off across the clocks going back, the list and its
+  count; the pilot walk sets a next action due today on its household's
+  quote and finds it on **Today** and in the inbox.)
+- **The unfinished-quote reminder went to anyone, unbudgeted.** Every
+  draft with any email typed at step 1 got the reminder the next morning,
+  up to 50 a day, outside the website's email budget: a script typing
+  addresses could make us send 50 emails a day from our domain to
+  strangers, and with the other two budgets, more than Resend Free's 100 a
+  day the office's own proposals and invoices need. The email had no
+  opt-out line, and someone with two drafts could get two "only" nudges.
+  Now step 1 offers **Email me one reminder if I don't finish** under the
+  email (ticked unless they untick it), the draft records the answer, and
+  only drafts left ticked are reminded: once per address ever, never one
+  that finished a quote, at most 10 a run, from a new reminder budget of
+  10 a day (the website's three budgets total 65). The email says why it
+  came and how to have the quote deleted. Older drafts are never reminded,
+  and the **Unfinished** tab offers its pre-written email only where the
+  box was left ticked. (New tests: the real daily job with 15 ticked
+  drafts, an unticked one, an old one, a finished one and an
+  already-reminded one sends 10, to ticked drafts only, each with the
+  opt-out line; run again the same day it sends none and releases the
+  other 5 for the next day. The quote-form walk checks the box is offered,
+  ticked and can be unticked.) Known limitations 29 and 42.
 
 ## What round 5 found
 
@@ -386,14 +448,14 @@ fixed.
 
 One new pilot household taken from set-up to closed, in a real browser, by
 each person on their own device: the admin at a desk (1280 × 800), the
-family, the surveyor and the crew on phones (390 × 844). The same 197 checks
+family, the surveyor and the crew on phones (390 × 844). The same 200 checks
 passed four times on the final commit: twice on the local file database and
 twice on the Supabase-shaped stack. Any page error in the browser (including the
 hydration warning below) or any server error fails the walk.
 
 | Phase | What it does | Checks | Passed |
 | --- | --- | --- | --- |
-| A | Admin signs in, sets up a new pilot (number typed in), owner and surveyor | 9 | 9 |
+| A | Admin signs in, sets up a new pilot (number typed in), owner and surveyor; a next action due today on its quote shows under **Website leads due today** and in the inbox | 12 | 12 |
 | B | The family opens their emailed link, books the survey, agrees to documents by email | 9 | 9 |
 | C | Surveyor on a phone: on my way, start, every section (2 rooms measured, photos, a drawing), outdoor, electrics, planning checks, risks, submit at 100% | 16 | 16 |
 | D | Catalogue loaded and priced from a CSV, design drafted, layout photos chosen, sent for review, approved and signed by the technical lead | 12 | 12 |
@@ -405,7 +467,7 @@ hydration warning below) or any server error fails the walk.
 | J | Handover pack published, the family signs "All good", balance invoice paid (DEMO card simulator), electrical certificate and warranty in, issues resolved, project closed, all documents present | 30 | 30 |
 | K | Every customer message logged; the Pilots page shows the pilot; the CSV downloads | 9 | 9 |
 | L | Security: a duplicate pilot number, another family (pages, documents, invoices, photos), a subcontractor (office pages, other jobs, photos, margins, and on their own job the family's project, pay, proposal and documents pages and every document, while the office sees the prices there), signed-out visitors, a forged sign-in cookie, a bad Stripe signature, the demo-data button | 31 | 31 |
-| | **Total** | **197** | **197** |
+| | **Total** | **200** | **200** |
 
 ## The founder's walk (START-HERE, followed literally)
 
@@ -464,11 +526,12 @@ above covers them), and anything needing real email, Supabase or Stripe.
 ## The quote form walk
 
 The public website on a phone: home page, postcode, coverage confirmed, the
+reminder box under the email (offered, ticked, can be unticked), the
 house and rooms steps with a price, the optional photo step, two separate
 unticked consent boxes (saving without the required one is refused), the
 result page ("confirmed at your survey", with its validity), **Book my home
 survey** opening the project page, no placeholder phone number, and an
-out-of-area postcode told the truth and its heads-up stored. **23 of 23
+out-of-area postcode told the truth and its heads-up stored. **24 of 24
 pass.**
 
 ## The database checks
@@ -509,8 +572,8 @@ service-role key. Then:
 
 | Walk | What it does | Round 1 | Round 2 |
 | --- | --- | --- | --- |
-| Pilot walk | The 197 checks above | **197 of 197** | **197 of 197** |
-| Quote form | The 23 checks below | **23 of 23** | **23 of 23** |
+| Pilot walk | The 200 checks above | **200 of 200** | **200 of 200** |
+| Quote form | The 24 checks above | **24 of 24** | **24 of 24** |
 | Property book | 3,000 sample homes imported, enriched and classified, three times what one database read returns | **3,000 / 900 / 3,000** | **3,000 / 900 / 3,000** |
 | Every screen | Break-glass sign-in, the 5 DEMO pilots loaded, 284 pages over 212 routes (every ops, field, customer and public screen, help pages included), 141 requests with ids that don't exist or aren't ids (a 404, never a crash), a NUL character in the quote form (saved without it), 4 CSV exports, 4 daily jobs | **439 of 439** | **439 of 439** |
 | Postgres log | Any statement the database refused | **None** | **None** |
@@ -529,8 +592,9 @@ pilot walks, two quote-form walks and one screen walk per round).
   not sent) and the DEMO card simulator, not Resend, Twilio or Stripe.
   After going live, send yourself a test email and walk the quote form once
   on the live site (`/ops/launch` lists it). With no email provider the
-  public email budget is never spent, so the walks don't exercise it: unit
-  tests do, with a stand-in provider.
+  email budgets are never spent and the unfinished-quote reminder doesn't
+  run, so the walks don't exercise them: unit tests do, with a stand-in
+  provider (the reminder through its real daily job).
 - A real Supabase project: the Supabase-shaped run uses the same database,
   PostgREST version and Storage API calls, on this machine, but not
   Supabase's own servers, their network delays or their photo storage.
