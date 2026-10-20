@@ -172,7 +172,7 @@ const FULL: { [E in CommsEventId]: CommsData[E] } = {
   "install-day-before": { startDate: "2026-12-01", crewNames: ["Jo Demo", "Pat Demo"], arrival: "8:30", parkingNotes: "Permit in the hall" },
   "installer-on-my-way": { etaMinutes: 25, at: "2026-12-01T08:05:00.000Z", name: "Jo Demo" },
   "install-day-update": { n: 1, totalDays: 3, text: "Holes drilled and sealed, brackets up.", photoCount: 3, nextDate: "2026-12-02", by: "Jo Demo" },
-  "variation-approval": { title: "Condensate pump in the loft room", description: "No fall to an outside wall.", totalDeltaPence: 18_000, issueNumber: 4 },
+  "variation-approval": { title: "Condensate pump in the loft room", description: "No fall to an outside wall.", totalDeltaPence: 18_000, issueNumber: 4, ownRight: { days: 14 } },
   "variation-accepted": {
     title: "Condensate pump in the loft room",
     description: "No fall to an outside wall.",
@@ -184,6 +184,7 @@ const FULL: { [E in CommsEventId]: CommsData[E] } = {
     name: "Sam Taylor",
     wording: "I agree to pay £180 more (including VAT)",
     newContractTotalPence: 663_000,
+    ownRight: { days: 14, endsOn: "2026-12-15" },
   },
   "cancellation-confirmed": { receivedAt: "2026-11-14T10:00:00.000Z", channel: "email", refundDueBy: "2026-11-28", paidPence: 45_000, collectEquipment: true, withinPeriod: true },
   "issue-update": { title: "Drip from the bedroom unit", update: "We've found a kinked drain hose.", nextStep: "Jo will replace it.", dueOn: "2026-12-08", issueNumber: 5 },
