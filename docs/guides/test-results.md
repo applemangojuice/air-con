@@ -1,11 +1,11 @@
 # Test results
 
-The latest real results of every automatic check, run on the afternoon of
-**20 October 2026** on branch `claude/pilot-ops` at commit `cd92532`: the
-two engineering gaps round 8 left, now built ([below](#the-two-gaps-round-8-left):
-the pressure and vacuum decay tests, and the manufacturer's minimums), on
-top of round 8 of the pre-launch review (`f181ae5`,
-[below](#what-round-8-found)), the five gaps round 7 left
+The latest real results of every automatic check, run on the evening of
+**20 October 2026** on branch `claude/pilot-ops` at commit `32e378b`: round 9
+of the pre-launch review ([below](#what-round-9-found): the planning consent
+gate and the round's medium list), on top of the two engineering gaps round
+8 left (`cd92532`, [below](#the-two-gaps-round-8-left)), round 8
+(`f181ae5`, [below](#what-round-8-found)), the five gaps round 7 left
 ([below](#the-five-gaps-round-7-left)), round 7's fixes (`1f8f0da`,
 [below](#what-round-7-found)), round 6's (`ed1732e`,
 [below](#what-round-6-found)), round 5's (`a04cc53`,
@@ -16,53 +16,54 @@ rounds 3 and 4. Everything was run **twice, start to finish, and passed
 both times**, on both databases. Every person, home and price the browser
 walks use is fictional and labelled DEMO.
 
-**Summary: everything passed, on both databases.** 1,037 unit tests, the
+**Summary: everything passed, on both databases.** 1,059 unit tests, the
 type check (the iOS scaffold included), the production build (Next.js
 15.5.28), every database migration check and the upgrade file check; then
-the browser walks on **both** backends: on the local file database, 228
+the browser walks on **both** backends: on the local file database, 230
 end-to-end pilot checks and 24 quote-form checks; on a Supabase-shaped
 stack (Postgres 16, PostgREST and the Storage API, as a real Supabase
 project serves them, with the database's default grants as a project
-created today has them), the same 228 and 24, the property book importers
+created today has them), the same 230 and 24, the property book importers
 over 3,000 homes, and 443 checks across the screens with no statement
 refused by the database.
 
 | Check | Command | Result | Round 1 (UTC, 20 Oct) | Round 2 (UTC, 20 Oct) |
 | --- | --- | --- | --- | --- |
-| Type check (domain, web, mobile) | `pnpm -r typecheck` | **Pass** (3 of 3 projects) | 17:08 | 17:25 |
-| Domain unit tests | `pnpm test` | **505 of 505 pass**, 0 fail (31 test files) | 17:09 | 17:25 to 17:26 |
-| Web unit tests | `pnpm test` | **532 of 532 pass**, 0 fail (58 test files) | 17:09 | 17:25 to 17:26 |
-| Production build | `pnpm --filter @aircon/web build` | **Pass**: Next.js 15.5.28, compiled, 35 of 35 static pages generated | 17:09 to 17:10 | 17:26 to 17:27 |
-| Database migrations | `bash supabase/tests/run-migrations.sh` | **Pass**: 15 migrations and the pilot upgrade bundle (none new: both gaps live in JSON columns, the runsheet and the catalogue item); the local backend's schema matches | 17:10 | 17:27 |
-| Upgrade file is current | `bash supabase/build-pilot-upgrade.sh --check` | **Pass**: `pilot-upgrade.sql` is current (0010 to 0014) | 17:10 | 17:27 |
-| Pilot walk, **local file database** | `node scripts/e2e-pilot.mjs` | **228 of 228 pass** | 17:10 to 17:15 | 17:27 to 17:32 |
-| Quote form walk, **local file database** | `node scripts/e2e-funnel.mjs` | **24 of 24 pass** | 17:15 | 17:32 |
-| Pilot walk, **Supabase-shaped** | `bash supabase/tests/compat/run-compat-e2e.sh` | **228 of 228 pass** | 17:15 to 17:25 | 17:32 to 17:42 |
+| Type check (domain, web, mobile) | `pnpm -r typecheck` | **Pass** (3 of 3 projects) | 19:35 | 19:52 |
+| Domain unit tests | `pnpm test` | **522 of 522 pass**, 0 fail (31 test files) | 19:36 | 19:52 to 19:53 |
+| Web unit tests | `pnpm test` | **537 of 537 pass**, 0 fail (59 test files) | 19:36 | 19:52 to 19:53 |
+| Production build | `pnpm --filter @aircon/web build` | **Pass**: Next.js 15.5.28, compiled, 35 of 35 static pages generated | 19:36 to 19:37 | 19:53 to 19:54 |
+| Database migrations | `bash supabase/tests/run-migrations.sh` | **Pass**: 15 migrations and the pilot upgrade bundle (none new: round 9 lives in JSON columns, the checklist item, the runsheet and the project); the local backend's schema matches | 19:37 | 19:54 |
+| Upgrade file is current | `bash supabase/build-pilot-upgrade.sh --check` | **Pass**: `pilot-upgrade.sql` is current (0010 to 0014) | 19:37 | 19:54 |
+| Pilot walk, **local file database** | `node scripts/e2e-pilot.mjs` | **230 of 230 pass** | 19:37 to 19:42 | 19:54 to 19:59 |
+| Quote form walk, **local file database** | `node scripts/e2e-funnel.mjs` | **24 of 24 pass** | 19:42 | 19:59 |
+| Pilot walk, **Supabase-shaped** | `bash supabase/tests/compat/run-compat-e2e.sh` | **230 of 230 pass** | 19:43 to 19:52 | 19:59 to 20:09 |
 | Quote form walk, **Supabase-shaped** | (same run) | **24 of 24 pass** | (same run) | (same run) |
 | Property book import, **Supabase-shaped** | (same run) | **Pass**: 3,000 homes, 900 in a conservation area, 3,000 classified (three times Max Rows) | (same run) | (same run) |
 | Every screen, **Supabase-shaped** | (same run) | **443 of 443 pass** | (same run) | (same run) |
 | Database and app logs, **Supabase-shaped** | (same run) | **Clean**: no statement refused by Postgres, no PostgREST or Storage error in the app's log | (same run) | (same run) |
 
-Both rounds ran on commit `cd92532`, each from a fresh build and fresh,
-empty data, straight through, on ports 3901 and 3902 (the local walks) and
-3904 to 3906 and 55901 (the Supabase-shaped stack). The pilot walk has four
-more checks than before: in phase D, the design's pipe-limits check reads
-the outdoor unit's minimum run from the catalogue (3 m a room on the
-Panasonic CU-2Z50CBE); in phase I, the Commission tab judges the strength
-test from its readings and the vacuum decay test against the rise limit,
-and the commissioning certificate shows the tests as measured (the
-readings, the temperature correction, the allowance and the result). The
-walk now also sets the four new targets (both hold times, the allowed fall
-and the rise limit) and types the gauge's resolution. Before the two
-rounds, a trial pass of each walk passed on each gap's own commit
-(`92c823c`, `e070846`), and a first full round passed everything on the
-local database; its Supabase-shaped run never started (the stack's
-Postgres can't reach a data folder inside the session's private scratch
-directory) and was not counted; the runner now uses the stack's own
-folder in `/tmp` again. One earlier trial walk failed in phase D because
-its data folder wasn't fresh (a folder name another run had already used,
-holding a catalogue from before round 8): every walk since starts on a
-newly made folder. Nothing flaked.
+Both rounds ran on commit `32e378b`, each from a fresh build and fresh,
+empty data, straight through, on ports 3990 and 3991 (the local walks) and
+3993 to 3995 and 55990 (the Supabase-shaped stack, reusing the round's own
+build). The pilot walk has two more checks than before, in phase G: the
+checklist carries the statutory **Planning permission or listed building
+consent granted** item, and once the technical lead records "PD checks
+passed" (the walk's DEMO home isn't listed) it marks itself not
+applicable. The walk now chooses the planning outcome and answers "not
+listed" when it approves those items, approves the new supply and DNO item,
+and fills the runsheet's new readings (the leak detector and the pressure at
+the joints, the interconnect and its terminal photo, the EIC's scope). Its
+design's planning check now asks for the customer note, which the walk
+adds. Before the two rounds, a trial pass of every check passed on both
+databases (230, 24, 443). A first counted round was thrown out and not
+counted: its local walks ran against the trial's servers, still answering on
+3990 and 3991 with the trial's data, because the runner had stopped `npx`
+rather than the server it started (Next's server renames itself
+`next-server` and outlived it); three deposit checks failed on that stale
+data. The runner now starts `next start` directly, stops it by that PID,
+and refuses to walk against a port that already answers. That round's
+Supabase-shaped run passed. Nothing flaked.
 
 Set-up for the local walks: a production build (`next start`) on the local
 file database (which enforces the same schema Postgres does), a fresh
