@@ -965,3 +965,19 @@ test("the crew's day: access at height names the equipment and the bracket heigh
   assert.deepEqual(field.heavyLifts({ runsheet: [{ id: "k", phase: 1, title: "Kit and serial check", evidence: [], equipment: { kind: "outdoor", room: "Outdoor", label: "DEMO", model: "DEMO-RX50", weightKg: 38 } }] }), [{ model: "DEMO-RX50", weightKg: 38 }]);
   assert.deepEqual(field.heavyLifts({ runsheet: [{ id: "k", phase: 1, title: "Kit and serial check", evidence: [], equipment: { kind: "outdoor", room: "Outdoor", label: "DEMO", model: "DEMO-RX25", weightKg: 25 } }] }), []);
 });
+
+test("CDM 2015: with a subcontractor on the crew the pack carries a health and safety file; in-house only, none", async () => {
+  await seedHandover();
+  assert.equal((await field.handoverDraft(PROJECT, FGAS)).snapshot.healthAndSafetyFile, undefined, "one contractor: no file");
+  const db = requireDb();
+  const row = await db.from("projects").select("project").eq("id", PROJECT).single();
+  const p = (row.data as { project: Project }).project;
+  p.booking = { ...p.booking, crew: [...p.booking.crew, { staffId: SUB.id, name: SUB.name, role: "electrician", external: true }] };
+  assert.equal((await db.from("projects").update({ project: p }).eq("id", PROJECT)).error, null);
+  const file = (await field.handoverDraft(PROJECT, FGAS)).snapshot.healthAndSafetyFile;
+  assert.ok(file, "the file");
+  assert.ok(file!.contractors.some((c) => c.includes(SUB.name) && /subcontractor/.test(c)));
+  assert.ok(file!.refrigerant.some((l) => /F-gas certified engineer/.test(l)));
+  assert.ok(file!.isolators.length > 0);
+  assert.equal(file!.techLeadNote, "", "no commissioning line yet");
+});

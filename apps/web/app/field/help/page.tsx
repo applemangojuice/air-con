@@ -311,6 +311,10 @@ export default async function FieldHelpPage() {
 
         <Fold id="sign-off" title="Commissioning and handover sign-off">
           <p>
+            With a subcontractor on the crew, the sign form asks a line <B>For the health and safety file</B> (anything the next person working on it should know). The
+            handover pack carries the file: the routes as built, the R32, the isolators, the manuals and your line.
+          </p>
+          <p>
             <B>Commission</B> (the tech lead signs): the results for each system, from the evidence, with the pressure and vacuum tests worked out; the manufacturer&apos;s targets (test pressure and PS, hold times, the allowed fall, the vacuum target and rise limit, torques, drain fall); every Needs review item looked at. A failed pressure or vacuum test stops the signature until it&apos;s retested. <B>Sign commissioning</B> completes the install and issues the certificate. It can&apos;t be undone from the field.
           </p>
           <p>

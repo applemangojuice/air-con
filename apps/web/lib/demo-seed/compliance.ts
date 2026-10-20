@@ -68,7 +68,9 @@ export function demoChecklist(
           ? { listedBuilding: "no" as const }
           : s?.status === "approved" && row.key === "heat-pump-building-regs"
             ? { buildingRegsRoute: "competent-person" as const }
-            : {};
+            : s?.status === "approved" && row.key === "rams"
+              ? { cdmRoles: { principalContractor: "Dang It's Hot Ltd", principalDesigner: "Dang It's Hot Ltd" } }
+              : {};
     return {
       ...answers,
       id: makeId(row.key),

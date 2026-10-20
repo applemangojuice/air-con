@@ -14,6 +14,7 @@ import {
   transitionIssue,
   type BlockContext,
   type BuildingRegsRoute,
+  type CdmRoles,
   type ComplianceItem,
   type ComplianceStatus,
   type Issue,
@@ -153,7 +154,7 @@ export async function loadChecklist(project: Project): Promise<ComplianceItem[]>
 export async function reviewItem(
   projectId: string,
   itemId: string,
-  input: { to: ComplianceStatus; note?: string; overrideReason?: string; planningOutcome?: PlanningOutcome; listedBuilding?: "yes" | "no"; buildingRegsRoute?: BuildingRegsRoute },
+  input: { to: ComplianceStatus; note?: string; overrideReason?: string; planningOutcome?: PlanningOutcome; listedBuilding?: "yes" | "no"; buildingRegsRoute?: BuildingRegsRoute; cdmRoles?: Partial<CdmRoles> },
   staff: StaffMember,
 ): Promise<Outcome<ComplianceItem>> {
   const project = await loadProject(projectId);
@@ -162,6 +163,7 @@ export async function reviewItem(
     ...(input.planningOutcome ? { planningOutcome: input.planningOutcome } : {}),
     ...(input.listedBuilding ? { listedBuilding: input.listedBuilding } : {}),
     ...(input.buildingRegsRoute ? { buildingRegsRoute: input.buildingRegsRoute } : {}),
+    ...(input.cdmRoles ? { cdmRoles: input.cdmRoles } : {}),
   };
   const res = await mutateRow<ComplianceItem>("compliance_items", itemId, complianceRepo, (current) => {
     if (current.projectId !== projectId) return { ok: false, error: "That item isn't on this project's checklist." };

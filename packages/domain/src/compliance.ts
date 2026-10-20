@@ -58,6 +58,21 @@ export function buildingRegsRouteProblem(route: BuildingRegsRoute | undefined, b
   return null;
 }
 
+/** CDM 2015 duty holders, recorded to approve `rams`. With a subcontractor on the job both are needed (and we're both by default). */
+export interface CdmRoles {
+  principalContractor: string;
+  principalDesigner: string;
+}
+
+/** Why these CDM roles can't approve the RAMS, or null. */
+export function cdmRolesProblem(roles: Partial<CdmRoles> | undefined): string | null {
+  const pc = roles?.principalContractor?.trim() ?? "";
+  const pd = roles?.principalDesigner?.trim() ?? "";
+  if (pc.length < 2 || pd.length < 2) return "Name the principal contractor and the principal designer (CDM 2015): our company for both unless someone else has agreed in writing to take a role.";
+  if (pc.length > 160 || pd.length > 160) return "Keep each name under 160 characters.";
+  return null;
+}
+
 /** The technical lead's planning outcome on `planning-pd`. */
 export type PlanningOutcome = "pd" | "consent-needed";
 
@@ -409,7 +424,7 @@ export const COMPLIANCE_TEMPLATE: ComplianceTemplateItem[] = [
     allowNa: false,
     basis: "Management of Health and Safety at Work Regulations 1999; CDM 2015 (domestic client duties pass to the contractor: construction phase plan, induction, welfare)",
     guidance:
-      "Write the risk assessment and method statement for this home: access, height, drilling, electrics, refrigerant, nitrogen and brazing (hot work: fire precautions and a fire watch), pets and children. Under CDM 2015 the household's client duties pass to us, so it also serves as the construction phase plan: site rules, emergency arrangements, the welfare agreed with the household (toilet, washing, water), the induction for everyone on site, and how we coordinate with the electrician. With a subcontractor on the job we're principal contractor and principal designer, and the handover leaves a short health and safety file (where the pipes and cables run hidden, the R32 refrigerant, the isolators). The crew read it before day 1.",
+      "Write the risk assessment and method statement for this home: access, height, drilling, electrics, refrigerant, nitrogen and brazing (hot work: fire precautions and a fire watch), pets and children. Under CDM 2015 the household's client duties pass to us, so it also serves as the construction phase plan: site rules, emergency arrangements, the welfare agreed with the household (toilet, washing, water), the induction for everyone on site, and how we coordinate with the electrician. Approving it records who is principal contractor and principal designer: our company for both by default (the subcontracted electrician is a contractor). With a subcontractor on the job, the handover pack gains a short health and safety file built from the job (the hidden pipe and cable routes as built, the R32 refrigerant, the isolators, the manuals) with a line the technical lead completes at commissioning. The crew read it before day 1.",
     evidenceHint: "The RAMS and construction phase plan, the crew's acknowledgement, and (with a subcontractor) the health and safety file notes.",
   },
   {
@@ -562,6 +577,8 @@ export interface ComplianceItem {
   listedBuilding?: "yes" | "no";
   /** heat-pump-building-regs, while approved: how the work is covered. */
   buildingRegsRoute?: BuildingRegsRoute;
+  /** rams, while approved: the principal contractor and principal designer (CDM 2015). */
+  cdmRoles?: CdmRoles;
 }
 
 /** The survey's and the property record's word on listing, before anyone checks the heritage list. */
@@ -695,6 +712,8 @@ export interface ComplianceReviewContext {
   asbestosSuspected?: boolean;
   /** The reviewer's answer to approve heat-pump-building-regs. */
   buildingRegsRoute?: BuildingRegsRoute;
+  /** The reviewer's answer to approve rams. */
+  cdmRoles?: Partial<CdmRoles>;
   /** A flat in a block, and whether it's a higher-risk building (the survey's block answers). */
   block?: BlockContext;
 }
@@ -759,6 +778,10 @@ export function reviewCompliance(
         }
         if (item.key === "heat-pump-building-regs") {
           const problem = buildingRegsRouteProblem(context.buildingRegsRoute, context.block);
+          if (problem) return fail(problem);
+        }
+        if (item.key === "rams") {
+          const problem = cdmRolesProblem(context.cdmRoles);
           if (problem) return fail(problem);
         }
         if ((t?.approvalNeeds ?? "evidence-or-note") === "note" && !text) {
@@ -846,6 +869,8 @@ export function reviewCompliance(
   else delete next.listedBuilding;
   if (to === "approved" && item.key === "heat-pump-building-regs") next.buildingRegsRoute = context.buildingRegsRoute;
   else delete next.buildingRegsRoute;
+  if (to === "approved" && item.key === "rams") next.cdmRoles = { principalContractor: context.cdmRoles!.principalContractor!.trim(), principalDesigner: context.cdmRoles!.principalDesigner!.trim() };
+  else delete next.cdmRoles;
   return { ok: true, item: clean(next) };
 }
 
@@ -954,6 +979,7 @@ export function syncCompliance(
       delete next.planningOutcome;
       delete next.listedBuilding;
       delete next.buildingRegsRoute;
+      delete next.cdmRoles;
     }
     // A status the system decided says why, where the item shows its note.
     if (to === "not-applicable" || (item.key === "planning-consent" && to === "evidence-required")) next.note = note;
@@ -1040,6 +1066,12 @@ export function syncCompliance(
           ? `Reopened automatically: ${buildingRegsRouteProblem(item.buildingRegsRoute, context.block)}`
           : "Reopened automatically: choose the route (our competent person scheme, full plans, a building notice, or the Building Safety Regulator), so the checklist can tell whether it fits this home.",
       );
+      continue;
+    }
+    // The RAMS approved before the CDM roles were recorded: asked again before day 1, so the pack's health
+    // and safety file (and anyone checking) knows who the principal contractor and designer are.
+    if (beforeDay1 && item.key === "rams" && item.status === "approved" && !item.cdmRoles) {
+      set(item, "under-review", "System", now, "Reopened automatically: record the principal contractor and principal designer (CDM 2015) with the approval.");
       continue;
     }
     // Approved before the outcome (or the listing answer) was a recorded choice: the free-text note

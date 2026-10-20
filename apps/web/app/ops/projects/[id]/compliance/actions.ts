@@ -55,6 +55,8 @@ export async function reviewAction(projectId: string, _prev: ActionState, form: 
   const outcome = z.enum(PLANNING_OUTCOMES as [PlanningOutcome, ...PlanningOutcome[]]).safeParse(form.get("planningOutcome"));
   const listed = z.enum(["yes", "no"]).safeParse(form.get("listedBuilding"));
   const route = z.enum(BUILDING_REGS_ROUTES as [BuildingRegsRoute, ...BuildingRegsRoute[]]).safeParse(form.get("buildingRegsRoute"));
+  const pc = text(form, "principalContractor", 160);
+  const pdesigner = text(form, "principalDesigner", 160);
   const done: Record<ComplianceStatus, string> = {
     approved: "Approved.",
     "not-applicable": "Marked not applicable.",
@@ -74,6 +76,7 @@ export async function reviewAction(projectId: string, _prev: ActionState, form: 
         ...(outcome.success ? { planningOutcome: outcome.data } : {}),
         ...(listed.success ? { listedBuilding: listed.data } : {}),
         ...(route.success ? { buildingRegsRoute: route.data } : {}),
+        ...(pc || pdesigner ? { cdmRoles: { ...(pc ? { principalContractor: pc } : {}), ...(pdesigner ? { principalDesigner: pdesigner } : {}) } } : {}),
       },
       staff,
     ),

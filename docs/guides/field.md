@@ -479,7 +479,12 @@ clear it.
    how far off it is): **Accept** it with the reason (an extra coil laid, a
    manual's own figure), or **Capture again**. If the length is typed again
    afterwards, it comes back to you.
-4. **Sign as \<your name\>**. That completes the install and issues the
+4. A subcontractor on the crew (CDM 2015: more than one contractor)? The
+   sign form asks **For the health and safety file**: anything the next
+   person working on it should know (hidden fixings, anything left in place,
+   safe access). The pack's file already lists the routes as built, the R32,
+   the isolators and the manuals; leave it blank if there's nothing to add.
+5. **Sign as \<your name\>**. That completes the install and issues the
    commissioning certificate. It can't be undone from the field. If a
    reading arrived from another phone since your screen loaded, signing is
    refused and names it: check the results again, then sign.

@@ -6,6 +6,7 @@ import {
   addComplianceEvidence,
   asbestosSuspectedAtSurvey,
   buildingRegsRouteProblem,
+  cdmRolesProblem,
   companyFgasCertProblem,
   complianceProgress,
   complianceTemplateFor,
@@ -604,4 +605,26 @@ test("flats in blocks: the Building Regulations route is a choice; a flat can't 
   assert.equal(reopened?.buildingRegsRoute, undefined, "the answer goes with the approval");
   // Once the install has started, nothing is reopened by itself.
   assert.equal(syncCompliance([notice], project((p) => { p.install.status = "in-progress"; }), NOW, undefined, { block: { flat: true, higherRisk: false } }).length, 0);
+});
+
+test("CDM 2015: approving the RAMS records the principal contractor and designer; one approved without them is asked again before day 1", () => {
+  const rams = item("rams", { status: "under-review", mediaIds: ["m-rams"] });
+  const note = "DEMO: RAMS and construction phase plan attached.";
+  const none = reviewCompliance(rams, "approved", TECH, note, undefined, NOW, {});
+  assert.equal(none.ok, false);
+  if (!none.ok) assert.match(none.error, /Name the principal contractor and the principal designer/);
+  assert.match(cdmRolesProblem({ principalContractor: "DEMO Ltd" }) ?? "", /principal designer/);
+  const ok = reviewCompliance(rams, "approved", TECH, note, undefined, NOW, { cdmRoles: { principalContractor: " DEMO Installs Ltd ", principalDesigner: "DEMO Installs Ltd" } });
+  assert.equal(ok.ok, true);
+  if (ok.ok) assert.deepEqual(ok.item.cdmRoles, { principalContractor: "DEMO Installs Ltd", principalDesigner: "DEMO Installs Ltd" });
+  // Reopened: the roles go with the approval.
+  if (ok.ok) {
+    const back = reviewCompliance(ok.item, "under-review", TECH, "DEMO: crew changed", undefined, NOW, {});
+    assert.ok(back.ok && back.item.cdmRoles === undefined);
+  }
+  const old = item("rams", { status: "approved", reviewedBy: "DEMO Tess", reviewedAt: NOW, note });
+  const [reopened] = syncCompliance([old], project(), NOW, undefined, {});
+  assert.equal(reopened?.status, "under-review");
+  assert.match(reopened?.history?.at(-1)?.note ?? "", /principal contractor and principal designer/);
+  assert.equal(syncCompliance([{ ...old, cdmRoles: { principalContractor: "DEMO", principalDesigner: "DEMO" } }], project(), NOW, undefined, {}).length, 0);
 });

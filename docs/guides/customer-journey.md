@@ -181,7 +181,7 @@ pack and certificates in **Your documents**.
 
 | Message | Channel | When |
 | --- | --- | --- |
-| **Your handover pack is ready** | Email | When the crew publishes it (after commissioning is signed): equipment and serial numbers, commissioning certificate, manuals, warranty, care guide, contacts |
+| **Your handover pack is ready** | Email | When the crew publishes it (after commissioning is signed): equipment and serial numbers, commissioning certificate, manuals, warranty, care guide, contacts, and, when a subcontractor worked on the job, a short **health and safety file** (who the principal contractor and designer were, the pipe and cable routes as built, the R32, the isolators, the manuals, and the technical lead's note) |
 | **Invoice \<number\>: £X due \<day\>** | Email | The balance, when you issue it after the installation is finished. Due in 7 days by default |
 | **Payment received: £X, thank you** | Email | When the balance is recorded |
 | **Your electrical certificate is in your documents** | Email | When you add the electrician's certificate (if the pack was already out) |

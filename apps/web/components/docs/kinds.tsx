@@ -820,6 +820,31 @@ export function HandoverPackDoc({ snap, ctx }: { snap: HandoverPackSnapshot; ctx
         </DocSection>
       )}
 
+      {snap.healthAndSafetyFile && (
+        <DocSection title="Health and safety file">
+          <p>
+            More than one contractor worked on this installation, so under the Construction (Design and Management) Regulations 2015 we leave this short file: keep it with your home&apos;s papers, and show it to anyone who works on the system, the walls or the ceilings it runs through.
+          </p>
+          <Facts
+            rows={[
+              ["Principal contractor", snap.healthAndSafetyFile.principalContractor],
+              ["Principal designer", snap.healthAndSafetyFile.principalDesigner],
+              ["Who worked on it", snap.healthAndSafetyFile.contractors.join("; ")],
+            ]}
+          />
+          <p className="pt-1 font-semibold text-ink-900">Pipe and cable routes, as built</p>
+          <Bullets items={snap.healthAndSafetyFile.routes} />
+          <p className="pt-1 font-semibold text-ink-900">The refrigerant</p>
+          <Bullets items={snap.healthAndSafetyFile.refrigerant} />
+          <p className="pt-1 font-semibold text-ink-900">Isolators</p>
+          <Bullets items={snap.healthAndSafetyFile.isolators} />
+          <p className="pt-1 font-semibold text-ink-900">Manuals</p>
+          <Bullets items={snap.healthAndSafetyFile.manuals} />
+          <p className="pt-1 font-semibold text-ink-900">From the technical lead{snap.healthAndSafetyFile.techLead ? ` (${snap.healthAndSafetyFile.techLead})` : ""}</p>
+          <p>{snap.healthAndSafetyFile.techLeadNote || "Nothing further to add."}</p>
+        </DocSection>
+      )}
+
       <DocSection title="Service, problems and contacts">
         <p>{ctx.live?.serviceDueOn ? `Your first service is due around ${fmtDate(ctx.live.serviceDueOn)}. We'll remind you a few weeks before, and every year after.` : "We'll remind you when your first service is due, about a year after installation, and every year after."}</p>
         <p>

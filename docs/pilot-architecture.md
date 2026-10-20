@@ -2925,4 +2925,20 @@ changelog and the reasons, so nobody "fixes" a deliberate choice back.
       Aftercare box shows the next due, the visits and the forms; the
       family's page and the pack say "every year". The route walk opens
       `/stop`.
+    - *CDM 2015 roles* (was known limitation 31a's CDM line):
+      `ComplianceItem.cdmRoles` (`CdmRoles`: principal contractor and
+      designer), asked to approve `rams` (`ComplianceReviewContext.cdmRoles`,
+      `cdmRolesProblem`; the page prefills the company's legal name), kept
+      while approved; `syncCompliance` reopens a RAMS approval without them
+      before day 1 (the demo seed's carry them). `moreThanOneContractor`
+      (any external crew member) decides the pack's
+      `HandoverPackSnapshot.healthAndSafetyFile` (`HealthSafetyFile`,
+      `healthSafetyFileFor`: the roles, the contractors, each room's route
+      from the survey with its as-built run (`asBuiltRunsFromJob`, hidden
+      routes marked), the supply cable, the F-gas records and the R32 rules,
+      `isolatorsFromJob`, the models' manuals, and the technical lead's
+      line). `CommissioningRecord.hsFileNote` is that line: the Commission
+      tab asks it when the crew has a subcontractor, `signCommissioning`
+      keeps it only then. The pack renders a "Health and safety file"
+      section.
 

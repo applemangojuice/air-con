@@ -81,3 +81,41 @@ test("documentCustomer: name and address from the project", () => {
     { name: "Sam (DEMO)", addressLine: "1 Demo Street", postcode: "SW16 9ZZ" },
   );
 });
+
+test("health and safety file: only with more than one contractor; built from the job's records with the tech lead's line", async () => {
+  const { healthSafetyFileFor, moreThanOneContractor } = await import("./documents.ts");
+  const inHouse = [
+    { name: "DEMO Tess", role: "tech-lead", external: false },
+    { name: "DEMO Eli", role: "electrician", external: false },
+  ];
+  const withSub = [...inHouse.slice(0, 1), { name: "DEMO Sparks Ltd", role: "electrician", external: true }];
+  assert.equal(moreThanOneContractor(inHouse), false);
+  assert.equal(moreThanOneContractor(withSub), true);
+  const base = {
+    company: "DEMO Installs Ltd",
+    runs: [
+      { room: "Main bedroom", route: "internal-concealed", routeNote: "in the ceiling void above the landing", asBuiltM: 7.5 },
+      { room: "Living room", route: "through-wall", asBuiltM: 3 },
+    ],
+    cable: { lengthM: 9, note: "under the stairs, out through the back wall" },
+    fgas: [{ system: "System", refrigerant: "R32", gwp: 675, factoryChargeKg: 1.1, additionalChargeKg: 0.2, totalKg: 1.3, tco2e: 0.878 }],
+    isolators: ["System: 20 A rotary isolator fitted by the outdoor unit."],
+    equipment: [
+      { room: "Main bedroom", label: "DEMO wall unit", model: "DEMO-FTX25", serial: "1" },
+      { room: "Outdoor", label: "DEMO outdoor", model: "DEMO-RX25", serial: "2" },
+    ],
+  };
+  assert.equal(healthSafetyFileFor({ ...base, crew: inHouse }), null, "one contractor: no file");
+  const file = healthSafetyFileFor({ ...base, crew: withSub, roles: { principalContractor: "DEMO Installs Ltd" }, techLeadNote: " The bracket's top fixing is a resin anchor. ", techLead: "DEMO Tess" })!;
+  assert.deepEqual([file.principalContractor, file.principalDesigner], ["DEMO Installs Ltd", "DEMO Installs Ltd"], "the company by default");
+  assert.deepEqual(file.contractors, ["DEMO Installs Ltd (installation and refrigeration)", "DEMO Sparks Ltd (electrician, subcontractor)"]);
+  assert.match(file.routes[0]!, /^Hidden: Main bedroom: .*hidden inside the walls, floor or ceiling \(in the ceiling void above the landing\), 7\.5 m as built\.$/);
+  assert.doesNotMatch(file.routes[1]!, /^Hidden/);
+  assert.match(file.routes[2]!, /supply cable .*under the stairs.*about 9 m/);
+  assert.match(file.refrigerant[0]!, /R32 \(mildly flammable, A2L\), 1\.3 kg/);
+  assert.match(file.refrigerant[1]!, /Only an F-gas certified engineer/);
+  assert.deepEqual(file.isolators, base.isolators);
+  assert.match(file.manuals[0]!, /DEMO-FTX25, DEMO-RX25/);
+  assert.deepEqual([file.techLeadNote, file.techLead], ["The bracket's top fixing is a resin anchor.", "DEMO Tess"]);
+  assert.equal(healthSafetyFileFor({ ...base, crew: withSub })!.techLeadNote, "", "nothing written: the pack says nothing further");
+});

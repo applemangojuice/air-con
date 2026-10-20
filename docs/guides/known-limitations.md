@@ -433,13 +433,20 @@ says what to do instead. Approvals that need a professional are in
       learns about the freeholder's consent at the survey, not from the
       online price. *Instead:* the surveyor records the tenure carefully;
       tell a leaseholder about the consent at the survey.
-    - *CDM 2015*: the RAMS item asks for the construction phase plan's
-      content (site rules, welfare, induction, coordination), but nothing
-      records who is principal contractor and principal designer, and the
-      handover pack has no health and safety file for a job with a
-      subcontracted electrician. *Instead:* write both into the RAMS, and
-      add the hidden pipe and cable routes, the R32 note and the isolators
-      to the pack's notes for those jobs.
+    - *CDM 2015* (§K49; was "nothing records who is principal contractor"):
+      approving the RAMS records the principal contractor and principal
+      designer (our legal name by default), and a job with a subcontractor
+      on the crew gets a short health and safety file in the handover pack,
+      from the job's records, with the technical lead's line from
+      commissioning. But: "more than one contractor" is read from the crew
+      (anyone marked external), not from who else the household engaged;
+      the file is what the app knows (survey routes, as-built runs, the
+      F-gas record, the isolator, the models), not a drawing; and the
+      domestic client rules (duties passing to the contractor, a principal
+      designer's written agreement) were read through HSE's summaries, not
+      the regulations themselves (unreachable from here). *Instead:* when
+      another contractor works there without being on our crew, add them to
+      the RAMS and the commissioning line.
     - *Asbestos awareness*: the booking warns (doesn't block) when a pre-2000
       home's crew has no current asbestos awareness training on file, and
       nothing checks the surveyor's. *Instead:* add the training to each

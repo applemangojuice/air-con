@@ -44,6 +44,8 @@ import {
   buildRunsheet,
   NUMERIC_KINDS,
   carryTargets,
+  asBuiltRunsFromJob,
+  isolatorsFromJob,
   chargeCheck,
   chargeToleranceG,
   decayRetestMarkers,
@@ -499,6 +501,19 @@ test("a flat in a block: a crossing adds the fire-stopping step (photo and produ
   assert.equal(runsheetFromDesign(design(1, "single"), "v-std", CATALOGUE, measured()).some((s) => s.id === "d1-firestop"), false, "a house");
   // The customer's words mention it once.
   assert.ok(customerWorkNext(crossing).length > 0);
+});
+
+test("the health and safety file's inputs from the job: isolators and as-built runs; the tech lead's line on the commissioning record", () => {
+  const steps = runsheetFromDesign(design(2, "single"), "v-std", CATALOGUE);
+  const iso = isolatorsFromJob({ runsheet: steps });
+  assert.equal(iso.length, 2, "one per system, never the walkthrough's check");
+  assert.match(iso[0]!, /^System 1: 20 A rotary isolator fitted by the outdoor unit\.$/);
+  const run = steps.find((s) => s.roomId === "room-1" && s.evidence.some((e) => e.role === "as-built-run"))!.evidence.find((e) => e.role === "as-built-run")!;
+  const j = job(steps, [{ id: "r1", specId: run.id, value: 8.5, at: AT, by: TECH.name }]);
+  assert.deepEqual([...asBuiltRunsFromJob(j)], [["room-1", 8.5]]);
+  const rec = buildCommissioningRecord(j, TECH, AT, undefined, "  The outdoor bracket's top fixing is a resin anchor (DEMO).  ");
+  assert.equal(rec.hsFileNote, "The outdoor bracket's top fixing is a resin anchor (DEMO).");
+  assert.equal(buildCommissioningRecord(j, TECH, AT, undefined, "  ").hsFileNote, undefined);
 });
 
 test("unknown variant or empty design is refused loudly", () => {

@@ -27,13 +27,15 @@ export async function POST(request: Request, { params }: Params): Promise<Respon
   const body = z
     .object({
       notes: z.string().max(2000).optional(),
+      // A job with a subcontractor: the technical lead's line for the health and safety file.
+      hsFileNote: z.string().max(2000).optional(),
       // Every evidence id the signer's screen had from the server: a capture that arrived since is refused.
       seen: z.array(z.string().min(1).max(100)).max(5000).optional(),
     })
     .safeParse(await readJson(request));
   if (!body.success) return json({ error: "Invalid request" }, 400);
   return answer(async () => {
-    const { certificate, record, already, project } = await signCommissioning(projectId, staff, body.data.notes, body.data.seen);
+    const { certificate, record, already, project } = await signCommissioning(projectId, staff, body.data.notes, body.data.seen, body.data.hsFileNote);
     return { ok: true, certificate, record, already, header: headerStateOf(project) };
   });
 }

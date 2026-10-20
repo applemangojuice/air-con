@@ -302,6 +302,13 @@ start. A few ask for more than a note:
   test result (or the avoiding route) attached.
 - **Supply capacity and the network operator (DNO)**: the electrician's
   written outcome, before booking.
+- **Risk assessment and method statement**: approving it records the CDM
+  2015 **Principal contractor** and **Principal designer** (our legal name
+  in both to start with; a subcontracted electrician is a contractor). An
+  approval from before this was asked is reopened before day 1. With a
+  subcontractor on the crew, the handover pack gains a short health and
+  safety file built from the job, with the technical lead's line from
+  commissioning.
 - **Building Regulations route for the heat pump**: choose how it's covered
   (**Competent person scheme** is ticked to start with), and write the
   scheme and registration number, or the application's reference and date.

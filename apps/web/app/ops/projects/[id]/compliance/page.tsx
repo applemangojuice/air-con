@@ -145,6 +145,7 @@ export default async function CompliancePage({ params }: { params: Promise<{ id:
                         media={item.mediaIds.map((m) => mediaById.get(m)).filter((m) => m !== undefined)}
                         context={context(item)}
                         {...(survey?.data ? { measured: survey.data } : {})}
+                        companyName={settings.company.legalName}
                       />
                     ))}
                   </ul>
@@ -340,6 +341,7 @@ function ItemCard({
   media,
   context,
   measured,
+  companyName,
 }: {
   item: ComplianceItem;
   projectId: string;
@@ -350,6 +352,8 @@ function ItemCard({
   context: ContextRow[];
   /** The survey: which Building Regulations routes fit this home. */
   measured?: MeasuredSurvey;
+  /** Our legal name: the CDM roles' default. */
+  companyName: string;
 }) {
   const t = complianceTemplateFor(item.key);
   const settled = item.status === "approved" || item.status === "not-applicable";
@@ -382,6 +386,11 @@ function ItemCard({
           <div className="mt-3 text-sm">
             {item.status === "approved" && item.planningOutcome && <p className="font-semibold text-ink-900">Outcome: {PLANNING_OUTCOME_TEXT[item.planningOutcome]}</p>}
             {item.status === "approved" && item.buildingRegsRoute && <p className="font-semibold text-ink-900">Route: {BUILDING_REGS_ROUTE_TEXT[item.buildingRegsRoute]}</p>}
+            {item.status === "approved" && item.cdmRoles && (
+              <p className="font-semibold text-ink-900">
+                Principal contractor: {item.cdmRoles.principalContractor} · Principal designer: {item.cdmRoles.principalDesigner}
+              </p>
+            )}
             {item.status === "approved" && item.listedBuilding && (
               <p className="font-semibold text-ink-900">Listed building, or in the curtilage of one: {item.listedBuilding === "yes" ? "Yes" : "No"}</p>
             )}
@@ -516,6 +525,22 @@ function ItemCard({
                       })}
                     </div>
                     <p className="mt-1 text-xs text-ink-500">Write the scheme and registration number, or the application reference and date, in the note.</p>
+                  </fieldset>
+                )}
+                {item.key === "rams" && choices.some((c) => c.to === "approved") && (
+                  <fieldset className="mt-3">
+                    <legend className="mb-1.5 text-sm font-semibold text-ink-900">CDM 2015 roles (to approve)</legend>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <label className="block text-sm text-ink-900">
+                        Principal contractor
+                        <input name="principalContractor" defaultValue={item.cdmRoles?.principalContractor ?? companyName} maxLength={160} className="mt-1 min-h-11 w-full rounded-xl border border-line bg-white px-3 text-sm" />
+                      </label>
+                      <label className="block text-sm text-ink-900">
+                        Principal designer
+                        <input name="principalDesigner" defaultValue={item.cdmRoles?.principalDesigner ?? companyName} maxLength={160} className="mt-1 min-h-11 w-full rounded-xl border border-line bg-white px-3 text-sm" />
+                      </label>
+                    </div>
+                    <p className="mt-1 text-xs text-ink-500">Us for both unless someone else agreed in writing; the subcontracted electrician is a contractor. With a subcontractor, the handover pack gets a short health and safety file.</p>
                   </fieldset>
                 )}
                 {item.key === "designations" && choices.some((c) => c.to === "approved") && (

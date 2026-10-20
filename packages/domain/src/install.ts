@@ -727,6 +727,8 @@ export interface CommissioningRecord {
   at: string;
   results: CommissioningResult[];
   notes?: string;
+  /** A job with a subcontractor: the technical lead's line for the health and safety file (the pack's). */
+  hsFileNote?: string;
 }
 
 export interface InstallJobV2 extends InstallJob {
@@ -3114,16 +3116,40 @@ export function commissioningSignErrors(job: InstallJobV2, signer: StaffMember, 
 }
 
 /** The record the tech lead signs: who, when, their F-gas reference, and the derived results. */
-export function buildCommissioningRecord(job: InstallJobV2, signer: StaffMember, now: string, notes?: string): CommissioningRecord {
+export function buildCommissioningRecord(job: InstallJobV2, signer: StaffMember, now: string, notes?: string, hsFileNote?: string): CommissioningRecord {
   const on = now.slice(0, 10);
   const cert = signer.qualifications.find((q) => q.kind === "fgas-cat1" && qualificationStatus(q, on) === "current");
   const clean = notes?.trim();
+  const hs = hsFileNote?.trim();
   return {
     signedBy: { staffId: signer.id, name: signer.name, qualificationRef: cert?.reference.trim() ?? "" },
     at: now,
     results: commissioningFromJob(job),
     ...(clean ? { notes: clean } : {}),
+    ...(hs ? { hsFileNote: hs } : {}),
   };
+}
+
+/** The circuit step's isolator, as the runsheet names it, per system ("System: 20 A rotary isolator fitted by the outdoor unit"). */
+export function isolatorsFromJob(job: Pick<InstallJob, "runsheet">): string[] {
+  const out: string[] = [];
+  for (const s of job.runsheet) {
+    const spec = s.evidence.find((e) => e.id.endsWith(".isolator") && e.kind === "photo" && e.role !== "walkthrough" && /isolator/i.test(e.label));
+    if (spec) out.push(`${(s.item ?? "System").replace(/:.*$/, "")}: ${spec.label.replace(/^(.)/, (c) => c.toUpperCase())}.`);
+  }
+  return out;
+}
+
+/** Each room's as-built run (one way, m) from its Pipework step, by room id. */
+export function asBuiltRunsFromJob(job: Pick<InstallJobV2, "runsheet" | "evidence" | "exceptionReviews">): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const s of job.runsheet) {
+    const spec = s.evidence.find((e) => e.role === "as-built-run");
+    if (!spec || !s.roomId) continue;
+    const r = latestEvidence(job, spec.id);
+    if (typeof r?.value === "number" && Number.isFinite(r.value)) out.set(s.roomId, r.value);
+  }
+  return out;
 }
 
 /* ---------------- a short summary for cards ---------------- */

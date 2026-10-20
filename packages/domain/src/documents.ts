@@ -317,6 +317,86 @@ export interface HandoverPackSnapshot extends DocumentHeader {
    * over. Absent on packs published before this was recorded.
    */
   asBuilt?: { mediaId: string; caption?: string }[];
+  /** CDM 2015: a job with more than one contractor (a subcontracted electrician) leaves a short health and safety file. */
+  healthAndSafetyFile?: HealthSafetyFile;
+}
+
+/**
+ * The health and safety file for a job with more than one contractor (CDM
+ * 2015, the principal designer's duty; read through HSE's summaries, to
+ * verify): what anyone working on the system or the walls later needs to
+ * know, built from the job's own records, and the technical lead's note.
+ */
+export interface HealthSafetyFile {
+  principalContractor: string;
+  principalDesigner: string;
+  /** Who worked on it: "Dang It's Hot Ltd (installation and refrigeration)", "<name> (electrician, subcontractor)". */
+  contractors: string[];
+  /** Each pipe run and the cable as built, the hidden ones said so. */
+  routes: string[];
+  refrigerant: string[];
+  isolators: string[];
+  manuals: string[];
+  /** The technical lead's own line, written at commissioning ("" when they had nothing to add). */
+  techLeadNote: string;
+  techLead?: string;
+}
+
+/** Does this crew make more than one contractor (anyone from outside the company)? */
+export function moreThanOneContractor(crew: { external: boolean }[]): boolean {
+  return crew.some((c) => c.external);
+}
+
+const HIDDEN_ROUTES = new Set(["internal-concealed", "via-loft", "other"]);
+const ROUTE_WORDS: Record<string, string> = {
+  "through-wall": "straight through the wall",
+  "external-trunking": "outside, in trunking",
+  "internal-concealed": "hidden inside the walls, floor or ceiling",
+  "via-loft": "through the loft",
+  other: "another route",
+};
+
+/** The health and safety file from the job's records, or null for a job with one contractor. */
+export function healthSafetyFileFor(input: {
+  company: string;
+  roles?: { principalContractor?: string; principalDesigner?: string };
+  crew: { name: string; role: string; external: boolean }[];
+  runs: { room: string; route?: string; routeNote?: string; asBuiltM?: number }[];
+  cable?: { lengthM?: number; note?: string };
+  fgas: FgasRecord[];
+  isolators: string[];
+  equipment: InstalledEquipmentRow[];
+  techLeadNote?: string;
+  techLead?: string;
+}): HealthSafetyFile | null {
+  if (!moreThanOneContractor(input.crew)) return null;
+  const company = input.company.trim() || "The installer";
+  const roleWords = (r: string) => (r === "electrician" ? "electrician" : r === "tech-lead" ? "technical lead" : r === "surveyor" ? "surveyor" : "installer");
+  const subs = input.crew.filter((c) => c.external).map((c) => `${c.name} (${roleWords(c.role)}, subcontractor)`);
+  const routes = input.runs.map((r) => {
+    const how = r.route ? (ROUTE_WORDS[r.route] ?? r.route) : "route not recorded";
+    const hidden = r.route && HIDDEN_ROUTES.has(r.route) ? "Hidden: " : "";
+    return `${hidden}${r.room}: refrigerant pipes, condensate drain and the interconnect cable, ${how}${r.routeNote?.trim() ? ` (${r.routeNote.trim()})` : ""}${typeof r.asBuiltM === "number" ? `, ${r.asBuiltM} m as built` : ""}.`;
+  });
+  if (input.cable && (input.cable.note?.trim() || typeof input.cable.lengthM === "number")) {
+    routes.push(`The outdoor unit's supply cable from the fuse board${input.cable.note?.trim() ? `: ${input.cable.note.trim()}` : ""}${typeof input.cable.lengthM === "number" ? ` (about ${input.cable.lengthM} m)` : ""}.`);
+  }
+  const refrigerant = input.fgas.length
+    ? input.fgas.map((f) => `${f.system}: ${f.refrigerant} (mildly flammable, A2L), ${f.totalKg} kg in total (GWP ${f.gwp}, ${f.tco2e} tCO2e).`)
+    : ["R32 refrigerant (mildly flammable, A2L): see the F-gas label on the outdoor unit for the charge."];
+  refrigerant.push("Only an F-gas certified engineer may open the system. No hot work (brazing, cutting) near the pipework until the refrigerant is recovered, and keep ignition sources away from any leak.");
+  const models = [...new Set(input.equipment.map((e) => e.model).filter(Boolean))];
+  return {
+    principalContractor: input.roles?.principalContractor?.trim() || company,
+    principalDesigner: input.roles?.principalDesigner?.trim() || company,
+    contractors: [`${company} (installation and refrigeration)`, ...subs],
+    routes,
+    refrigerant,
+    isolators: input.isolators.length ? input.isolators : ["A rotary isolator by each outdoor unit, and the circuit's own device at the fuse board."],
+    manuals: models.length ? [`The manufacturer's installation and user manuals for ${models.join(", ")}, handed over at the walkthrough: keep them with this file.`] : ["The manufacturer's manuals, handed over at the walkthrough: keep them with this file."],
+    techLeadNote: input.techLeadNote?.trim() ?? "",
+    ...(input.techLead ? { techLead: input.techLead } : {}),
+  };
 }
 
 export interface SurveyReportSnapshot extends DocumentHeader {

@@ -235,6 +235,9 @@ export function Commissioning({ data: page, certificateHref, holds = [] }: { dat
   // Captures for this job still on this phone (waiting, or refused): the screen shows them, the server hasn't got them.
   const onPhone = outboxState.items.filter((i) => i.projectId === header.projectId).length;
   const [notes, setNotes] = useState("");
+  // A job with a subcontractor (CDM 2015: more than one contractor) leaves a health and safety file: the tech lead's line for it.
+  const [hsNote, setHsNote] = useState("");
+  const severalContractors = header.crew.some((c) => c.external);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [blockers, setBlockers] = useState<Blocker[]>([]);
@@ -285,7 +288,7 @@ export function Commissioning({ data: page, certificateHref, holds = [] }: { dat
     }
     // Every capture this screen showed: the server refuses if a newer one has arrived (another crew phone).
     const seen = (merged?.job.evidence ?? []).map((e) => e.id).filter((x): x is string => Boolean(x));
-    const r = await postAnswer<SignAnswer>(`/api/field/jobs/${header.projectId}/commissioning`, { notes, seen }, NO_REPLY);
+    const r = await postAnswer<SignAnswer>(`/api/field/jobs/${header.projectId}/commissioning`, { notes, seen, ...(severalContractors && hsNote.trim() ? { hsFileNote: hsNote.trim() } : {}) }, NO_REPLY);
     setBusy(false);
     if (!r.ok) {
       setError(r.error);
@@ -505,6 +508,17 @@ export function Commissioning({ data: page, certificateHref, holds = [] }: { dat
                 Notes (optional, printed on the certificate)
               </label>
               <textarea id="comm-notes" rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} className="mt-1.5 w-full rounded-2xl border border-line bg-white px-4 py-3 text-base" />
+              {severalContractors && (
+                <>
+                  <label htmlFor="comm-hs" className="mt-3 block text-sm font-semibold text-ink-900">
+                    For the health and safety file (a subcontractor worked on this job)
+                  </label>
+                  <p className="text-sm text-ink-500">
+                    The pack lists the pipe and cable routes as built, the R32, the isolators and the manuals. Add what else the next person working on it should know (hidden fixings, anything left in place, safe access), or leave it blank.
+                  </p>
+                  <textarea id="comm-hs" rows={3} maxLength={2000} value={hsNote} onChange={(e) => setHsNote(e.target.value)} className="mt-1.5 w-full rounded-2xl border border-line bg-white px-4 py-3 text-base" />
+                </>
+              )}
               {error && (
                 <p role="alert" className="mt-2 text-sm font-medium text-red-700">
                   {error}

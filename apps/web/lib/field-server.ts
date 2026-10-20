@@ -45,6 +45,10 @@ import {
   transitionIssue,
   variationStart,
   withExceptionReview,
+  asBuiltRunsFromJob,
+  healthSafetyFileFor,
+  isolatorsFromJob,
+  moreThanOneContractor,
   type Blocker,
   type CatalogueItem,
   type CommissioningRecord,
@@ -53,6 +57,7 @@ import {
   type EvidenceRecord,
   type ExceptionReview,
   type HandoverPackSnapshot,
+  type HealthSafetyFile,
   type InstallJobV2,
   type InstallStep,
   type Issue,
@@ -109,6 +114,7 @@ import * as mediaRepo from "./repo/media";
 import * as messagesRepo from "./repo/messages";
 import * as proposalsRepo from "./repo/proposals";
 import * as purchaseOrdersRepo from "./repo/purchaseOrders";
+import * as complianceRepo from "./repo/compliance";
 import * as surveysRepo from "./repo/surveys";
 import * as timeRepo from "./repo/time";
 import { SETTINGS_UNAVAILABLE, getSettings, settingsForWrite } from "./settings-server";
@@ -1668,7 +1674,7 @@ export function unseenEvidence(job: Pick<InstallJobV2, "evidence" | "runsheet">,
   return [...latest.values()].filter((e) => e.id && !known.has(e.id)).map((e) => ({ specId: e.specId, label: labelOf(e.specId) }));
 }
 
-export async function signCommissioning(projectId: string, staff: StaffMember, notes?: string, seen?: string[]) {
+export async function signCommissioning(projectId: string, staff: StaffMember, notes?: string, seen?: string[], hsFileNote?: string) {
   const project = await projectForStaff(projectId, staff);
   const now = nowIso();
   const today = londonToday();
@@ -1696,7 +1702,7 @@ export async function signCommissioning(projectId: string, staff: StaffMember, n
   // The certificate freezes the company's details: read them before anything is signed.
   const settings = await settingsForWrite();
   if (!settings) throw new FieldError(SETTINGS_UNAVAILABLE, 503);
-  const record: CommissioningRecord = buildCommissioningRecord(job, staff, now, notes);
+  const record: CommissioningRecord = buildCommissioningRecord(job, staff, now, notes, moreThanOneContractor(project.booking.crew) ? hsFileNote : undefined);
   await mutateJob(projectId, (parts) => (parts.commissioning ? null : { ...parts, commissioning: record, qa: { status: "signed-off", reviewedBy: staff.name } }));
   const undo = () =>
     mutateJob(projectId, (parts) =>
@@ -1818,6 +1824,30 @@ export async function handoverDraft(projectId: string, staff: StaffMember, opts:
     .map((m) => ({ mediaId: m.id, ...(m.caption ? { caption: m.caption } : {}) }));
   if (asBuilt.length === 0) missing.push("There are no as-built photos the customer can see (finished or progress photos).");
   const phone = isPlaceholderPhone(settings.company.phone) ? undefined : settings.company.phone;
+  // CDM 2015: with a subcontractor on the job, a short health and safety file from the job's own records.
+  let healthAndSafetyFile: HealthSafetyFile | null = null;
+  if (moreThanOneContractor(project.booking.crew)) {
+    const [survey, rams] = await Promise.all([surveysRepo.currentForProject(projectId).catch(() => null), complianceRepo.getByKey(projectId, "rams").catch(() => null)]);
+    const runs = job ? asBuiltRunsFromJob(job) : new Map<string, number>();
+    const rooms = (survey?.data.rooms ?? []).filter((r) => r.include !== false);
+    healthAndSafetyFile = healthSafetyFileFor({
+      company: settings.company.legalName,
+      ...(rams?.status === "approved" && rams.cdmRoles ? { roles: rams.cdmRoles } : {}),
+      crew: project.booking.crew,
+      runs: (rooms.length ? rooms.map((r) => ({ id: r.id, name: r.name, route: r.route, routeNote: r.routeNote })) : [...runs.keys()].map((id) => ({ id, name: id, route: undefined, routeNote: undefined }))).map((r) => ({
+        room: r.name,
+        ...(r.route ? { route: r.route } : {}),
+        ...(r.routeNote ? { routeNote: r.routeNote } : {}),
+        ...(runs.has(r.id) ? { asBuiltM: runs.get(r.id)! } : {}),
+      })),
+      ...(survey?.data.electrics ? { cable: { ...(survey.data.electrics.cableRouteM !== undefined ? { lengthM: survey.data.electrics.cableRouteM } : {}), ...(survey.data.electrics.cableRouteNote ? { note: survey.data.electrics.cableRouteNote } : {}) } } : {}),
+      fgas: fgas.filter((f) => f.record).map((f) => f.record!),
+      isolators: job ? isolatorsFromJob(job) : [],
+      equipment,
+      ...(job?.commissioning?.hsFileNote ? { techLeadNote: job.commissioning.hsFileNote } : {}),
+      ...(job?.commissioning?.signedBy.name ? { techLead: job.commissioning.signedBy.name } : {}),
+    });
+  }
   const snapshot: HandoverPackSnapshot = {
     ...header(settings, project, now),
     completedOn,
@@ -1838,6 +1868,7 @@ export async function handoverDraft(projectId: string, staff: StaffMember, opts:
       { label: "Report a problem", ...(phone ? { phone } : {}), email: settings.company.email },
     ],
     asBuilt,
+    ...(healthAndSafetyFile ? { healthAndSafetyFile } : {}),
   };
   if (progress && !progress.walkthroughDone) missing.push("The customer walkthrough isn't ticked off yet.");
   return { snapshot, missing, certificate: cert ? { kind: "commissioning-certificate", ref: cert.ref, id: cert.id, title: cert.title } : null };
