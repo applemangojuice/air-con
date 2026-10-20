@@ -13,6 +13,7 @@ import {
   migrateProject,
   outstandingPence,
   owedInvoices,
+  asbestosSuspectedAtSurvey,
   planningConsentForGate,
   stillToBillPence,
   acceptedVariationsPence,
@@ -249,6 +250,7 @@ export function contextFromRecords(
       ...(rec.designs.get(id)?.site?.planning?.intel?.listedBuilding ? { intelListed: true } : {}),
     }, new Date().toISOString()).map((c) => ({ key: c.key, label: c.label, status: c.status, statutory: c.statutory, gate: c.gate })),
     ...(rec.surveys.get(id)?.data?.site?.tenure === "leaseholder" || rec.surveys.get(id)?.data?.site?.tenure === "tenant" ? { authorityConsentNeeded: true } : {}),
+    ...(rec.surveys.get(id)?.data && (rec.surveys.get(id)?.data!.house.era !== "2000+" || asbestosSuspectedAtSurvey(rec.surveys.get(id)?.data)) ? { asbestosAwarenessNeeded: true } : {}),
     crew: project.booking.crew.map((m) => rec.staff.get(m.staffId)).filter((s): s is StaffMember => Boolean(s)),
     openIssues: issues.filter(isOpen).map((i) => ({
       id: i.id,

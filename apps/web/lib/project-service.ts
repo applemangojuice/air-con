@@ -16,6 +16,7 @@ import {
   migrateProject,
   nextGate,
   outstandingPence,
+  asbestosSuspectedAtSurvey,
   planningConsentForGate,
   stillToBillPence,
   acceptedVariationsPence,
@@ -512,6 +513,7 @@ export async function buildReadinessContext(project: Project, actor?: StaffMembe
       gate: c.gate,
     })),
     ...(survey?.data?.site?.tenure === "leaseholder" || survey?.data?.site?.tenure === "tenant" ? { authorityConsentNeeded: true } : {}),
+    ...(survey?.data && (survey?.data!.house.era !== "2000+" || asbestosSuspectedAtSurvey(survey?.data)) ? { asbestosAwarenessNeeded: true } : {}),
     crew,
     openIssues: issues.filter(isOpen).map((i) => ({
       id: i.id,

@@ -12,7 +12,7 @@ import {
 } from "./project-v1.ts";
 import type { IssueKind, IssueStatus, VariationStatus } from "./issues.ts";
 import { DEFAULT_SETTINGS, schedule2Missing, type PilotSettings } from "./settings.ts";
-import { ROLE_LABEL, can, meetsRequirement, type StaffMember, type StaffRole } from "./staff.ts";
+import { ROLE_LABEL, can, hasCurrentQualification, meetsRequirement, type StaffMember, type StaffRole } from "./staff.ts";
 import { addWorkingDays, nextWorkingDay, notWorkingReason } from "./working-days.ts";
 
 // Unchanged from v1: one declaration, shared by both machines.
@@ -955,6 +955,8 @@ export interface ReadinessContext {
   compliance: { key: string; label: string; status: ComplianceStatus; statutory: boolean; gate: GateId }[];
   /** The survey records a leaseholder or tenant: the owner's authority item holds day 1 until its written consent is in. */
   authorityConsentNeeded?: boolean;
+  /** The home was built before 2000, or the survey suspects asbestos: the crew should hold asbestos awareness training. */
+  asbestosAwarenessNeeded?: boolean;
   crew: StaffMember[]; // full records of booking.crew
   kit?: { requiredLines: number; deliveredLines: number; inspectedLines: number; damaged: number };
   openIssues: { id: string; title: string; kind: string; severity: string; blocking: boolean; gate?: GateId }[];
@@ -1273,6 +1275,16 @@ export function blockersFor(project: Project, ctx: ReadinessContext, gate: GateI
       }
       if (!ctx.crew.some((m) => meetsRequirement(m, "tech-lead", today))) {
         warn("no-tech-lead", "Nobody on the crew can sign off commissioning.", "ops", "Assign a technical lead");
+      }
+      // Control of Asbestos Regulations 2012 reg 10: training for anyone liable to disturb it. The employer's duty:
+      // the app reminds, it can't prove the training was adequate.
+      if (ctx.asbestosAwarenessNeeded && ctx.crew.length > 0 && !ctx.crew.some((m) => hasCurrentQualification(m, "asbestos-awareness", today))) {
+        warn(
+          "no-asbestos-awareness",
+          "This home was built before 2000 (or the survey suspects asbestos), and nobody on the crew has current asbestos awareness training on file.",
+          "ops",
+          "Add the training to their staff record, or assign someone who has it",
+        );
       }
       // The deposit the contract says, not today's settings.
       const pay = ctx.agreedPayments ?? s.payments;

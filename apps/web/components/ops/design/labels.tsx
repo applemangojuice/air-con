@@ -44,7 +44,7 @@ export const RULE_LIGHT: Record<RuleStatus, { label: string; dot: string; ring: 
 };
 
 export const VERDICT: Record<DesignVerdict, { tone: Tone; label: string; detail: string }> = {
-  "auto-approved": { tone: "success", label: "All checks pass", detail: "Nothing for the engineer to look at beyond the sign-off." },
+  "auto-approved": { tone: "success", label: "All checks pass", detail: "Every check here passes. They don't cover the supply's capacity, the cable sizing or the RCD type: the electrician confirms those before booking." },
   "needs-review": { tone: "warn", label: "Needs the engineer's eye", detail: "Some checks want a human look before signing." },
   "cannot-determine": { tone: "danger", label: "Can't be settled yet", detail: "Some checks are missing data or have a problem to fix." },
 };

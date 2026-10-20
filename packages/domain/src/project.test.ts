@@ -2303,3 +2303,13 @@ test("cancellation charge credited: the charge comes down by the credit note, on
   assert.equal(step(less, { type: "cancellation-charge-credited", amountPence: 30_000, creditNoteId: "cn-1" }, "2026-11-20T10:05:00.000Z").cancellation?.charge?.amountPence, 60_000, "the same credit note twice: once");
   refuses(cancelledAfterDay1(), { type: "cancellation-charge-credited", amountPence: 100, creditNoteId: "cn-x" }, "2026-11-20T10:00:00.000Z", {}, /no charge/);
 });
+
+test("round 9: an older home warns at booking when nobody on the crew has asbestos awareness training on file", () => {
+  const p = walk("proposal-accepted");
+  const awareness = { kind: "asbestos-awareness" as const, reference: "DEMO-UKATA-1", expiresOn: "2030-12-31", verifiedAt: "2026-01-05T10:00:00.000Z", mediaId: "media-ukata" };
+  const c = (over: Partial<ReadinessContext>) => ctx(T.dates, over);
+  assert.equal(severityOf(blockersFor(p, c({ asbestosAwarenessNeeded: true }), "booking"), "no-asbestos-awareness"), "warn");
+  assert.equal(severityOf(blockersFor(p, c({}), "booking"), "no-asbestos-awareness"), undefined, "a post-2000 home with nothing suspected");
+  const trained = c({ asbestosAwarenessNeeded: true, crew: [{ ...INSTALLER, qualifications: [...INSTALLER.qualifications, awareness] }, TECH_LEAD, SPARKY] });
+  assert.equal(severityOf(blockersFor(p, trained, "booking"), "no-asbestos-awareness"), undefined);
+});
