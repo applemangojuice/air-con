@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { CATALOGUE_KIND_LABEL, CATALOGUE_KINDS, SPEC_FIELDS, type CatalogueItem, type EquipmentSpecs } from "@aircon/domain";
 import { saveCatalogueItemAction, setCatalogueItemActiveAction } from "@/app/ops/catalogue/actions";
 import { Button, Card, Checkbox, Fieldset, Input, Select, Textarea } from "@/components/kit";
@@ -168,8 +168,11 @@ export function ItemForm({
   defaultKind = "material",
   today,
   pairOptions,
+  loadedAt,
 }: {
   item: CatalogueItem | null;
+  /** The row's updated_at as the page loaded it: a save from an older copy is refused (another tab, a retirement). */
+  loadedAt?: string;
   defaultKind?: CatalogueItem["kind"];
   today: string;
   /** Ids the "paired with" field can point at (the other kind of unit). */
@@ -200,6 +203,21 @@ export function ItemForm({
   };
   const original = useMemo(() => JSON.stringify(draftOf(item, defaultKind)), [item, defaultKind]);
   const dirty = JSON.stringify(d) !== original;
+  // The copy this form is working from: from the page, then from each of its own saves.
+  const version = useRef(loadedAt);
+  useEffect(() => {
+    version.current = loadedAt;
+  }, [loadedAt]);
+  // The stored item changed under the form (its own save landing, Retire / Restore): an untouched form
+  // follows it; edits in progress are kept, but whether it's in use always follows the item (never "unsaved").
+  const previous = useRef(original);
+  useEffect(() => {
+    if (previous.current === original) return;
+    const wasClean = JSON.stringify(d) === previous.current;
+    previous.current = original;
+    const fresh = draftOf(item, defaultKind);
+    setD((cur) => (wasClean ? fresh : { ...cur, active: fresh.active }));
+  }, [original, d, item, defaultKind]);
 
   const save = () => {
     const { item: out, errors } = toItem(d);
@@ -211,11 +229,12 @@ export function ItemForm({
     }
     start(async () => {
       try {
-        const r = await saveCatalogueItemAction(out, creating ? "create" : "update");
+        const r = await saveCatalogueItemAction(out, creating ? "create" : "update", creating ? undefined : version.current);
         if (!r.ok) {
           setServerErrors(r.errors);
           return;
         }
+        if (r.value.version) version.current = r.value.version;
         setSaved(creating ? "Added to the catalogue." : "Saved.");
         if (creating) router.push(`/ops/catalogue/${encodeURIComponent(r.value.id)}`);
         else router.refresh();

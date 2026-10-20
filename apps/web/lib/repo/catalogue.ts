@@ -36,6 +36,32 @@ export async function get(id: string): Promise<CatalogueItem | null> {
   return data ? fromRow(data) : null;
 }
 
+/** One item with the row's `updated_at`: the token `updateIfUnchanged` compares. */
+export async function getStamped(id: string): Promise<{ item: CatalogueItem; updatedAt: string } | null> {
+  if (!id) return null;
+  const data = must(await db().from(TABLE).select("*").eq("id", id).maybeSingle(), "catalogue get");
+  return data ? { item: fromRow(data), updatedAt: String((data as Row).updated_at) } : null;
+}
+
+/**
+ * Compare-and-set: write only if nobody has saved the item since the read
+ * that gave `expectedUpdatedAt` (a price rise in another tab, a retirement),
+ * so a stale editor never silently reverts it. Null when someone has.
+ */
+export async function updateIfUnchanged(item: CatalogueItem, expectedUpdatedAt: string): Promise<{ item: CatalogueItem; updatedAt: string } | null> {
+  const data = must(
+    await db()
+      .from(TABLE)
+      .update({ ...toRow(item), updated_at: nowIso() })
+      .eq("id", item.id)
+      .eq("updated_at", expectedUpdatedAt)
+      .select("*")
+      .maybeSingle(),
+    "catalogue update",
+  );
+  return data ? { item: fromRow(data), updatedAt: String((data as Row).updated_at) } : null;
+}
+
 export async function list(opts: { kind?: CatalogueKind; activeOnly?: boolean } = {}): Promise<CatalogueItem[]> {
   // Page by page past Max Rows (1000): a big supplier import must not silently drop the items that sort last.
   const data = await selectAllPages<Row>((from, to, count) => {

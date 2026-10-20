@@ -821,6 +821,9 @@ export function planningNoteErrors(
   ];
 }
 
+/** The last day of the zero rate for energy-saving materials in homes (TAX_CODES["zero-esm"]): accountant to confirm. */
+export const ZERO_ESM_LAST_DAY = "2027-03-31";
+
 export function proposalIssueErrors(p: ProposalRecord, settings: PilotSettings, todayIso: string): string[] {
   const errors: string[] = [];
   const today = dateOf(todayIso);
@@ -849,6 +852,10 @@ export function proposalIssueErrors(p: ProposalRecord, settings: PilotSettings, 
     }
     if (settings.tax.vatRegistered && pr.taxCode !== effectiveTaxCode(settings) && !p.taxOverride?.reason.trim()) {
       errors.push(`${name}: a different tax code from settings needs an admin override with a reason.`);
+    }
+    // The 0% rate for energy-saving materials (heat pumps in homes) ends on 31 March 2027: never offered after it.
+    if (pr.taxCode === "zero-esm" && today > ZERO_ESM_LAST_DAY) {
+      errors.push(`${name}: the 0% VAT rate for energy-saving materials ended on 31 March 2027. Use the standard rate (or the code your accountant gives you).`);
     }
     if (pr.belowMinMargin && !p.marginOverride?.reason.trim()) {
       errors.push(`${name}: the margin (${pr.grossMarginPct}%) is below the ${settings.pricing.minMarginPct}% minimum. Change the price, or an admin records an override with a reason.`);

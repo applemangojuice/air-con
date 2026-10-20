@@ -14,6 +14,8 @@ export interface ActionResult {
   href?: string;
   /** Extra data a form may show (e.g. an on-screen sign-in link in development). */
   detail?: string;
+  /** An editor's new "as saved" token (the row's updated_at), so its next save isn't taken for a stale one. */
+  version?: string;
 }
 
 export const done = (message: string, extra: Partial<ActionResult> = {}): ActionResult => ({ ok: true, message, ...extra });

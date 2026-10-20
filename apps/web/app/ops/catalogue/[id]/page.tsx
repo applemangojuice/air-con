@@ -17,6 +17,7 @@ import { ItemForm } from "@/components/ops/design/catalogue/item-form";
 import { AvailabilityBadge, ConfidenceBadge, Row } from "@/components/ops/design/labels";
 import { requireStaff } from "@/lib/auth/server";
 import { loadCatalogue, withoutCosts } from "@/lib/catalogue-server";
+import * as catalogueRepo from "@/lib/repo/catalogue";
 import { fmtDate } from "@/lib/format";
 import { londonToday } from "@/lib/project-service";
 
@@ -40,6 +41,8 @@ export default async function CatalogueItemPage({ params }: { params: Promise<{ 
   const found = items.find((i) => i.id === id);
   if (!found) notFound();
   const canEdit = can(staff, "catalogue.edit");
+  // The editor's "as I loaded it" token: a save from an older copy is refused, never written over a newer one.
+  const loadedAt = canEdit ? (await catalogueRepo.getStamped(id))?.updatedAt : undefined;
   const canSeeCosts = can(staff, "finance.view-margin");
   const item: CatalogueItem = canSeeCosts ? found : withoutCosts(found);
   const today = londonToday();
@@ -104,7 +107,7 @@ export default async function CatalogueItemPage({ params }: { params: Promise<{ 
       )}
 
       {canEdit ? (
-        <ItemForm item={item} today={today} pairOptions={pairOptions} />
+        <ItemForm item={item} loadedAt={loadedAt} today={today} pairOptions={pairOptions} />
       ) : (
         <div className="space-y-5">
           {item.customerBlurb && (

@@ -56,7 +56,7 @@ export async function POST(request: Request): Promise<Response> {
     const confirmed = await confirmStaffUpload({ ...input, by: admin });
     if ("error" in confirmed) return json({ error: confirmed.error }, confirmed.status);
     if (input.purpose === "photo" && person.photoMediaId !== confirmed.item.id) {
-      await staffRepo.update({ ...person, photoMediaId: confirmed.item.id }, admin);
+      await staffRepo.setPhoto(person.id, confirmed.item.id, admin);
       await audit({ actor: admin, action: "staff.photo", entity: "staff", entityId: person.id, detail: { mediaId: confirmed.item.id } });
       revalidatePath("/ops/staff");
       revalidatePath(`/ops/staff/${person.id}`);

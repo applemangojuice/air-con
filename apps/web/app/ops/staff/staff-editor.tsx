@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { QUALIFICATION_LABEL, ROLE_LABEL, STAFF_ROLES, type Qualification, type QualificationKind, type StaffMember, type StaffRole } from "@aircon/domain";
 import { Badge } from "@/components/kit/badge";
 import { Button } from "@/components/kit/button";
@@ -86,6 +86,7 @@ async function uploadStaffFile(file: File, staffId: string, purpose: "photo" | "
 export function StaffEditor({
   action,
   person,
+  loadedAt,
   today,
   photoUrl,
   evidenceUrls = {},
@@ -93,6 +94,8 @@ export function StaffEditor({
 }: {
   action: (fd: FormData) => Promise<ActionResult>;
   person?: StaffMember;
+  /** The row's updated_at as this page loaded it: a save from an older copy is refused (another tab, another admin). */
+  loadedAt?: string;
   today: string;
   photoUrl?: string | null;
   evidenceUrls?: Record<string, string>;
@@ -108,6 +111,11 @@ export function StaffEditor({
   const [uploading, setUploading] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const seq = useRef(quals.length);
+  // The copy this editor is working from: from the page, then from each of its own saves.
+  const version = useRef(loadedAt);
+  useEffect(() => {
+    version.current = loadedAt;
+  }, [loadedAt]);
 
   const update = (key: string, patch: Partial<QualRow>) => setQuals((qs) => qs.map((q) => (q.key === key ? { ...q, ...patch } : q)));
   const toggleRole = (r: StaffRole) => setRoles((rs) => (rs.includes(r) ? rs.filter((x) => x !== r) : [...rs, r]));
@@ -133,6 +141,7 @@ export function StaffEditor({
     const v = (name: string) => String(fd.get(name) ?? "");
     return JSON.stringify({
       id: person?.id ?? "",
+      ...(version.current ? { loadedAt: version.current } : {}),
       name: v("name"),
       email: v("email"),
       phone: v("phone").trim(),
@@ -159,6 +168,7 @@ export function StaffEditor({
           return action(fd);
         }}
         onResult={(r) => {
+          if (r.ok && r.version) version.current = r.version;
           if (r.ok && r.href && !person) router.push(r.href);
         }}
       >

@@ -614,8 +614,11 @@ export class FieldOutbox {
         // The ops that were waiting for it can go now.
         void this.flushOps(false);
       } catch (err) {
-        const retryable = !(err && typeof err === "object" && "retryable" in err && (err as { retryable: boolean }).retryable === false);
-        const message = err instanceof Error ? err.message : "The photo didn't upload.";
+        // Signed out (the 30-day sign-in ran out, or the staff check failed for a moment): the photo waits
+        // for sign-in, like the ops lane, and goes by itself after, never "needs attention" for good.
+        const signedOut = Boolean(err && typeof err === "object" && "status" in err && (err as { status: number | null }).status === 401);
+        const retryable = signedOut || !(err && typeof err === "object" && "retryable" in err && (err as { retryable: boolean }).retryable === false);
+        const message = signedOut ? "You're signed out. Sign in again and it will send." : err instanceof Error ? err.message : "The photo didn't upload.";
         const [next] = failBatch([media], message, this.deps.now(), { permanent: !retryable });
         await this.save(next!);
         this.emit();

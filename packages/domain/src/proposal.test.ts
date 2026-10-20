@@ -417,6 +417,9 @@ test("proposalIssueErrors: VAT treatment and tax overrides", () => {
   assert.match(proposalIssueErrors(p, registered, TODAY).join(" "), /isn't confirmed by the accountant/);
   const withOverride = { ...p, taxOverride: { reason: "Accountant confirmed by phone", by: "DEMO Ada", at: NOW } };
   assert.deepEqual(proposalIssueErrors(withOverride, registered, TODAY), []);
+  // The energy-saving materials zero rate is never offered after it ends.
+  assert.match(proposalIssueErrors(withOverride, registered, "2027-04-01").join(" "), /0% VAT rate for energy-saving materials ended on 31 March 2027/);
+  assert.doesNotMatch(proposalIssueErrors(withOverride, registered, "2027-03-31").join(" "), /energy-saving materials ended/);
   const confirmed = mergeSettings({ ...registered, tax: { ...registered.tax, accountantConfirmed: true } });
   const changedCode = { ...p, options: p.options.map((o) => ({ ...o, pricing: { ...o.pricing, taxCode: "standard-20" as const } })) };
   assert.match(proposalIssueErrors(changedCode, confirmed, TODAY).join(" "), /different tax code/);

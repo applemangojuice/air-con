@@ -107,7 +107,7 @@ export default async function PilotsPage({ searchParams }: { searchParams: Promi
                         </Link>
                         <span className="block text-xs font-normal text-ink-700">{r.metrics.label}</span>
                         <span className="mt-1 flex flex-wrap gap-1">
-                          <Badge tone="info">{STAGE_INFO[r.metrics.stage].label}</Badge>
+                          <Badge tone={r.metrics.cancelled ? "danger" : "info"}>{r.metrics.cancelled ? `Cancelled at ${STAGE_INFO[r.metrics.stage].label.toLowerCase()}` : STAGE_INFO[r.metrics.stage].label}</Badge>
                           {r.demo && <Badge tone="warn">DEMO</Badge>}
                         </span>
                       </th>

@@ -22,7 +22,7 @@ import {
 
 export type ActionResult<T = null> = { ok: true; value: T } | { ok: false; errors: string[] };
 // Named, so no signature below carries braces (the route-guard test reads bodies by brace matching).
-type SavedId = ActionResult<{ id: string }>;
+type SavedId = ActionResult<{ id: string; version?: string }>;
 type Imported = ActionResult<{ written: number; skipped: number; errors: string[] }>;
 
 const failure = (err: unknown): { ok: false; errors: string[] } => {
@@ -30,14 +30,14 @@ const failure = (err: unknown): { ok: false; errors: string[] } => {
   return { ok: false, errors: ["Something went wrong saving that. Nothing was changed; please try again."] };
 };
 
-export async function saveCatalogueItemAction(input: unknown, mode: "create" | "update"): Promise<SavedId> {
+export async function saveCatalogueItemAction(input: unknown, mode: "create" | "update", expectedUpdatedAt?: string): Promise<SavedId> {
   const staff = await requireStaff("catalogue.edit");
   try {
-    const result = await saveItem(input, staff, mode === "create" ? "create" : "update");
+    const result = await saveItem(input, staff, mode === "create" ? "create" : "update", typeof expectedUpdatedAt === "string" ? { expectedUpdatedAt } : {});
     if (!result.ok) return result;
     revalidatePath("/ops/catalogue");
     revalidatePath(`/ops/catalogue/${result.value.id}`);
-    return { ok: true, value: { id: result.value.id } };
+    return { ok: true, value: { id: result.value.id, ...(result.version ? { version: result.version } : {}) } };
   } catch (err) {
     return failure(err);
   }

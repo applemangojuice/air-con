@@ -6,7 +6,7 @@ import { FieldIdentity } from "@/components/field/field-identity";
 import { SignOut } from "@/components/field/sign-out";
 import { SyncBadge } from "@/components/field/sync-badge";
 import { fmtDate } from "@/components/field/format";
-import { requireStaff } from "@/lib/auth/server";
+import { getSession, requireStaff } from "@/lib/auth/server";
 import { londonToday } from "@/lib/project-service";
 
 /** Me: who I'm signed in as, what I'm qualified to sign, when certificates run out, and sign out. */
@@ -19,12 +19,26 @@ const DAY = 86_400_000;
 export default async function FieldMePage() {
   const staff = await requireStaff();
   const today = londonToday();
+  // Staff sign-ins last a fixed 30 days: say when this phone's runs out, so it's never a surprise mid-job.
+  const session = await getSession();
+  const endsAt = session?.kind === "staff" ? session.exp * 1000 : null;
+  const daysLeft = endsAt ? Math.floor((endsAt - Date.now()) / DAY) : null;
   const reqs: StepRequirement[] = ["fgas", "electrical", "tech-lead"];
   return (
     <>
       <SyncBadge />
       <FieldIdentity id={staff.id} name={staff.name} />
       <PageHeader eyebrow="Me" title={staff.name} subtitle={`${staff.roles.map((r) => ROLE_LABEL[r]).join(", ")}${staff.external ? " · subcontractor" : ""}`} />
+
+      {endsAt && (
+        <p
+          role={daysLeft !== null && daysLeft < 3 ? "alert" : undefined}
+          className={`mb-5 rounded-2xl border px-4 py-3 text-base ${daysLeft !== null && daysLeft < 3 ? "border-amber-300 bg-amber-50 text-amber-950" : "border-line bg-white text-ink-700"}`}
+        >
+          Signed in on this phone until {fmtDate(new Date(endsAt).toISOString())}.
+          {daysLeft !== null && daysLeft < 3 ? " Sign out and in again (with signal) before a job day, so it doesn't run out on site." : ""}
+        </p>
+      )}
 
       <Link href="/field/help" className="mb-5 flex min-h-16 items-center justify-between gap-3 rounded-2xl border border-line bg-white px-4 py-3">
         <span>

@@ -1263,7 +1263,7 @@ export async function recordStripeRefund(refund: StripeRefundInput): Promise<Out
           title: `A refund failed at Stripe: ${money(refund.amountPence)}`,
           lines: [
             `Stripe says refund ${refund.refundId} ${refund.status === "failed" ? "failed" : "was cancelled"}, so the money didn't go back to the customer.`,
-            "It was recorded here while it was pending. Record the money as received again (Money, Record a payment you've seen, Card taken elsewhere, reference the refund id), then sort it out with the customer.",
+            "It was recorded here while it was pending, with a credit note. Don't refund it again or record it by hand (either counts it twice, and the form refuses the money while the credit note covers it): ask the developer to reverse the recorded refund and its credit note, then sort it out with the customer.",
           ],
           urgent: true,
         },

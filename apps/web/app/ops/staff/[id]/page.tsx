@@ -25,8 +25,9 @@ export default async function StaffMemberPage({ params }: { params: Promise<{ id
     );
   }
   if (!UUID_RE.test(id)) notFound();
-  const person = await staffRepo.get(id);
-  if (!person) notFound();
+  const stamped = await staffRepo.getStamped(id);
+  if (!stamped) notFound();
+  const person = stamped.member;
   const [photos, evidence] = await Promise.all([
     staffPhotoUrls([person]),
     Promise.all(person.qualifications.filter((q) => q.mediaId).map(async (q) => [q.mediaId!, await mediaUrl(q.mediaId!)] as const)),
@@ -40,7 +41,7 @@ export default async function StaffMemberPage({ params }: { params: Promise<{ id
         title={person.name}
         subtitle={person.demo ? "A DEMO account: it stops working when demo sign-in is turned off." : person.email}
       />
-      <StaffEditor action={saveStaffAction} person={person} today={londonToday()} photoUrl={photos.get(person.id) ?? null} evidenceUrls={evidenceUrls} self={person.id === admin.id} />
+      <StaffEditor action={saveStaffAction} person={person} loadedAt={stamped.updatedAt} today={londonToday()} photoUrl={photos.get(person.id) ?? null} evidenceUrls={evidenceUrls} self={person.id === admin.id} />
     </main>
   );
 }

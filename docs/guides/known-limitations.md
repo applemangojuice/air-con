@@ -43,8 +43,15 @@ says what to do instead. Approvals that need a professional are in
 
 ## The field app
 
-10. **No native app.** It's a website on the phone. Add it to the home
-    screen for an app-like icon.
+10. **No native app.** It's a website on the phone: use it in Safari or
+    Chrome, with a bookmark to `/field`. A Home Screen icon opens the public
+    home page, and on an iPhone it doesn't share Safari's sign-in (sign-in
+    links always open in the browser), so don't use one for the field app.
+    Staff sign-ins last a fixed 30 days and aren't renewed as you use them:
+    **Me** says when this phone's runs out (in amber in the last 3 days);
+    sign out and in again with signal before a job day. A photo refused
+    because the sign-in ran out waits and sends by itself once you're
+    signed in again.
 11. **Offline is a queue, not full offline.** Work done without signal
     (evidence, photos, survey answers, drawings) is saved on the phone and
     sent when signal returns, with a visible count. But:
@@ -104,8 +111,12 @@ says what to do instead. Approvals that need a professional are in
     billing. You issue each invoice; bank transfers are recorded by hand once
     seen; card payments only through Stripe, if you set it up. A service-plan
     offer is never charged automatically.
-21. **No accounting-software link** (Xero, QuickBooks). The Pilots page
-    downloads a CSV.
+21. **No accounting-software link** (Xero, QuickBooks), and no export of
+    every invoice and payment across projects. The Pilots page downloads a
+    CSV of pilot metrics (not an accounting record: a cancelled pilot
+    counts only the money kept as revenue, with `cancelled` = yes). *For
+    the accountant:* print each project's invoices, credit notes and
+    receipts to PDF from its money page (four pilots, four pages).
 22. **Documents go by email only.** The proposal, contract confirmation and
     cancellation form are sent by email, and only once the family has agreed
     to that (the law's default is paper). There's no paper route: no way to
@@ -118,6 +129,29 @@ says what to do instead. Approvals that need a professional are in
     credit note, so the history stays true. Recording a refund doesn't
     email the family by itself (their page shows the invoice as refunded):
     tell them it's on its way, or send the receipt from **Messages**.
+    - *More than is owed arrived* (a second transfer, a family paying the
+      gross figure): tick **More than is owed arrived** on **Record a payment
+      you've seen** (also on a paid invoice) and record it all; the extra is
+      credit on their account, the team is alerted, and **Record a refund**
+      on that invoice pays it back with no credit note.
+    - *A card refund that Stripe reports as failed after it was recorded*
+      (rare): the refund and its credit note stay recorded and nothing in the
+      app can reverse them. Don't refund again or record it by hand (both
+      count it twice): ask the developer to reverse the two records in the
+      database, then sort it out with the customer. The urgent alert says so.
+    - *A cancellation after work began at the family's request* inside the
+      period: nothing can be billed after a cancellation, so a proportionate
+      charge for that work (CCR reg 36(4)) can't be invoiced in the app.
+      Their page and the email no longer say "nothing more is due" in that
+      case; keep any deduction by recording a partial refund with the reason
+      (it stays on the deposit invoice), and for a charge above what they
+      paid take advice and invoice it outside the app (solicitor question 2
+      in `docs/research/uk-consumer-legal.md`). The unpaid part of a
+      part-paid invoice is credited when the cancellation is recorded.
+    - *The 0% VAT rate for energy-saving materials* can't be put on a
+      proposal issued after 31 March 2027; a job that straddles the date
+      (issued before, installed after) goes to the accountant (approvals
+      item 11).
 
 ## Customers and messages
 
@@ -240,3 +274,8 @@ says what to do instead. Approvals that need a professional are in
     send a proposal as for any household. Call anyone whose note gives an
     old install date. Only a project where work really went ahead on the
     old site (kit sent or the install finished) keeps its old contract.
+44. **Two people editing the same staff record or catalogue item:** the
+    second save from a page opened before the first is refused ("Someone
+    saved this … since you opened it"), never written over it; reload and
+    make the change again. **Retire** / **Restore** is its own button: saving
+    the form never brings a retired item back into use.

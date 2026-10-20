@@ -89,6 +89,42 @@ export async function insert(member: Omit<StaffMember, "id"> & { id?: string }, 
   return fromRow(data!);
 }
 
+/** One person with the row's `updated_at`: the token `updateIfUnchanged` compares (the editor's "as I loaded it"). */
+export async function getStamped(id: string): Promise<{ member: StaffMember; updatedAt: string } | null> {
+  if (!isUuid(id)) return null;
+  const data = must(await db().from(TABLE).select("*").eq("id", id).maybeSingle(), "staff get");
+  return data ? { member: fromRow(data), updatedAt: String((data as Row).updated_at) } : null;
+}
+
+/**
+ * Compare-and-set: write only if nobody has saved this person since the read
+ * that gave `expectedUpdatedAt` (another admin's tab, a deactivation), so a
+ * stale editor can't silently undo it. Null when someone has.
+ */
+export async function updateIfUnchanged(member: StaffMember, by: StaffWriter, expectedUpdatedAt: string): Promise<{ member: StaffMember; updatedAt: string } | null> {
+  const data = must(
+    await db()
+      .from(TABLE)
+      .update({ ...toRow(taintedByDemo(member, by)), updated_at: nowIso() })
+      .eq("id", member.id)
+      .eq("updated_at", expectedUpdatedAt)
+      .select("*")
+      .maybeSingle(),
+    "staff update",
+  );
+  return data ? { member: fromRow(data), updatedAt: String((data as Row).updated_at) } : null;
+}
+
+/**
+ * The profile photo only (the editor's other fields untouched, and its
+ * updated_at token kept, so an editor open beside the upload still saves).
+ * A demo writer still taints the row (see the module note).
+ */
+export async function setPhoto(id: string, mediaId: string, by: StaffWriter): Promise<void> {
+  if (!isUuid(id)) return;
+  must(await db().from(TABLE).update({ photo_media_id: uuidOrNull(mediaId), ...(by?.demo ? { demo: true } : {}) }).eq("id", id), "staff photo");
+}
+
 export async function update(member: StaffMember, by: StaffWriter): Promise<StaffMember> {
   const data = must(
     await db()

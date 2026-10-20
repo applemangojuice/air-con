@@ -301,16 +301,38 @@ function cleanItem(raw: z.infer<typeof catalogueItemSchema>): CatalogueItem {
  * (so a typo can't overwrite another item); `"update"` refuses one that
  * isn't there.
  */
-export async function saveItem(input: unknown, actor: StaffMember, mode: "create" | "update"): Promise<Result<CatalogueItem>> {
+/** A save from an editor opened before someone else's save (another tab, a price import, a retirement). */
+export const STALE_ITEM = "Someone saved this item since you opened it (another tab, a price list import, or Retire / Restore). Nothing was saved: reload to see their change, then make yours.";
+
+export async function saveItem(
+  input: unknown,
+  actor: StaffMember,
+  mode: "create" | "update",
+  opts: { expectedUpdatedAt?: string } = {},
+): Promise<Result<CatalogueItem> & { version?: string }> {
   const parsed = catalogueItemSchema.safeParse(input);
   if (!parsed.success) return fail(issuesOf(parsed.error, input));
-  const item = cleanItem(parsed.data);
+  let item = cleanItem(parsed.data);
   const problems = catalogueItemErrors(item);
   if (problems.length) return fail(problems);
-  const existing = await catalogueRepo.get(item.id);
+  const stamped = await catalogueRepo.getStamped(item.id);
+  const existing = stamped?.item ?? null;
   if (mode === "create" && existing) return fail(`There's already an item with the id "${item.id}". Pick another id, or edit that item.`);
   if (mode === "update" && !existing) return fail("That item doesn't exist any more. Reload the catalogue.");
-  const saved = await catalogueRepo.upsert(item);
+  let saved: CatalogueItem;
+  let version: string | undefined;
+  if (existing && stamped) {
+    // The editor's copy must be the one stored (a price rise or a retirement since it opened is never undone unseen).
+    if (opts.expectedUpdatedAt && Date.parse(stamped.updatedAt) !== Date.parse(opts.expectedUpdatedAt)) return fail(STALE_ITEM);
+    // Retire and restore are their own action: a save never changes whether the item is in use.
+    item = { ...item, active: existing.active };
+    const written = await catalogueRepo.updateIfUnchanged(item, stamped.updatedAt);
+    if (!written) return fail(STALE_ITEM);
+    saved = written.item;
+    version = written.updatedAt;
+  } else {
+    saved = await catalogueRepo.upsert(item);
+  }
   await audit({
     actor,
     action: mode === "create" ? "catalogue.create" : "catalogue.update",
@@ -318,7 +340,7 @@ export async function saveItem(input: unknown, actor: StaffMember, mode: "create
     entityId: item.id,
     detail: existing ? { changed: changedKeys(existing, saved) } : {},
   });
-  return { ok: true, value: saved };
+  return { ok: true, value: saved, ...(version ? { version } : {}) };
 }
 
 function changedKeys(a: CatalogueItem, b: CatalogueItem): string[] {

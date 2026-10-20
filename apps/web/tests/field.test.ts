@@ -843,3 +843,29 @@ test("the picker's thumbnails are small, lazy and fixed-size; the list is capped
   assert.match(src, /Show more photos/);
   assert.match(src, /reuseUrls\(groups, dayPhotoUrls\.get\(key\)/);
 });
+
+test("outbox: a photo refused because the sign-in ran out (401) waits for sign-in and sends after, never 'needs attention' for good", async () => {
+  let signedOut = true;
+  const outbox = new FieldOutbox({
+    store: memoryStore(),
+    now: () => 1_000,
+    online: () => true,
+    upload: async () => {
+      if (signedOut) throw Object.assign(new Error("Sign in required"), { status: 401, retryable: false });
+      return MEDIA;
+    },
+    send: async (ops) => ops.map((o) => ({ id: o.id, ok: true as const })),
+  });
+  await outbox.ready();
+  outbox.setSignedIn({ id: "s-1", name: "DEMO Joe" });
+  await outbox.enqueueMedia({ projectId: PROJECT, blob: new Blob(["x"]), fileName: "d.jpg", tag: "progress", source: "install" }, "Day photo");
+  await outbox.flush(true);
+  const held = outbox.state().items[0]!;
+  assert.notEqual(held.state, "failed", "not a permanent failure");
+  assert.match(held.lastError ?? "", /signed out\. Sign in again and it will send/);
+  assert.equal(badgeState(outbox.state()).text.includes("needs attention"), false);
+  // Signed in again (the page after the sign-in link): it goes by itself.
+  signedOut = false;
+  await outbox.flush(true);
+  assert.equal(outbox.state().items.length, 0);
+});

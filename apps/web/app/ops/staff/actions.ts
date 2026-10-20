@@ -40,6 +40,8 @@ const staffSchema = z.object({
   active: z.boolean(),
   bio: z.string().trim().max(600),
   qualifications: z.array(qualificationSchema).max(20),
+  /** When the editor loaded this person (the row's updated_at): a save from an older copy is refused. */
+  loadedAt: z.string().max(60).optional(),
 });
 
 export async function saveStaffAction(fd: FormData): Promise<ActionResult> {
@@ -55,8 +57,12 @@ export async function saveStaffAction(fd: FormData): Promise<ActionResult> {
   const d = parsed.data;
   if (d.roles.length === 0) return refused("Pick at least one role.");
 
-  const existing = d.id ? await staffRepo.get(d.id) : null;
+  const stamped = d.id ? await staffRepo.getStamped(d.id) : null;
+  const existing = stamped?.member ?? null;
   if (d.id && !existing) return refused("That person isn't on the team any more. Reload the page.");
+  // Another admin (or another tab) saved them since this editor loaded: never write over it unseen.
+  const STALE = "Someone saved this person since you opened the page (another tab, or another admin). Nothing was saved: reload to see their change, then make yours.";
+  if (existing && d.loadedAt && stamped && Date.parse(stamped.updatedAt) !== Date.parse(d.loadedAt)) return refused(STALE);
 
   // Never lock yourself (or the business) out.
   if (existing && existing.id === admin.id) {
@@ -106,12 +112,15 @@ export async function saveStaffAction(fd: FormData): Promise<ActionResult> {
 
   try {
     if (existing) {
-      const saved = await staffRepo.update({ ...record, id: existing.id }, admin);
+      // Atomic: only over the row this action read (a save landing meanwhile is refused, not overwritten).
+      const written = await staffRepo.updateIfUnchanged({ ...record, id: existing.id }, admin, stamped!.updatedAt);
+      if (!written) return refused(STALE);
+      const saved = written.member;
       const changed = (Object.keys(record) as (keyof typeof record)[]).filter((k) => !sameJson(record[k], existing[k]));
       await audit({ actor: admin, action: "staff.update", entity: "staff", entityId: saved.id, detail: { changed } });
       revalidatePath("/ops/staff");
       revalidatePath(`/ops/staff/${saved.id}`);
-      return done(`${saved.name} saved.`);
+      return done(`${saved.name} saved.`, { version: written.updatedAt });
     }
     const clash = await staffRepo.getByEmail(d.email);
     if (clash) return refused(`${d.email} is already on the team (${clash.name}).`);

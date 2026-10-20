@@ -95,6 +95,8 @@ export interface PilotMetrics {
   pilotNumber?: number;
   label: string;
   stage: ProjectStageId;
+  /** The contract was cancelled: revenue is only what we kept, and the stage is where it stopped. */
+  cancelled: boolean;
   instantPricePence: number;
   listPricePence: number | null;
   contractPricePence: number | null;
@@ -268,7 +270,12 @@ export function pilotMetrics(input: {
       .map((i) => i.netPence || 0),
   );
   let revenuePence = 0;
-  if (contractPricePence !== null) {
+  // A cancelled contract earns only what we kept (paid, less refunds), net of VAT: never the contract price.
+  const cancelled = Boolean(p.cancellation) || (p.closure.closed && p.closure.reason === "cancelled");
+  if (cancelled && accepted) {
+    const rate = pricing ? (TAX_CODES[pricing.taxCode]?.ratePct ?? 0) : 0;
+    revenuePence = Math.round(Math.max(0, p.money.paidPence) / (1 + rate / 100));
+  } else if (contractPricePence !== null) {
     const base = pricing && accepted ? pricing.netPence : contractPricePence;
     revenuePence = base + variationsNet + (p.money.changeFeesPence || 0) - reductionsPence;
   }
@@ -436,6 +443,7 @@ export function pilotMetrics(input: {
     ...(p.pilot ? { pilotNumber: p.pilot.number } : {}),
     label: p.pilot?.label || p.customer.name || p.id,
     stage: currentStage(p),
+    cancelled,
     instantPricePence,
     listPricePence,
     contractPricePence,
@@ -582,6 +590,7 @@ const CSV_COLUMNS: Column[] = [
   { header: "label", value: (m) => m.label },
   { header: "project_id", value: (m) => m.projectId },
   { header: "stage", value: (m) => m.stage },
+  { header: "cancelled", value: (m) => (m.cancelled ? "yes" : "no") },
   { header: "instant_price_gbp", value: (m) => pounds(m.instantPricePence) },
   { header: "list_price_gbp", value: (m) => pounds(m.listPricePence) },
   { header: "contract_price_gbp", value: (m) => pounds(m.contractPricePence) },

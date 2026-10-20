@@ -29,9 +29,13 @@ is the longer one. Every picture here is fictional DEMO data.
    email** → **Email me a sign-in link**.
 3. Open the email on the same phone → **Sign in** → **Continue as …**. The
    link works once, for 20 minutes.
-4. Add the page to your home screen (Safari: **Share** → **Add to Home
-   Screen**; Chrome: **⋮** → **Add to Home screen**). You stay signed in on
-   that phone for 30 days.
+4. Keep using the field app in the browser you signed in with (Safari or
+   Chrome): bookmark `/field`. Don't add it to the Home Screen on an
+   iPhone: an icon there opens the website's home page, and on iPhone it
+   doesn't share Safari's sign-in, so a sign-in link can never reach it.
+   You stay signed in on that phone for 30 days; **Me** says until when.
+   If an email app opens the sign-in link in its own browser, use **Open in
+   Safari** (or Chrome) before you tap **Continue**.
 
 Subcontractors only ever see the jobs they're on: no prices, no margins,
 no other families. On the crew's phones (installers, the electrician and any

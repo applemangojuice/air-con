@@ -584,3 +584,17 @@ test("csvCell quotes and defuses", () => {
   assert.equal(csvCell("line\nbreak"), '"line\nbreak"');
   assert.equal(csvCell("@sum"), "'@sum");
 });
+
+test("a cancelled, refunded contract earns only what was kept, and the CSV says cancelled", () => {
+  const p = finishedProject();
+  p.cancellation = { receivedAt: "2026-10-24T10:00:00.000Z", channel: "phone", evidenceRef: "DEMO call", recordedAt: "2026-10-24T10:05:00.000Z", withinPeriod: true, refundDueBy: "2026-11-07" };
+  p.closure = { closed: true, closedAt: "2026-10-24T10:05:00.000Z", reason: "cancelled" };
+  p.money.paidPence = 0; // refunded in full
+  const m = pilotMetrics({ project: p, proposal: proposal(), settings: DEFAULT_SETTINGS });
+  assert.equal(m.cancelled, true);
+  assert.equal(m.revenuePence, 0, "never the contract price");
+  p.money.paidPence = 50_000; // kept for work done at their request (not VAT registered: all of it is revenue)
+  assert.equal(pilotMetrics({ project: p, proposal: proposal(), settings: DEFAULT_SETTINGS }).revenuePence, 50_000);
+  assert.match(pilotsCsv([m]), /,cancelled,/);
+  assert.equal(pilotMetrics({ project: finishedProject(), proposal: proposal(), settings: DEFAULT_SETTINGS }).cancelled, false);
+});

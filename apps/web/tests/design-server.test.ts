@@ -231,3 +231,40 @@ test("catalogue editor: every researched item passes the editor's schema, and a 
   assert.match(text, /Cooling capacity: should be a number/);
   assert.doesNotMatch(text, /Invalid input|specs\.|costSource\./);
 });
+
+test("two tabs: a stale catalogue or staff editor never silently undoes a price rise, a retirement or a deactivation", async () => {
+  const catalogueRepo = await import("../lib/repo/catalogue.ts");
+  await catalogue.loadResearchedCatalogue(false, TECH);
+  const id = "panasonic-cu-z25cke";
+  const tabA = (await catalogueRepo.getStamped(id))!;
+  const tabB = (await catalogueRepo.getStamped(id))!;
+  await new Promise((r) => setTimeout(r, 5));
+  // Tab B raises the trade price.
+  const raised = await catalogue.saveItem({ ...tabB.item, costPence: 112_000 }, TECH, "update", { expectedUpdatedAt: tabB.updatedAt });
+  assert.ok(raised.ok, raised.ok ? "" : raised.errors.join(" "));
+  // Stale tab A renames it: refused, and the price stands.
+  const stale = await catalogue.saveItem({ ...tabA.item, label: `${tabA.item.label} (renamed)` }, TECH, "update", { expectedUpdatedAt: tabA.updatedAt });
+  assert.ok(!stale.ok && stale.errors[0] === catalogue.STALE_ITEM);
+  assert.equal((await catalogue.getItem(id))!.costPence, 112_000);
+  // A save with the token its own last save gave works.
+  const again = await catalogue.saveItem({ ...(await catalogue.getItem(id))!, label: "Renamed (DEMO)" }, TECH, "update", { expectedUpdatedAt: raised.ok ? raised.version : "" });
+  assert.ok(again.ok, again.ok ? "" : again.errors.join(" "));
+  // Retired, then a save from a form still showing it in use: it stays retired.
+  await catalogue.setItemActive(id, false, TECH);
+  const fresh = (await catalogueRepo.getStamped(id))!;
+  const keeps = await catalogue.saveItem({ ...fresh.item, active: true, notes: "DEMO note" }, TECH, "update", { expectedUpdatedAt: fresh.updatedAt });
+  assert.ok(keeps.ok);
+  assert.equal((await catalogue.getItem(id))!.active, false, "Retire / Restore is its own action: a save never brings an item back into use");
+
+  // Staff: deactivated in one tab, a stale editor's save is refused (never reactivated unseen).
+  const person = Object.values(DEMO_STAFF).find((s) => s.roles.includes("installer"))!;
+  const before = (await staffRepo.getStamped(person.id))!;
+  await new Promise((r) => setTimeout(r, 5));
+  const off = await staffRepo.updateIfUnchanged({ ...before.member, active: false }, null, before.updatedAt);
+  assert.ok(off);
+  assert.equal(await staffRepo.updateIfUnchanged({ ...before.member, phone: "07700 900123" }, null, before.updatedAt), null);
+  assert.equal((await staffRepo.get(person.id))!.active, false);
+  // A photo upload writes only the photo, so an editor open beside it still saves.
+  await staffRepo.setPhoto(person.id, crypto.randomUUID(), null);
+  assert.ok(await staffRepo.updateIfUnchanged({ ...off!.member, active: true }, null, off!.updatedAt));
+});
