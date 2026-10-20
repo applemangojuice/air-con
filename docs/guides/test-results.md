@@ -1,11 +1,11 @@
 # Test results
 
 The latest real results of every automatic check, run on the afternoon of
-**20 October 2026** on branch `claude/pilot-ops` at commit `2f82a13`: the
-five gaps round 7 left as known limitations, now built
-[below](#the-five-gaps-round-7-left), on top of round 7's fixes (`1f8f0da`,
-[below](#what-round-7-found)), round 6's (`ed1732e`,
-[below](#what-round-6-found)), round 5's (`a04cc53`,
+**20 October 2026** on branch `claude/pilot-ops` at commit `f181ae5`: round
+8 of the pre-launch review ([below](#what-round-8-found)), on top of the five
+gaps round 7 left, now built ([below](#the-five-gaps-round-7-left), checked
+again here), round 7's fixes (`1f8f0da`, [below](#what-round-7-found)),
+round 6's (`ed1732e`, [below](#what-round-6-found)), round 5's (`a04cc53`,
 [below](#what-round-5-found)), the handover fix (`454c8d1`,
 [below](#the-handover-flake-fixed)), the go-live pack, the Supabase
 compatibility work and the fixes from the final pre-launch review and
@@ -13,53 +13,53 @@ rounds 3 and 4. Everything was run **twice, start to finish, and passed
 both times**, on both databases. Every person, home and price the browser
 walks use is fictional and labelled DEMO.
 
-**Summary: everything passed, on both databases.** 1,002 unit tests, the
+**Summary: everything passed, on both databases.** 1,012 unit tests, the
 type check (the iOS scaffold included), the production build (Next.js
 15.5.28), every database migration check (110 assertions) and the upgrade
 file check; then the browser walks on **both** backends: on the local file
-database, 220 end-to-end pilot checks and 24 quote-form checks; on a
+database, 224 end-to-end pilot checks and 24 quote-form checks; on a
 Supabase-shaped stack (Postgres 16, PostgREST and the Storage API, as a real
 Supabase project serves them, with the database's default grants as a
-project created today has them), the same 220 and 24, the property book
+project created today has them), the same 224 and 24, the property book
 importers over 3,000 homes, and 443 checks across 285 screens with no
 statement refused by the database.
 
 | Check | Command | Result | Round 1 (UTC, 20 Oct) | Round 2 (UTC, 20 Oct) |
 | --- | --- | --- | --- | --- |
-| Type check (domain, web, mobile) | `pnpm -r typecheck` | **Pass** (3 of 3 projects) | 12:44 | 13:03 |
-| Domain unit tests | `pnpm test` | **477 of 477 pass**, 0 fail (30 test files) | 12:40 (476: one test came with round 2's change) | 13:03 |
-| Web unit tests | `pnpm test` | **525 of 525 pass**, 0 fail (58 test files) | 12:40 | 13:03 |
-| Production build | `pnpm --filter @aircon/web build` | **Pass**: Next.js 15.5.28, compiled, 35 of 35 static pages generated | 12:49 to 12:50 | 13:07 to 13:08 |
-| Database migrations | `bash supabase/tests/run-migrations.sh` | **Pass**: 15 migrations and the pilot upgrade bundle (none new: nothing here needed a column); the local backend's schema matches; 110 sanity assertions | 12:46 | 13:08 |
-| Upgrade file is current | `bash supabase/build-pilot-upgrade.sh --check` | **Pass**: `pilot-upgrade.sql` is current (0010 to 0014) | 12:46 | 13:08 |
-| Pilot walk, **local file database** | `node scripts/e2e-pilot.mjs` | **220 of 220 pass** | 12:51 to 12:56 | 13:09 to 13:13 |
-| Quote form walk, **local file database** | `node scripts/e2e-funnel.mjs` | **24 of 24 pass** | 12:56 | 13:14 |
-| Pilot walk, **Supabase-shaped** | `bash supabase/tests/compat/run-compat-e2e.sh` | **220 of 220 pass** | 12:58 to 13:07 | 13:14 to 13:23 |
+| Type check (domain, web, mobile) | `pnpm -r typecheck` | **Pass** (3 of 3 projects) | 15:12 | 15:28 |
+| Domain unit tests | `pnpm test` | **483 of 483 pass**, 0 fail (30 test files) | 15:12 to 15:13 | 15:29 |
+| Web unit tests | `pnpm test` | **529 of 529 pass**, 0 fail (58 test files) | 15:12 to 15:13 | 15:29 |
+| Production build | `pnpm --filter @aircon/web build` | **Pass**: Next.js 15.5.28, compiled, 35 of 35 static pages generated | 15:13 to 15:14 | 15:29 to 15:30 |
+| Database migrations | `bash supabase/tests/run-migrations.sh` | **Pass**: 15 migrations and the pilot upgrade bundle (none new: every round 8 change lives in JSON columns); the local backend's schema matches; 110 sanity assertions | 15:14 | 15:30 |
+| Upgrade file is current | `bash supabase/build-pilot-upgrade.sh --check` | **Pass**: `pilot-upgrade.sql` is current (0010 to 0014) | 15:14 | 15:30 |
+| Pilot walk, **local file database** | `node scripts/e2e-pilot.mjs` | **224 of 224 pass** | 15:14 to 15:18 | 15:30 to 15:35 |
+| Quote form walk, **local file database** | `node scripts/e2e-funnel.mjs` | **24 of 24 pass** | 15:19 | 15:35 |
+| Pilot walk, **Supabase-shaped** | `bash supabase/tests/compat/run-compat-e2e.sh` | **224 of 224 pass** | 15:19 to 15:28 | 15:35 to 15:44 |
 | Quote form walk, **Supabase-shaped** | (same run) | **24 of 24 pass** | (same run) | (same run) |
 | Property book import, **Supabase-shaped** | (same run) | **Pass**: 3,000 homes, 900 in a conservation area, 3,000 classified (three times Max Rows) | (same run) | (same run) |
 | Every screen, **Supabase-shaped** | (same run) | **443 of 443 pass**: 285 pages over 213 routes, 141 requests with ids that aren't there, a NUL in the quote form, 7 CSV exports (the accountant's three included), 4 daily jobs | (same run) | (same run) |
 | Database and app logs, **Supabase-shaped** | (same run) | **Clean**: no statement refused by Postgres, no PostgREST or Storage error in the app's log | (same run) | (same run) |
 
-Round 1 ran on commit `2276ee1`; round 2 on `2f82a13`, which adds one
-thing found while writing the guides (the charge for work done can be
-brought down with a credit note against it: **Reduce the charge**, with a
-domain test and a step in the web test). Each round started from a fresh
-build and fresh, empty data, straight through, on ports 3901 and 3902 (the
-local walks) and 3904 to 3906 and 55901 (the Supabase-shaped stack). The
-pilot walk has sixteen more checks than before: ten in phase B (a family
-signs in with the 6-digit code in a second browser after a wrong one is
-refused; an installer does the same on the team sign-in and lands on the
-field app, which has its own Home Screen manifest starting at `/field`,
-and **Me** shows the rolling sign-in) and six in phase K (the accountant's
-page shows the totals, its three CSVs download and reconcile to the penny
-with the walk's own invoices and payments in them, and a technical lead is
-refused). The route walk downloads the accountant's three files as well.
-Before the two rounds, one trial pass of the local pilot walk stopped in
-phase B on the walk's own selector (the team code form labelled itself
-twice, so "the code box" matched two elements); the form was fixed. Nothing
-flaked: every walk passed first time in both rounds. The handover isn't
-touched, so the 30-handover loops were not repeated (their results are
-with the handover fix [below](#the-handover-flake-fixed)).
+Both rounds ran on commit `f181ae5`, each from a fresh build and fresh,
+empty data, straight through, on ports 3990 and 3991 (the local walks) and
+3993 to 3995 and 55990 (the Supabase-shaped stack). The pilot walk has four
+more checks than before, all in phase H: the family's agree step says a
+change over £42 has its own 14 days to cancel; the office's Issues page
+shows the change's own period and that the crew waits; the office records
+the family's written request to start; and the crew's phone then says the
+change is a go. Phase C now counts the hard surfaces round the outdoor
+unit, and phase D's "no check is blocked" covers the new room-size check.
+Before the two rounds, one trial pass of each walk on each database passed,
+and a full round passed on `2edb11c`; its second round was stopped on
+purpose when one factory charge was found missing from the researched seed
+(the MUZ-LN25VG2's 0.80 kg, in its own notes), and both rounds were run
+again on the commit that adds it. One earlier attempt stopped after its
+pilot walk had passed, on the test runner's own clean-up (it shut down its
+own process group with the server's; the runner now records the server's
+group itself). Nothing flaked: every walk passed first time in every
+round. The handover isn't touched, so the 30-handover loops were not
+repeated (their results are with the handover fix
+[below](#the-handover-flake-fixed)).
 
 Set-up for the local walks: a production build (`next start`) on the local
 file database (which enforces the same schema Postgres does), a fresh
@@ -70,6 +70,92 @@ supabase-js with the service-role key, as a demo deployment
 (`ALLOW_DEMO_LOGIN=1 DEMO_DEPLOYMENT=1`), the route walk signing in by
 **Admin break-glass**. Node 22.22.0, pnpm 10.12.1, PostgreSQL 16.15,
 PostgREST 12.2.3.
+
+## What round 8 found
+
+An eighth pass of the pre-launch review, with heat-pump engineering and
+consumer-law reviewers, found four problems that reach real families and a
+list of medium ones. All are fixed or written up (architecture §K46), each
+with tests that fail without the fix:
+
+- **The design put a small bedroom on a multi-split with too much
+  refrigerant for it.** R32 is mildly flammable, and above 1.84 kg in one
+  system every room it serves needs a minimum floor area (IEC 60335-2-40
+  Annex GG). The design engine drafted a 6.5 m² box room onto a 2.78 kg
+  four-room outdoor unit with every check green. Now the catalogue holds
+  each outdoor unit's factory charge (filled in for 25 of the 40 researched
+  units from their own research notes) and each indoor unit's height, every
+  system's total charge is worked out, a room below its minimum (7.4 m² for
+  2.78 kg on a wall unit), a room not measured, or a multi-split whose
+  charge isn't known blocks approval, the engine never suggests such a
+  multi-split, a new check "Room size for the R32 charge" shows the figures
+  and says the manual's own table decides, and the install day's charge
+  step flags an added charge over what the smallest room allows. (Tests: the
+  formula against Daikin's published figure, the review's terrace, a
+  forced four-room design refused, an unmeasured room, a multi-split with no
+  factory charge, the runsheet's limit.)
+- **The handover pack printed the catalogue's research notes as the
+  family's warranty.** "Up to 5 years parts & labour when installed by a
+  Panasonic Accredited Installer … NOT confirmed … before quoting
+  customers" went into the pack families keep. The pack now states the
+  warranty wording frozen on their accepted proposal (or the settings', or
+  "No manufacturer warranty is stated"); the catalogue's notes never reach
+  a family. (Test: a research note on the installed unit, and the pack
+  without it.)
+- **The noise check passed installs that fail permitted development.** It
+  compared the heat pump's own level with 42 dB(A) and passed anything 3 dB
+  under, but the 42 dB(A) includes an assumed 40 dB(A) background, so
+  MCS 020(a) leaves the heat pump 37.0 dB(A); and a corner or a London side
+  return (three reflecting surfaces, Q8) could never be entered. A unit at
+  38.5 dB(A) read "pass, 3.5 dB inside the limit" and asked for no planning
+  note. Now the surveyor counts the hard surfaces within 1 m of each
+  outdoor position, the check compares with 37.0 dB(A) (no barrier credit,
+  the last 1 dB in review, never a pass without the count), and the
+  checklist, the suggested planning note and the survey stop quoting 42 as
+  the pass mark. (Tests: the review's 38.5 dB(A) case, Q8, an uncounted
+  position, the close band.)
+- **Paid changes agreed during the install had no cancellation
+  information**, and the family was told they could only change their mind
+  before the work started. A priced change agreed in the home is very likely
+  a contract of its own once it's over £42. Until a solicitor says otherwise
+  (new solicitor question 13), such a change's emails carry its own 14-day
+  cancellation information and the model form, the family is told they can
+  cancel it within 14 days, the extra work waits for their written request
+  to start (which the office records on the Issues page) or the end of the
+  14 days, and the crew's card says so. The terms (`pilot-draft-2`) say the
+  same. (Tests: the rules in the domain, both emails, the accepted change on
+  the real modules with its request recorded; in the walk, the agree step,
+  the Issues page, the request and the crew's card.)
+
+From the round's medium list, fixed: analytics no longer store the postcode
+typed into the quote form, the quote's price or the consent choices (the
+server drops them too); the terms no longer cap our liability at "the price
+you paid us", which was £0 on a 0% deposit (solicitor question 14); "App
+control" appears only for a unit whose Wi-Fi spec says built in; the Quiet
+option says "quieter" only when every room's unit is quieter than
+Standard's (otherwise it's "Premium" with neutral copy); the parking prep
+item asks for information and says any permit cost is ours unless the
+proposal lists it; the property pages and the mailing letter no longer say
+"already designed", "week in, week out" or "three doors down", and the
+made-up sample page and sample book are kept to demo deployments and
+labelled DEMO. Written up with the workaround instead (known limitations 7,
+9a, 9b): a pressure drop during the strength test isn't worked out (set the
+target's minimum to the manual's test pressure), and the manuals' minimum
+pipe lengths, fewest indoor units and indoor-to-indoor heights aren't
+modelled (the technical lead checks them from the manual).
+
+**The five gaps round 7 left, checked again.** Each was read against its
+code and passed its own tests and walk checks in both rounds: sign-in codes
+(only the newest email's code for that address, inside min(link life, 15
+minutes), constant-time, spent with its link, attempts counted first);
+rolling staff sessions (renewed only by the route handler after re-reading
+the staff row, capped at 90 days from signing in, never for break-glass or
+customers); the charge for work done before a cancellation (refused without
+an evidenced early-start request, without the pre-contract information, with
+no work started, after the period, twice or above the contract); the
+accountant's export (admins only, formula-like text defused, the summary
+reconciling to the penny); and a failed Stripe refund (kept as failed, the
+invoice paid again, the family in credit, the team told).
 
 ## The five gaps round 7 left
 
@@ -608,7 +694,7 @@ fixed.
 
 One new pilot household taken from set-up to closed, in a real browser, by
 each person on their own device: the admin at a desk (1280 × 800), the
-family, the surveyor and the crew on phones (390 × 844). The same 220 checks
+family, the surveyor and the crew on phones (390 × 844). The same 224 checks
 passed four times: twice on the local file database and twice on the
 Supabase-shaped stack. Any page error in the browser (including the
 hydration warning below) or any server error fails the walk.
@@ -622,12 +708,12 @@ hydration warning below) or any server error fails the walk.
 | E | Proposal with two options and PILOT15; the design's planning or noise check is flagged, so the office adds the suggested planning and noise note; issuing is refused until the Schedule 2 settings are filled in, then it issues | 15 | 15 |
 | F | The family views it (the planning and noise note included) and accepts option 1 with an early start and their typed name; the contract renders | 11 | 11 |
 | G | Office: early-start email on file (one from the wrong address is refused), dates, crew certificates, deposit invoice paid by bank transfer, booking confirmed, purchase order ordered, delivered and checked, compliance approved | 19 | 19 |
-| H | Install days 1 to 3 on phones: on my way, every step's evidence, an issue, a variation the family approves on their page (their next step names it, on the page and on **Your homes**, until they answer), end-of-day updates with photos, F-gas steps by the technical lead and electrical steps by the electrician | 35 | 35 |
+| H | Install days 1 to 3 on phones: on my way, every step's evidence, an issue, a variation the family approves on their page (their next step names it, on the page and on **Your homes**, until they answer; over £42 it has its own 14 days, so the office records their written request before the crew's card says go), end-of-day updates with photos, F-gas steps by the technical lead and electrical steps by the electrician | 39 | 39 |
 | I | Technical lead sets the job's targets and signs commissioning; the certificate renders | 5 | 5 |
 | J | Handover pack published, the family signs "All good", balance invoice paid (DEMO card simulator), electrical certificate and warranty in, issues resolved, project closed, all documents present | 30 | 30 |
 | K | Every customer message logged; the Pilots page shows the pilot; the CSV downloads; the accountant's page shows the totals and its three CSVs reconcile to the penny (a technical lead is refused) | 15 | 15 |
 | L | Security: a duplicate pilot number, another family (pages, documents, invoices, photos), a subcontractor (office pages, other jobs, photos, margins, and on their own job the family's project, pay, proposal and documents pages and every document, while the office sees the prices there), signed-out visitors, a forged sign-in cookie, a bad Stripe signature, the demo-data button | 31 | 31 |
-| | **Total** | **220** | **220** |
+| | **Total** | **224** | **224** |
 
 ## The founder's walk (START-HERE, followed literally)
 
@@ -732,7 +818,7 @@ service-role key. Then:
 
 | Walk | What it does | Round 1 | Round 2 |
 | --- | --- | --- | --- |
-| Pilot walk | The 220 checks above | **220 of 220** | **220 of 220** |
+| Pilot walk | The 224 checks above | **224 of 224** | **224 of 224** |
 | Quote form | The 24 checks above | **24 of 24** | **24 of 24** |
 | Property book | 3,000 sample homes imported, enriched and classified, three times what one database read returns | **3,000 / 900 / 3,000** | **3,000 / 900 / 3,000** |
 | Every screen | Break-glass sign-in, the 5 DEMO pilots loaded, 285 pages over 213 routes (every ops, field, customer and public screen, help pages included), 141 requests with ids that don't exist or aren't ids (a 404, never a crash), a NUL character in the quote form (saved without it), 7 CSV exports (the accountant's three included), 4 daily jobs | **443 of 443** | **443 of 443** |
