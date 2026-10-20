@@ -186,6 +186,21 @@ The project → **Build the proposal** → **Start the proposal**.
    go**: Schedule 2 settings, documents-by-email agreement, design signed,
    email working, margin below the minimum (an admin can override, with a
    reason).
+   - **Planning and noise**: when an option's approved design has its
+     outdoor-unit count (permitted development, Class G), unit size or noise
+     at the neighbour's window (42 dB(A)) in review or blocked, the option
+     shows an amber warning with the design's own words, and the proposal
+     can't go until you either write a **Note for the customer** (**Start
+     from the suggested note** gives a short one: a planning application may
+     be needed, and what happens next; edit it to fit) or say **why it
+     doesn't apply** (internal, kept with your name). The note is printed on
+     their proposal, the contract and the issue email. Never write that
+     planning is or isn't needed: that's the technical lead's call on the
+     compliance page, where the same results sit next to the survey's
+     permitted-development answers. Approving a new design version sends the
+     **Permitted development** and **Noise** compliance items back to
+     **Waiting for review** if they were signed off before that version
+     existed.
 6. **Issue proposal**. It emails the family their proposal, the
    pre-contract information and the cancellation form.
 

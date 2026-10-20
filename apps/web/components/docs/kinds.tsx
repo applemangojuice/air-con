@@ -190,6 +190,11 @@ export function ProposalDoc({ snap, ctx }: { snap: ProposalSnapshot; ctx: DocCon
           <Bullets items={p.assumptions} />
         </DocSection>
       )}
+      {p.planningNote && (
+        <DocSection title="Planning and noise">
+          <p>{p.planningNote}</p>
+        </DocSection>
+      )}
       <DocSection title="Guarantees and warranty">
         <p>{p.warranty ?? "No manufacturer warranty is stated in this proposal."}</p>
         {ctx.company.workmanshipGuarantee && <p>{ctx.company.workmanshipGuarantee}</p>}
@@ -274,6 +279,12 @@ export function ContractDoc({ snap, ctx }: { snap: ContractSnapshot; ctx: DocCon
           <>
             <p className="font-semibold text-ink-900">Assumed</p>
             <Bullets items={snap.assumptions} />
+          </>
+        )}
+        {snap.planningNote && (
+          <>
+            <p className="font-semibold text-ink-900">Planning and noise</p>
+            <p>{snap.planningNote}</p>
           </>
         )}
       </DocSection>

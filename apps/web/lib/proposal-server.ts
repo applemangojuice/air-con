@@ -24,6 +24,7 @@ import {
   hasCurrentQualification,
   measuredToEngineSurvey,
   pricingInputsOf,
+  planningNoteErrors,
   proposalIssueErrors,
   recomputeOption,
   reviseProposal,
@@ -415,6 +416,10 @@ export interface DraftPatch {
   inclusions: string[];
   exclusions: string[];
   assumptions: string[];
+  /** Customer-visible: what they're told when the design's planning or noise check is flagged. Blank: none. */
+  planningNote?: string;
+  /** Internal: why that flagged check needs no note. Blank: none. */
+  planningNotApplicable?: string;
   options: {
     designVariantId: string;
     label: string;
@@ -583,6 +588,15 @@ export async function saveDraft(
   const notes = patch.internalNotes?.trim();
   if (notes) next.internalNotes = notes;
   else delete next.internalNotes;
+  // Planning and noise: the customer's note, or (internal) why none is needed, with who said so.
+  const planningNote = patch.planningNote?.trim();
+  if (planningNote) next.planningNote = planningNote;
+  else delete next.planningNote;
+  const notApplicable = patch.planningNotApplicable?.trim();
+  if (notApplicable) {
+    next.planningNotApplicable =
+      stored.planningNotApplicable?.reason === notApplicable ? stored.planningNotApplicable : { reason: notApplicable, by: staff.name, at: new Date().toISOString() };
+  } else delete next.planningNotApplicable;
 
   // Optimistic, and atomic: only if nobody has written the row since it was
   // read (a colleague's save, or a colleague issuing it, which bumps the
@@ -754,7 +768,8 @@ export async function issueDraft(
   // reach the customer, and are frozen with this version from here on, with the full terms text.
   let record = withSettingsWording({ ...stored, options: repriced }, settings);
   if (record.status === "draft") record = { ...record, termsText: termsSections(toPublicSettings(settings, today)) };
-  const errors = proposalIssueErrors(record, settings, today);
+  // The approved design's own planning or noise check flagged an option: the customer is told, or someone says why not.
+  const errors = [...proposalIssueErrors(record, settings, today), ...planningNoteErrors(record, approved)];
   if (errors.length) return fail("The proposal isn't ready to issue yet.", 422, { errors });
 
   // The gate first, without writing anything: the same check the reducer makes.
@@ -1028,6 +1043,7 @@ async function createContractDocument(project: Project, record: ProposalRecord, 
     inclusions: record.inclusions,
     exclusions: record.exclusions,
     assumptions: record.assumptions,
+    ...(record.planningNote ? { planningNote: record.planningNote } : {}),
     warranty: record.warranty,
     termsVersion: record.termsVersion,
     // The full terms text as offered, and its fingerprint.

@@ -60,6 +60,8 @@ const patchSchema = z.object({
   inclusions: z.array(text(400)).max(40),
   exclusions: z.array(text(400)).max(40),
   assumptions: z.array(text(400)).max(40),
+  planningNote: text(1500).optional(),
+  planningNotApplicable: text(1000).optional(),
   options: z
     .array(
       z.object({

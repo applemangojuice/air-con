@@ -34,6 +34,8 @@ export interface ProposalPageData {
   inclusions: string[];
   exclusions: string[];
   assumptions: string[];
+  /** The design's planning or noise check, in the proposal's words (ProposalRecord.planningNote). */
+  planningNote?: string;
   guarantees: string[];
   validUntil: string;
   increaseReason?: string;

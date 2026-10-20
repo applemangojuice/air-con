@@ -11,7 +11,9 @@ import {
   complianceProgress,
   complianceTemplateFor,
   meetsRequirement,
+  planningNoiseFlags,
   type ComplianceItem,
+  type DesignRecord,
   type ComplianceStatus,
   type Project,
   type StaffMember,
@@ -23,6 +25,7 @@ import { fmtDate } from "@/lib/format";
 import { signedMediaUrls } from "@/lib/media-server";
 import { londonToday } from "@/lib/project-service";
 import { isUuid } from "@/lib/repo/base";
+import * as designsRepo from "@/lib/repo/designs";
 import * as mediaRepo from "@/lib/repo/media";
 import * as staffRepo from "@/lib/repo/staff";
 import * as surveysRepo from "@/lib/repo/surveys";
@@ -57,10 +60,11 @@ export default async function CompliancePage({ params }: { params: Promise<{ id:
   if (!loaded) notFound();
   const { project: p, items } = loaded;
 
-  const [settings, survey, crew] = await Promise.all([
+  const [settings, survey, crew, design] = await Promise.all([
     getSettings(),
     surveysRepo.currentForProject(id),
     staffRepo.listByIds(p.booking.crew.map((c) => c.staffId)),
+    designsRepo.approvedForProject(id).catch(() => null),
   ]);
   const media = await mediaRepo.listByIds([...new Set(items.flatMap((i) => i.mediaIds))]);
   const urls = await signedMediaUrls(media);
@@ -70,7 +74,7 @@ export default async function CompliancePage({ params }: { params: Promise<{ id:
   const contributor = reviewer || can(staff, "projects.edit") || can(staff, "install.work");
   const today = londonToday();
 
-  const context = (item: ComplianceItem) => contextFor(item, { project: p, survey: survey?.data.permissions.pd, crew, settingsCert: settings.company.fgasCompanyCert, today });
+  const context = (item: ComplianceItem) => contextFor(item, { project: p, survey: survey?.data.permissions.pd, crew, settingsCert: settings.company.fgasCompanyCert, today, design });
 
   return (
     <main className="mx-auto w-full min-w-0 max-w-5xl px-4 py-8 sm:px-6">
@@ -148,17 +152,24 @@ function contextFor(
     crew: StaffMember[];
     settingsCert?: { body: string; number: string; expiresOn?: string };
     today: string;
+    /** The approved design: its own unit-count, size and noise checks sit beside the survey's answers. */
+    design?: DesignRecord | null;
   },
-): { label: string; value: string; tone?: "success" | "warn" | "danger" }[] {
+): ContextRow[] {
   const p = facts.project;
   const on = p.booking.dates.at(-1) ?? facts.today;
   switch (item.key) {
-    case "planning-pd":
-      if (!facts.survey) return [{ label: "Survey checklist", value: "Not recorded yet", tone: "warn" }];
-      return PD_CHECKS.map((c) => {
-        const a = facts.survey?.[c.id];
-        return { label: c.label, value: a === "yes" ? "Yes" : a === "no" ? "No" : a === "unsure" ? "Unsure" : "Not answered", tone: a === "yes" ? "success" : a === "no" ? "danger" : "warn" };
-      });
+    case "planning-pd": {
+      const answers: ContextRow[] = !facts.survey
+        ? [{ label: "Survey checklist", value: "Not recorded yet", tone: "warn" }]
+        : PD_CHECKS.map((c) => {
+            const a = facts.survey?.[c.id];
+            return { label: c.label, value: a === "yes" ? "Yes" : a === "no" ? "No" : a === "unsure" ? "Unsure" : "Not answered", tone: a === "yes" ? "success" : a === "no" ? "danger" : "warn" };
+          });
+      return [...answers, ...designChecks(facts.design, ["unit-count", "outdoor-volume", "noise"])];
+    }
+    case "noise-assessment":
+      return designChecks(facts.design, ["noise"]);
     case "fgas-company":
       return [
         facts.settingsCert?.number
@@ -187,13 +198,40 @@ function contextFor(
   }
 }
 
-function ContextList({ context }: { context: { label: string; value: string; tone?: "success" | "warn" | "danger" }[] }) {
+type ContextRow = { label: string; value: string; tone?: "success" | "warn" | "danger"; detail?: string };
+
+const RULE_WORD = { pass: "Pass", review: "Review", fail: "Blocked" } as const;
+
+/**
+ * The approved design's own checks (Class G unit count and size, the noise
+ * estimate), per option, in the design's words: never a planning decision,
+ * only what the reviewer should weigh.
+ */
+function designChecks(design: DesignRecord | null | undefined, ids: string[]): ContextRow[] {
+  if (!design) return [{ label: "Approved design", value: "None yet", tone: "warn" }];
+  const rows: ContextRow[] = [];
+  for (const v of design.variants) {
+    const flagged = new Set(planningNoiseFlags(v).map((r) => r.id));
+    for (const r of v.rules.filter((x) => ids.includes(x.id))) {
+      rows.push({
+        label: `Design v${design.version}, ${v.label}: ${r.title}`,
+        value: RULE_WORD[r.status],
+        tone: flagged.has(r.id) ? (r.status === "fail" ? "danger" : "warn") : "success",
+        detail: r.detail,
+      });
+    }
+  }
+  return rows.length ? rows : [{ label: `Design v${design.version}`, value: "No unit-count, size or noise result recorded", tone: "warn" }];
+}
+
+function ContextList({ context }: { context: ContextRow[] }) {
   return (
     <dl className="mt-3 grid gap-x-4 gap-y-1.5 rounded-2xl bg-surface/60 px-4 py-3 text-sm sm:grid-cols-[minmax(0,1fr)_auto]">
       {context.map((c) => (
         <div key={c.label} className="contents">
           <dt className="text-ink-700">{c.label}</dt>
           <dd className={`font-medium sm:text-right ${c.tone === "success" ? "text-emerald-800" : c.tone === "danger" ? "text-red-700" : c.tone === "warn" ? "text-amber-800" : "text-ink-900"}`}>{c.value}</dd>
+          {c.detail && <dd className="-mt-1 mb-1 text-xs leading-relaxed text-ink-500 sm:col-span-2">{c.detail}</dd>}
         </div>
       ))}
     </dl>
@@ -222,7 +260,7 @@ function ItemCard({
   reviewer: boolean;
   contributor: boolean;
   media: { id: string; contentType: string; url: string | null; caption?: string; takenAt: string }[];
-  context: { label: string; value: string; tone?: "success" | "warn" | "danger" }[];
+  context: ContextRow[];
 }) {
   const t = complianceTemplateFor(item.key);
   const settled = item.status === "approved" || item.status === "not-applicable";

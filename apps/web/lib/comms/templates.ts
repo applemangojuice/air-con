@@ -83,6 +83,8 @@ interface ProposalDetails {
   exclusions?: string[];
   /** What the price assumes (how anything not priced in advance is worked out). */
   assumptions?: string[];
+  /** What the proposal says about the design's planning or noise check. */
+  planningNote?: string;
   /** The proposal's own warranty wording, which wins over settings. */
   warranty?: string | null;
   /** The proposal's frozen guarantee lines (withSettingsWording), which win over settings. */
@@ -130,6 +132,7 @@ export interface CommsData {
     inclusions?: string[];
     exclusions?: string[];
     assumptions?: string[];
+    planningNote?: string;
     warranty?: string | null;
     /** The proposal's frozen guarantee lines, terms and terms text (see ProposalDetails). */
     guarantees?: string[];
@@ -679,6 +682,7 @@ function preContractInfo(ctx: TemplateContext, x: ProposalDetails & { cancellati
     p: "The price is fixed for the work described. If we find something we couldn't have seen at the survey that changes the job, we'll explain it and give you the price in writing first. Nothing extra is charged unless you agree to it.",
   });
   if (x.assumptions?.length) out.push({ p: "The price assumes:" }, { list: x.assumptions });
+  if (x.planningNote?.trim()) out.push({ p: { strong: "Planning and noise" } }, { p: x.planningNote.trim() });
   const fee = dateChangeFee();
   out.push({
     p: fee
@@ -1036,6 +1040,7 @@ const TEMPLATES: { [E in CommsEventId]: Renderer<E> } = {
           inclusions: d.inclusions,
           exclusions: d.exclusions,
           assumptions: d.assumptions,
+          ...(d.planningNote ? { planningNote: d.planningNote } : {}),
           warranty: d.warranty,
           ...(d.guarantees ? { guarantees: d.guarantees } : {}),
           ...(d.terms ? { terms: d.terms } : {}),

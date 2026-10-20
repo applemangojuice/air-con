@@ -370,3 +370,24 @@ test("company F-gas: approval rests on a current certificate in settings, or the
   assert.deepEqual(syncCompliance([{ ...approved, mediaIds: ["m-sub-cert"] }], booked, NOW, undefined, { companyFgasProblem: problem }), [], "the subcontractor's certificate still stands");
   assert.deepEqual(syncCompliance([approved], booked, NOW, undefined, { companyFgasProblem: null }), []);
 });
+
+test("planning and noise reviewed before the approved design version existed are reopened for review; a review of this version stands", () => {
+  const p = project((x) => (x.design = { status: "approved", designId: "d2", version: 2, approvedAt: "2026-10-20T16:30:00.000Z", approvedBy: "DEMO Tess" }));
+  const v2 = { id: "d2", projectId: "p-1", version: 2, status: "approved", rooms: [], variants: [], overrides: [], createdAt: "2026-10-20T09:00:00.000Z" } as unknown as DesignRecord;
+  const approvedAt = (at: string) =>
+    checklist().map((i) => (i.key === "planning-pd" || i.key === "noise-assessment" ? { ...i, status: "approved" as const, reviewedBy: "DEMO Tess", reviewedAt: at } : i));
+  // Reviewed against version 1, the day before version 2 was drafted: both go back to waiting for review.
+  const reopened = syncCompliance(approvedAt("2026-10-19T15:00:00.000Z"), p, NOW, v2).filter((c) => c.key === "planning-pd" || c.key === "noise-assessment");
+  assert.deepEqual(reopened.map((c) => [c.key, c.status]).sort(), [["noise-assessment", "under-review"], ["planning-pd", "under-review"]]);
+  assert.match(reopened[0]!.history!.at(-1)!.note!, /design version 2 was approved after this was reviewed/);
+  // Reviewed while version 2 was in review (before it was signed): left as it is.
+  assert.deepEqual(syncCompliance(approvedAt("2026-10-20T16:10:00.000Z"), p, NOW, v2).filter((c) => c.key === "planning-pd" || c.key === "noise-assessment"), []);
+});
+
+test("the design's planning and noise flags: unit count, size and noise in review or blocked, never other rules", async () => {
+  const { planningNoiseFlags } = await import("./design-record.ts");
+  const rule = (id: string, status: "pass" | "review" | "fail") => ({ id, title: id, status, detail: `${id} ${status}` });
+  const flags = planningNoiseFlags({ rules: [rule("unit-count", "review"), rule("outdoor-volume", "pass"), rule("noise", "fail"), rule("planning", "review"), rule("pipe-length", "fail")] });
+  assert.deepEqual(flags.map((r) => r.id), ["unit-count", "noise"]);
+  assert.deepEqual(planningNoiseFlags(undefined), []);
+});

@@ -191,6 +191,12 @@ export function IncludedSection({ data, n }: { data: ProposalPageData; n: number
           <Bullets items={data.assumptions} tone="neutral" />
         </div>
       )}
+      {data.planningNote && (
+        <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-5 sm:p-6">
+          <h3 className="mb-2 font-semibold text-ink-900">Planning and noise</h3>
+          <p className="text-sm leading-relaxed text-ink-700">{data.planningNote}</p>
+        </div>
+      )}
     </section>
   );
 }

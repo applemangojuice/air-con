@@ -12,7 +12,7 @@ import {
   type OptionPricing,
   type PriceLine,
 } from "./costing.ts";
-import type { DesignRecord, DesignVariant, RoomDesignInput } from "./design-record.ts";
+import { planningNoiseFlags, type DesignRecord, type DesignVariant, type RoomDesignInput } from "./design-record.ts";
 import type { ContractType, DocumentsConsentRecord, ReadinessContext } from "./project.ts";
 import { TAX_CODES, effectiveTaxCode, type PilotSettings, type TaxCodeId } from "./settings.ts";
 
@@ -161,6 +161,15 @@ export interface ProposalRecord {
    * by the document hash, so the text that applied can always be shown.
    */
   termsText?: TermsSection[];
+  /**
+   * The design's own planning or noise check (unit count, size, noise) was
+   * in review or blocked for an option: what the customer is told about it
+   * (customer-visible, printed with what's included and covered by the
+   * document hash). Never a conclusion that planning is or isn't needed.
+   */
+  planningNote?: string;
+  /** Internal: why that check doesn't need a note to the customer (recorded instead of a note). Never shown to the customer. */
+  planningNotApplicable?: { reason: string; by: string; at: string };
   /** Internal notes for the team. Never shown to the customer. */
   internalNotes?: string;
   /** Bumped on every draft save, so two people editing can't silently overwrite each other. */
@@ -770,6 +779,48 @@ export function draftProposal(
  * consent, Schedule 2 details in settings) is checked by the reducer on
  * top of this; this is about the proposal record itself.
  */
+/* ------------------------------------------------------------------ */
+/* Planning and noise                                                  */
+/* ------------------------------------------------------------------ */
+
+/** The options whose design variant has a planning or noise check in review or blocked, with those checks. */
+export function planningFlaggedOptions(
+  p: Pick<ProposalRecord, "options">,
+  design: Pick<DesignRecord, "variants"> | null | undefined,
+): { label: string; designVariantId: string; flags: ReturnType<typeof planningNoiseFlags> }[] {
+  return p.options
+    .map((o) => ({ label: o.label.trim() || "An option", designVariantId: o.designVariantId, flags: planningNoiseFlags(design?.variants.find((v) => v.id === o.designVariantId)) }))
+    .filter((o) => o.flags.length > 0);
+}
+
+/**
+ * The short note the builder offers when a check is flagged, for the office
+ * to edit: what the check found, in plain words, that a planning
+ * application may be needed, and what happens next. It never says planning
+ * is or isn't needed.
+ */
+export function defaultPlanningNote(flagged: ReturnType<typeof planningFlaggedOptions>, allOptions: number): string {
+  const ids = new Set(flagged.flatMap((o) => o.flags.map((f) => f.id)));
+  const found: string[] = [];
+  if (ids.has("unit-count")) found.push("the number of outdoor units is more than permitted development allows for your home");
+  if (ids.has("outdoor-volume")) found.push("the outdoor unit's size still has to be checked against the permitted development limit");
+  if (ids.has("noise")) found.push("the noise at your neighbour's nearest window needs a closer look against the 42 dB(A) limit");
+  const which = flagged.length < allOptions ? `For the ${flagged.map((o) => o.label).join(" and ")} option${flagged.length === 1 ? "" : "s"}, our` : "Our";
+  return `${which} design checks found that ${found.join(", and ") || "the planning checks need a closer look"}. A planning application, or a different position or unit, may be needed. Before any work starts we'll check it, with the council if needed, and tell you what it means for the dates and the price. Nothing is installed until it's settled.`;
+}
+
+/** Issue waits for one of the two: the customer told (a note on the proposal), or a recorded reason it doesn't apply. */
+export function planningNoteErrors(
+  p: Pick<ProposalRecord, "options" | "planningNote" | "planningNotApplicable">,
+  design: Pick<DesignRecord, "variants"> | null | undefined,
+): string[] {
+  const flagged = planningFlaggedOptions(p, design);
+  if (!flagged.length || p.planningNote?.trim() || p.planningNotApplicable?.reason.trim()) return [];
+  return [
+    `The design's planning or noise check is in review or blocked for ${flagged.map((o) => o.label).join(" and ")}: add the planning and noise note for the customer, or record why it doesn't apply.`,
+  ];
+}
+
 export function proposalIssueErrors(p: ProposalRecord, settings: PilotSettings, todayIso: string): string[] {
   const errors: string[] = [];
   const today = dateOf(todayIso);
@@ -959,7 +1010,7 @@ export function withoutDiscountLine(lines: PriceLine[], netPence: number): Price
  * only the crew size.
  */
 export function customerSafeProposal(p: ProposalRecord): ProposalRecord {
-  const { marginOverride: _m, taxOverride: _t, internalNotes: _n, draftRevision: _r, ...rest } = clone(p);
+  const { marginOverride: _m, taxOverride: _t, internalNotes: _n, draftRevision: _r, planningNotApplicable: _pn, ...rest } = clone(p);
   return {
     ...rest,
     options: rest.options.map(({ pricingInputs: _inputs, ...o }) => {

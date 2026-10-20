@@ -816,6 +816,26 @@ export function syncCompliance(
         continue;
       }
     }
+    // Planning and noise were reviewed before the approved design version existed (against an
+    // earlier one, or none): that version (more outdoor units, a bigger or louder one, a new
+    // position) needs them looked at again. A review made while this version was drafted or in
+    // review stands.
+    if (
+      (item.key === "planning-pd" || item.key === "noise-assessment") &&
+      item.status === "approved" &&
+      design?.status === "approved" &&
+      item.reviewedAt &&
+      Date.parse(item.reviewedAt) < Date.parse(design.createdAt)
+    ) {
+      set(
+        item,
+        "under-review",
+        "System",
+        now,
+        `Reopened automatically: design version ${design.version} was approved after this was reviewed. Check its unit count, size and noise results on this page.`,
+      );
+      continue;
+    }
     // Approved on the strength of the company certificate in settings, which no longer covers the job: back to review.
     if (item.status === "approved" && restsOnSettingsCert(item) && context.companyFgasProblem) {
       set(item, "under-review", "System", now, `Reopened automatically: ${context.companyFgasProblem}`);

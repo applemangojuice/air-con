@@ -176,6 +176,7 @@ export default async function CustomerProposalPage({
     inclusions: proposal.inclusions,
     exclusions: proposal.exclusions,
     assumptions: proposal.assumptions,
+    ...(proposal.planningNote ? { planningNote: proposal.planningNote } : {}),
     guarantees: proposal.guarantees?.length ? proposal.guarantees : guaranteeLines(settings, proposal.warranty),
     validUntil: proposal.validUntil,
     ...(proposal.increaseReason ? { increaseReason: proposal.increaseReason } : {}),

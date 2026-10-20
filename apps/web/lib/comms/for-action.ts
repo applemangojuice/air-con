@@ -56,6 +56,7 @@ const recordDetails = (r: ProposalRecord) => ({
   inclusions: r.inclusions ?? [],
   exclusions: r.exclusions ?? [],
   assumptions: r.assumptions ?? [],
+  ...(r.planningNote ? { planningNote: r.planningNote } : {}),
   warranty: r.warranty ?? null,
   ...(r.guarantees?.length ? { guarantees: r.guarantees } : {}),
   ...(r.terms ? { terms: r.terms } : {}),

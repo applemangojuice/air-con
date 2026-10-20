@@ -2,7 +2,17 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { defaultOptionFor, guaranteeLines, proposalIssueErrors, type Blocker, type OptionContext, type ProposalRecord } from "@aircon/domain";
+import {
+  defaultOptionFor,
+  defaultPlanningNote,
+  guaranteeLines,
+  planningFlaggedOptions,
+  planningNoteErrors,
+  proposalIssueErrors,
+  type Blocker,
+  type OptionContext,
+  type ProposalRecord,
+} from "@aircon/domain";
 import { BlockerList, Button, Card, Fieldset, Input, Textarea } from "@/components/kit";
 import { fmtDate, money } from "@/lib/format";
 import type { EngineReference, ProposalMedia } from "@/lib/proposal-server";
@@ -80,7 +90,12 @@ export function ProposalBuilder(props: BuilderProps) {
     [ctx, form.options, canSeeMargins, proposal.options],
   );
   const draftRecord = useMemo(() => recordFromForm(proposal, form, previews.map((p) => p.preview.option)), [proposal, form, previews]);
-  const liveErrors = useMemo(() => proposalIssueErrors(draftRecord, ctx.settings, props.today), [draftRecord, ctx.settings, props.today]);
+  // The approved design's own planning or noise checks (unit count, size, noise) in review or blocked, per option.
+  const planningFlagged = useMemo(() => planningFlaggedOptions(draftRecord, ctx.design), [draftRecord, ctx.design]);
+  const liveErrors = useMemo(
+    () => [...proposalIssueErrors(draftRecord, ctx.settings, props.today), ...planningNoteErrors(draftRecord, ctx.design)],
+    [draftRecord, ctx.settings, ctx.design, props.today],
+  );
   const projectBlockers = props.blockers.filter((b) => !LIVE_CODES.has(b.code));
   const blocking = projectBlockers.filter((b) => b.severity === "block");
   const anyAboveInstant = props.instantPricePence > 0 && previews.some((p) => p.preview.option.pricing.totalPence > props.instantPricePence);
@@ -255,6 +270,21 @@ export function ProposalBuilder(props: BuilderProps) {
         </div>
 
         <div id="option-panel" role="tabpanel">
+          {active && planningFlagged.find((f) => f.designVariantId === active.form.designVariantId) && (
+            <div role="alert" className="mb-4 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+              <p className="font-semibold">Planning or noise: this option&apos;s design check needs a look</p>
+              <ul className="mt-1 list-disc space-y-1 pl-5">
+                {planningFlagged
+                  .find((f) => f.designVariantId === active.form.designVariantId)!
+                  .flags.map((r) => (
+                    <li key={r.id}>
+                      <span className="font-semibold">{r.title}</span> ({r.status === "fail" ? "blocked" : "in review"}): {r.detail}
+                    </li>
+                  ))}
+              </ul>
+              <p className="mt-1">It never decides planning by itself. Tell the customer below (Planning and noise), or record why it doesn&apos;t apply.</p>
+            </div>
+          )}
           {active ? (
             <OptionEditor
               key={active.form.designVariantId}
@@ -287,6 +317,39 @@ export function ProposalBuilder(props: BuilderProps) {
           <div className="mt-4">
             <ListEditor label="What the price assumes" value={form.assumptions} onChange={(v) => setForm((f) => ({ ...f, assumptions: v }))} max={20} />
           </div>
+          {(planningFlagged.length > 0 || form.planningNote || form.planningNotApplicable) && (
+            <div id="planning-note" className="mt-5 rounded-2xl border border-amber-300 bg-amber-50/60 p-4">
+              <p className="text-sm font-semibold text-ink-900">Planning and noise</p>
+              <p className="mt-1 text-sm text-ink-700">
+                {planningFlagged.length > 0
+                  ? `The design's planning or noise check is in review or blocked for ${planningFlagged.map((f) => f.label).join(" and ")}. Before issuing, either tell the customer (the note is shown on their proposal, with what's included) or record why it doesn't apply. Never write that planning is or isn't needed.`
+                  : "No option's planning or noise check is flagged now; clear these if they no longer apply."}
+              </p>
+              <div className="mt-3 space-y-3">
+                <Textarea
+                  label="Note for the customer"
+                  hint="Shown on their proposal and in the issue email. Edit it to fit this home."
+                  rows={4}
+                  maxLength={1500}
+                  value={form.planningNote ?? ""}
+                  onChange={(e) => setForm((f) => ({ ...f, planningNote: e.target.value }))}
+                />
+                {!form.planningNote?.trim() && planningFlagged.length > 0 && (
+                  <Button variant="secondary" onClick={() => setForm((f) => ({ ...f, planningNote: defaultPlanningNote(planningFlagged, f.options.length) }))}>
+                    Start from the suggested note
+                  </Button>
+                )}
+                <Textarea
+                  label="Or: why it doesn't apply (internal)"
+                  hint="For the team only, e.g. the full MCS 020 calculation with the barrier passes at 39 dB(A). Recorded with your name."
+                  rows={2}
+                  maxLength={1000}
+                  value={form.planningNotApplicable ?? ""}
+                  onChange={(e) => setForm((f) => ({ ...f, planningNotApplicable: e.target.value }))}
+                />
+              </div>
+            </div>
+          )}
           <div className="mt-5 rounded-2xl bg-cream p-4">
             <p className="text-sm font-semibold text-ink-900">Guarantees (from settings)</p>
             <ul className="mt-2 space-y-1 text-sm text-ink-700">

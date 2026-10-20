@@ -476,3 +476,52 @@ test("issuing reprices on today's catalogue: a draft saved before a cost change 
   assert.match(gated.errors!.join(" "), /minimum/, "below the minimum on today's costs");
   assert.equal((await proposalsRepo.get(d2))!.status, "draft");
 });
+
+test("a design whose planning or noise check is in review: the builder's issue waits for a note to the customer (shown and frozen) or a recorded reason", async () => {
+  await fresh();
+  const designsRepo = await import("../lib/repo/designs.ts");
+  // DEMO 2's approved design, with its noise estimate close to the limit (a review), as the studio would record it.
+  const design = (await designsRepo.approvedForProject(DEMO2))!;
+  const flagged = {
+    ...design,
+    variants: design.variants.map((v, i) =>
+      i === 0 ? { ...v, rules: v.rules.map((r) => (r.id === "noise" ? { ...r, status: "review" as const, detail: "About 40.5 dB(A), within 42 dB(A) but with under 3 dB to spare (DEMO)." } : r)) } : v,
+    ),
+  };
+  await designsRepo.update(flagged);
+  const v1 = (await proposalsRepo.listForProject(DEMO2))[0]!;
+  const draftId = ((await server.reviseFrom(DEMO2, v1.id, ADMIN)) as { proposalId: string }).proposalId;
+  const priced = patchFrom(await proposalsRepo.get(draftId), { increaseReason: "Your survey found a longer pipe run (DEMO)." });
+  assert.ok((await server.saveDraft(DEMO2, draftId, priced, ADMIN)).ok);
+
+  // Neither a note nor a reason: refused, naming the option.
+  const refused = await server.issueDraft(DEMO2, draftId, ADMIN);
+  assert.equal(refused.ok, false);
+  const label = flagged.variants[0]!.label;
+  assert.match((refused as { errors?: string[] }).errors!.join(" "), new RegExp(`planning or noise check is in review or blocked for ${label}`));
+
+  // The suggested note never concludes either way.
+  const { defaultPlanningNote, planningFlaggedOptions, customerSafeProposal } = await import("@aircon/domain");
+  const suggested = defaultPlanningNote(planningFlaggedOptions((await proposalsRepo.get(draftId))!, flagged), priced.options.length);
+  assert.match(suggested, /may be needed/);
+  assert.match(suggested, /42 dB\(A\)/);
+  assert.doesNotMatch(suggested, /isn't needed|not needed|no planning/i);
+
+  // An internal reason lets it go, and the customer never sees it.
+  const why = await server.saveDraft(DEMO2, draftId, { ...patchFrom(await proposalsRepo.get(draftId), { increaseReason: "Your survey found a longer pipe run (DEMO)." }), planningNotApplicable: "Full MCS 020 sheet with the fence as a barrier: 38 dB(A) (DEMO)." }, ADMIN);
+  assert.ok(why.ok);
+  const stored = (await proposalsRepo.get(draftId))!;
+  assert.equal(stored.planningNotApplicable?.by, ADMIN.name);
+  assert.equal(customerSafeProposal(stored).planningNotApplicable, undefined);
+
+  // Or a note for the customer: on the issued version, its frozen document and the issue email.
+  const note = "Planning and noise: the noise at your neighbour's window is close to the 42 dB(A) limit (DEMO). We'll check it before any work starts.";
+  const withNote = await server.saveDraft(DEMO2, draftId, { ...patchFrom(await proposalsRepo.get(draftId), { increaseReason: "Your survey found a longer pipe run (DEMO)." }), planningNote: note }, ADMIN);
+  assert.ok(withNote.ok);
+  const issued = await server.issueDraft(DEMO2, draftId, ADMIN);
+  assert.ok(issued.ok, JSON.stringify(issued));
+  const doc = (await listDocuments(DEMO2, { kind: "proposal" }))[0]!;
+  assert.equal((doc.snapshot as { proposal: { planningNote?: string } }).proposal.planningNote, note);
+  const email = (await messagesRepo.listForProject(DEMO2)).find((m) => m.event === "proposal-issued" && m.channel === "email" && /version 2/.test(m.subject ?? ""))!;
+  assert.ok(email.bodyText.includes(note), "the issue email carries the note");
+});

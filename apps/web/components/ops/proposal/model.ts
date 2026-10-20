@@ -28,6 +28,8 @@ export function formFromRecord(p: ProposalRecord): DraftPatch {
     inclusions: [...p.inclusions],
     exclusions: [...p.exclusions],
     assumptions: [...p.assumptions],
+    ...(p.planningNote ? { planningNote: p.planningNote } : {}),
+    ...(p.planningNotApplicable ? { planningNotApplicable: p.planningNotApplicable.reason } : {}),
     options: p.options.map(optionFormFrom),
   };
 }
@@ -137,5 +139,7 @@ export function recordFromForm(base: ProposalRecord, form: DraftPatch, options: 
     exclusions: form.exclusions,
     assumptions: form.assumptions,
     ...(form.increaseReason?.trim() ? { increaseReason: form.increaseReason } : { increaseReason: undefined }),
+    planningNote: form.planningNote?.trim() || undefined,
+    planningNotApplicable: form.planningNotApplicable?.trim() ? { reason: form.planningNotApplicable.trim(), by: "", at: "" } : undefined,
   };
 }

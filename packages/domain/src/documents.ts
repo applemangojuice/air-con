@@ -172,6 +172,8 @@ export interface ContractSnapshot extends DocumentHeader {
   inclusions: string[];
   exclusions: string[];
   assumptions: string[];
+  /** What the proposal told them about the design's planning or noise check (ProposalRecord.planningNote). */
+  planningNote?: string;
   warranty: string | null;
   termsVersion: string;
   cancellation: { text: string; endsOn?: string; earlyStartRequested: boolean };
