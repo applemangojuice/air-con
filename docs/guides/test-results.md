@@ -1,6 +1,146 @@
 # Test results
 
-The latest real results of every automatic check, run late on
+The latest real results of every automatic check, run in the first hours
+of **21 October 2026** (London; late on 20 October UTC) on branch
+`claude/pilot-ops` at commit `f42dbc7`: round 10 of the pre-launch review
+([below](#what-round-10-found): a variation can't change the design, and the
+round's medium list), on top of the six items round 9 left half-done (the
+builder's `6d05122` to `f27e113`, [below](#the-six-items-round-9-left-single-run))
+and round 9 (`32e378b`, [below](#the-run-for-round-9)). Everything was run
+**twice, start to finish, and passed both times**, on both databases. Every
+person, home and price the browser walks use is fictional and labelled
+DEMO.
+
+**Summary: everything passed, on both databases.** 1,090 unit tests (542
+domain, 548 web: 11 new), the type check (the iOS scaffold included), the
+production build (Next.js 15.5.28), every database migration check and the
+upgrade file check (no migration: round 10 lives in JSON columns, the
+checklist and the project); then the browser walks on **both** backends: on
+the local file database, 236 end-to-end pilot checks and 24 quote-form
+checks; on the Supabase-shaped stack (Postgres 16, PostgREST 12.2.3 and the
+Storage API), the same 236 and 24, the property book importers over 3,000
+homes, and 444 checks across the screens with no statement refused by the
+database.
+
+| Check | Command | Result | Round A (UTC) | Round B (UTC) |
+| --- | --- | --- | --- | --- |
+| Type check (domain, web, mobile) | `pnpm -r typecheck` | **Pass** (3 of 3 projects) | 23:12 | 23:28 |
+| Domain unit tests | `pnpm test` | **542 of 542 pass**, 0 fail (31 test files) | 23:12 | 23:28 to 23:29 |
+| Web unit tests | `pnpm test` | **548 of 548 pass**, 0 fail (59 test files) | 23:12 | 23:28 to 23:29 |
+| Production build | `pnpm --filter @aircon/web build` | **Pass**: Next.js 15.5.28, compiled, 35 of 35 static pages generated | 23:12 to 23:13 | 23:29 to 23:30 |
+| Database migrations | `bash supabase/tests/run-migrations.sh` | **Pass**: 15 migrations and the pilot upgrade bundle (none new); the local backend's schema matches | 23:13 | 23:30 |
+| Upgrade file is current | `bash supabase/build-pilot-upgrade.sh --check` | **Pass**: `pilot-upgrade.sql` is current (0010 to 0014) | 23:13 | 23:30 |
+| Pilot walk, **local file database** | `node scripts/e2e-pilot.mjs` (port 3990) | **236 of 236 pass** | 23:13 to 23:18 | 23:30 to 23:35 |
+| Quote form walk, **local file database** | `node scripts/e2e-funnel.mjs` (port 3991) | **24 of 24 pass** | 23:18 to 23:19 | 23:35 |
+| Pilot walk, **Supabase-shaped** | `bash supabase/tests/compat/run-compat-e2e.sh` (Postgres 55990, PostgREST 3993, gateway 3994, app 3995) | **236 of 236 pass** | 23:19 to 23:28 | 23:35 to 23:45 |
+| Quote form walk, **Supabase-shaped** | (same run) | **24 of 24 pass** | (same run) | (same run) |
+| Property book import, **Supabase-shaped** | (same run) | **Pass**: 3,000 homes, 900 in a conservation area, 3,000 classified | (same run) | (same run) |
+| Every screen, **Supabase-shaped** | (same run) | **444 of 444 pass** (286 pages, 214 routes, 141 requests with ids that aren't there, the exports, the crons) | (same run) | (same run) |
+| Database and app logs, **Supabase-shaped** | (same run) | **Clean**: no statement refused by Postgres, no PostgREST or Storage error in the app's log | (same run) | (same run) |
+
+Both rounds ran on commit `f42dbc7`, each from a fresh build and fresh,
+empty data, straight through: the local walks against `next start` started
+directly (node, so its PID is the server's) on ports 3990 and 3991, each on a
+fresh data folder and stopped by that PID; the Supabase-shaped run on 55990
+(Postgres), 3993 (PostgREST), 3994 (gateway) and 3995 (the app), reusing the
+round's own build (`SKIP_BUILD=1`). The pilot walk has six more checks than
+before (236): the variation sheet's first question ("Yes" shows why it
+can't be a variation and offers no price; the office sees the crew's answer
+and ticks the same before sending), the kit check's quantities start blank
+and are typed from the boxes, the technical lead records the planning
+outcome before the proposal goes, the heat pump's certificate can't be
+approved before the install and approves after it with its file and number;
+it answers seven permitted-development checks (the noise check is the
+design's), and counts four statutory items open before install (the three
+about the finished work and commissioning). An earlier, uncounted round at
+`b8d6f78` failed one pilot-walk check on the local database: the walk ran
+across London midnight, and it compared the customer's install date with
+"today" rather than the day day 1 started (the timeline was right). The walk
+now records the London day day 1 started; the rest of that round, the
+Supabase-shaped run included, passed. Nothing else flaked. Covered by unit
+tests only, not by the walks (the DEMO household is an owner in a house
+built after 2000, its readings pass, nobody cancels the change): a variation
+the family cancels, the consent and planning next steps on the family's
+page, the target-change confirmation and the hold-time line, the asbestos
+"not applicable" rule, the supply and DNO block (the walk approves it before
+day 1), the subcontracted technical lead's refusal and the kit emails for a
+delivery to the home.
+
+## What round 10 found
+
+A tenth pass of the pre-launch review, on the snapshot at `ec521aa`, found
+one problem that reaches real families, and a list of medium ones. All are
+fixed or written up (architecture §K50), each with tests that fail without
+the fix:
+
+- **A unit added or moved after acceptance met none of the design's
+  checks.** Once a proposal is accepted the design is locked, and every
+  change is a variation: a description and a price. The field guide even
+  named "a unit moved" as a variation. So a box room added on install day
+  (5.5 m², 2.7 kg of R32 on a 45 m run, which the design's room-size check
+  refuses: 6.9 m² needed, IEC 60335-2-40 formula, to verify against the
+  manual) went to the family priced, with no technical lead, no kit, no
+  runsheet steps (no flare torque, as-built run or serial) and no line on
+  the commissioning certificate or handover pack. Now the crew's variation
+  sheet asks one question first: **Does it add, remove or swap a unit, or
+  move one to another room or outdoor position?** "Yes" says why it can't
+  be a variation and sends it to the office as a question; the phone's sync
+  refuses a variation answered "Yes"; and the office ticks the same before
+  any variation goes to the family (recorded on it). The change is quoted as
+  a new job, designed and signed off by the technical lead (known
+  limitation 9h: there is still no design-change route after acceptance).
+  (Tests: the review's repro on the domain, the sync and the office's send;
+  in the walk, "Yes" shows the reason and no price, then "No" and the tick.)
+
+From the round's medium list, fixed: the crew's pressure and vacuum steps
+show the hold time to keep (or that it isn't set: ask the tech lead), the
+guides set the targets before day 1, a target change that would fail a test
+already taken asks the technical lead to confirm it (so a typo can't fail a
+good test for good), and a hold over 24 hours is refused; the survey no
+longer asks the noise check, which only the design can answer (the family's
+survey report said "Yes"); the certificates and the notice about the
+finished work can't be approved before the install is complete, the heat
+pump's needs its file and number, and the family's page says "Sent to you"
+only with a file; the kit check's quantities start blank (typed from the
+boxes) and the warning goes to the office; the supply and DNO item holds
+day 1; a change the family cancels after agreeing it is recorded and never
+done or billed (the office is told to credit an invoice already raised);
+suspected asbestos (or a home before 2000) can't be marked not applicable; a
+subcontracted technical lead is told why they can't approve designs, and
+the launch page no longer shows green for one; the terms state the balance
+the way the proposal and contract do; the proposal waits for the technical
+lead's planning outcome, as the terms promise, and "consent needed" needs
+the customer note; a tenant's or leaseholder's missing consent is the
+family's next step, and planning permission still awaited replaces "You're
+all set"; kit coming to the home asks for someone in and the boxes kept
+dry, with a prep item for it. Written up instead: per-model commissioning
+targets and an early prompt to set them (known limitation 7), heating use
+still asked twice and the volume and unit count still the surveyor's (31a),
+an invoice for a cancelled change credited by hand and no charge for work
+done before a change was cancelled (23), the design-change route (9h), and,
+for the solicitor and the broker, who carries the risk of kit waiting at the
+family's home (approvals 24a) and the refund deadline's wording (approvals
+5). Primary sources (legislation.gov.uk, HSE, ENA, the manufacturers) were
+unreachable from here: every limit is from search-engine extracts and
+worded as to be confirmed.
+
+**The six items round 9 left half-done, checked again** (the builder's
+`6d05122` to `f27e113`, [below](#the-six-items-round-9-left-single-run)):
+read against the code and passed their own unit tests in both rounds: the
+charge against the as-built length (the expected figure, the 10%/50 g
+tolerance and the tech lead's sign-off), access at height (no ladder above
+2.5 m, the hire as a cost line, the two-person lift), flats in blocks (the
+block's height, a crossing's fire-stopping step, the Building Regulations
+route), the yearly service and the `/stop` link (an HMAC of the project id,
+a page with one button), CDM 2015 roles and the health and safety file, and
+multi-split reducers (nothing uses them until port sizes are added). The
+walk covers the charge check and the scheme route; the rest stay unit-tested
+only, as the builder said (a house, ground-level unit, in-house crew, no port
+sizes).
+
+## The six items round 9 left (single run)
+
+The builder's single run of every automatic check, late on
 **20 October 2026** on branch `claude/pilot-ops` at commit `f27e113`: the
 six items round 9 left half-done (architecture §K49: the charge against the
 as-built length, access at height, flats in blocks, the yearly service and
