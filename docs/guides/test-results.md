@@ -1,73 +1,118 @@
 # Test results
 
 The latest real results of every automatic check, run on the night of
-**19 to 20 October 2026** on branch `claude/pilot-ops` at commit `4d9c16b`
-(the go-live pack merged with the Supabase compatibility work, the six
-fixes from the final pre-launch review [below](#what-the-final-review-found),
-the nine from round 3 [below](#what-round-3-found) and the nine from round 4
-[below](#what-round-4-found)). Everything was run **twice, start to finish,
-and passed both times** (in round 2 the Supabase-shaped run stopped once on
-a field-app screen this round didn't touch and passed when run again: see
-below). Every person, home and price the browser walks use is fictional
-and labelled DEMO.
+**19 to 20 October 2026** on branch `claude/pilot-ops` at commit `454c8d1`:
+the fix for the handover flake [below](#the-handover-flake-fixed), on top of
+the go-live pack, the Supabase compatibility work and the fixes from the
+final pre-launch review and rounds 3 and 4 (`4d9c16b`, [below](#what-round-4-found)).
+Everything was run **twice, start to finish, and passed both times**, on
+both databases, and in each round the handover was repeated **30 times in a
+row on each database**, the Supabase-shaped one slowed down on purpose, and
+passed every time. Every person, home and price the browser walks use is
+fictional and labelled DEMO.
 
-**Summary: everything passed, on both databases.** 909 unit tests, the type
+**Summary: everything passed, on both databases.** 920 unit tests, the type
 check, the production build (Next.js 15.5.28), every database migration
 check (110 assertions) and the upgrade file check; then the browser walks on
-**both** backends: on the local file database, 193 end-to-end pilot checks
-and 23 quote-form checks; on a Supabase-shaped stack (Postgres 16, PostgREST
-and the Storage API, as a real Supabase project serves them, with the
-database's default grants as a project created today has them), the same
-193 and 23, the property book importers over 3,000 homes, and 439 checks
-across 284 screens, with no statement refused by the database.
+**both** backends: on the local file database, 193 end-to-end pilot checks,
+23 quote-form checks and 30 of 30 handovers; on a Supabase-shaped stack
+(Postgres 16, PostgREST and the Storage API, as a real Supabase project
+serves them, with the database's default grants as a project created today
+has them), the same 193 and 23, the property book importers over 3,000
+homes, 439 checks across 284 screens with no statement refused by the
+database, and 30 of 30 handovers with every database and storage request
+held 60 ms plus up to 240 ms more.
 
 | Check | Command | Result | Round 1 (UTC, 20 Oct) | Round 2 (UTC, 20 Oct) |
 | --- | --- | --- | --- | --- |
-| Type check (domain, web, mobile) | `pnpm -r typecheck` | **Pass** (3 of 3 projects) | 00:04 | 00:21 |
-| Domain unit tests | `pnpm test` | **460 of 460 pass**, 0 fail (29 test files) | 00:04 to 00:05 | 00:21 to 00:22 |
-| Web unit tests | `pnpm test` | **449 of 449 pass**, 0 fail (50 test files) | 00:04 to 00:05 | 00:21 to 00:22 |
-| Production build | `pnpm --filter @aircon/web build` | **Pass**: Next.js 15.5.28, compiled, 34 of 34 static pages generated | 00:05 to 00:06 | 00:22 to 00:23 |
-| Database migrations | `bash supabase/tests/run-migrations.sh` | **Pass**: 15 migrations and the pilot upgrade bundle; the local backend's schema matches; 110 sanity assertions | 00:06 | 00:23 |
-| Upgrade file is current | `bash supabase/build-pilot-upgrade.sh --check` | **Pass**: `pilot-upgrade.sql` is current (0010 to 0014) | 00:06 | 00:23 |
-| Pilot walk, **local file database** | `node scripts/e2e-pilot.mjs` | **193 of 193 pass** | 00:06 to 00:11 | 00:23 to 00:27 |
-| Quote form walk, **local file database** | `node scripts/e2e-funnel.mjs` | **23 of 23 pass** | 00:11 | 00:28 |
-| Pilot walk, **Supabase-shaped** | `bash supabase/tests/compat/run-compat-e2e.sh` | **193 of 193 pass** | 00:11 to 00:21 | 00:39 to 00:47 (see below) |
+| Type check (domain, web, mobile) | `pnpm -r typecheck` | **Pass** (3 of 3 projects) | 01:50 | 02:26 |
+| Domain unit tests | `pnpm test` | **460 of 460 pass**, 0 fail (29 test files) | 01:50 | 02:26 to 02:27 |
+| Web unit tests | `pnpm test` | **460 of 460 pass**, 0 fail (51 test files) | 01:50 | 02:26 to 02:27 |
+| Production build | `pnpm --filter @aircon/web build` | **Pass**: Next.js 15.5.28, compiled, 34 of 34 static pages generated | 01:50 to 01:52 | 02:27 to 02:28 |
+| Database migrations | `bash supabase/tests/run-migrations.sh` | **Pass**: 15 migrations and the pilot upgrade bundle; the local backend's schema matches; 110 sanity assertions | 01:52 | 02:28 |
+| Upgrade file is current | `bash supabase/build-pilot-upgrade.sh --check` | **Pass**: `pilot-upgrade.sql` is current (0010 to 0014) | 01:52 | 02:28 |
+| Pilot walk, **local file database** | `node scripts/e2e-pilot.mjs` | **193 of 193 pass** | 01:52 to 01:56 | 02:28 to 02:33 |
+| Quote form walk, **local file database** | `node scripts/e2e-funnel.mjs` | **23 of 23 pass** | 01:56 to 01:57 | 02:33 |
+| Handover, 30 times, **local file database** | `node scripts/e2e-handover-loop.mjs` (after the pilot walk to phase I) | **30 of 30 rounds pass**; the sign-off opens a median 121 and 114 ms after the tap (rounds 1 and 2) | 01:57 to 02:02 | 02:33 to 02:39 |
+| Pilot walk, **Supabase-shaped** | `bash supabase/tests/compat/run-compat-e2e.sh` | **193 of 193 pass** | 02:02 to 02:11 | 02:39 to 02:48 |
 | Quote form walk, **Supabase-shaped** | (same run) | **23 of 23 pass** | (same run) | (same run) |
 | Property book import, **Supabase-shaped** | (same run) | **Pass**: 3,000 homes, 900 in a conservation area, 3,000 classified (three times Max Rows) | (same run) | (same run) |
 | Every screen, **Supabase-shaped** | (same run) | **439 of 439 pass**: 284 pages over 212 routes, 141 requests with ids that aren't there, a NUL in the quote form, 4 CSV exports, 4 daily jobs | (same run) | (same run) |
 | Database and app logs, **Supabase-shaped** | (same run) | **Clean**: no statement refused by Postgres, no PostgREST or Storage error in the app's log | (same run) | (same run) |
+| Handover, 30 times, **Supabase-shaped, slowed down** | `bash supabase/tests/compat/run-handover-loop.sh` (60 ms + up to 240 ms on every database and storage request) | **30 of 30 rounds pass**; the sign-off opens a median 5,246 and 5,342 ms after the tap (the publish itself, at that latency) | 02:12 to 02:26 | 02:48 to 03:02 |
 
-Both rounds ran on commit `4d9c16b` itself (only this document changed
-after it), each from a fresh build and a fresh, empty local data folder.
-
-**One stop in round 2, then a pass.** The first Supabase-shaped run of
-round 2 (00:28 to 00:38) stopped in the pilot walk at phase J, "handover
-pack published": the crew phone published the pack (the server answered
-200 and the screen said "Published"), but the page's refresh was cut off
-part-way (`net::ERR_ABORTED`), most likely by the screen's own
-refresh-after-sync landing at the same moment, so the screen kept its old
-header and the sign-off stayed greyed out. Everything else in that run
-passed (23 of 23, 3,000 / 900 / 3,000, 439 of 439, clean logs). The
-handover screen and its refresh weren't changed in this round, and the same
-step passed in every other walk of this round (four on this commit, two on
-the working tree). Run again on the same build (00:39 to 00:47), everything
-passed. On a real phone the fix is to pull down to refresh, or open the job
-again.
-
-Before that commit, the same walks also passed once on the working tree
-while the fixes were being made (193 and 23 on the local file database
-from 23:41 to 23:46 on 19 October; 193, 23, 3,000 / 900 / 3,000 and 439 of
-439 on the Supabase-shaped stack from 23:49 to 23:58).
+Both rounds ran on commit `454c8d1` itself (only this document changed
+after it), each from a fresh build and fresh, empty data. In round 1 the
+slowed-down handover loop's first start (02:11) found its database port
+taken by another stack on this machine and stopped before anything ran; it
+was started again on free ports at 02:12. Round 2 ran straight through.
 
 Set-up for the local walks: a production build (`next start`) on the local
 file database (which enforces the same schema Postgres does), a fresh
-empty data folder each round, demo sign-in on, `SESSION_SECRET` of 40
+empty data folder each round, demo sign-in on, a `SESSION_SECRET` over 40
 characters, headless Chromium 1194. For the Supabase-shaped walks: the same
 build with **no** `DATA_BACKEND`, talking to the stack only through
 supabase-js with the service-role key, as a demo deployment
 (`ALLOW_DEMO_LOGIN=1 DEMO_DEPLOYMENT=1`), the route walk signing in by
-**Admin break-glass**. Node 22.22.0, pnpm 10.12.1, PostgreSQL 16.15,
-PostgREST 12.2.3.
+**Admin break-glass**. The handover loops walk a new pilot to phase I
+(commissioning signed) at full speed, then put the job back to that point
+before each round (the project row only, written directly: test-only).
+Node 22.22.0, pnpm 10.12.1, PostgreSQL 16.15, PostgREST 12.2.3.
+
+## The handover flake (fixed)
+
+**What was seen.** Twice on the Supabase-shaped stack (once in the
+compatibility run, once in round 2 of round 4's checks), the pilot walk
+stopped at phase J: the crew phone published the handover pack (the server
+answered 200 and the screen said "Published"), but the sign-off stayed
+greyed out. On a real phone that's in front of the family, at the moment
+they're asked to sign.
+
+**Reproduced.** The compatibility gateway now has a test-only latency knob
+(`GATEWAY_LATENCY_MS`, `GATEWAY_JITTER_MS`, or `POST /__compat/latency`
+while it runs), and a loop repeats just the handover on one job
+(`scripts/e2e-handover-loop.mjs`; `supabase/tests/compat/run-handover-loop.sh`
+sets it all up), reading every page-refresh response as the page itself
+reads it. On the build before the fix (`3f53dd5`), slowed down by 40 ms
+plus up to 160 ms, **19 of 30** rounds passed; at 60 plus up to 240,
+**20 of 30**. Every double tap (every third round) published the pack twice:
+two versions, two emails. And once in each run the screen never moved on:
+the refresh after the step arrived complete, with the pack (or the
+sign-off) in it, and was never put on screen; a tap on a tab still worked.
+When it did move on, the sign-off opened 5 to 9 seconds after the tap.
+
+**Why.** The screen enabled the sign-off only when `router.refresh()` had
+re-drawn the page from the server. On Next.js 15.5 an in-place refresh can
+stall for good when its response streams in pieces, more often when a
+second one overlaps it (the double tap's, or the one after a sync). The
+proposal builder had met the same thing (it reloads the page instead).
+
+**The fix** (architecture §K41). Nothing on a field screen waits for a
+refresh any more: every step answers with what the screen needs (the job's
+header, versioned so an older refresh can't take the screen back), and the
+screen shows it at once; refreshes run in the background, one at a time.
+Publishing carries the tap's own id, so a double tap or a retry is one pack
+and one email; signing a signed handover or signed commissioning, and
+starting a day already under way, answer with what's on record instead of
+an error; with no reply, the phone says it may not have gone and that
+trying again is safe. The same goes for commissioning (targets, reviews,
+the signature), day start and end, and on my way. The family's portal
+takes an answered change off "needs your answer" at once (and the same
+answer again is accepted, not refused), and says when the page hasn't
+caught up. Office forms (booking, payments, invoices, compliance and the
+rest) hold their button and say so when a refresh never lands, so a payment
+can't be recorded twice against a page that still shows it owed.
+
+**Proof.** 11 new unit tests and new checks in the variation test: the
+server answering a publish, a sign-off, commissioning, a day start and a
+variation answer sent twice (each fails on the old code), and the header,
+commissioning and portal overlays. The same loop on the fixed
+build passed **30 of 30** at 60 plus up to 240 ms during the work, and in
+both final rounds above **30 of 30 on each database**; double taps
+published once. In 1 of the 120 final rounds (on the local file database,
+so it isn't only Supabase's slower answers) and 1 of the 30 during the
+work, the background refresh never landed within 10 seconds: those rounds
+passed anyway, because nothing waits for it any more.
 
 ## What round 4 found
 
@@ -449,6 +494,12 @@ BASE_URL=http://localhost:3330 pnpm --filter @aircon/web test:e2e
 # The Supabase-shaped run: builds, starts the stack and the app, runs every walk, tears down.
 bash supabase/build-pilot-upgrade.sh --check
 bash supabase/tests/compat/run-compat-e2e.sh
+
+# The handover, 30 times, on the Supabase-shaped stack slowed down (60 ms + up to 240 ms a request):
+LOOPS=30 GATEWAY_LATENCY_MS=60 GATEWAY_JITTER_MS=240 bash supabase/tests/compat/run-handover-loop.sh
+# …or on the local file database, against the server above (on a fresh data folder):
+BASE_URL=http://localhost:3330 E2E_UNTIL=I E2E_IDS_FILE=/tmp/ids.json node apps/web/scripts/e2e-pilot.mjs
+BASE_URL=http://localhost:3330 IDS_FILE=/tmp/ids.json LOCAL_DATA_DIR=<that folder> LOOPS=30 node apps/web/scripts/e2e-handover-loop.mjs
 ```
 
 Use a fresh `LOCAL_DATA_DIR` for each pilot walk. Against the live site, only
