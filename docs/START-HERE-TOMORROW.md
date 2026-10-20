@@ -191,7 +191,7 @@ for **Ready**.
    lasts 15 minutes.)
 4. You land on **Today**, the office home page (the **Board** is in the top
    menu). This first sign-in made your admin account. You stay signed in on
-   this device for 30 days.
+   this device for 30 days, renewed as you use it, for up to 90 days.
 
 ![The team sign-in page](screenshots/guides/01-login.png)
 

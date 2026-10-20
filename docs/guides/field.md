@@ -48,7 +48,10 @@ is the longer one. Every picture here is fictional DEMO data.
    type your email → **Email me a sign-in link**, read the code in your
    email app, come back to the icon and type the code. Never tap the link
    for this: a link always opens the browser, not the Home Screen app.
-   You stay signed in on that phone for 30 days; **Me** says until when.
+   A sign-in lasts 30 days and renews itself as you use the app (once
+   it's more than halfway through, opening any page with signal gives it
+   another 30 days), up to 90 days after you signed in; then sign in again.
+   **Me** says until when, and the latest it can go on to.
 
 Subcontractors only ever see the jobs they're on: no prices, no margins,
 no other families. On the crew's phones (installers, the electrician and any

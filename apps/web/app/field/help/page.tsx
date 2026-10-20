@@ -111,6 +111,9 @@ export default async function FieldHelpPage() {
             menu → <B>Add to Home screen</B> on Android). The icon opens the field app. It has its own sign-in, apart from the browser&apos;s: the first time, sign in there
             with the code, never the link (a link always opens the browser).
           </p>
+          <p>
+            A sign-in lasts 30 days and renews itself as you use the app, up to 90 days after you signed in. <B>Me</B> says until when.
+          </p>
         </Fold>
         <Fold id="on-my-way" title="On my way and Arrived">
           <p>

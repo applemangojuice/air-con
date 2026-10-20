@@ -443,7 +443,10 @@ status, channel and message type.
   the email, or its 6-digit code typed on the sign-in page (for the Home
   Screen app, or when an email app opens the link in its own browser). The
   code lasts 15 minutes and goes with the link: using either uses up both.
-  Sessions last 30 days on each device.
+  A sign-in lasts 30 days on each device and renews itself as it's used
+  (another 30 days once it's past halfway), up to 90 days after signing
+  in; break-glass sign-ins last 12 hours and never renew. Unticking
+  **Active** stops someone at once, renewed or not.
 
 ## 9. Settings and the catalogue
 

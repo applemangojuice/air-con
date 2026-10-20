@@ -134,7 +134,10 @@ photos, signatures, documents).
 **Sessions:**
 - Cookie `dih_session`: HMAC-SHA256-signed JSON (`base64url(payload).sig`)
   via Web Crypto, httpOnly, `SameSite=Lax`, `Secure` in production, 30-day
-  expiry (break-glass: 12 hours).
+  expiry (break-glass: 12 hours). Staff sessions roll (§K45): `iat` and
+  `auth` in the payload; past half its life, `POST /auth/renew` (called by
+  the shells' `SessionRenewal`) re-signs it for 30 days from now, capped at
+  `auth` + 90 days, only for an active staff row (`staffForSession`).
 - Secret: `SESSION_SECRET` (`openssl rand -hex 32`). Without it, dev uses a
   fixed fallback and logs a warning; production refuses to sign, and treats
   a secret under 32 characters (`MIN_SESSION_SECRET_LENGTH`) as unset.
@@ -2459,3 +2462,22 @@ changelog and the reasons, so nobody "fixes" a deliberate choice back.
       layout, so a Home Screen icon added there opens the field app; the
       field guide, `/field/help` (**Signing in, and the Home Screen**) and
       the customer guide say to sign in there with the code.
+    - *Rolling staff sessions* (refines §K44's fixed 30 days): the cookie
+      keeps its HMAC format and gains `iat` (when signed) and `auth` (when
+      the person signed in), read only as a pair so older cookies verify
+      exactly as before and never renew. `renewableFrom` (half the life
+      gone), `renewedSession` (30 days from now, capped at `auth` + 90 days,
+      `SESSION_MAX_SECONDS`) and `sessionHardEnd` are pure (`session.ts`).
+      Renewal happens in a route handler, never on a page: `POST
+      /auth/renew` (same-origin) verifies the cookie, then re-reads the
+      staff row with the same `staffForSession` every guard uses, so a
+      deactivated, removed or demo-off account, a rotated secret or an
+      expired cookie gets nothing, and refusals stay immediate (every
+      request still checks the row); name, roles and the subcontractor flag
+      are refreshed from the row, `auth` never moves. Middleware was
+      considered and not used: it can't see a deactivation. The ops and
+      field shells render `SessionRenewal` with `renewableFrom`, which posts
+      once the time has come (again on the next page if there was no
+      signal). Break-glass sessions (12 hours, shorter than a normal life)
+      and customer sessions never renew. **Me** shows the end and the
+      90-day limit; amber only for one that can't renew.

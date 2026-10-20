@@ -71,7 +71,9 @@ export const quoteOwnerGrant = cache(async (): Promise<string[]> => {
   return readQuoteOwner(store.get(QUOTE_OWNER_COOKIE)?.value);
 });
 
+/** A fresh sign-in: `iat` and `auth` now (renewals keep `auth`, §K45). */
 export function staffSession(staff: StaffMember, ttlSeconds?: number): StaffSession {
+  const now = Date.now();
   return {
     kind: "staff",
     staffId: staff.id,
@@ -79,18 +81,23 @@ export function staffSession(staff: StaffMember, ttlSeconds?: number): StaffSess
     name: staff.name,
     roles: staff.roles,
     external: staff.external,
-    exp: sessionExpiry(Date.now(), ttlSeconds),
+    exp: sessionExpiry(now, ttlSeconds),
+    iat: Math.floor(now / 1000),
+    auth: Math.floor(now / 1000),
   };
 }
 
 export function customerSession(customer: CustomerRecord, projectIds: string[]): CustomerSession {
+  const now = Date.now();
   return {
     kind: "customer",
     customerId: customer.id,
     email: customer.email,
     name: customer.name ?? "",
     projectIds,
-    exp: sessionExpiry(),
+    exp: sessionExpiry(now),
+    iat: Math.floor(now / 1000),
+    auth: Math.floor(now / 1000),
   };
 }
 
@@ -133,7 +140,7 @@ function breakGlassAdmin(email: string): StaffMember {
  * The live staff record behind a staff session, or null (signed out):
  * missing, inactive, or a break-glass session that no longer qualifies.
  */
-async function staffForSession(session: StaffSession): Promise<StaffMember | null> {
+export async function staffForSession(session: StaffSession): Promise<StaffMember | null> {
   const env = process.env;
   if (session.staffId === BREAK_GLASS_STAFF_ID) {
     // Only while there's nowhere to keep a real admin row: no database, or

@@ -48,11 +48,12 @@ says what to do instead. Approvals that need a professional are in
     field app). The Home Screen app has its own sign-in, apart from the
     browser's, and a sign-in link always opens the browser, so sign in there
     with the 6-digit code from the sign-in email (field guide §1).
-    Staff sign-ins last a fixed 30 days and aren't renewed as you use them:
-    **Me** says when this phone's runs out (in amber in the last 3 days);
-    sign out and in again with signal before a job day. A photo refused
-    because the sign-in ran out waits and sends by itself once you're
-    signed in again.
+    Staff sign-ins renew as they're used (30 days at a time) but end 90
+    days after signing in, whatever happens: **Me** says when, and the
+    latest it can go on to. A phone left unused for 30 days is signed out,
+    and a sign-in from before renewals arrived doesn't renew (sign in
+    again once). A photo refused because the sign-in ran out waits and
+    sends by itself once you're signed in again.
 11. **Offline is a queue, not full offline.** Work done without signal
     (evidence, photos, survey answers, drawings) is saved on the phone and
     sent when signal returns, with a visible count. But:

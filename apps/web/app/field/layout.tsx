@@ -1,12 +1,15 @@
 import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { SessionRenewal } from "@/components/auth/session-renewal";
 import { OfflineGuard } from "@/components/field/offline-guard";
 import { OutboxKick } from "@/components/field/outbox-kick";
 import { CatchUpRunner } from "@/components/field/server-answer";
 import { ModeBanner } from "@/components/kit/mode-banner";
 import { NavLink } from "@/components/kit/nav-link";
 import { Mark } from "@/components/site/logo";
+import { getSession } from "@/lib/auth/server";
+import { renewableFrom } from "@/lib/auth/session";
 
 /**
  * The field shell (contract §F): the surveyor's and installer's phone app.
@@ -57,7 +60,8 @@ const TABS: { href: string; label: string; exact?: boolean; icon: ReactNode }[] 
   },
 ];
 
-export default function FieldLayout({ children }: { children: ReactNode }) {
+export default async function FieldLayout({ children }: { children: ReactNode }) {
+  const session = await getSession();
   return (
     <div className="flex min-h-dvh flex-col bg-cream text-lg text-ink-900">
       <ModeBanner />
@@ -78,6 +82,7 @@ export default function FieldLayout({ children }: { children: ReactNode }) {
       <OfflineGuard />
       <OutboxKick />
       <CatchUpRunner />
+      <SessionRenewal from={session ? renewableFrom(session) : null} />
 
       <nav aria-label="Field" className="no-print fixed inset-x-0 bottom-0 z-40 border-t border-line bg-white pb-[env(safe-area-inset-bottom)]">
         <ul className="mx-auto grid max-w-xl grid-cols-4">

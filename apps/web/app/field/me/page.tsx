@@ -7,6 +7,7 @@ import { SignOut } from "@/components/field/sign-out";
 import { SyncBadge } from "@/components/field/sync-badge";
 import { fmtDate } from "@/components/field/format";
 import { getSession, requireStaff } from "@/lib/auth/server";
+import { renewableFrom, sessionHardEnd } from "@/lib/auth/session";
 import { londonToday } from "@/lib/project-service";
 
 /** Me: who I'm signed in as, what I'm qualified to sign, when certificates run out, and sign out. */
@@ -19,10 +20,15 @@ const DAY = 86_400_000;
 export default async function FieldMePage() {
   const staff = await requireStaff();
   const today = londonToday();
-  // Staff sign-ins last a fixed 30 days: say when this phone's runs out, so it's never a surprise mid-job.
+  // Say when this phone's sign-in runs out, so it's never a surprise mid-job. Using the app renews it
+  // (§K45: 30 days at a time once half is used, up to 90 days after signing in); older ones don't renew.
   const session = await getSession();
   const endsAt = session?.kind === "staff" ? session.exp * 1000 : null;
+  const hardEnd = session?.kind === "staff" ? sessionHardEnd(session) * 1000 : null;
+  const rolling = session?.kind === "staff" && renewableFrom(session) !== null;
   const daysLeft = endsAt ? Math.floor((endsAt - Date.now()) / DAY) : null;
+  // A rolling one renews as this page opens; only one that can't renew needs the amber warning.
+  const warn = daysLeft !== null && daysLeft < 3 && !rolling;
   const reqs: StepRequirement[] = ["fgas", "electrical", "tech-lead"];
   return (
     <>
@@ -32,11 +38,15 @@ export default async function FieldMePage() {
 
       {endsAt && (
         <p
-          role={daysLeft !== null && daysLeft < 3 ? "alert" : undefined}
-          className={`mb-5 rounded-2xl border px-4 py-3 text-base ${daysLeft !== null && daysLeft < 3 ? "border-amber-300 bg-amber-50 text-amber-950" : "border-line bg-white text-ink-700"}`}
+          role={warn ? "alert" : undefined}
+          className={`mb-5 rounded-2xl border px-4 py-3 text-base ${warn ? "border-amber-300 bg-amber-50 text-amber-950" : "border-line bg-white text-ink-700"}`}
         >
           Signed in on this phone until {fmtDate(new Date(endsAt).toISOString())}.
-          {daysLeft !== null && daysLeft < 3 ? " Sign out and in again (with signal) before a job day, so it doesn't run out on site." : ""}
+          {rolling && hardEnd
+            ? ` Using the app keeps it going, up to ${fmtDate(new Date(hardEnd).toISOString())} (90 days after you signed in); then sign in again.`
+            : warn
+              ? " Sign out and in again (with signal) before a job day, so it doesn't run out on site."
+              : " This sign-in doesn't renew itself: sign in again before then."}
         </p>
       )}
 

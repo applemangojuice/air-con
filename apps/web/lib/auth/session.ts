@@ -17,10 +17,23 @@ import { isPlaceholderValue } from "../env-placeholders.ts";
 
 export const SESSION_COOKIE = "dih_session";
 
-/** Staff stay signed in on their phone for 30 days (plan §7.2). */
+/** Staff stay signed in on their phone for 30 days (plan §7.2), renewed as they use it (below). */
 export const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
 
-/** `exp` is seconds since the Unix epoch, as in a JWT. */
+/**
+ * Rolling staff sessions (§K45): once more than half a session's life has
+ * passed, using the app re-signs the cookie for another 30 days, but never
+ * past this long after the original sign-in. So a crew isn't signed out
+ * mid-job, and a stolen cookie still dies within 90 days of the sign-in it
+ * came from, however it's used.
+ */
+export const SESSION_MAX_SECONDS = 90 * 24 * 60 * 60;
+
+/**
+ * `exp` is seconds since the Unix epoch, as in a JWT. `iat` is when this
+ * cookie was signed and `auth` when the person actually signed in (both
+ * seconds); cookies from before renewals have neither and never renew.
+ */
 export type StaffSession = {
   kind: "staff";
   staffId: string;
@@ -29,6 +42,8 @@ export type StaffSession = {
   roles: StaffRole[];
   external: boolean;
   exp: number;
+  iat?: number;
+  auth?: number;
 };
 
 export type CustomerSession = {
@@ -38,6 +53,8 @@ export type CustomerSession = {
   name: string;
   projectIds: string[];
   exp: number;
+  iat?: number;
+  auth?: number;
 };
 
 export type Session = StaffSession | CustomerSession;
@@ -153,6 +170,10 @@ export async function signSession(session: Session, secret: string | null = sess
 }
 
 const isStr = (v: unknown): v is string => typeof v === "string" && v.length > 0;
+const isTime = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v) && v > 0;
+/** `iat` and `auth` when the payload has them (both, or neither), so old cookies read exactly as before. */
+const times = (r: Record<string, unknown>): { iat?: number; auth?: number } =>
+  isTime(r.iat) && isTime(r.auth) ? { iat: r.iat, auth: r.auth } : {};
 const isStrArray = (v: unknown): v is string[] => Array.isArray(v) && v.every((x) => typeof x === "string");
 
 /** A signature alone isn't enough: the payload must also have the exact session shape. */
@@ -171,6 +192,7 @@ function asSession(raw: unknown): Session | null {
       roles: r.roles as StaffRole[],
       external: r.external,
       exp: r.exp,
+      ...times(r),
     };
   }
   if (r.kind === "customer" && isStr(r.customerId) && isStrArray(r.projectIds)) {
@@ -181,6 +203,7 @@ function asSession(raw: unknown): Session | null {
       name: r.name,
       projectIds: r.projectIds,
       exp: r.exp,
+      ...times(r),
     };
   }
   return null;
@@ -226,4 +249,45 @@ export function sessionCookieOptions(env: Record<string, string | undefined> = p
     path: "/",
     maxAge: SESSION_TTL_SECONDS,
   };
+}
+
+/* ------------------------------------------------------------------ */
+/* Renewal (§K45)                                                      */
+/* ------------------------------------------------------------------ */
+
+/**
+ * When this staff session can next be renewed (seconds), or null when it
+ * never can: a customer's, a break-glass one (shorter than a normal
+ * session: emergencies stay short), one from before renewals (no
+ * `iat`/`auth`), or one already at its 90-day cap.
+ */
+export function renewableFrom(session: Session): number | null {
+  if (session.kind !== "staff" || session.iat === undefined || session.auth === undefined) return null;
+  const life = session.exp - session.iat;
+  if (life < SESSION_TTL_SECONDS) return null;
+  if (session.exp >= session.auth + SESSION_MAX_SECONDS) return null;
+  return session.iat + Math.floor(life / 2);
+}
+
+/** The latest a session can last, however it's used: 90 days after the sign-in (or its own expiry, if it never renews). */
+export function sessionHardEnd(session: Session): number {
+  return session.kind === "staff" && renewableFrom(session) !== null && session.auth !== undefined
+    ? session.auth + SESSION_MAX_SECONDS
+    : session.exp;
+}
+
+/**
+ * The same session re-signed for another 30 days from now (capped at 90
+ * days from the sign-in), or null when it isn't due or can't renew. The
+ * caller has already checked the person is still an active staff member:
+ * renewing never brings back anyone the database refuses.
+ */
+export function renewedSession(session: Session, nowMs: number = Date.now()): StaffSession | null {
+  const from = renewableFrom(session);
+  if (from === null || session.kind !== "staff" || session.auth === undefined) return null;
+  const now = Math.floor(nowMs / 1000);
+  if (now < from || now >= session.exp) return null;
+  const exp = Math.min(now + SESSION_TTL_SECONDS, session.auth + SESSION_MAX_SECONDS);
+  if (exp <= session.exp) return null;
+  return { ...session, iat: now, exp };
 }

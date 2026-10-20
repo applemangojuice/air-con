@@ -5,7 +5,9 @@ import { ModeBanner } from "@/components/kit/mode-banner";
 import { Menu } from "@/components/kit/menu";
 import { NavLink } from "@/components/kit/nav-link";
 import { Mark } from "@/components/site/logo";
+import { SessionRenewal } from "@/components/auth/session-renewal";
 import { getSession } from "@/lib/auth/server";
+import { renewableFrom } from "@/lib/auth/session";
 
 /**
  * The ops shell (contract §F): mode banner, the team's top nav and who's
@@ -48,6 +50,7 @@ export default async function OpsLayout({ children }: { children: ReactNode }) {
 
   return (
     <>
+      <SessionRenewal from={staff ? renewableFrom(staff) : null} />
       <div className="no-print">
         <ModeBanner />
         <header className="bg-ink-950 text-white">
