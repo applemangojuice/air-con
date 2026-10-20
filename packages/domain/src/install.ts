@@ -1,5 +1,5 @@
 import type { CatalogueItem } from "./catalogue.ts";
-import type { DesignRecord, DesignVariant, SystemSelection } from "./design-record.ts";
+import { A2L_ROOM_CHECK_ABOVE_KG, a2lMaxChargeKg, releaseHeightOf, type DesignRecord, type DesignVariant, type SystemSelection } from "./design-record.ts";
 import { R32_GWP, fgasRecord, type FgasRecord, type InstalledEquipmentRow } from "./documents.ts";
 import type { PhotoTag } from "./media.ts";
 import { can, meetsRequirement, qualificationStatus, type StaffMember, type StepRequirement } from "./staff.ts";
@@ -1390,6 +1390,19 @@ export function runsheetFromDesign(
       typeof gpm === "number" && typeof pre === "number"
         ? `Design: max(0, ${runM} m − ${pre} m pre-charged) × ${gpm} g/m = ${expected} g.`
         : `Design figure: ${expected} g (the catalogue has no charge rate for this model: check the manual).`;
+    // R32 room size, again as built: the most the smallest room on this system may hold (1.84 kg when a room isn't measured).
+    const limits = s.rooms.map((r) => {
+      const dr = design.rooms.find((x) => x.roomId === r.id);
+      const h = releaseHeightOf(r.indoor);
+      const area = dr?.areaM2 && !dr.estimated?.includes("area") ? dr.areaM2 : undefined;
+      return { name: r.name, area, maxKg: area && h ? Math.max(A2L_ROOM_CHECK_ABOVE_KG, a2lMaxChargeKg(area, h.h0)) : A2L_ROOM_CHECK_ABOVE_KG };
+    });
+    const tightest = limits.sort((a, b) => a.maxKg - b.maxKg)[0];
+    const factoryKg = s.outdoor?.specs?.factoryChargeKg;
+    const maxAddedG = tightest && typeof factoryKg === "number" && factoryKg > 0 ? Math.max(0, Math.floor((tightest.maxKg - factoryKg) * 1000 + 1e-6)) : undefined;
+    const roomNote = tightest
+      ? ` R32 room size: keep the total (nameplate factory charge plus what you add) at or under ${tightest.maxKg} kg, ${tightest.area ? `the most ${tightest.name} (${tightest.area} m²) may hold` : "the level above which every room needs measuring"}; over it, stop and tell the tech lead.`
+      : "";
     add({
       key: `d3-charge-${s.key}`,
       phase: 10,
@@ -1398,10 +1411,18 @@ export function runsheetFromDesign(
       item: sysItem(s),
       systemId: s.sel.id,
       requires: "fgas",
-      guidance: `Charge by weight from the outdoor unit's formula, using the as-built length. ${formula} Fill in the F-gas label in the unit: factory, added and total charge in kg and tCO2e (R32, GWP ${R32_GWP}).`,
+      guidance: `Charge by weight from the outdoor unit's formula, using the as-built length. ${formula} Fill in the F-gas label in the unit: factory, added and total charge in kg and tCO2e (R32, GWP ${R32_GWP}).${roomNote}`,
       slots: [
         { key: "length", kind: "measurement", label: "As-built one-way pipe length", unit: "m", role: "as-built-length", window: RECORD_ONLY("Measured as built, not the design length.") },
-        { key: "added", kind: "measurement", label: `Refrigerant added, weighed (design: ${expected} g)`, unit: "g", role: "additional-charge", window: RECORD_ONLY(formula) },
+        {
+          key: "added",
+          kind: "measurement",
+          label: `Refrigerant added, weighed (design: ${expected} g)`,
+          unit: "g",
+          role: "additional-charge",
+          ...(maxAddedG !== undefined ? { max: maxAddedG } : {}),
+          window: RECORD_ONLY(maxAddedG !== undefined ? `${formula} At most ${maxAddedG} g for the R32 room size (${factoryKg} kg factory charge in the catalogue).` : formula),
+        },
         { key: "factory", kind: "measurement", label: "Factory charge from the nameplate", unit: "kg", role: "factory-charge", window: RECORD_ONLY("As printed on the outdoor unit's nameplate.") },
         { key: "label", kind: "photo", label: "Completed F-gas label in the outdoor unit", tag: "kit", role: "fgas-label" },
       ],

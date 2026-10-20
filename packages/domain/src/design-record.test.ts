@@ -3,8 +3,11 @@ import { test } from "node:test";
 import { DEMO_CATALOGUE, DEMO_COMPATIBILITY, type CatalogueItem } from "./catalogue.ts";
 import { RESEARCHED_CATALOGUE, RESEARCHED_COMPATIBILITY } from "./catalogue-data.ts";
 import {
+  A2L_ROOM_CHECK_ABOVE_KG,
   COMBINATION_TABLE_ACK,
   PRELIMINARY_LOAD_LABEL,
+  a2lMaxChargeKg,
+  a2lMinFloorAreaM2,
   addDecibels,
   applyDesignEdits,
   approveDesign,
@@ -24,6 +27,7 @@ import {
   type DesignRecord,
 } from "./design-record.ts";
 import { emptyConstraints, emptyMarketing, emptyPlanning, type PropertyIntel } from "./intelligence.ts";
+import { runsheetFromDesign } from "./install.ts";
 import type { MeasuredRoom, MeasuredSurvey, OutdoorPosition } from "./survey-visit.ts";
 import type { Survey } from "./types.ts";
 
@@ -504,4 +508,106 @@ test("dropping the Quiet option keeps Standard; dropping everything keeps what w
   assert.deepEqual(one.variants.map((v) => v.id), ["standard"]);
   const none = applyDesignEdits(d, { ...edits, variants: [] }, ctx(d));
   assert.deepEqual(none.variants.map((v) => v.id), ["standard", "premium"]);
+});
+
+/* ------------------------------------------------------------------ */
+/* R32 (A2L) charge and room size                                      */
+/* ------------------------------------------------------------------ */
+
+test("R32 room size: the IEC 60335-2-40 Annex GG formula for a wall unit at 1.8 m", () => {
+  assert.equal(A2L_ROOM_CHECK_ABOVE_KG, 1.84);
+  assert.equal(a2lMinFloorAreaM2(1.8, 1.8), 3.1); // Daikin's R32 table: 1.8 kg needs 3.09 m² for a wall unit
+  assert.equal(a2lMinFloorAreaM2(2.78, 1.8), 7.4);
+  assert.equal(a2lMinFloorAreaM2(3.22, 1.8), 9.9);
+  assert.equal(a2lMinFloorAreaM2(4.2, 1.8), 16.7);
+  assert.equal(a2lMinFloorAreaM2(2.78, 0.6), 65.8, "a floor unit releases low, so the room must be far bigger");
+  assert.equal(a2lMaxChargeKg(6.5, 1.8), 2.62);
+  assert.ok(a2lMaxChargeKg(a2lMinFloorAreaM2(2.78, 1.8), 1.8) >= 2.78);
+});
+
+/** A London terrace: three good rooms and a 6.5 m² box room, on the researched Panasonic range. */
+const TERRACE = [
+  room("liv", "Living", { type: "living-room", floor: "ground", lengthM: 5, widthM: 4, pipeRunM: 14 }),
+  room("mb", "Main bed", { lengthM: 4, widthM: 3.5, pipeRunM: 12 }),
+  room("b2", "Bed 2", { lengthM: 3.2, widthM: 3.125, pipeRunM: 12 }),
+  room("box", "Box room", { lengthM: 2.6, widthM: 2.5, pipeRunM: 10 }),
+];
+const pana = (rooms: MeasuredRoom[]) =>
+  draftDesign({ projectId: "p1", id: "d1", version: 1, measured: survey(rooms, { house: { ...survey([]).house, type: "terraced" } }), baseSurvey: BASE, catalogue: RESEARCHED_CATALOGUE, compatibility: RESEARCHED_COMPATIBILITY, intel: INTEL, now: NOW, manufacturer: "Panasonic" });
+
+test("R32 room size: the engine never drafts a box room onto a multi-split with too much refrigerant for it", () => {
+  const d = pana(TERRACE);
+  for (const v of d.variants) {
+    for (const s of v.systems) {
+      if (!s.roomIds.includes("box")) continue;
+      assert.ok((s.refrigerant.totalChargeKg ?? 0) <= a2lMaxChargeKg(6.5, 1.8), `${v.id}: ${s.outdoorItemId} holds ${s.refrigerant.totalChargeKg} kg`);
+    }
+    assert.notEqual(rule(d, v.id, "refrigerant-room").status, "fail");
+    assert.ok(!designApprovalErrors(d).some((e) => /minimum floor area/.test(e)));
+  }
+});
+
+test("R32 room size: all four rooms forced onto the CU-4Z80CBE (2.78 kg) blocks approval for the box room", () => {
+  const d = pana(TERRACE);
+  const edits = editsFromDesign(d);
+  const ids = TERRACE.map((r) => r.id);
+  const forced = applyDesignEdits(
+    d,
+    {
+      ...edits,
+      variants: edits.variants.map((v) => ({ ...v, roomUnits: ids.map((roomId) => ({ roomId, indoorItemId: roomId === "liv" ? "panasonic-cs-z35ckew" : "panasonic-cs-z25ckew" })), systems: [{ outdoorItemId: "panasonic-cu-4z80cbe", roomIds: ids }] })),
+      reasons: { "variants.standard.systems": "One outdoor unit (DEMO)", "variants.premium.systems": "One outdoor unit (DEMO)" },
+    },
+    ctx(d, RESEARCHED_CATALOGUE, RESEARCHED_COMPATIBILITY),
+  );
+  const s = standard(forced).systems[0]!;
+  assert.equal(s.refrigerant.factoryChargeKg, 2.72);
+  assert.equal(s.refrigerant.totalChargeKg, 2.78);
+  assert.ok(s.compatibility.errors.some((e) => /^Box room: 6\.5 m² is below the 7\.4 m² minimum floor area for 2\.78 kg of R32 on CU-4Z80CBE/.test(e)), s.compatibility.errors.join(" | "));
+  const r = rule(forced, "standard", "refrigerant-room");
+  assert.equal(r.status, "fail");
+  assert.match(r.detail, /Box room: 6\.5 m² is BELOW the 7\.4 m² minimum/);
+  assert.match(r.detail, /installation manual's own table decides and can be stricter/);
+  assert.ok(designApprovalErrors(forced).some((e) => /Box room: 6\.5 m² is below the 7\.4 m² minimum floor area/.test(e)));
+
+  // The same system without the box room is fine, and the runsheet carries the limit to the charge step.
+  const three = applyDesignEdits(
+    d,
+    {
+      ...edits,
+      variants: edits.variants.map((v) => ({ ...v, roomUnits: ids.map((roomId) => ({ roomId, indoorItemId: roomId === "liv" ? "panasonic-cs-z35ckew" : "panasonic-cs-z25ckew" })), systems: [{ outdoorItemId: "panasonic-cu-4z80cbe", roomIds: ["liv", "mb", "b2"] }, { outdoorItemId: "panasonic-cu-z25cke", roomIds: ["box"] }] })),
+      reasons: {},
+    },
+    ctx(d, RESEARCHED_CATALOGUE, RESEARCHED_COMPATIBILITY),
+  );
+  assert.ok(!standard(three).systems.some((x) => x.compatibility.errors.some((e) => /floor area/.test(e))));
+  assert.equal(rule(three, "standard", "refrigerant-room").status, "pass");
+  const steps = runsheetFromDesign(three, "standard", RESEARCHED_CATALOGUE);
+  const charge = steps.find((x) => x.id.startsWith("d3-charge-") && x.evidence.some((e) => e.role === "additional-charge") && /4Z80|Free Multi|4-room|4 room/i.test(`${x.item}`)) ?? steps.filter((x) => x.id.startsWith("d3-charge-"))[0]!;
+  const added = charge.evidence.find((e) => e.role === "additional-charge")!;
+  // The smallest room on the 4Z80 is Bed 2 (10 m²): at most 3.25 kg, so at most 530 g on top of the 2.72 kg factory charge.
+  assert.equal(a2lMaxChargeKg(10, 1.8), 3.25);
+  assert.equal(added.max, 530);
+  assert.match(charge.guidance ?? "", /at or under 3\.25 kg, the most Bed 2 \(10 m²\) may hold/);
+});
+
+test("R32 room size: an unmeasured room on a big system, and a multi-split with no factory charge, block approval", () => {
+  const d = pana(TERRACE);
+  const edits = editsFromDesign(d);
+  const ids = TERRACE.map((r) => r.id);
+  const units = ids.map((roomId) => ({ roomId, indoorItemId: roomId === "liv" ? "panasonic-cs-z35ckew" : "panasonic-cs-z25ckew" }));
+  const big = { ...edits, variants: edits.variants.map((v) => ({ ...v, roomUnits: units, systems: [{ outdoorItemId: "panasonic-cu-4z80cbe", roomIds: ["liv", "mb", "b2"] }, { outdoorItemId: "panasonic-cu-z25cke", roomIds: ["box"] }] })), reasons: {} };
+  // Bed 2 never measured: the area is an estimate.
+  const unmeasured = { ...d, rooms: d.rooms.map((r) => (r.roomId === "b2" ? { ...r, estimated: [...(r.estimated ?? []), "area" as const] } : r)) };
+  const u = applyDesignEdits(unmeasured, big, ctx(d, RESEARCHED_CATALOGUE, RESEARCHED_COMPATIBILITY));
+  assert.ok(designApprovalErrors(u).some((e) => /Bed 2: measure the floor area\. CU-4Z80CBE holds 2\.72 kg of R32, so every room it serves needs at least 7 m²/.test(e)), designApprovalErrors(u).join(" | "));
+  // No factory charge on record for the multi-split: it can't be checked, so it can't be approved.
+  const noCharge = RESEARCHED_CATALOGUE.map((i) => (i.id === "panasonic-cu-4z80cbe" ? { ...i, specs: { ...i.specs, factoryChargeKg: null } } : i));
+  const n = applyDesignEdits(d, big, { ...ctx(d, noCharge, RESEARCHED_COMPATIBILITY) });
+  assert.ok(designApprovalErrors(n).some((e) => /No factory charge on record for CU-4Z80CBE/.test(e)));
+  assert.equal(rule(n, "standard", "refrigerant-room").status, "fail");
+  // A small single split is under 1.84 kg: no minimum applies, and the rule says so.
+  const single = pana(TERRACE.slice(3));
+  assert.equal(rule(single, "standard", "refrigerant-room").status, "pass");
+  assert.match(rule(single, "standard", "refrigerant-room").detail, /not over 1\.84 kg, so no minimum room size applies/);
 });

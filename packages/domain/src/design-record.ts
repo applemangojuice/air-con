@@ -98,7 +98,15 @@ export interface SystemSelection {
   outdoorPositionId?: string;
   compatibility: CombinationCheck;
   electrical: { breaker: string; cableMm2: number; isolator: string; routeNote?: string; breakerSource?: "manufacturer" | "rule-of-thumb" };
-  refrigerant: { totalPipeM: number; prechargedPipeM: number; additionalChargeG: number; chargeKnown?: boolean };
+  refrigerant: {
+    totalPipeM: number;
+    prechargedPipeM: number;
+    additionalChargeG: number;
+    chargeKnown?: boolean;
+    /** Additive (round 8): the outdoor unit's factory charge, and factory plus added, kg (when the catalogue has the figures). */
+    factoryChargeKg?: number;
+    totalChargeKg?: number;
+  };
   /** Additive (F3): the compatibility rule used, and how sure it is. */
   ruleId?: string;
   ruleConfidence?: "verified" | "provisional";
@@ -554,7 +562,10 @@ function bestMulti(
     const units = group.map((r) => pick(r, rule));
     if (units.some((u) => !u)) continue;
     const check = validateCombination(rule, outdoor, units as CatalogueItem[], group.map((r) => r.pipeRunM));
-    if (check.ok) found.push({ outdoor, rule, units: units as CatalogueItem[] });
+    if (!check.ok) continue;
+    // Never suggest a multi-split that's too much R32 for one of its rooms (or whose charge can't be worked out).
+    const a2l = a2lSystemCheck(outdoor, refrigerantFor(outdoor, group.map((r) => r.pipeRunM)), group.map((room, i) => ({ room, indoor: units[i] })));
+    if (a2l.errors.length === 0) found.push({ outdoor, rule, units: units as CatalogueItem[] });
   }
   found.sort(
     (a, b) =>
@@ -767,6 +778,122 @@ export function soundPressureDb(lwa: number, distanceM: number, q: number): numb
 /** Several sources at one window add as energy. */
 export function addDecibels(levels: number[]): number {
   return 10 * Math.log10(sum(levels.map((l) => 10 ** (l / 10))));
+}
+
+/* ------------------------------------------------------------------ */
+/* R32 (A2L) charge and room size                                      */
+/* ------------------------------------------------------------------ */
+
+/** R32's lower flammability limit, kg/m³. */
+export const R32_LFL_KG_M3 = 0.307;
+
+/**
+ * R32 is mildly flammable (A2L). Above 1.84 kg in one system (6 m³ × LFL)
+ * IEC 60335-2-40 Annex GG / BS EN 378-1 Annex C, and the manufacturers' R32
+ * manuals, set a minimum floor area for every room the system serves,
+ * because a leak can release the whole system's charge into any one of them.
+ */
+export const A2L_ROOM_CHECK_ABOVE_KG = 1.84;
+
+/** The release height h0 the standard gives a wall-mounted indoor unit. */
+export const WALL_RELEASE_HEIGHT_M = 1.8;
+
+/** A room closer to its minimum than this (×) is flagged for the manual's own table, which can be stricter. */
+const A2L_CLOSE_FACTOR = 1.25;
+
+const A2L_K = 2.5 * R32_LFL_KG_M3 ** 1.25;
+
+/** The smallest floor area (m², rounded up) for a charge released at h0: A = (m ÷ (2.5 × LFL^1.25 × h0))². */
+export function a2lMinFloorAreaM2(chargeKg: number, releaseHeightM: number): number {
+  return Math.ceil((chargeKg / (A2L_K * releaseHeightM)) ** 2 * 10 - 1e-9) / 10;
+}
+
+/** The most R32 (kg, rounded down) a room of this floor area may hold at h0: 2.5 × LFL^1.25 × h0 × √A. */
+export function a2lMaxChargeKg(areaM2: number, releaseHeightM: number): number {
+  return Math.floor(A2L_K * releaseHeightM * Math.sqrt(areaM2) * 100 + 1e-9) / 100;
+}
+
+/** An indoor unit's release height: its catalogue figure, else a wall unit's 1.8 m (said so), never a guess for a floor or ceiling unit. */
+export function releaseHeightOf(indoor: CatalogueItem | undefined): { h0: number; assumed: boolean } | null {
+  const h = indoor?.specs?.releaseHeightM;
+  if (typeof h === "number" && Number.isFinite(h) && h > 0) return { h0: h, assumed: false };
+  if (/floor|console|cassette|ceiling|duct/i.test(`${indoor?.label ?? ""} ${indoor?.series ?? ""} ${indoor?.category ?? ""}`)) return null;
+  return { h0: WALL_RELEASE_HEIGHT_M, assumed: true };
+}
+
+export interface A2lRoomCheck {
+  roomId: string;
+  roomName: string;
+  /** The measured floor area, when there is one. */
+  areaM2?: number;
+  minAreaM2?: number;
+  h0?: number;
+  h0Assumed?: boolean;
+  status: "ok" | "close" | "below" | "unmeasured" | "no-height";
+}
+
+export interface A2lSystemCheck {
+  /** Factory plus added, kg; a lower bound when `complete` is false. Null when the factory charge isn't on record. */
+  totalKg: number | null;
+  factoryKg: number | null;
+  /** The added charge is known (pre-charged length and grams per metre on record). */
+  complete: boolean;
+  /** Over the threshold, so every room needs its minimum floor area. */
+  applies: boolean;
+  rooms: A2lRoomCheck[];
+  /** What blocks approval (the compatibility errors). */
+  errors: string[];
+}
+
+/**
+ * The R32 room-size check for one system: the total charge (the outdoor
+ * unit's factory charge plus the added charge the design works out), and,
+ * above 1.84 kg, each room's floor area against the minimum by the
+ * standard's formula. It blocks approval when a measured room is too small,
+ * when a room it applies to isn't measured, when a floor or ceiling unit has
+ * no release height, and when a multi-split's charge can't be worked out (the
+ * systems that pass 1.84 kg). The manufacturer's table in the installation
+ * manual decides and can be stricter: the rule says so.
+ */
+export function a2lSystemCheck(
+  outdoor: CatalogueItem | undefined,
+  refrigerant: SystemSelection["refrigerant"],
+  rooms: { room: RoomDesignInput; indoor: CatalogueItem | undefined }[],
+): A2lSystemCheck {
+  const code = outdoor ? codeOf(outdoor) : "the outdoor unit";
+  const factory = outdoor?.specs?.factoryChargeKg;
+  const factoryKg = typeof factory === "number" && Number.isFinite(factory) && factory > 0 ? factory : null;
+  const complete = factoryKg !== null && refrigerant.chargeKnown !== false;
+  const totalKg = factoryKg === null ? null : Math.round((factoryKg + (refrigerant.chargeKnown === false ? 0 : refrigerant.additionalChargeG / 1000)) * 100) / 100;
+  const multi = rooms.length > 1 || (outdoor ? isMultiOutdoor(outdoor) : false);
+  const errors: string[] = [];
+  if (multi && totalKg === null) errors.push(`No factory charge on record for ${code}: add it from the nameplate or the installation manual, so the smallest room it may serve (R32) can be checked.`);
+  else if (multi && !complete)
+    errors.push(`${code}: the added charge can't be worked out (no pre-charged length or grams per metre on record), so the total R32 charge and the smallest room it may serve can't be checked.`);
+  const applies = totalKg !== null && totalKg > A2L_ROOM_CHECK_ABOVE_KG;
+  const checks: A2lRoomCheck[] = rooms.map(({ room, indoor }) => {
+    const base = { roomId: room.roomId, roomName: room.roomName, ...(positive(room.areaM2) && !room.estimated?.includes("area") ? { areaM2: room.areaM2 } : {}) };
+    if (!applies || totalKg === null) return { ...base, status: "ok" as const };
+    const h = releaseHeightOf(indoor);
+    if (!h) {
+      errors.push(`${room.roomName}: set the R32 release height of ${indoor ? codeOf(indoor) : "its indoor unit"} in the catalogue (a floor unit is 0.6 m, a ceiling unit 2.2 m): ${code} holds ${totalKg} kg, over ${A2L_ROOM_CHECK_ABOVE_KG} kg.`);
+      return { ...base, status: "no-height" as const };
+    }
+    const minAreaM2 = a2lMinFloorAreaM2(totalKg, h.h0);
+    const view = { ...base, minAreaM2, h0: h.h0, h0Assumed: h.assumed };
+    if (base.areaM2 === undefined) {
+      errors.push(`${room.roomName}: measure the floor area. ${code} holds ${complete ? "" : "at least "}${totalKg} kg of R32, so every room it serves needs at least ${minAreaM2} m².`);
+      return { ...view, status: "unmeasured" as const };
+    }
+    if (base.areaM2 < minAreaM2) {
+      errors.push(
+        `${room.roomName}: ${base.areaM2} m² is below the ${minAreaM2} m² minimum floor area for ${complete ? "" : "at least "}${totalKg} kg of R32 on ${code} (indoor unit at ${h.h0} m, IEC 60335-2-40 Annex GG). Serve this room from a smaller system, or choose a larger room.`,
+      );
+      return { ...view, status: "below" as const };
+    }
+    return { ...view, status: base.areaM2 < minAreaM2 * A2L_CLOSE_FACTOR ? ("close" as const) : ("ok" as const) };
+  });
+  return { totalKg, factoryKg, complete, applies, rooms: checks, errors };
 }
 
 /* ------------------------------------------------------------------ */
@@ -1243,6 +1370,51 @@ function designRules(x: RuleInput): RuleResult[] {
     }
   }
 
+  // 5b. Room size for the R32 charge (A2L: mildly flammable).
+  if (systems.some((s) => outdoorOf(s))) {
+    const statuses: RuleStatus[] = [];
+    const notes: string[] = [];
+    let applied = false;
+    for (const s of systems) {
+      const o = outdoorOf(s);
+      if (!o) continue;
+      const group = s.roomIds.map((id) => rooms.find((r) => r.roomId === id)).filter((r): r is RoomDesignInput => !!r);
+      const check = a2lSystemCheck(o, s.refrigerant, group.map((room) => ({ room, indoor: unitFor(room.roomId) })));
+      const code = codeOf(o);
+      if (check.totalKg === null) {
+        statuses.push("fail");
+        notes.push(`Cannot determine for ${code}: add its factory charge (nameplate or installation manual) to the catalogue.`);
+        continue;
+      }
+      const added = s.refrigerant.chargeKnown === false ? "an added charge the catalogue can't work out" : `${round1(s.refrigerant.additionalChargeG / 100) / 10} kg added`;
+      const total = `${check.complete ? "" : "at least "}${check.totalKg} kg of R32 (${check.factoryKg} kg factory, ${added})`;
+      if (!check.applies) {
+        if (!check.complete) {
+          statuses.push("fail");
+          notes.push(`Cannot determine for ${code}: ${total}.`);
+        } else {
+          statuses.push("pass");
+          notes.push(`${code}: ${total}, not over ${A2L_ROOM_CHECK_ABOVE_KG} kg, so no minimum room size applies.`);
+        }
+        continue;
+      }
+      applied = true;
+      if (!check.complete) statuses.push("fail");
+      const parts = check.rooms.map((r) => {
+        if (r.status === "no-height") return `${r.roomName}: indoor unit height not set (floor or ceiling unit)`;
+        if (r.status === "unmeasured") return `${r.roomName}: not measured, needs at least ${r.minAreaM2} m²`;
+        if (r.status === "below") return `${r.roomName}: ${r.areaM2} m² is BELOW the ${r.minAreaM2} m² minimum`;
+        if (r.status === "close") return `${r.roomName}: ${r.areaM2} m², close to the ${r.minAreaM2} m² minimum`;
+        return `${r.roomName}: ${r.areaM2} m² (minimum ${r.minAreaM2} m²)`;
+      });
+      for (const r of check.rooms) statuses.push(r.status === "ok" ? "pass" : r.status === "close" ? "review" : "fail");
+      const assumed = check.rooms.some((r) => r.h0Assumed);
+      notes.push(`${code}: ${total}, over ${A2L_ROOM_CHECK_ABOVE_KG} kg, so every room it serves needs a minimum floor area. ${parts.join("; ")}.${assumed ? ` Taken as wall units at ${WALL_RELEASE_HEIGHT_M} m.` : ""}`);
+    }
+    if (applied) notes.push("Minimums by the IEC 60335-2-40 Annex GG formula (R32, LFL 0.307 kg/m³); the installation manual's own table decides and can be stricter, so check every room against it.");
+    add("refrigerant-room", "Room size for the R32 charge", worst(statuses), notes.join(" "));
+  }
+
   // 6. Electrics.
   {
     const e = site?.electrics;
@@ -1600,6 +1772,14 @@ function buildVariant(input: {
       }
     }
 
+    let refrigerant = refrigerantFor(outdoor, runs);
+    if (outdoor) {
+      // R32 is mildly flammable: above 1.84 kg every room on the system needs its minimum floor area.
+      const a2l = a2lSystemCheck(outdoor, refrigerant, groupRooms.map((room, k) => ({ room, indoor: indoors[k] })));
+      if (a2l.factoryKg !== null) refrigerant = { ...refrigerant, factoryChargeKg: a2l.factoryKg, ...(a2l.complete && a2l.totalKg !== null ? { totalChargeKg: a2l.totalKg } : {}) };
+      if (a2l.errors.length) compatibility_ = { ok: false, errors: [...compatibility_.errors, ...a2l.errors], warnings: compatibility_.warnings };
+    }
+
     const position = c.outdoorPositionId ? site?.outdoorPositions.find((p) => p.id === c.outdoorPositionId) : defaultPosition(site, i);
     const connectedKw = sum(indoors.map((u) => kwOf(u) ?? 0));
     return {
@@ -1610,7 +1790,7 @@ function buildVariant(input: {
       ...(position ? { outdoorPositionId: position.id } : {}),
       compatibility: compatibility_,
       electrical: electricalFor(outdoor, connectedKw, site),
-      refrigerant: refrigerantFor(outdoor, runs),
+      refrigerant,
       ...(rule ? { ruleId: rule.id, ruleConfidence: rule.confidence } : {}),
       layoutMediaIds: c.layoutMediaIds ?? (position?.mediaId ? [position.mediaId] : []),
     };

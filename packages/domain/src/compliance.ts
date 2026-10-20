@@ -174,7 +174,7 @@ export const COMPLIANCE_TEMPLATE: ComplianceTemplateItem[] = [
     ownerRole: "tech-lead",
     basis: "Manufacturer manuals and warranty terms",
     guidance:
-      "From the installation manual for each chosen model: maximum pipe length and height difference, pre-charged length and extra charge per metre, breaker size, clearances, condensate fall, and anything the warranty depends on (accredited installer, registration deadline).",
+      "From the installation manual for each chosen model: maximum and minimum pipe lengths and height difference, pre-charged length and extra charge per metre, the factory charge, breaker size, clearances, condensate fall, and anything the warranty depends on (accredited installer, registration deadline). R32 is mildly flammable: when a system's total charge (factory plus added) is over 1.84 kg, check every room it serves against the manual's minimum floor area table (the design's \"Room size for the R32 charge\" check uses the IEC 60335-2-40 formula; the manual's table can be stricter).",
     evidenceHint: "The manual pages or links for the chosen models, and a note of anything that changed the design.",
   },
   {

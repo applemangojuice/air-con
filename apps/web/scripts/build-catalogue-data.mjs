@@ -38,7 +38,7 @@ const UNCERTAIN = {
 const SPEC_KEYS = [
   "coolingKw", "heatingKw", "seer", "scop", "energyClassCooling", "energyClassHeating", "soundPressureLowDb",
   "soundPressureHighDb", "soundPowerDb", "dimensionsMm", "weightKg", "refrigerant", "liquidPipeMm", "gasPipeMm",
-  "maxPipeM", "maxHeightDiffM", "prechargedPipeM", "additionalChargeGPerM", "powerSupply", "recommendedBreakerA",
+  "maxPipeM", "maxHeightDiffM", "prechargedPipeM", "additionalChargeGPerM", "factoryChargeKg", "releaseHeightM", "powerSupply", "recommendedBreakerA",
   "wifi", "operatingRangeCoolingC", "operatingRangeHeatingC",
 ];
 

@@ -46,6 +46,14 @@ interface Draft {
   specs: Record<SpecKey, string>;
 }
 
+/** Why a figure matters, beside the fields the design checks read. */
+const SPEC_HINT: Partial<Record<SpecKey, string>> = {
+  soundPowerDb: "Needed for the MCS 020 noise check.",
+  prechargedPipeM: "Needed to work out the extra refrigerant.",
+  factoryChargeKg: "Outdoor units, from the nameplate: sets the smallest room the system may serve (R32).",
+  releaseHeightM: "Indoor units: 1.8 for a wall unit, 0.6 floor, 2.2 ceiling. Blank counts as a wall unit.",
+};
+
 const str = (v: unknown) => (v === null || v === undefined ? "" : String(v));
 
 function draftOf(item: CatalogueItem | null, kind: CatalogueItem["kind"]): Draft {
@@ -343,7 +351,7 @@ export function ItemForm({
                 value={d.specs[f.key]}
                 onChange={(e) => setSpec(f.key, e.target.value)}
                 error={fieldErrors[`spec.${f.key}`]}
-                hint={f.key === "soundPowerDb" ? "Needed for the MCS 020 noise check." : f.key === "prechargedPipeM" ? "Needed to work out the extra refrigerant." : undefined}
+                hint={SPEC_HINT[f.key]}
               />
             ))}
           </div>

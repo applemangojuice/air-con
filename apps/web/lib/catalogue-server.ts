@@ -113,6 +113,8 @@ const specsSchema = z
     maxHeightDiffM: nullableNum,
     prechargedPipeM: nullableNum,
     additionalChargeGPerM: nullableNum,
+    factoryChargeKg: num.positive().max(50).nullable().optional(),
+    releaseHeightM: num.positive().max(5).nullable().optional(),
     powerSupply: nullableText(500),
     recommendedBreakerA: nullableNum,
     wifi: nullableText(500),

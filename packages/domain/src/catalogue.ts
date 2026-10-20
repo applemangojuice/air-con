@@ -44,6 +44,10 @@ export interface EquipmentSpecs {
   maxHeightDiffM: number | null;
   prechargedPipeM: number | null;
   additionalChargeGPerM: number | null;
+  /** Outdoor units: the refrigerant charged at the factory (nameplate), kg. With the added charge it sets the R32 minimum room size. */
+  factoryChargeKg?: number | null;
+  /** Indoor units: the release height h0 for the R32 room-size check (wall 1.8 m, floor 0.6 m, ceiling 2.2 m). */
+  releaseHeightM?: number | null;
   powerSupply: string | null;
   recommendedBreakerA: number | null;
   wifi: string | null;
@@ -71,6 +75,8 @@ export const SPEC_FIELDS: { key: keyof EquipmentSpecs; label: string; unit?: str
   { key: "maxHeightDiffM", label: "Maximum height difference", unit: "m", kind: "number" },
   { key: "prechargedPipeM", label: "Pre-charged (chargeless) pipe length", unit: "m", kind: "number" },
   { key: "additionalChargeGPerM", label: "Additional charge per metre", unit: "g/m", kind: "number" },
+  { key: "factoryChargeKg", label: "Factory refrigerant charge", unit: "kg", kind: "number" },
+  { key: "releaseHeightM", label: "Indoor unit height for the R32 room-size check", unit: "m", kind: "number" },
   { key: "powerSupply", label: "Power supply", kind: "text" },
   { key: "recommendedBreakerA", label: "Recommended breaker", unit: "A", kind: "number" },
   { key: "wifi", label: "Wi-Fi / app", kind: "text" },
@@ -866,9 +872,10 @@ const demoIndoor = (kw: number, heatKw: number, lowDb: number, w: number): Parti
   liquidPipeMm: 6.35,
   gasPipeMm: kw > 3 ? 12.7 : 9.52,
   wifi: "Built in (DEMO app)",
+  releaseHeightM: 1.8,
 });
 
-const demoOutdoor = (kw: number, precharged: number, maxPipe: number, powerDb: number): Partial<EquipmentSpecs> => ({
+const demoOutdoor = (kw: number, precharged: number, maxPipe: number, powerDb: number, factoryKg: number): Partial<EquipmentSpecs> => ({
   coolingKw: kw,
   heatingKw: Math.round(kw * 1.25 * 10) / 10,
   refrigerant: "R32",
@@ -877,6 +884,7 @@ const demoOutdoor = (kw: number, precharged: number, maxPipe: number, powerDb: n
   maxHeightDiffM: 15,
   prechargedPipeM: precharged,
   additionalChargeGPerM: 20,
+  factoryChargeKg: factoryKg,
   powerSupply: "230 V single phase",
   recommendedBreakerA: kw > 4 ? 20 : 16,
   dimensionsMm: { w: 800, h: 550, d: 285 },
@@ -896,12 +904,12 @@ export const DEMO_CATALOGUE: CatalogueItem[] = [
   demo({ id: "demo-ind-whs25", kind: "indoor", manufacturer: DEMO_MAKER, series: "Whisper", model: "DM-WHS25", label: "Whisper 25 wall unit (DEMO)", tier: "premium", multiSplitCapable: true, specs: demoIndoor(2.5, 3.4, 19, 800), costPence: 62_000, customerBlurb: "Whisper-quiet at 19 dB, with app control and an air purifying filter.", category: "wall" }),
   demo({ id: "demo-ind-whs35", kind: "indoor", manufacturer: DEMO_MAKER, series: "Whisper", model: "DM-WHS35", label: "Whisper 35 wall unit (DEMO)", tier: "premium", multiSplitCapable: true, specs: demoIndoor(3.5, 4.2, 19, 890), costPence: 70_000, customerBlurb: "Our quietest larger unit: 19 dB, app control, purifying filter.", category: "wall" }),
 
-  demo({ id: "demo-out-brz25", kind: "outdoor", manufacturer: DEMO_MAKER, series: "Breeze", model: "DM-BRZ25-O", label: "Breeze 25 outdoor unit (DEMO)", tier: "standard", ports: 1, pairedWith: "demo-ind-brz25", specs: demoOutdoor(2.5, 15, 20, 59), costPence: 52_000 }),
-  demo({ id: "demo-out-brz35", kind: "outdoor", manufacturer: DEMO_MAKER, series: "Breeze", model: "DM-BRZ35-O", label: "Breeze 35 outdoor unit (DEMO)", tier: "standard", ports: 1, pairedWith: "demo-ind-brz35", specs: demoOutdoor(3.5, 15, 20, 61), costPence: 60_000 }),
-  demo({ id: "demo-out-whs25", kind: "outdoor", manufacturer: DEMO_MAKER, series: "Whisper", model: "DM-WHS25-O", label: "Whisper 25 outdoor unit (DEMO)", tier: "premium", ports: 1, pairedWith: "demo-ind-whs25", specs: demoOutdoor(2.5, 15, 20, 56), costPence: 66_000 }),
-  demo({ id: "demo-out-whs35", kind: "outdoor", manufacturer: DEMO_MAKER, series: "Whisper", model: "DM-WHS35-O", label: "Whisper 35 outdoor unit (DEMO)", tier: "premium", ports: 1, pairedWith: "demo-ind-whs35", specs: demoOutdoor(3.5, 15, 20, 57), costPence: 74_000 }),
-  demo({ id: "demo-out-duo50", kind: "outdoor", manufacturer: DEMO_MAKER, series: "Duo", model: "DM-DUO50", label: "Duo 50 two-room outdoor unit (DEMO)", tier: "standard", multiSplitCapable: true, ports: 2, specs: demoOutdoor(5.0, 20, 30, 62), costPence: 112_000 }),
-  demo({ id: "demo-out-trio52", kind: "outdoor", manufacturer: DEMO_MAKER, series: "Trio", model: "DM-TRIO52", label: "Trio 52 three-room outdoor unit (DEMO)", tier: "standard", multiSplitCapable: true, ports: 3, specs: demoOutdoor(5.2, 30, 45, 63), costPence: 145_000 }),
+  demo({ id: "demo-out-brz25", kind: "outdoor", manufacturer: DEMO_MAKER, series: "Breeze", model: "DM-BRZ25-O", label: "Breeze 25 outdoor unit (DEMO)", tier: "standard", ports: 1, pairedWith: "demo-ind-brz25", specs: demoOutdoor(2.5, 15, 20, 59, 0.6), costPence: 52_000 }),
+  demo({ id: "demo-out-brz35", kind: "outdoor", manufacturer: DEMO_MAKER, series: "Breeze", model: "DM-BRZ35-O", label: "Breeze 35 outdoor unit (DEMO)", tier: "standard", ports: 1, pairedWith: "demo-ind-brz35", specs: demoOutdoor(3.5, 15, 20, 61, 0.75), costPence: 60_000 }),
+  demo({ id: "demo-out-whs25", kind: "outdoor", manufacturer: DEMO_MAKER, series: "Whisper", model: "DM-WHS25-O", label: "Whisper 25 outdoor unit (DEMO)", tier: "premium", ports: 1, pairedWith: "demo-ind-whs25", specs: demoOutdoor(2.5, 15, 20, 56, 0.6), costPence: 66_000 }),
+  demo({ id: "demo-out-whs35", kind: "outdoor", manufacturer: DEMO_MAKER, series: "Whisper", model: "DM-WHS35-O", label: "Whisper 35 outdoor unit (DEMO)", tier: "premium", ports: 1, pairedWith: "demo-ind-whs35", specs: demoOutdoor(3.5, 15, 20, 57, 0.75), costPence: 74_000 }),
+  demo({ id: "demo-out-duo50", kind: "outdoor", manufacturer: DEMO_MAKER, series: "Duo", model: "DM-DUO50", label: "Duo 50 two-room outdoor unit (DEMO)", tier: "standard", multiSplitCapable: true, ports: 2, specs: demoOutdoor(5.0, 20, 30, 62, 1.2), costPence: 112_000 }),
+  demo({ id: "demo-out-trio52", kind: "outdoor", manufacturer: DEMO_MAKER, series: "Trio", model: "DM-TRIO52", label: "Trio 52 three-room outdoor unit (DEMO)", tier: "standard", multiSplitCapable: true, ports: 3, specs: demoOutdoor(5.2, 30, 45, 63, 1.6), costPence: 145_000 }),
 
   demo({ id: "demo-mat-lineset", kind: "material", label: "Insulated copper line set, 1/4 + 3/8 (DEMO)", unit: "m", category: "pipework", costPence: 900, supplier: DEMO_TRADE }),
   demo({ id: "demo-mat-trunking", kind: "material", label: "Line-set trunking, 2 m length (DEMO)", unit: "length", category: "pipework", costPence: 1_200, supplier: DEMO_TRADE }),
