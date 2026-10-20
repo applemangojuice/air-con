@@ -19,6 +19,8 @@ import {
   can,
   cancellationStatus,
   complianceProgress,
+  approvalTooEarly,
+  asbestosNaRefusal,
   asbestosSuspectedAtSurvey,
   complianceTemplateFor,
   meetsRequirement,
@@ -146,6 +148,7 @@ export default async function CompliancePage({ params }: { params: Promise<{ id:
                         context={context(item)}
                         {...(survey?.data ? { measured: survey.data } : {})}
                         companyName={settings.company.legalName}
+                        installComplete={p.install.status === "complete"}
                       />
                     ))}
                   </ul>
@@ -342,6 +345,7 @@ function ItemCard({
   context,
   measured,
   companyName,
+  installComplete,
 }: {
   item: ComplianceItem;
   projectId: string;
@@ -354,13 +358,18 @@ function ItemCard({
   measured?: MeasuredSurvey;
   /** Our legal name: the CDM roles' default. */
   companyName: string;
+  /** A certificate or notice about the finished work opens for review only after it. */
+  installComplete: boolean;
 }) {
   const t = complianceTemplateFor(item.key);
   const settled = item.status === "approved" || item.status === "not-applicable";
-  const choices = REVIEW_CHOICES.filter((c) => {
+  const tooEarly = !settled ? approvalTooEarly(item.key, installComplete) : null;
+  const naRefused = item.key === "asbestos" ? asbestosNaRefusal({ asbestosSuspected: asbestosSuspectedAtSurvey(measured), builtFrom2000: measured?.house?.era === "2000+" }) : null;
+  const choices = tooEarly ? [] : REVIEW_CHOICES.filter((c) => {
     if (c.to === item.status) return false;
     if (t?.auto && c.to === "approved") return false;
     if (t?.allowNa === false && c.to === "not-applicable") return false;
+    if (naRefused && c.to === "not-applicable") return false;
     if (c.to === "under-review" && !settled && item.status !== "rejected") return false;
     return true;
   });
@@ -406,6 +415,7 @@ function ItemCard({
         )}
 
         {context.length > 0 && !settled && <ContextList context={context} />}
+        {tooEarly && <p className="mt-3 text-sm font-medium text-ink-700">{tooEarly}</p>}
 
         {media.length > 0 && (
           <ul className="mt-3 flex flex-wrap gap-2">
@@ -581,7 +591,9 @@ function ItemCard({
                 <p id={`rh-${item.id}`} className="mt-1.5 text-xs text-ink-500">
                   {item.key === "planning-consent"
                     ? "Statutory: approval needs the decision notice attached (above, under Add evidence) and its reference, date and conditions here. It can't be overridden."
-                    : item.statutory
+                    : item.key === "heat-pump-compliance-certificate"
+                      ? "Statutory: approval needs the certificate attached (above, under Add evidence) and its number here, once it's emailed to the family: their page then says it was sent to them. It can't be overridden."
+                      : item.statutory
                       ? "Statutory: approval needs evidence or a written note of what you checked. It can't be overridden."
                       : "Approval needs evidence or a note. A reason is needed to reject or mark it not applicable."}
                 </p>

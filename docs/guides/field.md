@@ -393,7 +393,9 @@ second update and still stops your clock.
   manual asks for (Type A, F or B), and size the cable for its route. Before
   the booking, write that outcome, and whether the network operator (UK
   Power Networks) is told or applied to first, on the checklist's
-  **Supply capacity and the network operator (DNO)** item.
+  **Supply capacity and the network operator (DNO)** item (notified with
+  the reference, applied with the reference and the answer, or not needed
+  and why). Install day 1 can't start until it's approved.
 - The circuit step also checks the **interconnect** between the units
   (mains voltage: the cable the manual specifies, terminals tight, strain
   relief, earth) with a photo of the terminal blocks, and the certificate

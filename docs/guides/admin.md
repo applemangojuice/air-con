@@ -287,8 +287,14 @@ The project → **Open the checklist**. Twenty-five items, each with its gate
 (**Review** → Approve or Not applicable, with a note → **Save the
 review**). Some update by themselves (the design sign-off, commissioning,
 the warranty, and the planning consent item when the outcome is "PD checks
-passed"). Everything for install day must be approved before the crew can
-start. A few ask for more than a note:
+passed"). Items in the "before the proposal" and "before booking" groups
+are checked at ready to install: the statutory ones (and the supply and DNO
+item) hold install day 1, not the proposal or the booking, and the rest are
+flagged. Everything for install day must be approved before the crew can
+start. The three about the finished work (the electrical certificate, the
+commissioning notice and the heat pump's Building Regulations certificate)
+open for review only once the install is complete. A few ask for more than
+a note:
 
 - **Permitted development checks**: choose the outcome. "Planning
   permission or listed building consent needed" holds day 1 on **Planning
@@ -299,9 +305,16 @@ start. A few ask for more than a note:
 - **Owner's authority to contract**: for a leaseholder or tenant, the
   written consent attached (holds day 1).
 - **Asbestos check before drilling**: when the survey suspected it, the
-  test result (or the avoiding route) attached.
+  test result (or the avoiding route) attached. **Not applicable** only for
+  a home the survey dates 2000 or later, with nothing suspected.
 - **Supply capacity and the network operator (DNO)**: the electrician's
-  written outcome, before booking.
+  written route (notified with the reference, applied with the reference
+  and the answer, or not needed and why). Do it before booking; it holds
+  install day 1 until it's approved.
+- **Building Regulations certificate for the heat pump, to the customer**:
+  after the install, attach the certificate (or the council's completion
+  certificate), write its number, email it to the family, then approve: the
+  family's page says "Sent to you" from then.
 - **Risk assessment and method statement**: approving it records the CDM
   2015 **Principal contractor** and **Principal designer** (our legal name
   in both to start with; a subcontracted electrician is a contractor). An
@@ -580,7 +593,10 @@ status, channel and message type.
 **Staff** → **Add a person**, or click someone to edit them.
 
 - **Roles** decide what they can do (§10). **Subcontractor** means they
-  only see the jobs they're on, never prices, margins or other families.
+  only see the jobs they're on, never prices, margins or other families,
+  and can't approve designs: a subcontracted technical lead signs
+  commissioning but not designs, so at least one technical lead (or an
+  admin with F-gas) must not be marked Subcontractor.
 - **Qualifications**: F-gas Category I, Part P scheme, 18th Edition, PASMA,
   IPAF, asbestos awareness, first aid. Each needs its number and expiry;
   then **Upload evidence** and tick **I've checked it against the
@@ -653,7 +669,7 @@ verified against the manufacturer's table.
 | **Surveyor** | Surveys, drafting designs and proposals, sees margins, sends messages, the Pilots page |
 | **Installer** | The field app for jobs they're on; sends on-my-way texts |
 | **Electrician** | The field app for jobs they're on; electrical steps (needs Part P) |
-| **Subcontractor** (tick on top of a role) | Only the jobs they're on. No Board, no margins, no other families |
+| **Subcontractor** (tick on top of a role) | Only the jobs they're on. No Board, no margins, no other families, no design approval (a subcontracted technical lead can still sign commissioning) |
 
 Refrigerant steps need a current F-gas Category I certificate; electrical
 steps need Part P; commissioning needs the technical lead role **and**

@@ -1089,6 +1089,16 @@ export function blockersFor(project: Project, ctx: ReadinessContext, gate: GateI
         );
         continue;
       }
+      if (item.key === "supply-and-dno") {
+        // Internal, but nothing is connected to a supply nobody has checked (round 10: it only warned).
+        block(
+          "compliance:supply-and-dno",
+          "Supply capacity and the network operator (DNO): the electrician hasn't recorded the supply check and the DNO route, so nothing is connected yet.",
+          "electrician",
+          "Record the supply check and the DNO route on the checklist",
+        );
+        continue;
+      }
       if (item.key === "planning-consent") {
         // One clear line: while the planning outcome is still open, its own item says so.
         const pdOpen = ctx.compliance.some((i) => i.key === "planning-pd") && !settled("planning-pd");
@@ -2231,6 +2241,10 @@ export function applyProjectAction(project: Project, action: ProjectAction, now:
   const qualified = (perm: "design.approve" | "commissioning.sign", what: string): ApplyResult | null => {
     if (!staff) return err(`${what} needs a signed-in technical lead.`);
     if (!can(staff, perm) || !meetsRequirement(staff, "tech-lead", today)) {
+      // A subcontracted technical lead is qualified but has no design sign-off (EXTERNAL_DENIED): say so, not "needs a technical lead".
+      if (staff.external && meetsRequirement(staff, "tech-lead", today)) {
+        return err(`${staff.name} is marked Subcontractor, and subcontractors can't do this: ${what.toLowerCase()} needs a technical lead with current F-gas certification who isn't marked Subcontractor (Staff → untick Subcontractor).`);
+      }
       return err(`${staff.name} can't do this: ${what.toLowerCase()} needs a technical lead with current F-gas certification.`);
     }
     return null;

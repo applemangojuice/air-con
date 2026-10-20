@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  AFTER_INSTALL_KEYS,
+  approvalTooEarly,
+  asbestosNaRefusal,
   COMPLIANCE_GATE_GROUPS,
   COMPLIANCE_TEMPLATE,
   addComplianceEvidence,
@@ -571,6 +574,47 @@ test("round 9: supply capacity and the DNO is on the checklist before booking, a
   assert.equal(reviewCompliance(i, "approved", TECH, undefined, undefined, NOW).ok, false, "a photo alone isn't the outcome");
   assert.equal(reviewCompliance(i, "not-applicable", TECH, "Small unit", undefined, NOW).ok, false);
   assert.ok(reviewCompliance(i, "approved", TECH, "60 A cut-out, not looped, max demand 38 A after diversity; connect and notify, UKPN ref DEMO-1 (DEMO)", undefined, NOW).ok);
+});
+
+test("round 10: suspected asbestos (or an older home) can't be marked not applicable; only a 2000+ home with nothing suspected can", () => {
+  const asb = item("asbestos", { status: "under-review" });
+  // The review's repro: "Not drilling near the ceiling" marked it not applicable over a suspected survey.
+  const suspected = reviewCompliance(asb, "not-applicable", TECH, "Not drilling near the ceiling", undefined, NOW, { asbestosSuspected: true, builtFrom2000: false });
+  assert.ok(!suspected.ok && /always applies: approve it with the test result/.test(suspected.error), JSON.stringify(suspected));
+  const older = reviewCompliance(asb, "not-applicable", TECH, "Looks fine", undefined, NOW, { asbestosSuspected: false, builtFrom2000: false });
+  assert.ok(!older.ok && /only for a home the survey dates 2000 or later/.test(older.error));
+  assert.equal(reviewCompliance(asb, "not-applicable", TECH, "Looks fine", undefined, NOW, {}).ok, false, "no survey date: not applicable is refused");
+  assert.equal(asbestosNaRefusal({ asbestosSuspected: true, builtFrom2000: true }) !== null, true, "suspected beats the date");
+  assert.ok(reviewCompliance(asb, "not-applicable", TECH, "Built 2012, nothing suspected (DEMO)", undefined, NOW, { asbestosSuspected: false, builtFrom2000: true }).ok);
+});
+
+test("round 10: a certificate or notice about the finished work can't be approved before the install is complete; the heat pump's needs the file and its number", () => {
+  for (const key of AFTER_INSTALL_KEYS) {
+    const i = item(key, { status: "under-review", mediaIds: ["cert"] });
+    const early = reviewCompliance(i, "approved", TECH, "Will register with the scheme", undefined, NOW, { installComplete: false });
+    assert.ok(!early.ok && /Opens once the install is complete/.test(early.error), `${key}: ${JSON.stringify(early)}`);
+    assert.match(approvalTooEarly(key, undefined) ?? "", /Opens once the install is complete/, "unknown counts as not complete");
+  }
+  assert.equal(approvalTooEarly("rams", false), null, "other items aren't held");
+  // The review's repro: a note alone approved the heat pump's certificate before install, and the family's page said "Sent to you".
+  const hp = item("heat-pump-compliance-certificate", { status: "under-review" });
+  const noteOnly = reviewCompliance(hp, "approved", TECH, "Will register with scheme", undefined, NOW, { installComplete: true });
+  assert.ok(!noteOnly.ok && /Attach the certificate[\s\S]*its number/.test(noteOnly.error));
+  assert.equal(reviewCompliance({ ...hp, mediaIds: ["cert"] }, "approved", TECH, undefined, undefined, NOW, { installComplete: true }).ok, false, "a file without its number");
+  assert.ok(reviewCompliance({ ...hp, mediaIds: ["cert"] }, "approved", TECH, "DEMO-CPS certificate 0001", undefined, NOW, { installComplete: true }).ok);
+  assert.equal(complianceTemplateFor("heat-pump-compliance-certificate")!.approvalNeeds, "evidence-and-note");
+  // A professional's "not notifiable" decision can still be recorded, with a reason.
+  assert.ok(reviewCompliance(hp, "not-applicable", TECH, "Not notifiable: confirmed with building control (DEMO)", undefined, NOW, { installComplete: false }).ok);
+});
+
+test("round 10: the supply and DNO check holds install day 1 until the electrician records it", () => {
+  const items = allSettledBut(["supply-and-dno"]);
+  const b = blockersFor(project(), gateCtx(items), "ready-to-install").find((x) => x.code === "compliance:supply-and-dno");
+  assert.equal(b?.severity, "block", "an internal item, but it no longer only warns");
+  assert.equal(b?.owner, "electrician");
+  assert.match(b?.message ?? "", /hasn't recorded the supply check and the DNO route/);
+  assert.equal(blockersFor(project(), gateCtx(allSettledBut([])), "ready-to-install").some((x) => x.code === "compliance:supply-and-dno"), false);
+  assert.match(complianceTemplateFor("supply-and-dno")!.guidance, /holds install day 1[\s\S]*notified \(with the reference\), applied[\s\S]*not needed \(and why\)/);
 });
 
 test("flats in blocks: the Building Regulations route is a choice; a flat can't use a building notice, a higher-risk building can't use the council", () => {

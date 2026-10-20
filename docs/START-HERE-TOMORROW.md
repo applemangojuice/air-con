@@ -322,7 +322,10 @@ and in date.
    (approves designs, signs commissioning: needs F-gas); Installer;
    **Electrician** (electrical steps: needs Part P). Tick **Subcontractor**
    for anyone not on your payroll: they only ever see their own jobs, never
-   prices or margins.
+   prices or margins, and **a subcontractor can't approve designs**. If your
+   only F-gas technical lead is freelance, leave Subcontractor unticked for
+   them (they then see the board and margins), or no proposal can go out:
+   `/ops/launch` says so.
 4. **Qualifications** → **Add a qualification**: pick **F-gas Category I**
    or **Part P competent person scheme**, type the certificate or
    registration number, who issued it, and the expiry date. Add **Asbestos
@@ -507,7 +510,13 @@ What you do the day before:
      test result (or the route that avoids it), attached, with a note.
    Before the booking, the electrician writes the supply check and the
    network operator's route on **Supply capacity and the network operator
-   (DNO)**.
+   (DNO)**: it holds install day 1 until it's approved.
+   - **Asbestos**: **Not applicable** is only for a home the survey dates
+     2000 or later with nothing suspected; an older home is approved with
+     what was checked.
+   - After the install, **Building Regulations certificate for the heat
+     pump** opens for review: attach the certificate, write its number and
+     email it to the family, then approve.
 
 ## 13. If something goes wrong
 

@@ -294,7 +294,7 @@ export const COMPLIANCE_TEMPLATE: ComplianceTemplateItem[] = [
     approvalNeeds: "note",
     basis: "BS 7671 132.16 (existing equipment, including the distributor's, adequate for the addition); ENA connect-and-notify process. Verify the current criteria",
     guidance:
-      "Before the booking, the electrician confirms the supply can take the new load: the cut-out (main fuse) rating, whether the service is looped, the earthing, the existing large loads (electric shower, EV charger, other heat pumps) and the maximum demand after diversity, using the outdoor unit's maximum running current. Then the network operator (UK Power Networks in London): under the ENA process a heat pump within the cut-out's capacity (60 A a phase or less, cut-out known, not looped, one device) is connected and notified within 28 days; otherwise the application goes in first and the install waits for the answer. Whether the DNO treats an air-to-air unit as a heat pump wasn't confirmed: if in doubt, notify. Write the outcome in the note.",
+      "Before the booking (it holds install day 1 until approved), the electrician confirms the supply can take the new load: the cut-out (main fuse) rating, whether the service is looped, the earthing, the existing large loads (electric shower, EV charger, other heat pumps) and the maximum demand after diversity, using the outdoor unit's maximum running current. Then the network operator (UK Power Networks in London): under the ENA process a heat pump within the cut-out's capacity (60 A a phase or less, cut-out known, not looped, one device) is connected and notified within 28 days; otherwise the application goes in first and the install waits for the answer. The connect-and-notify criteria (including any maximum demand limit and whether the model must be listed in the ENA's database) weren't verified here: check the current ENA form. Whether the DNO treats an air-to-air unit as a heat pump wasn't confirmed: if in doubt, apply or ask them. Write the route in the note: notified (with the reference), applied (with the reference and the answer), or not needed (and why).",
     evidenceHint:
       "A photo of the cut-out and its rating, the electrician's maximum demand note, and the DNO's notification or application reference (or why none is needed, in writing).",
   },
@@ -491,10 +491,11 @@ export const COMPLIANCE_TEMPLATE: ComplianceTemplateItem[] = [
     statutory: true,
     gate: "closed",
     ownerRole: "admin",
+    approvalNeeds: "evidence-and-note",
     basis: "Building Regulations 2010 reg 20 (competent person self-certification)",
     guidance:
-      "Under a competent person scheme, the customer (the occupier) gets a Building Regulations compliance certificate for the heat pump work within 30 days of completion, as well as the electrician's one for the circuit. Under a building notice, it's building control's completion certificate instead. Chase it, and add it to the customer's documents. Due 30 days after the install completed.",
-    evidenceHint: "The certificate (PDF or photo) and its number, or the council's completion certificate.",
+      "Under a competent person scheme, the customer (the occupier) gets a Building Regulations compliance certificate for the heat pump work within 30 days of completion, as well as the electrician's one for the circuit. Under a building notice, it's building control's completion certificate instead. Chase it, email it to the family, and approve this with the certificate attached and its number in the note (the family's page then says it was sent to them). It can't be approved before the install is complete. Due 30 days after the install completed.",
+    evidenceHint: "The certificate (PDF or photo) and its number, or the council's completion certificate: both required.",
   },
   {
     key: "warranty-registration",
@@ -716,6 +717,38 @@ export interface ComplianceReviewContext {
   cdmRoles?: Partial<CdmRoles>;
   /** A flat in a block, and whether it's a higher-risk building (the survey's block answers). */
   block?: BlockContext;
+  /** The survey's build era is 2000 or later: the only case the asbestos check can be marked not applicable. */
+  builtFrom2000?: boolean;
+  /** The install is complete: a certificate or notice about finished work can only be approved after it. */
+  installComplete?: boolean;
+}
+
+/**
+ * Items about finished work (a certificate or notice that can only exist
+ * once the install is done): approving one before then would read as "sent"
+ * on the family's page and stop it holding the job at closing.
+ */
+export const AFTER_INSTALL_KEYS = ["electrical-certificate", "commissioning-notice", "heat-pump-compliance-certificate"] as const;
+
+/** Why this item can't be approved yet (an after-install item before the install is complete), or null. */
+export function approvalTooEarly(key: string, installComplete: boolean | undefined): string | null {
+  if (!(AFTER_INSTALL_KEYS as readonly string[]).includes(key) || installComplete) return null;
+  return "Opens once the install is complete: this is about the finished work, so it can't be approved before then.";
+}
+
+/**
+ * Why the asbestos check can't be marked not applicable here, or null: only
+ * a home the survey dates 2000 or later, with nothing suspected, can be.
+ * Otherwise it's approved on the evidence (the result, when suspected).
+ */
+export function asbestosNaRefusal(ctx: Pick<ComplianceReviewContext, "asbestosSuspected" | "builtFrom2000">): string | null {
+  if (ctx.asbestosSuspected) {
+    return "The survey says asbestos is possible or suspected here, so this check always applies: approve it with the test result or asbestos survey (or a photo of the route that avoids it) attached and the note saying which.";
+  }
+  if (ctx.builtFrom2000 !== true) {
+    return "Not applicable only for a home the survey dates 2000 or later. For an older home (or one the survey doesn't date), approve it with what you checked.";
+  }
+  return null;
 }
 
 /** Tenures whose authority to contract rests on someone else's written consent. */
@@ -762,6 +795,8 @@ export function reviewCompliance(
     case "approved": {
       if (t?.auto) return fail(`This one updates itself when ${AUTO_SOURCE[t.auto]}.`);
       if (!reviews) return fail(`${reviewer.name} can't approve compliance items: that needs the compliance review permission.`);
+      const early = approvalTooEarly(item.key, context.installComplete);
+      if (early) return fail(early);
       if (statutory) {
         if (item.key === "planning-pd") {
           if (!context.planningOutcome || !PLANNING_OUTCOMES.includes(context.planningOutcome)) {
@@ -793,7 +828,11 @@ export function reviewCompliance(
           );
         }
         if (t?.approvalNeeds === "evidence-and-note" && (item.mediaIds.length === 0 || !text)) {
-          return fail("Attach the council's decision notice and write its reference, the date it was granted and its conditions: both are needed to approve this.");
+          return fail(
+            item.key === "heat-pump-compliance-certificate"
+              ? "Attach the certificate (or the council's completion certificate) and write its number in the note: both are needed, because the family's page then says it was sent to them."
+              : "Attach the council's decision notice and write its reference, the date it was granted and its conditions: both are needed to approve this.",
+          );
         }
         if (!hasEvidence && !text) return fail("Attach the evidence, or write down what you checked, before approving.");
         // A note can't stand in for the certificate itself: settings must hold a current one, or the subcontractor's is attached.
@@ -816,6 +855,10 @@ export function reviewCompliance(
     case "not-applicable": {
       if (!reviews) return fail(`${reviewer.name} can't mark compliance items not applicable: that needs the compliance review permission.`);
       if (t && t.allowNa === false) return fail(`"${item.label}" always applies, so it can't be marked not applicable.`);
+      if (item.key === "asbestos") {
+        const refusal = asbestosNaRefusal(context);
+        if (refusal) return fail(refusal);
+      }
       if (!text) return fail("Say why it doesn't apply.");
       break;
     }

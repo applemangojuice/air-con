@@ -154,7 +154,8 @@ says what to do instead. Approvals that need a professional are in
    says so, and the runsheet asks the electrician to size it. *Instead:* the
    electrician designs the circuit and writes the supply check and the
    network operator's route on the checklist item **Supply capacity and the
-   network operator (DNO)** before the booking; price any armoured cable or
+   network operator (DNO)** before the booking (it holds install day 1 until
+   it's approved); price any armoured cable or
    board work as a cost line.
 9f. **Access at height: the survey refuses a ladder above the limit**
    (§K49; was "the surveyor's and the technical lead's call"). The survey

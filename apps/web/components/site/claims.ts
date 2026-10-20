@@ -323,10 +323,11 @@ export function paymentCopy(ps: PublicSettings): { deposit: string; balance: str
     p.depositPct > 0
       ? `A ${p.depositPct}% deposit is due ${p.depositTiming === "on-acceptance" ? "when you accept your proposal" : "before we order your equipment"}.`
       : "No deposit.";
+  // The same basis as the pre-contract information, the proposal and the contract (round 10: this said "of handover").
   const balance =
     p.balanceDueDays > 0
-      ? `The balance is due within ${p.balanceDueDays} days of handover, once your system is installed, commissioned and explained.`
-      : "The balance is due at handover, once your system is installed, commissioned and explained.";
+      ? `We invoice the balance once the installation is finished. It's due within ${p.balanceDueDays} ${p.balanceDueDays === 1 ? "day" : "days"} of our invoice.`
+      : "We invoice the balance once the installation is finished. It's due when you receive our invoice.";
   const names = p.methods.map((m) => (m === "bank-transfer" ? "bank transfer" : "card"));
   const methods = names.length ? `You can pay by ${names.join(" or ")}.` : "We'll agree how you pay in your proposal.";
   return { deposit, balance, methods };

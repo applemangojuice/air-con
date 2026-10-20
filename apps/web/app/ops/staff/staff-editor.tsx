@@ -204,7 +204,7 @@ export function StaffEditor({
               <div className="mt-3 grid gap-x-4 border-t border-line pt-3 sm:grid-cols-2">
                 <Checkbox
                   label="Subcontractor"
-                  hint="External: no board, no margins, no other customers."
+                  hint="External: no board, no margins, no other customers, and no design approval (a subcontracted technical lead can sign commissioning, not designs)."
                   checked={external}
                   onChange={(e) => setExternal(e.currentTarget.checked)}
                 />

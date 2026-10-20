@@ -1105,7 +1105,10 @@ try {
       /Outcome: PD checks passed/.test(await tech.locator("main li").filter({ has: tech.locator("h3", { hasText: /^Permitted development checks/ }) }).innerText()) &&
         /Not applicable[\s\S]*Not needed: .* recorded "PD checks passed"/.test(await consentCard.innerText()),
     );
-    check("no statutory item left open before install", await has(tech, /STATUTORY OPEN\s*[0-2]\b/));
+    // Round 10: the certificates and the notice about the finished work wait for it (3 statutory items).
+    check("no statutory item left open before install but the three about the finished work", await has(tech, /STATUTORY OPEN\s*[0-3]\b/));
+    const hpCert = tech.locator("main li").filter({ has: tech.locator("h3", { hasText: "Building Regulations certificate for the heat pump" }) });
+    check("the heat pump's certificate can't be approved before the install", /Opens once the install is complete/.test(await hpCert.innerText()) && (await hpCert.locator("summary", { hasText: /^\s*▸?\s*Review\s*$/ }).count()) === 0);
     await shot(tech, "G-compliance");
     await go(admin, `/ops/projects/${ids.pid}`);
     check("nothing blocks install day 1", await has(admin, /Next gate: Install complete|Nothing stands in the way of ready to install/));
@@ -1403,6 +1406,15 @@ try {
     await warForm.getByRole("button", { name: "Add to their documents" }).click();
     check("warranty registered, with its reference", await waitFor(admin, /Warranty\s*Registered/));
     await go(tech, `/ops/projects/${ids.pid}/compliance`);
+    // The heat pump's certificate approves only with its file and number (the family's page then says it was sent).
+    const hpCard = tech.locator("main li").filter({ has: tech.locator("h3", { hasText: "Building Regulations certificate for the heat pump" }) });
+    await hpCard.locator("summary", { hasText: "Add evidence or a note" }).click();
+    const hpForm = hpCard.locator("form").filter({ has: tech.getByRole("button", { name: "Save evidence" }) });
+    await hpForm.locator('input[type="file"]').setInputFiles(PHOTO);
+    await hpForm.getByText("Uploaded").waitFor({ timeout: 30_000 });
+    await hpForm.locator("textarea").fill("DEMO: scheme certificate DEMO-HP-0001, emailed to the family.");
+    await hpForm.getByRole("button", { name: "Save evidence" }).click();
+    await tech.waitForTimeout(1500);
     await reviewCompliance(tech);
     check("every compliance item settled", await has(tech, /DONE\s*(\d+) of \1/));
     check("auto items name a person, not a phrase", !(await has(tech, /Approved by Recorded on the project/)));

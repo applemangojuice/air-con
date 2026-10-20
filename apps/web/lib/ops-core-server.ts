@@ -904,7 +904,10 @@ export async function goLiveChecks(): Promise<GoLiveCheck[]> {
   const pool = demoMode ? staff : real;
   // Verified, with the certificate on file, and current: what the gates count.
   const holds = (s: StaffMember, kind: "fgas-cat1" | "part-p") => hasCurrentQualification(s, kind, today);
-  const techLead = pool.some((s) => (s.roles.includes("tech-lead") || s.roles.includes("admin")) && holds(s, "fgas-cat1"));
+  // A subcontractor can sign commissioning but never a design (EXTERNAL_DENIED), so they don't count here.
+  const signer = (s: StaffMember) => (s.roles.includes("tech-lead") || s.roles.includes("admin")) && holds(s, "fgas-cat1");
+  const techLead = pool.some((s) => signer(s) && !s.external);
+  const externalOnly = !techLead && pool.some((s) => signer(s) && s.external);
   const electrician = pool.some((s) => s.roles.includes("electrician") && holds(s, "part-p"));
   checks.push({
     id: "tech-lead",
@@ -912,8 +915,12 @@ export async function goLiveChecks(): Promise<GoLiveCheck[]> {
     level: techLead ? "green" : "red",
     detail: techLead
       ? "Designs and commissioning can be signed off."
-      : "Nobody can approve a design or sign commissioning, so no proposal can be issued.",
-    fix: "Staff → add the technical lead with their F-gas Category I certificate number and expiry, upload the certificate and tick that you've checked it.",
+      : externalOnly
+        ? "Your only F-gas technical lead is marked Subcontractor: subcontractors can't approve designs, so no proposal can be issued."
+        : "Nobody can approve a design or sign commissioning, so no proposal can be issued.",
+    fix: externalOnly
+      ? "Staff → the technical lead → untick Subcontractor (they then see the board and the margins), or add a technical lead on your payroll."
+      : "Staff → add the technical lead with their F-gas Category I certificate number and expiry, upload the certificate and tick that you've checked it.",
     href: "/ops/staff",
   });
   checks.push({

@@ -492,6 +492,8 @@ test("design-approved needs a qualified, permitted tech lead", () => {
   refuses(p, approve, T.design, { actor: INSTALLER }, /can't do this/); // F-gas but not a tech lead
   const lapsed = { ...TECH_LEAD, qualifications: [fgas("FG-0001", "2026-10-01")] };
   refuses(p, approve, T.design, { actor: lapsed }, /current F-gas/);
+  // Round 10: a subcontracted technical lead is qualified, but subcontractors can't sign designs: the refusal says why.
+  refuses(p, approve, T.design, { actor: { ...TECH_LEAD, external: true } }, /is marked Subcontractor, and subcontractors can't do this[\s\S]*untick Subcontractor/);
   refuses(p, { ...approve, version: 2 }, T.design, { actor: TECH_LEAD }, /latest design/);
   refuses(p, approve, T.design, { actor: TECH_LEAD, design: { status: "in-review", compatibilityErrors: ["Too many indoor units"] } }, /compatibility/);
   const admin = step(p, approve, T.design, { actor: { ...ADMIN, qualifications: [fgas("FG-0009")] } });

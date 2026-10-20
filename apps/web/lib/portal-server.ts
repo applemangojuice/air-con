@@ -335,7 +335,8 @@ export async function loadHub(projectId: string, access: ProjectAccess): Promise
   const pack: HubPack | null =
     packDoc && packSnap?.electricalCert && packSnap.maintenanceInfo && packSnap.warranty
       ? {
-          heatPumpCertificate: heatPumpCert?.status === "approved" ? "done" : heatPumpCert?.status === "not-applicable" ? "na" : "pending",
+          // "Sent to you" only once the certificate itself is attached (an older approval on a note alone stays pending).
+          heatPumpCertificate: heatPumpCert?.status === "approved" && heatPumpCert.mediaIds.length > 0 ? "done" : heatPumpCert?.status === "not-applicable" ? "na" : "pending",
           documentId: packDoc.id,
           completedOn: String(packSnap.completedOn ?? ""),
           electricalCert: { ...packSnap.electricalCert, status: project.handover.electricalCert },

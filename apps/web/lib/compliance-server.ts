@@ -43,7 +43,7 @@ export async function listingFacts(projectId: string): Promise<ListingFacts> {
 }
 
 /** What the survey says that a review needs: the listing facts, the tenure and whether asbestos is suspected. */
-async function surveyFacts(projectId: string): Promise<{ listing: ListingFacts; tenure?: MeasuredSurvey["site"]["tenure"]; asbestosSuspected: boolean; block?: BlockContext }> {
+async function surveyFacts(projectId: string): Promise<{ listing: ListingFacts; tenure?: MeasuredSurvey["site"]["tenure"]; asbestosSuspected: boolean; builtFrom2000: boolean; block?: BlockContext }> {
   const [survey, design] = await Promise.all([
     surveysRepo.currentForProject(projectId).catch(() => null),
     designsRepo.latestForProject(projectId).catch(() => null),
@@ -55,6 +55,7 @@ async function surveyFacts(projectId: string): Promise<{ listing: ListingFacts; 
     },
     ...(survey?.data?.site?.tenure ? { tenure: survey.data.site.tenure } : {}),
     asbestosSuspected: asbestosSuspectedAtSurvey(survey?.data),
+    builtFrom2000: survey?.data?.house?.era === "2000+",
     // A flat in a block (and a higher-risk one): which Building Regulations routes fit.
     ...(survey?.data ? { block: { flat: isFlat(survey.data), higherRisk: higherRiskBuilding(survey.data) } } : {}),
   };
@@ -73,7 +74,9 @@ async function reviewContext(project: Project) {
     listed: listedOnRecord(items, facts.listing),
     ...(facts.tenure ? { tenure: facts.tenure } : {}),
     asbestosSuspected: facts.asbestosSuspected,
+    builtFrom2000: facts.builtFrom2000,
     ...(facts.block ? { block: facts.block } : {}),
+    installComplete: project.install.status === "complete",
   };
 }
 

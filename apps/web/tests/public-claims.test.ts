@@ -133,7 +133,8 @@ test("survey is 'Free' only when the fee is zero", () => {
 test("payment and cancellation copy follow settings", () => {
   const none = paymentCopy(pub());
   assert.equal(none.deposit, "No deposit.");
-  assert.match(none.balance, /within 7 days of handover/);
+  assert.match(none.balance, /once the installation is finished\. It's due within 7 days of our invoice/);
+  assert.doesNotMatch(none.balance, /handover/, "one basis for the balance everywhere (round 10)");
   assert.match(none.methods, /bank transfer or card/);
   const dep = paymentCopy(pub({ payments: { ...DEFAULT_SETTINGS.payments, depositPct: 20 } }));
   assert.match(dep.deposit, /20% deposit is due when you accept/);
@@ -222,4 +223,15 @@ test("property pages and the mailing letter make no track-record or 'already des
   // The /a sample says DEMO and never passes made-up facts off as public records.
   const page = readFileSync(new URL("../app/a/[id]/page.tsx", import.meta.url), "utf8");
   assert.match(page, /DEMO: a sample page\. This address and these facts are made up for the demo, not public records\./);
+});
+
+test("round 10: the terms, the proposal and the contract state one basis for the balance (our invoice, once the install is finished)", async () => {
+  const { termsSections, termsPlainText } = await import("../lib/legal/terms.ts");
+  const { paymentTerms } = await import("../components/proposal/copy.ts");
+  const terms = termsPlainText(termsSections(pub())).join("\n");
+  const proposal = paymentTerms(100_000, DEFAULT_SETTINGS).join("\n");
+  for (const [where, text] of [["terms", terms], ["proposal", proposal]] as const) {
+    assert.match(text, /once the installation is finished[\s\S]{0,40}due within 7 days of our invoice/, where);
+    assert.doesNotMatch(text, /days of handover/, `${where}: no second deadline`);
+  }
 });

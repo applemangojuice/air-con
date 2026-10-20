@@ -92,7 +92,9 @@ export function viewerFor(staff: StaffMember, todayIso: string): DesignViewer {
       ? {}
       : {
           approveBlockedReason: !can(staff, "design.approve")
-            ? "Approving needs a technical lead."
+            ? staff.external
+              ? "Approving needs a technical lead who isn't marked Subcontractor (Staff → untick Subcontractor)."
+              : "Approving needs a technical lead."
             : "Approving needs a current F-gas Category I certificate on your staff record.",
         }),
     canSeeCosts: can(staff, "finance.view-margin"),
