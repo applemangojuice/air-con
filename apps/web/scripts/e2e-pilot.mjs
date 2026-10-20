@@ -3,7 +3,9 @@
  * it do: admin at a desk, customers and the crew on their phones.
  *
  *   A  Admin (DEMO sign-in) sets up a new pilot (pilot number typed in), owner and surveyor.
- *   B  Customer opens their sign-in link, books the survey, agrees to documents by email.
+ *   B  Customer opens their sign-in link, books the survey, agrees to documents by email; in
+ *      another browser (a Home Screen app) they sign in with the 6-digit code instead, and so
+ *      does an installer on /login (the field app's own manifest, the rolling sign-in on Me).
  *   C  Surveyor on a phone: on my way, start, every section (2 rooms measured, photos,
  *      a drawing with the indoor unit and pipe route), outdoor, electrics, PD checks, risks, submit at 100%.
  *   D  Catalogue loaded and priced (CSV price list), design drafted by the surveyor, layout
@@ -26,7 +28,8 @@
  *      simulator), electrical certificate in, warranty registered, open issues resolved,
  *      closed; the customer's documents are all there.
  *   K  Every customer message logged as demo; /ops/pilots shows the pilot with its numbers;
- *      the CSV downloads.
+ *      the CSV downloads; the accountant's export (/ops/money) shows the totals and its three
+ *      CSVs reconcile, and a technical lead can't download them.
  *   L  Isolation and permissions: a duplicate pilot number, another customer (pages,
  *      documents, invoices, photos, the variation API), a subcontractor (ops pages, other
  *      jobs, media APIs), signed-out visitors, a forged cookie, a bad Stripe signature, the
@@ -147,6 +150,36 @@ function must(name, ok, detail) {
 const browser = await chromium.launch({ executablePath: findChromium(), args: ["--no-sandbox"] });
 const pages = {};
 const trails = {};
+
+/** RFC 4180 CSV (CRLF rows, "" escapes) as objects keyed by the header. */
+function csvRows(csv) {
+  const rows = [];
+  let row = [];
+  let cell = "";
+  let quoted = false;
+  for (let i = 0; i < csv.length; i++) {
+    const c = csv[i];
+    if (quoted) {
+      if (c === '"' && csv[i + 1] === '"') {
+        cell += '"';
+        i++;
+      } else if (c === '"') quoted = false;
+      else cell += c;
+    } else if (c === '"') quoted = true;
+    else if (c === ",") {
+      row.push(cell);
+      cell = "";
+    } else if (c === "\r" && csv[i + 1] === "\n") {
+      row.push(cell);
+      rows.push(row);
+      row = [];
+      cell = "";
+      i++;
+    } else cell += c;
+  }
+  const [head = [], ...body] = rows;
+  return body.map((r) => Object.fromEntries(head.map((h, i) => [h, r[i] ?? ""])));
+}
 
 /** A person with their own browser (cookies, phone or desk). */
 async function person(key, kind) {
@@ -588,6 +621,45 @@ try {
       stranger.url(),
     );
     await stranger.context().close();
+
+    // A link tapped in an email app signs in that app's browser, and a Home Screen app is a browser of
+    // its own: the 6-digit code in the same email signs in wherever it's typed (§K45).
+    const homeScreen = await person("home-screen", "phone");
+    await go(homeScreen, "/portal");
+    await homeScreen.getByLabel("Your email address").fill(CUSTOMER.email);
+    await homeScreen.getByRole("button", { name: "Email me a sign-in link" }).click();
+    must("after sending, the sign-in page asks for the code from the email", await waitFor(homeScreen, /Enter the 6-digit code from the email/));
+    const code = (await homeScreen.locator("strong.font-mono").first().innerText()).trim();
+    check("DEMO: the code that email would carry is on screen (a reserved address, email not set up)", /^\d{6}$/.test(code), code);
+    const codeBox = homeScreen.getByLabel(/Enter the 6-digit code from the email/);
+    await codeBox.fill(String((Number(code) + 1) % 1_000_000).padStart(6, "0"));
+    await homeScreen.getByRole("button", { name: "Sign in with the code" }).click();
+    check("a wrong code is refused, saying nothing about why", await waitFor(homeScreen, /That code didn't work/));
+    await codeBox.fill(`${code.slice(0, 3)} ${code.slice(3)}`);
+    await homeScreen.getByRole("button", { name: "Sign in with the code" }).click();
+    await homeScreen.waitForURL(/\/(portal|p\/)/, { timeout: 20_000 });
+    check("the code signs them in on this browser: their homes", await waitFor(homeScreen, new RegExp(CUSTOMER.address)));
+    await homeScreen.context().close();
+
+    // The same for the crew: the field app, signed in with the code on /login.
+    const crewApp = await person("crew-home-screen", "phone");
+    await go(crewApp, "/field");
+    check("the field app sends a signed-out phone to the sign-in page", /\/login\?next=%2Ffield/.test(crewApp.url()), crewApp.url());
+    await crewApp.getByLabel("Work email", { exact: true }).fill("demo.installer@demo.dang.invalid");
+    await crewApp.getByRole("button", { name: "Email me a sign-in link" }).click();
+    must("the team sign-in asks for the code too", await waitFor(crewApp, /Enter the 6-digit code from the email/));
+    const crewCode = (await crewApp.locator("strong.font-mono").first().innerText()).trim();
+    await crewApp.getByLabel(/Enter the 6-digit code from the email/).fill(crewCode);
+    await crewApp.getByRole("button", { name: "Sign in with the code" }).click();
+    await crewApp.waitForURL(/\/field/, { timeout: 20_000 });
+    await crewApp.waitForLoadState("load");
+    check("the installer is signed in on the field app with the code", !/\/login/.test(crewApp.url()) && (await waitFor(crewApp, /Today|Next up|Nothing booked/, 20_000, "body")), crewApp.url());
+    check("the field app has its own Home Screen manifest (its icon opens /field)", (await crewApp.locator('link[rel="manifest"]').getAttribute("href")) === "/field.webmanifest");
+    const manifest = await crewApp.context().request.get(`${BASE}/field.webmanifest`);
+    check("…which starts at /field", manifest.status() === 200 && (await manifest.json()).start_url === "/field");
+    await go(crewApp, "/field/me");
+    check("Me says when the sign-in ends and that using the app keeps it going (90 days at most)", await has(crewApp, /Signed in on this phone until .*Using the app keeps it going, up to .*90 days after you signed in/));
+    await crewApp.context().close();
   });
 
   const surveyor = await person("surveyor", "phone");
@@ -1351,6 +1423,38 @@ try {
     const [csv] = await Promise.all([admin.waitForEvent("download"), admin.getByRole("link", { name: "Download CSV" }).click()]);
     const body = readFileSync(await csv.path(), "utf8");
     check("CSV downloads with a header and the pilot's row", /^﻿?pilot_number,label,project_id/.test(body) && body.includes(ids.pid));
+
+    // The accountant's export (§K45): every invoice, credit note, payment and refund, and totals that reconcile.
+    const until = londonToday();
+    const since = `${Number(until.slice(0, 4)) - 1}${until.slice(4)}`;
+    await go(admin, `/ops/money?from=${since}&to=${until}`);
+    check(
+      "the accountant's page shows the period's totals",
+      (await has(admin, /Invoices issued/)) && (await has(admin, /Received by bank transfer/)) && (await has(admin, /Owed to us at the end of/)) && (await has(admin, /Revenue, net of VAT/)),
+    );
+    await shot(admin, "K-accountant", true);
+    const csvOf = async (file) => {
+      const r = await admin.context().request.get(`${BASE}/ops/money/export?file=${file}&from=${since}&to=${until}`);
+      return { status: r.status(), type: r.headers()["content-type"], rows: csvRows((await r.text()).replace(/^\uFEFF/, "")) };
+    };
+    const inv = await csvOf("invoices");
+    const pays = await csvOf("payments");
+    const sum = await csvOf("summary");
+    check("the three CSVs download (admin)", [inv, pays, sum].every((f) => f.status === 200 && /^text\/csv/.test(f.type ?? "")), [inv, pays, sum].map((f) => f.status).join(","));
+    const mine = inv.rows.filter((r) => r.project_id === ids.pid);
+    check("the walk's deposit and balance invoices are in it, with London dates and pounds to the penny", mine.some((r) => r.kind === "Deposit") && mine.some((r) => r.kind === "Balance") && mine.every((r) => /^\d{4}-\d{2}-\d{2}$/.test(r.issued_on) && /^-?\d+\.\d{2}$/.test(r.total_gbp)), JSON.stringify(mine.map((r) => [r.number, r.kind, r.total_gbp])));
+    const myPays = pays.rows.filter((r) => r.project_id === ids.pid);
+    check("its payments: the deposit by bank transfer and the balance by DEMO card (listed, not counted)", myPays.some((r) => r.method === "Bank transfer" && r.counted === "yes") && myPays.some((r) => /^DEMO/.test(r.provider) && r.counted === "no"), JSON.stringify(myPays.map((r) => [r.method, r.provider, r.counted])));
+    const pence = (v) => Math.round(Number(v) * 100);
+    const line = (start) => sum.rows.find((r) => r.line.startsWith(start));
+    check(
+      "the summary reconciles with the two files to the penny",
+      pence(line("Net received").total_gbp) === pays.rows.filter((r) => r.counted === "yes").reduce((t, r) => t + pence(r.amount_gbp), 0) &&
+        pence(line("Net invoiced").total_gbp) === inv.rows.filter((r) => r.status !== "void").reduce((t, r) => t + pence(r.total_gbp), 0) &&
+        pence(line("Owed to us").total_gbp) === inv.rows.filter((r) => r.status !== "void").reduce((t, r) => t + pence(r.owed_at_end_gbp), 0),
+    );
+    const techTry = await tech.context().request.get(`${BASE}/ops/money/export?file=invoices&from=${since}&to=${until}`, { maxRedirects: 0 });
+    check("a technical lead can't download it (admins only)", techTry.status() === 403, String(techTry.status()));
   });
 
   await phase("L · Isolation and permissions", async () => {

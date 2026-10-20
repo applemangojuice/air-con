@@ -10,7 +10,8 @@
  *      consoles, at most PER_PATTERN pages per route (/ops/projects/[id]/kit
  *      on two projects, not all of them), and fails on a 5xx, an error page,
  *      a page error in the browser or a failed request.
- *   4. Downloads the CSV exports and runs every cron with CRON_SECRET.
+ *   4. Downloads the CSV exports (the accountant's three included) and runs
+ *      every cron with CRON_SECRET.
  *
  * Env: BASE_URL (http://localhost:3390), ADMIN_EMAIL, OPS_PASSWORD,
  * CRON_SECRET (optional: crons are skipped without it), CHROMIUM_PATH,
@@ -328,7 +329,11 @@ try {
 
   /* ---------------------------------------------------------------- */
   console.log("Exports");
-  for (const path of ["/ops/pilots/export", "/ops/quotes/export", "/ops/catalogue/export", "/ops/intel/export"]) {
+  // The accountant's three files (§K45), over the last year to today.
+  const today = new Date().toISOString().slice(0, 10);
+  const yearAgo = `${Number(today.slice(0, 4)) - 1}${today.slice(4)}`;
+  const accounts = ["invoices", "payments", "summary"].map((f) => `/ops/money/export?file=${f}&from=${yearAgo}&to=${today}`);
+  for (const path of ["/ops/pilots/export", "/ops/quotes/export", "/ops/catalogue/export", "/ops/intel/export", ...accounts]) {
     const r = await page.request.get(`${BASE}${path}`);
     const type = r.headers()["content-type"] ?? "";
     const body = await r.text();

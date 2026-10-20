@@ -27,7 +27,7 @@ function SubmitButton({ children, pending: pendingLabel }: { children: string; p
 function CodeForm({ email, next, devCode }: { email?: string; next: string; devCode?: string }) {
   const [state, action] = useActionState<CodeState, FormData>(signInWithCode, { status: "idle" });
   return (
-    <form action={action} className="space-y-3 rounded-2xl border border-line bg-white p-5" aria-labelledby="code-heading">
+    <form action={action} className="space-y-3 rounded-2xl border border-line bg-white p-5">
       {email ? (
         <input type="hidden" name="email" value={email} />
       ) : (
@@ -38,7 +38,7 @@ function CodeForm({ email, next, devCode }: { email?: string; next: string; devC
       )}
       <input type="hidden" name="next" value={next} />
       <label className="block">
-        <span id="code-heading" className="mb-1 block font-semibold text-ink-900">
+        <span className="mb-1 block font-semibold text-ink-900">
           Enter the 6-digit code from the email
         </span>
         <span className="mb-2 block text-sm text-ink-700">
