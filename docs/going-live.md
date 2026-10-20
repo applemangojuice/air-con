@@ -201,8 +201,9 @@ With Resend and `CRON_SECRET` set, the Vercel crons in `apps/web/vercel.json`
 run: **daily ops** (16:00 UTC: survey and day-before reminders, proposal
 expiry, outbox retries, aftercare check-ins), the **morning digest** (06:00
 UTC: what needs doing today, who owes us what), and the **abandoned-quote
-follow-up** (10:00 UTC: one nudge to drafts 24 hours to 7 days old, then
-never again). Each can also be run by hand from `/ops/messages`.
+follow-up** (10:00 UTC: one reminder to drafts 24 hours to 7 days old
+whose owner left **Email me one reminder if I don't finish** ticked, at most
+10 a day from its own email budget, then never again to that address). Each can also be run by hand from `/ops/messages`.
 
 ## Uptime alarm
 

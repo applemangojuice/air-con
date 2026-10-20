@@ -624,25 +624,38 @@ When a gate fails, it returns that gate's blockers so the UI can show exactly
 what's missing.
 
 `migrateProject` mapping (literal: nothing becomes paid, approved or
-designed that v1 didn't record):
+designed that v1 didn't record). v1's final quote was the instant price,
+accepted with a click, and the old site said that committed nobody, so a v1
+project is a contract only once work went ahead on it (`committed`: kit
+`dispatched` or `delivered`, or the installation completed). Before that it
+starts again at the v2 steps, with an internal note per thing it had
+(§K43):
 - `floorPlan` → `roughPlan`.
-- `siteVisit` → `survey`: `completed` → `submitted` (with `submittedAt`),
-  booked → `booked`. A booked or completed visit keeps its mode (default
-  `video`), fee, payment status and a 60-minute duration. An unbooked visit
+- `siteVisit` → `survey`: `completed` → `submitted` (with `submittedAt`)
+  when committed; otherwise `not-booked` (in person, v2 duration; a v1 visit
+  left no survey record to design from), keeping its fee and payment, with
+  an internal `migrated-site-visit` note. Booked → `booked`. A booked (or
+  committed completed) visit keeps its mode (default `video`), fee, payment
+  status and a 60-minute duration. An unbooked visit
   was never agreed, so it takes the v2 terms: in person, fee 0,
   `not-required`. A v1 "paid" fee stays `paid` but moves no money (it wasn't
   a verified payment); an internal `migrated-survey-fee` event tells ops to
   check it and credit it on the balance invoice.
-- `finalQuote` → `proposal` (`contractType: "supply-and-install"`):
-  `issued` → `issued` (no proposalId), `accepted` → `accepted` with
-  `contractTotalPence = totalGbp * 100`. No `preContractInfoSentAt`, so
-  `cancellationStatus` applies reg 31.
-- `installation` → `booking`: `booked` → `booked`, start date, dates =
-  `installDays` consecutive working days, `installer` → crew entry
-  (`role: "installer"`, `staffId: "legacy"`).
-- `delivery` → `kit`: scheduled → `ordered`; `dispatched` / `delivered` as
-  is. Delivered on an accepted contract sets `goodsReceivedOn` and
-  `cancellationEndsOn`.
+- `finalQuote` → `proposal` (`contractType: "supply-and-install"`): when
+  committed, `issued` → `issued` (no proposalId), `accepted` → `accepted`
+  with `contractTotalPence = totalGbp * 100` (no `preContractInfoSentAt`, so
+  `cancellationStatus` applies reg 31). Otherwise `not-issued`, no contract
+  total, and an internal `migrated-final-quote` note with the price and the
+  date it was issued or accepted.
+- `installation` → `booking` (when committed): `booked` → `booked`, start
+  date, dates = `installDays` consecutive working days, `installer` → crew
+  entry (`role: "installer"`, `staffId: "legacy"`). Not committed: no
+  booking and no crew; a booked v1 install date is an internal
+  `migrated-install-booking` note.
+- `delivery` → `kit`: scheduled → `ordered` when committed (otherwise
+  `not-ordered`: a v1 "scheduled" was only its install booking's target
+  date); `dispatched` / `delivered` as is. Delivered on an accepted contract
+  sets `goodsReceivedOn` and `cancellationEndsOn`.
 - `installation.completed` → install complete, handover pending.
 - Reschedule fees carry over into `money.changeFeesPence`. `events` kept.
 - v1 kept email and phone on the quote: `withLegacyContact` (web) fills
@@ -2261,3 +2274,47 @@ changelog and the reasons, so nobody "fixes" a deliberate choice back.
       unit, cyan and green).
     - *Runbooks*: admin guide §11 (restore from backup) and §12
       (data-protection requests), linked from START-HERE §13.
+
+43. **Pre-launch review, round 6 (three findings, before the first real
+    customers).**
+    - *A v1 acceptance isn't a v2 contract* (`fromV1` in `project.ts`, §D3):
+      the old site's two-click "accept final quote" (auto-issued on a
+      high-confidence quote, "doesn't tie you in") had become an accepted
+      contract with a contract total, so design, consent and proposal
+      issue all refused ("The proposal is accepted…") and purchasing and
+      the ready-to-install gate could never pass. Now a v1 project is a
+      contract only once work went ahead (`committed`: kit dispatched or
+      delivered, or installed); otherwise the proposal is `not-issued`, a
+      completed v1 site visit becomes a survey still to book (it left no
+      survey record, so `draftNewDesign` had nothing to design from), a v1
+      install booking and its "scheduled" delivery aren't carried, and
+      internal notes (`migrated-final-quote`, `migrated-site-visit`,
+      `migrated-install-booking`) say what the old system had. A test walks
+      every uncommitted v1 state through survey, design, consent, proposal
+      issue and acceptance. A v1 *issued* final quote is `not-issued` too:
+      the hub no longer says "Review your proposal" with no proposal.
+    - *The leads' chase list is back* (`lib/lead-follow-ups.ts`): F7 had
+      dropped main's "Due today" list, the only place a quote's scheduled
+      next action surfaced. `/ops` shows **Website leads due today (N)**
+      (next_action_at before London's next midnight, `dueLeadCutoff`;
+      declined left out; 12 shown, "and N more"; overdue ones say since
+      when), the morning digest lists the same, and the quotes inbox has a
+      **Next action** column (due date, overdue in red) sortable soonest
+      first (`?sort=next`, nulls last); the CSV gains `next_action`,
+      `next_action_due`. The morning routines (admin guide §2, `/ops/help`)
+      include it.
+    - *The unfinished-quote reminder asks first and has a budget*
+      (`api/cron/follow-up`, `lib/follow-up.ts`, `lib/follow-up-notice.ts`):
+      step 1 shows **Email me one reminder if I don't finish** under the
+      email (ticked unless unticked); the draft records the answer and the
+      wording version in its `attribution` JSON (`reminderRecord`; no
+      migration), and only a draft that saw this wording and left it ticked
+      is reminded (`reminderAllowed`). `pickFollowUps` keeps one per person
+      and never an address that finished a quote or was ever reminded
+      before (the old code only de-duplicated within a run), at most
+      `FOLLOW_UPS_PER_RUN` (10); each send spends the new `follow-up` email
+      budget (10 a day; the three website pools total 65 of Resend Free's
+      100), and one it holds back is released for the next run. The email
+      says why it came and how to have the quote deleted (company email).
+      The **Unfinished** tab offers its pre-written email only for drafts
+      that may be reminded. The privacy notice says so.

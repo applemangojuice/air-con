@@ -225,5 +225,8 @@ that isn't set).
 - **A message that fails** shows in red on the Messages page and is retried
   on the next daily run, or straight away with **Retry**.
 - **Website enquiries that weren't finished** (not the pilots) get one
-  friendly nudge email between 24 hours and 7 days after they stopped, sent
-  at 10:00 UTC, and never another.
+  friendly reminder email between 24 hours and 7 days after they stopped,
+  sent at 10:00 UTC, and never another, but only if they left **Email me
+  one reminder if I don't finish** ticked under the email on the form's
+  first step (at most 10 a day). It says why it came and how to have the
+  quote deleted.

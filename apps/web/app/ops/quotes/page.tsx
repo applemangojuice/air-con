@@ -122,13 +122,6 @@ export default async function OpsQuotesPage({
               <tr className="border-b border-line bg-surface text-left text-xs font-semibold text-ink-500">
                 <th className="px-4 py-3">Received</th>
                 <th className="px-4 py-3">Customer</th>
-                <th className="px-4 py-3">Postcode</th>
-                <th className="px-4 py-3">Rooms</th>
-                <th className="px-4 py-3">Total</th>
-                <th className="px-4 py-3">Confidence</th>
-                <th className="px-4 py-3">Timeframe</th>
-                <th className="px-4 py-3">Source</th>
-                <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">
                   <Link
                     href={sortHref(tab.key, !byNext)}
@@ -138,6 +131,13 @@ export default async function OpsQuotesPage({
                     Next action{byNext ? " ↑" : ""}
                   </Link>
                 </th>
+                <th className="px-4 py-3">Postcode</th>
+                <th className="px-4 py-3">Rooms</th>
+                <th className="px-4 py-3">Total</th>
+                <th className="px-4 py-3">Confidence</th>
+                <th className="px-4 py-3">Timeframe</th>
+                <th className="px-4 py-3">Source</th>
+                <th className="px-4 py-3">Status</th>
                 {tab.key === "drafts" && <th className="px-4 py-3">Follow up</th>}
               </tr>
             </thead>
@@ -158,6 +158,9 @@ export default async function OpsQuotesPage({
                       <span className="block text-xs text-ink-300">{q.email}</span>
                     )}
                   </td>
+                  <td className="px-4 py-3">
+                    <NextAction action={q.next_action} at={q.next_action_at} today={today} />
+                  </td>
                   <td className="whitespace-nowrap px-4 py-3">{q.postcode}</td>
                   <td className="px-4 py-3">{q.room_count}</td>
                   <td className="whitespace-nowrap px-4 py-3 font-semibold">{gbp(q.total_gbp)}</td>
@@ -177,9 +180,6 @@ export default async function OpsQuotesPage({
                     >
                       {q.status}
                     </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <NextAction action={q.next_action} at={q.next_action_at} today={today} />
                   </td>
                   {tab.key === "drafts" && (
                     <td className="whitespace-nowrap px-4 py-3">

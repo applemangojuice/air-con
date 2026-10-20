@@ -95,6 +95,14 @@ to run more than once and never deletes anything.
 If it stops with "Two households share a pilot number": nothing changed. Give
 one of the projects it names a different pilot number, then run it again.
 
+**Projects started on the old site** stay, and show on the Board at
+**Price**. An old "accepted" final quote isn't a contract here (the old site
+told families it committed them to nothing, and sent none of the contract
+paperwork), so you survey, design and send a proposal as for anyone. Each
+one's history has an internal note, **Moved from the old system: …**, with
+the old price and dates; phone anyone whose note gives an old install date.
+(Known limitations 43.)
+
 A brand-new, empty Supabase project (no quotes yet)? First run each file in
 `supabase/migrations` from `0001` to `0009` the same way, in order (both
 `0006` files), then the upgrade. Details: [going-live.md](going-live.md).

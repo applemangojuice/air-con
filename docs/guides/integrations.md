@@ -115,7 +115,11 @@ database holding a real customer, and `/ops/launch` turns red.
   needs the customer to receive them), and nobody can get a sign-in link
   (break-glass only).
 - **Plan:** **Free**: 3,000 emails a month, 100 a day, one domain (secondary
-  source). Pilot months need about 300. Paid tiers *unverified*.
+  source). Pilot months need about 300. Paid tiers *unverified*. Emails a
+  website visitor can set off (quote emails, sign-in links, the unfinished
+  quote reminder) have their own daily budgets, 65 a day in all, so the
+  rest of the day's 100 is always there for the office (known limitations
+  29).
 
 ## Twilio (texts)
 

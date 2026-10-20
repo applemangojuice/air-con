@@ -153,10 +153,12 @@ says what to do instead. Approvals that need a professional are in
     shared with your own proposals, invoices and alerts). The quote form's
     two emails (the family's price, your lead alert) and the sign-in link a
     new project sends share 30 a day (12 an hour); sign-in links asked for
-    on `/portal` or a project page have 25 a day (10 an hour). Days are
+    on `/portal` or a project page have 25 a day (10 an hour); reminders to
+    unfinished quotes have 10 a day. Days are
     London days. Over it, nothing more of that kind is sent until the next
-    hour or day: quotes still save and show under **Quotes**, and a family
-    can ask for a link again later. Emails you send from the office are
+    hour or day: quotes still save and show under **Quotes**, a family
+    can ask for a link again later, and a reminder waits for the next
+    morning's run (inside its 7 days). Emails you send from the office are
     never held back by it. If real leads ever get near it, move to a paid
     Resend plan and raise the numbers in `lib/email-budget.ts`.
 30. **Service-level promises (credits for missed dates) are switched off**
@@ -214,3 +216,22 @@ says what to do instead. Approvals that need a professional are in
     few hundred bytes (a beacon over 4 KB, or with more than 20 facts, is
     refused), so nobody can fill the database through it. Past that,
     page views for the rest of the day aren't counted.
+42. **An unfinished quote gets one reminder only if its owner agreed at the
+    time.** Under the email on the quote form's first step is **Email me one
+    reminder if I don't finish**, ticked unless they untick it. Only those
+    left ticked get the reminder (once, a day to 7 days later, at most 10 a
+    day); the email says why it came and how to have the quote deleted.
+    Quotes started before this box existed are never reminded, by the daily
+    job or from the **Unfinished** tab. Nothing checks that an address
+    typed there is real, so a few reminders may bounce. *If someone asks
+    for their unfinished quote to be deleted:* see admin guide §12.
+43. **Projects from the old site start again at the survey.** The old site's
+    "final quote" was the instant price, accepted with a click, and it told
+    families that committed them to nothing; no proposal, contract or
+    cancellation information was ever sent. So an old project is not a
+    contract here: it shows on the Board at **Price**, the old site's
+    acceptance, site visit and install date are in an internal note in its
+    history (**Moved from the old system: …**), and you survey, design and
+    send a proposal as for any household. Call anyone whose note gives an
+    old install date. Only a project where work really went ahead on the
+    old site (kit sent or the install finished) keeps its old contract.
