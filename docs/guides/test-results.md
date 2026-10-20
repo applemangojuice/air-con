@@ -1,65 +1,65 @@
 # Test results
 
-The latest real results of every automatic check, run on the morning of
-**20 October 2026** on branch `claude/pilot-ops` at commit `1f8f0da`: the
-fixes from round 7 of the pre-launch review [below](#what-round-7-found),
-on top of round 6's (`ed1732e`, [below](#what-round-6-found)), round 5's
-(`a04cc53`, [below](#what-round-5-found)), the handover fix (`454c8d1`,
+The latest real results of every automatic check, run on the afternoon of
+**20 October 2026** on branch `claude/pilot-ops` at commit `2f82a13`: the
+five gaps round 7 left as known limitations, now built
+[below](#the-five-gaps-round-7-left), on top of round 7's fixes (`1f8f0da`,
+[below](#what-round-7-found)), round 6's (`ed1732e`,
+[below](#what-round-6-found)), round 5's (`a04cc53`,
+[below](#what-round-5-found)), the handover fix (`454c8d1`,
 [below](#the-handover-flake-fixed)), the go-live pack, the Supabase
 compatibility work and the fixes from the final pre-launch review and
 rounds 3 and 4. Everything was run **twice, start to finish, and passed
 both times**, on both databases. Every person, home and price the browser
 walks use is fictional and labelled DEMO.
 
-**Summary: everything passed, on both databases.** 958 unit tests, the type
-check (the iOS scaffold included), the production build (Next.js 15.5.28),
-every database migration check (110 assertions) and the upgrade file
-check; then the browser walks on **both** backends: on the local file
-database, 204 end-to-end pilot checks and 24 quote-form checks; on a
+**Summary: everything passed, on both databases.** 1,002 unit tests, the
+type check (the iOS scaffold included), the production build (Next.js
+15.5.28), every database migration check (110 assertions) and the upgrade
+file check; then the browser walks on **both** backends: on the local file
+database, 220 end-to-end pilot checks and 24 quote-form checks; on a
 Supabase-shaped stack (Postgres 16, PostgREST and the Storage API, as a real
 Supabase project serves them, with the database's default grants as a
-project created today has them), the same 204 and 24, the property book
-importers over 3,000 homes, and 439 checks across 284 screens with no
+project created today has them), the same 220 and 24, the property book
+importers over 3,000 homes, and 443 checks across 285 screens with no
 statement refused by the database.
 
 | Check | Command | Result | Round 1 (UTC, 20 Oct) | Round 2 (UTC, 20 Oct) |
 | --- | --- | --- | --- | --- |
-| Type check (domain, web, mobile) | `pnpm -r typecheck` | **Pass** (3 of 3 projects) | 10:56 | 11:12 |
-| Domain unit tests | `pnpm test` | **467 of 467 pass**, 0 fail (29 test files) | 10:56 to 10:57 | 11:12 |
-| Web unit tests | `pnpm test` | **491 of 491 pass**, 0 fail (53 test files) | 10:56 to 10:57 | 11:12 |
-| Production build | `pnpm --filter @aircon/web build` | **Pass**: Next.js 15.5.28, compiled, 34 of 34 static pages generated | 10:57 to 10:58 | 11:12 to 11:13 |
-| Database migrations | `bash supabase/tests/run-migrations.sh` | **Pass**: 15 migrations and the pilot upgrade bundle; the local backend's schema matches; 110 sanity assertions | 10:58 | 11:13 |
-| Upgrade file is current | `bash supabase/build-pilot-upgrade.sh --check` | **Pass**: `pilot-upgrade.sql` is current (0010 to 0014) | 10:58 | 11:13 |
-| Pilot walk, **local file database** | `node scripts/e2e-pilot.mjs` | **204 of 204 pass** | 10:58 to 11:02 | 11:13 to 11:18 |
-| Quote form walk, **local file database** | `node scripts/e2e-funnel.mjs` | **24 of 24 pass** | 11:02 to 11:03 | 11:18 |
-| Pilot walk, **Supabase-shaped** | `bash supabase/tests/compat/run-compat-e2e.sh` | **204 of 204 pass** | 11:03 to 11:12 | 11:18 to 11:27 |
+| Type check (domain, web, mobile) | `pnpm -r typecheck` | **Pass** (3 of 3 projects) | 12:44 | 13:03 |
+| Domain unit tests | `pnpm test` | **477 of 477 pass**, 0 fail (30 test files) | 12:40 (476: one test came with round 2's change) | 13:03 |
+| Web unit tests | `pnpm test` | **525 of 525 pass**, 0 fail (58 test files) | 12:40 | 13:03 |
+| Production build | `pnpm --filter @aircon/web build` | **Pass**: Next.js 15.5.28, compiled, 35 of 35 static pages generated | 12:49 to 12:50 | 13:07 to 13:08 |
+| Database migrations | `bash supabase/tests/run-migrations.sh` | **Pass**: 15 migrations and the pilot upgrade bundle (none new: nothing here needed a column); the local backend's schema matches; 110 sanity assertions | 12:46 | 13:08 |
+| Upgrade file is current | `bash supabase/build-pilot-upgrade.sh --check` | **Pass**: `pilot-upgrade.sql` is current (0010 to 0014) | 12:46 | 13:08 |
+| Pilot walk, **local file database** | `node scripts/e2e-pilot.mjs` | **220 of 220 pass** | 12:51 to 12:56 | 13:09 to 13:13 |
+| Quote form walk, **local file database** | `node scripts/e2e-funnel.mjs` | **24 of 24 pass** | 12:56 | 13:14 |
+| Pilot walk, **Supabase-shaped** | `bash supabase/tests/compat/run-compat-e2e.sh` | **220 of 220 pass** | 12:58 to 13:07 | 13:14 to 13:23 |
 | Quote form walk, **Supabase-shaped** | (same run) | **24 of 24 pass** | (same run) | (same run) |
 | Property book import, **Supabase-shaped** | (same run) | **Pass**: 3,000 homes, 900 in a conservation area, 3,000 classified (three times Max Rows) | (same run) | (same run) |
-| Every screen, **Supabase-shaped** | (same run) | **439 of 439 pass**: 284 pages over 212 routes, 141 requests with ids that aren't there, a NUL in the quote form, 4 CSV exports, 4 daily jobs | (same run) | (same run) |
+| Every screen, **Supabase-shaped** | (same run) | **443 of 443 pass**: 285 pages over 213 routes, 141 requests with ids that aren't there, a NUL in the quote form, 7 CSV exports (the accountant's three included), 4 daily jobs | (same run) | (same run) |
 | Database and app logs, **Supabase-shaped** | (same run) | **Clean**: no statement refused by Postgres, no PostgREST or Storage error in the app's log | (same run) | (same run) |
 
-Both rounds ran on commit `1f8f0da` (after it only documents changed:
-architecture §K44 and this file), each from a fresh build and fresh, empty
-data, straight through, on ports 3790 to 3793. The pilot walk has four more
-checks than before: in phase E the option's planning or noise warning, the
-issue panel's line asking for the note, and the suggested note (an
-application "may be needed", never "isn't needed"); in phase F the note on
-the family's proposal. Round 7 changes nothing in the handover, so the
-30-handover loops were not repeated: their results (30 of 30 on each
-database, the Supabase-shaped one slowed down) are with the handover fix
-[below](#the-handover-flake-fixed). Before the two rounds, two trial passes
-of the local walks: the first stopped at phase E because the walk didn't yet
-add the planning note the new rule asks for (the product refused the issue
-as designed; the walk was updated, not the rule), the second passed 204 and
-24. Nothing flaked: every walk passed first time in both rounds.
-
-The kept-drawing fix was also checked by hand on a production build (file
-backend, Pixel 7 emulation) with the reviewer's own script: a drawing whose
-save failed on a dropped connection reached the server before the survey
-submitted; and with the connection kept bad until the check screen, the
-screen said "1 drawing not saved yet", **Submit survey** stayed disabled,
-**Save it now** said it still wasn't saved, and once the signal returned it
-saved and the survey submitted with the drawing on the photo.
+Round 1 ran on commit `2276ee1`; round 2 on `2f82a13`, which adds one
+thing found while writing the guides (the charge for work done can be
+brought down with a credit note against it: **Reduce the charge**, with a
+domain test and a step in the web test). Each round started from a fresh
+build and fresh, empty data, straight through, on ports 3901 and 3902 (the
+local walks) and 3904 to 3906 and 55901 (the Supabase-shaped stack). The
+pilot walk has sixteen more checks than before: ten in phase B (a family
+signs in with the 6-digit code in a second browser after a wrong one is
+refused; an installer does the same on the team sign-in and lands on the
+field app, which has its own Home Screen manifest starting at `/field`,
+and **Me** shows the rolling sign-in) and six in phase K (the accountant's
+page shows the totals, its three CSVs download and reconcile to the penny
+with the walk's own invoices and payments in them, and a technical lead is
+refused). The route walk downloads the accountant's three files as well.
+Before the two rounds, one trial pass of the local pilot walk stopped in
+phase B on the walk's own selector (the team code form labelled itself
+twice, so "the code box" matched two elements); the form was fixed. Nothing
+flaked: every walk passed first time in both rounds. The handover isn't
+touched, so the 30-handover loops were not repeated (their results are
+with the handover fix [below](#the-handover-flake-fixed)).
 
 Set-up for the local walks: a production build (`next start`) on the local
 file database (which enforces the same schema Postgres does), a fresh
@@ -68,10 +68,63 @@ characters, headless Chromium 1194. For the Supabase-shaped walks: the same
 build with **no** `DATA_BACKEND`, talking to the stack only through
 supabase-js with the service-role key, as a demo deployment
 (`ALLOW_DEMO_LOGIN=1 DEMO_DEPLOYMENT=1`), the route walk signing in by
-**Admin break-glass**. The handover loops walk a new pilot to phase I
-(commissioning signed) at full speed, then put the job back to that point
-before each round (the project row only, written directly: test-only).
-Node 22.22.0, pnpm 10.12.1, PostgreSQL 16.15, PostgREST 12.2.3.
+**Admin break-glass**. Node 22.22.0, pnpm 10.12.1, PostgreSQL 16.15,
+PostgREST 12.2.3.
+
+## The five gaps round 7 left
+
+Round 7 wrote five things up as known limitations rather than fixing them.
+All five are now built (architecture §K45), each with its own tests, and
+the pilot walk checks the first, the second and the fourth in a browser:
+
+- **Sign-in codes.** A link tapped in the Gmail or Outlook app signs in that
+  app's own browser, and a Home Screen icon is a browser of its own, so
+  every sign-in email now carries a 6-digit code as well. Type it on the
+  sign-in page (**Enter the 6-digit code from the email**) in whichever
+  browser should be signed in. It lasts 15 minutes (or the link's life, if
+  shorter), works once, only for that address and only the newest email's;
+  using the code or the link uses up both. Five wrong tries rest an
+  address's codes for a quarter of an hour (the link still works). The code
+  is never stored. The field app has its own Home Screen icon again, and the
+  field guide says to sign in there with the code. (Tests: the code's
+  rules, the route that takes a family's code, the outbox keeping the code
+  out of the stored email; in the walk, a family signs in with the code in a
+  second browser after a wrong one is refused, and an installer does the
+  same on the team sign-in, landing on the field app with its own manifest.)
+- **Rolling sign-ins.** A staff sign-in renews itself as it's used (another
+  30 days once it's past halfway), never past 90 days from signing in, and
+  only after the server has checked the person is still an active staff
+  member: a deactivated account or a changed secret is still refused at
+  once. **Me** says when it ends and the latest it can go on to. (Tests:
+  the renewal rules and the route, including a deactivated person and a
+  forged cookie; in the walk, **Me** shows the rolling wording.)
+- **A charge for work done before a cancellation** (CCR regulation 36(4)).
+  When a family cancels inside the period after asking us to start early
+  (the request on file) and work had begun, the office records the charge
+  and how it was worked out on the money page; the app invoices it, holds
+  what they paid against it, and works out the refund (by the 14-day date)
+  or what's left to pay. The hub, the pay page, their email and the money
+  page show the same numbers; the equipment is never part of it. It's
+  refused without the evidenced request, after the period, with no work
+  done, or above the contract. (Tests: the rules in the domain, and the
+  whole flow on the real modules: below and above what they paid, refusals,
+  repeats, the refund of the rest, pilot revenue.)
+- **The accountant's export.** **Money: for the accountant** (`/ops/money`,
+  admins only) shows a period's totals and downloads every invoice and
+  credit note, every payment and refund, and a summary, as CSV: London dates,
+  pounds to the penny, tax code and VAT when registered, provider
+  references, what was owed at the end date. Cancelled contracts are never
+  revenue. (Tests: the files and the summary reconciling to the penny, the
+  end-date rebuild, formula-looking text defused, admins only; in the walk,
+  the page's totals, the three files reconciling, the walk's own invoices
+  and payments in them, and a technical lead refused.)
+- **A Stripe refund that fails.** When Stripe reports a refund failed or
+  cancelled (`refund.failed`, `refund.updated`, `charge.refund.updated`),
+  the refund is marked failed (kept), the invoice reads as paid again, the
+  family is in credit by what's owed back, the credit note stays, and the
+  team gets an urgent email with the next steps. Replays and late events
+  change nothing. (Tests: signed fake events through the real webhook
+  route.)
 
 ## What round 7 found
 
@@ -168,7 +221,9 @@ runs out; the field guide no longer says to add the app to the Home Screen.
 Written up with the workaround instead (known limitations 10, 21, 23, 44): a
 card refund that Stripe reports as failed after it was recorded, a charge
 for work done early before a cancellation, an export of every invoice for
-the accountant, and fixed (not sliding) staff sign-ins.
+the accountant, and fixed (not sliding) staff sign-ins. (All of them, and
+the Home Screen advice, are built since: [the five gaps round 7
+left](#the-five-gaps-round-7-left).)
 
 ## What round 6 found
 
@@ -553,15 +608,15 @@ fixed.
 
 One new pilot household taken from set-up to closed, in a real browser, by
 each person on their own device: the admin at a desk (1280 × 800), the
-family, the surveyor and the crew on phones (390 × 844). The same 204 checks
-passed four times on the final commit: twice on the local file database and
-twice on the Supabase-shaped stack. Any page error in the browser (including the
+family, the surveyor and the crew on phones (390 × 844). The same 220 checks
+passed four times: twice on the local file database and twice on the
+Supabase-shaped stack. Any page error in the browser (including the
 hydration warning below) or any server error fails the walk.
 
 | Phase | What it does | Checks | Passed |
 | --- | --- | --- | --- |
 | A | Admin signs in, sets up a new pilot (number typed in), owner and surveyor; a next action due today on its quote shows under **Website leads due today** and in the inbox | 12 | 12 |
-| B | The family opens their emailed link, books the survey, agrees to documents by email | 9 | 9 |
+| B | The family opens their emailed link, books the survey, agrees to documents by email; in a second browser they sign in with the 6-digit code instead (a wrong one refused first), and an installer does the same on the team sign-in, landing on the field app (its own Home Screen manifest, **Me** with the rolling sign-in) | 19 | 19 |
 | C | Surveyor on a phone: on my way, start, every section (2 rooms measured, photos, a drawing), outdoor, electrics, planning checks, risks, submit at 100% | 16 | 16 |
 | D | Catalogue loaded and priced from a CSV, design drafted, layout photos chosen, sent for review, approved and signed by the technical lead | 12 | 12 |
 | E | Proposal with two options and PILOT15; the design's planning or noise check is flagged, so the office adds the suggested planning and noise note; issuing is refused until the Schedule 2 settings are filled in, then it issues | 15 | 15 |
@@ -570,9 +625,9 @@ hydration warning below) or any server error fails the walk.
 | H | Install days 1 to 3 on phones: on my way, every step's evidence, an issue, a variation the family approves on their page (their next step names it, on the page and on **Your homes**, until they answer), end-of-day updates with photos, F-gas steps by the technical lead and electrical steps by the electrician | 35 | 35 |
 | I | Technical lead sets the job's targets and signs commissioning; the certificate renders | 5 | 5 |
 | J | Handover pack published, the family signs "All good", balance invoice paid (DEMO card simulator), electrical certificate and warranty in, issues resolved, project closed, all documents present | 30 | 30 |
-| K | Every customer message logged; the Pilots page shows the pilot; the CSV downloads | 9 | 9 |
+| K | Every customer message logged; the Pilots page shows the pilot; the CSV downloads; the accountant's page shows the totals and its three CSVs reconcile to the penny (a technical lead is refused) | 15 | 15 |
 | L | Security: a duplicate pilot number, another family (pages, documents, invoices, photos), a subcontractor (office pages, other jobs, photos, margins, and on their own job the family's project, pay, proposal and documents pages and every document, while the office sees the prices there), signed-out visitors, a forged sign-in cookie, a bad Stripe signature, the demo-data button | 31 | 31 |
-| | **Total** | **204** | **204** |
+| | **Total** | **220** | **220** |
 
 ## The founder's walk (START-HERE, followed literally)
 
@@ -677,10 +732,10 @@ service-role key. Then:
 
 | Walk | What it does | Round 1 | Round 2 |
 | --- | --- | --- | --- |
-| Pilot walk | The 204 checks above | **204 of 204** | **204 of 204** |
+| Pilot walk | The 220 checks above | **220 of 220** | **220 of 220** |
 | Quote form | The 24 checks above | **24 of 24** | **24 of 24** |
 | Property book | 3,000 sample homes imported, enriched and classified, three times what one database read returns | **3,000 / 900 / 3,000** | **3,000 / 900 / 3,000** |
-| Every screen | Break-glass sign-in, the 5 DEMO pilots loaded, 284 pages over 212 routes (every ops, field, customer and public screen, help pages included), 141 requests with ids that don't exist or aren't ids (a 404, never a crash), a NUL character in the quote form (saved without it), 4 CSV exports, 4 daily jobs | **439 of 439** | **439 of 439** |
+| Every screen | Break-glass sign-in, the 5 DEMO pilots loaded, 285 pages over 213 routes (every ops, field, customer and public screen, help pages included), 141 requests with ids that don't exist or aren't ids (a 404, never a crash), a NUL character in the quote form (saved without it), 7 CSV exports (the accountant's three included), 4 daily jobs | **443 of 443** | **443 of 443** |
 | Postgres log | Any statement the database refused | **None** | **None** |
 | App log | Any PostgREST or Storage error the app logged, even on a page that still rendered | **None** | **None** |
 
@@ -700,6 +755,17 @@ pilot walks, two quote-form walks and one screen walk per round).
   email budgets are never spent and the unfinished-quote reminder doesn't
   run, so the walks don't exercise them: unit tests do, with a stand-in
   provider (the reminder through its real daily job).
+- The sign-in code inside a real email: the walks read the code the demo
+  deployment shows on screen (a reserved address, email not set up); the
+  unit tests check the sent email carries it and the stored copy doesn't.
+  After going live, ask for a sign-in link to your own address and type its
+  code on another device once. A Home Screen app on a real iPhone isn't
+  tried here either (the walk checks the field app's manifest).
+- A refund that really fails at Stripe: the web tests post signed events
+  shaped like Stripe's (`refund.created`, `refund.failed`,
+  `refund.updated`, `charge.refund.updated`) through the real webhook route;
+  Stripe's own test mode isn't called. Add the `refund.*` events to the
+  webhook (going-live step 3) and send one from Stripe's dashboard once.
 - A real Supabase project: the Supabase-shaped run uses the same database,
   PostgREST version and Storage API calls, on this machine, but not
   Supabase's own servers, their network delays or their photo storage.
