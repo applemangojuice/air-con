@@ -6,6 +6,7 @@ import { generateQuote, type Survey } from "@aircon/domain";
 import { logServerEvent } from "@/lib/analytics-server";
 import { appUrl } from "@/lib/brand";
 import { escapeHtml, quoteEmail, sendEmail, sendTeamEmail } from "@/lib/email";
+import { TEAM_REPLY_LINE } from "@/lib/comms/templates";
 import { QUOTE_OWNER_COOKIE, quoteOwnerCookieOptions, readQuoteOwner, signQuoteOwner } from "@/lib/auth/quote-owner";
 import { personNameProblem } from "@/lib/person-name";
 import { spendEmailBudget } from "@/lib/email-budget";
@@ -298,6 +299,7 @@ async function notifyNewLead(
   <li>Marketing consent: ${marketing ? "yes" : "no"}</li>
   <li>Came from: ${escapeHtml(source)}</li>
 </ul>
+<p><strong>${escapeHtml(TEAM_REPLY_LINE)}</strong></p>
 <p><a href="${base}/ops/quotes/${id}">Open in ops →</a></p>`,
   );
 }
@@ -315,6 +317,7 @@ lead is <strong>not</strong> in the system. Reach out to them directly.</p>
   <li>Timeframe: ${escapeHtml(contact.timeframe)}</li>
   <li>Total shown: ${gbpText(totalGbp)}</li>
 </ul>
+<p><strong>${escapeHtml(TEAM_REPLY_LINE)}</strong></p>
 <p>Database error: <code>${escapeHtml(reason)}</code></p>
 <p>Check <a href="${appUrl()}/ops/status">/ops/status</a>: the schema is probably not fully migrated.</p>`,
   );

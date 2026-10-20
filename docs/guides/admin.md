@@ -416,6 +416,12 @@ status, channel and message type.
 - **Daily jobs**: reminders, proposal nudges and expiries, aftercare and
   retries run every afternoon by themselves. **Run daily jobs now** is safe
   at any time: nothing is ever sent twice.
+- **Replying to a team alert reaches our own inbox, not the family.** Every
+  email's reply address is the company inbox (so a family's reply reaches
+  you), so a reply to an alert about a customer (a problem report, a change
+  request, a decline, a new lead) writes to yourselves. Each such alert says
+  so and prints their phone and email: call them, email them fresh, or open
+  the project.
 
 ![Messages (DEMO)](../screenshots/guides/11-ops-messages.png)
 

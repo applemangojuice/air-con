@@ -1669,3 +1669,14 @@ test("kit held by us never reads as delivered, and the day the goods period star
   own.proposal.contractType = "install-only";
   assert.equal(commsForAction(own, { type: "kit-updated", status: "delivered", shortages: 0 }).some((n) => n.event === "cancellation-period"), false);
 });
+
+test("team emails about a customer say a reply reaches our own inbox, with the customer's phone and email; Reply-To stays ours", () => {
+  const ctx = { ...ctxFor(), projectId: PROJECT_ID, customerPhone: "07700 900123", customerEmail: "demo.customer@example.com" };
+  const alert = render("team-alert", { title: "Problem reported: DEMO", lines: ["The outdoor unit is loud (DEMO)."] }, ctx);
+  assert.match(alert.text, /Replying to this email reaches our own inbox, not the customer: call them or open the project\. Phone: 07700 900123 · Email: demo\.customer@example\.com/);
+  const changes = render("proposal-changes-requested", { text: "Can the bedroom unit go on the other wall? (DEMO)" }, ctx);
+  assert.match(changes.text, /reaches our own inbox, not the customer/);
+  // Not about a customer (an unmatched Stripe refund, a system alert): no such line.
+  const bare = render("team-alert", { title: "A Stripe refund we couldn't match" }, { ...ctxFor(), customerName: "", addressLine: "", postcode: "", customerPhone: undefined, customerEmail: undefined, projectId: undefined } as never);
+  assert.doesNotMatch(bare.text, /reaches our own inbox/);
+});

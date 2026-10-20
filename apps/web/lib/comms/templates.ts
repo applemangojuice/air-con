@@ -269,6 +269,19 @@ export interface TemplateContext {
 
 const TITLES = new Set(["mr", "mrs", "ms", "miss", "mx", "dr", "prof", "sir", "dame", "rev"]);
 
+/**
+ * Every email's Reply-To is our own inbox (so a family's reply reaches us),
+ * which means replying to a team email about a customer writes to
+ * ourselves. Team emails about a customer say so, with how to reach them.
+ * Never the customer as Reply-To: alerts carry internal lines.
+ */
+export const TEAM_REPLY_LINE = "Replying to this email reaches our own inbox, not the customer: call them or open the project.";
+
+function replyHere(ctx: Pick<TemplateContext, "customerPhone" | "customerEmail">): Block[] {
+  const reach = [ctx.customerPhone ? `Phone: ${ctx.customerPhone}` : "", ctx.customerEmail ? `Email: ${ctx.customerEmail}` : ""].filter(Boolean).join(" · ");
+  return [{ p: { strong: `${TEAM_REPLY_LINE}${reach ? ` ${reach}` : ""}` } }];
+}
+
 /** "Sam Taylor" → "Sam"; "Dr Sam Taylor" → "Dr Taylor"; DEMO-labelled fixtures skip the label. */
 export function firstNameOf(name: string | null | undefined): string {
   const words = (name ?? "").trim().split(/\s+/).filter(Boolean);
@@ -1081,6 +1094,7 @@ const TEMPLATES: { [E in CommsEventId]: Renderer<E> } = {
       {
         p: `Next: revise the design or proposal and issue a new version${ctx.customerPhone ? `, or call them on ${ctx.customerPhone}` : ""}.`,
       },
+      ...replyHere(ctx),
     ],
     cta: "Open the project",
   }),
@@ -1546,6 +1560,7 @@ const TEMPLATES: { [E in CommsEventId]: Renderer<E> } = {
   }),
 
   "team-alert": (ctx, d) => {
+    const about = ctx.projectId || ctx.customerName ? replyHere(ctx) : [];
     const lines = [...(d.lines ?? [])];
     const { legal } = ctx.settings;
     if (d.legalCheck && !legal.cancellationReviewed) lines.push("Cancellation wording is not yet marked reviewed in settings (legal).");
@@ -1560,6 +1575,7 @@ const TEMPLATES: { [E in CommsEventId]: Renderer<E> } = {
         ...(ctx.customerName || ctx.addressLine
           ? [{ p: { strong: [ctx.customerName, place(ctx)].filter(Boolean).join(", ") } } as Block]
           : []),
+        ...about,
         ...(d.detail ? [{ p: d.detail } as Block] : []),
         ...(lines.length ? [{ list: lines } as Block] : []),
       ],
