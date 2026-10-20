@@ -362,3 +362,55 @@ test("payHeadline: 'all paid up' only once something has been paid", async () =>
   assert.equal(payHeadline({ first: "Alex", cancelled: false, payableCount: 2, paidSomething: true }).title, "Hi Alex, here's what's due");
   assert.equal(payHeadline({ first: "Alex", cancelled: true, payableCount: 0, paidSomething: true }).title, "Your contract is cancelled, Alex");
 });
+
+test("a cancelled contract on the hub: it says cancelled, with the refund and collection inside the period and nothing promised after it", () => {
+  const p = accepted("2026-10-10T10:00:00.000Z");
+  p.booking = { ...p.booking, status: "booked", startDate: "2026-10-26", dates: ["2026-10-26", "2026-10-27", "2026-10-28"] };
+  p.kit = { ...p.kit, status: "delivered", deliveredAt: "2026-10-15T10:00:00.000Z" };
+  p.money = { ...p.money, contractTotalPence: 300_000, invoicedPence: 152_830, paidPence: 152_830 };
+  // Reached us at 00:30 BST on Sun 25 Oct (23:30 UTC on the 24th): the London day is the 25th.
+  p.cancellation = { receivedAt: "2026-10-24T23:30:00.000Z", channel: "phone", evidenceRef: "DEMO call", recordedAt: "2026-10-25T09:00:00.000Z", withinPeriod: true, refundDueBy: "2026-11-08" };
+  p.closure = { closed: true, closedAt: "2026-10-25T09:00:00.000Z", reason: "cancelled" };
+
+  assert.equal(view.isCancelledProject(p), true);
+  const copy = view.cancelledCopy(p)!;
+  assert.equal(copy.title, "Your contract is cancelled");
+  assert.match(copy.body, /We received your cancellation on Sun 25 Oct\./);
+  assert.match(copy.body, /We'll refund the £1,528\.30 you've paid by Sun 8 Nov at the latest/);
+  assert.match(copy.body, /We'll collect the equipment we supplied, at our cost/);
+  assert.deepEqual(view.waitingCopy(p), copy, "the next-step card says it, not 'This project is closed'");
+
+  // The stages that won't happen are cancelled (never "now" with the booked date); what was done stays done.
+  const cancelled = (["price", "survey", "proposal", "booking", "kit", "install", "handover", "aftercare"] as const).filter((s) => view.stageCancelled(p, s));
+  assert.deepEqual(cancelled, ["install", "handover", "aftercare"], "aftercare isn't 'done': it only closed");
+  // The panels with plans in them give way to the cancellation notice, from the proposal on.
+  assert.equal(view.showsCancelledPanel(p, "install"), true, "no day-by-day plan, prep list or power-off notice");
+  assert.equal(view.showsCancelledPanel(p, "booking"), true);
+  assert.equal(view.showsCancelledPanel(p, "proposal"), true);
+  assert.equal(view.showsCancelledPanel(p, "survey"), false, "history stays");
+
+  // Refunded already: nothing promised that's been done.
+  const refunded = structuredClone(p);
+  refunded.money.paidPence = 0;
+  assert.match(view.cancelledCopy(refunded)!.body, /Nothing more is due from you/);
+  // Install only: we supplied nothing, so nothing to collect.
+  const installOnly = structuredClone(p);
+  installOnly.proposal.contractType = "install-only";
+  assert.doesNotMatch(view.cancelledCopy(installOnly)!.body, /collect/);
+
+  // After the period: only that it reached us, and that we'll be in touch.
+  const late = structuredClone(p);
+  late.cancellation!.withinPeriod = false;
+  const lateCopy = view.cancelledCopy(late)!;
+  assert.equal(lateCopy.title, "We've received your cancellation");
+  assert.match(lateCopy.body, /after your cancellation period had ended\. We'll be in touch in writing/);
+  assert.doesNotMatch(lateCopy.body, /refund|collect/);
+
+  // Closed as cancelled before any contract: no cancellation record, the plain closed line.
+  const before = project();
+  before.closure = { closed: true, closedAt: "2026-10-25T09:00:00.000Z", reason: "cancelled" };
+  assert.equal(view.cancelledCopy(before)!.title, "This project is closed");
+  // Not cancelled: none of this.
+  assert.equal(view.cancelledCopy(accepted("2026-10-10T10:00:00.000Z")), null);
+  assert.equal(view.stageCancelled(accepted("2026-10-10T10:00:00.000Z"), "install"), false);
+});

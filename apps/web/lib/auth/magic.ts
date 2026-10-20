@@ -2,6 +2,7 @@ import { migrateProject } from "@aircon/domain";
 import { appUrl } from "@/lib/brand";
 import { notify } from "@/lib/comms/outbox";
 import { emailConfigured } from "@/lib/email";
+import { spendEmailBudget, type EmailPool } from "@/lib/email-budget";
 import * as customersRepo from "@/lib/repo/customers";
 import * as staffRepo from "@/lib/repo/staff";
 import * as tokensRepo from "@/lib/repo/tokens";
@@ -90,7 +91,13 @@ export async function issueMagicLink(input: {
   kind: "staff" | "customer";
   next?: string;
   ttlMinutes?: number;
-}): Promise<{ sent: boolean; devLink?: string }> {
+  /**
+   * A link someone asked for without signing in: spent from that shared
+   * email budget (lib/email-budget.ts) once it's known a link would go.
+   * Over it, nothing is sent (`heldBack`), with the same answer as any refusal.
+   */
+  budget?: EmailPool;
+}): Promise<{ sent: boolean; devLink?: string; heldBack?: boolean }> {
   const email = normaliseEmail(input.email);
   if (!isPlausibleEmail(email)) return { sent: false };
   requireDb();
@@ -134,6 +141,7 @@ export async function issueMagicLink(input: {
     console.warn(`[auth] sign-in links to one address held back: ${today} in the last 24 hours`);
     return { sent: false };
   }
+  if (input.budget && !(await spendEmailBudget(input.budget))) return { sent: false, heldBack: true };
   const next = input.next ? safeNextPath(input.next, "") || undefined : undefined;
   const token = await createToken({ kind: input.kind, subjectId, email, next, ttlMinutes });
 

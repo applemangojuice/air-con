@@ -116,3 +116,133 @@ test("break-glass: a flood of junk attempts locks out only the network sending i
   for (let n = 1; n <= 8; n++) if ((await sharedRateLimits(breakGlassLimits(rateLimitIdentity(v6(n)), `x${n}-${run}@example.test`))).ok) ok++;
   assert.equal(ok, 5, "rotating addresses inside one /64 doesn't buy more tries");
 });
+
+const { EMAIL_BUDGET, emailBudgetChecks, londonDayKey, spendEmailBudget } = await import("../lib/email-budget.ts");
+
+/** With a (fake) email provider set, as on the live site: the budget only counts real sends. */
+async function withEmailLive<T>(fn: () => Promise<T>): Promise<T> {
+  const saved = { key: process.env.RESEND_API_KEY, from: process.env.EMAIL_FROM };
+  process.env.RESEND_API_KEY = "re_demo_budget_test_key_123";
+  process.env.EMAIL_FROM = "DEMO <hello@demo.dang.invalid>";
+  try {
+    return await fn();
+  } finally {
+    if (saved.key === undefined) delete process.env.RESEND_API_KEY;
+    else process.env.RESEND_API_KEY = saved.key;
+    if (saved.from === undefined) delete process.env.EMAIL_FROM;
+    else process.env.EMAIL_FROM = saved.from;
+  }
+}
+
+test("the public email budget's day is the London day, across the clocks going back (25 Oct 2026)", () => {
+  assert.equal(londonDayKey(new Date("2026-10-24T22:59:59Z")), "2026-10-24", "23:59 BST on Sat 24 Oct");
+  assert.equal(londonDayKey(new Date("2026-10-24T23:00:00Z")), "2026-10-25", "midnight BST: Sunday in London, Saturday in UTC");
+  assert.equal(londonDayKey(new Date("2026-10-25T00:30:00Z")), "2026-10-25", "01:30 BST");
+  assert.equal(londonDayKey(new Date("2026-10-25T01:30:00Z")), "2026-10-25", "01:30 GMT, the hour that happens twice");
+  assert.equal(londonDayKey(new Date("2026-10-25T23:59:59Z")), "2026-10-25", "the 25-hour day's last second");
+  assert.equal(londonDayKey(new Date("2026-10-26T00:00:00Z")), "2026-10-26", "midnight GMT");
+  const [day, hour] = emailBudgetChecks("public", new Date("2026-10-25T00:30:00Z"));
+  assert.ok(day!.windowMs >= 25 * 3600_000, "the day's window outlasts the longest London day");
+  assert.notEqual(hour!.key, emailBudgetChecks("public", new Date("2026-10-25T01:30:00Z"))[1]!.key, "01:00-02:00 BST and GMT are two hours");
+  assert.equal(day!.key, emailBudgetChecks("public", new Date("2026-10-25T23:30:00Z"))[0]!.key, "one budget for the whole of Sunday");
+  assert.ok(EMAIL_BUDGET.public.perDay + EMAIL_BUDGET["sign-in"].perDay <= 60, "well under Resend Free's 100 a day, leaving the office's own");
+});
+
+test("the public email budget holds across a day, per hour and per London day, and starts again at London midnight", async () => {
+  await withEmailLive(async () => {
+    const spend = async (iso: string, n: number) => {
+      const out: boolean[] = [];
+      for (let i = 0; i < n; i++) out.push(await spendEmailBudget("public", new Date(iso)));
+      return out;
+    };
+    const { perDay, perHour } = EMAIL_BUDGET.public;
+    // 00:10 BST on Sun 25 Oct (23:10 UTC on Saturday): the hour's cap.
+    const first = await spend("2026-10-24T23:10:00Z", perHour + 1);
+    assert.deepEqual(first, [...Array<boolean>(perHour).fill(true), false]);
+    // 01:10 BST, then 01:10 GMT: two different hours, the same London day.
+    assert.ok((await spend("2026-10-25T00:10:00Z", perHour)).every(Boolean));
+    // Every attempt counts towards the day, the one the hour refused too (so none can be dodged).
+    const left = perDay - 2 * perHour - 1;
+    const third = await spend("2026-10-25T01:10:00Z", left + 1);
+    assert.deepEqual(third, [...Array<boolean>(left).fill(true), false], "then the day's cap");
+    // Still Sunday at 23:50 GMT: nothing more today.
+    assert.deepEqual(await spend("2026-10-25T23:50:00Z", 1), [false]);
+    // Monday in London: a fresh budget.
+    assert.deepEqual(await spend("2026-10-26T00:10:00Z", 1), [true]);
+    // The sign-in pool is its own: a quote flood never stops a customer's sign-in link.
+    assert.equal(await spendEmailBudget("sign-in", new Date("2026-10-25T23:50:00Z")), true);
+  });
+  // Without an email provider nothing is sent, so nothing is spent.
+  assert.equal(await spendEmailBudget("public", new Date("2026-10-25T23:50:00Z")), true);
+});
+
+test("sign-in links asked for from the website come out of the budget: over it, no token and no email", async () => {
+  const email = `budget.${crypto.randomUUID().slice(0, 8)}@example.test`;
+  await customersRepo.findOrCreate({ email, name: "DEMO Budget" });
+  await withEmailLive(async () => {
+    for (let i = 0; i < EMAIL_BUDGET["sign-in"].perHour; i++) await spendEmailBudget("sign-in");
+    const held = await issueMagicLink({ email, kind: "customer", next: "/portal", budget: "sign-in" });
+    assert.deepEqual(held, { sent: false, heldBack: true });
+  });
+  const { count } = await requireDb().from("login_tokens").select("id", { count: "exact", head: true }).eq("email", email);
+  assert.equal(count, 0, "no token minted");
+  // Staff sending one from the project (no budget) are never held back by it.
+  assert.ok((await issueMagicLink({ email, kind: "customer", next: "/portal" })).devLink);
+});
+
+const { readTextCapped } = await import("../lib/http-body.ts");
+const { surveySchema } = await import("../lib/schemas.ts");
+const track = await import("../app/api/track/route.ts");
+
+test("public bodies are read with a cap: a declared or streamed body past it is refused unread", async () => {
+  const req = (body: BodyInit, headers: Record<string, string> = {}) => new Request("http://localhost/x", { method: "POST", body, headers, duplex: "half" } as RequestInit);
+  assert.equal(await readTextCapped(req("small"), 10), "small");
+  assert.equal(await readTextCapped(req("x".repeat(11)), 10), null, "streamed past the cap");
+  assert.equal(await readTextCapped(req("tiny", { "content-length": "4000000" }), 4096), null, "declared past the cap: not read at all");
+  // A stream that never says how long it is, chunk by chunk.
+  const stream = new ReadableStream<Uint8Array>({
+    pull(c) {
+      c.enqueue(new Uint8Array(1024).fill(65));
+    },
+  });
+  assert.equal(await readTextCapped(req(stream), 4096), null, "an endless body is cut off after the cap");
+});
+
+test("/api/track stores one small event: a 4 MB blob, nested or numerous facts are refused, and the user agent is trimmed", async () => {
+  const count = async () => (await requireDb().from("analytics_events").select("id", { count: "exact", head: true })).count ?? 0;
+  const post = (body: string, headers: Record<string, string> = {}) =>
+    track.POST(new Request("http://localhost/api/track", { method: "POST", body, headers: { "content-type": "text/plain", "x-forwarded-for": `198.51.100.${Math.floor(Math.random() * 200)}`, ...headers } }));
+  const before = await count();
+
+  const blob = await post(JSON.stringify({ type: "page_view", meta: { x: "A".repeat(4_000_000) } }));
+  assert.equal(blob.status, 413, "the finding's 4 MB beacon");
+  assert.equal((await post(JSON.stringify({ type: "page_view", meta: { x: "A".repeat(5_000) } }))).status, 413, "one event is a few hundred bytes");
+  assert.equal((await post(JSON.stringify({ type: "page_view", meta: { deep: { a: 1 } } }))).status, 400, "flat facts only");
+  assert.equal((await post(JSON.stringify({ type: "page_view", meta: Object.fromEntries(Array.from({ length: 21 }, (_, i) => [`k${i}`, i])) }))).status, 400, "20 facts at most");
+  assert.equal(await count(), before, "nothing stored");
+
+  const ok = await post(JSON.stringify({ type: "quote_submit", path: "/quote", meta: { status: "saved", totalGbp: 3450, rooms: 2, postcode: "SW16 2HB", marketing: false } }), { "user-agent": "DEMO ".repeat(400) });
+  assert.equal(ok.status, 200);
+  assert.equal(await count(), before + 1);
+  const { data } = await requireDb().from("analytics_events").select("meta, user_agent").eq("type", "quote_submit");
+  const row = (data ?? []).at(-1) as { meta: Record<string, unknown>; user_agent: string };
+  assert.deepEqual(row.meta, { status: "saved", totalGbp: 3450, rooms: 2, postcode: "SW16 2HB", marketing: false }, "what track() really sends still goes through");
+  assert.equal(row.user_agent.length, 300);
+});
+
+test("survey bodies keep their photos bounded: long strings refused, more than 40 in a list dropped, not the answer", () => {
+  const photo = (i: number) => ({ id: `p-${i}`, kind: "room", storagePath: `11111111-1111-4111-8111-111111111111/room-${i}.jpg` });
+  const survey = {
+    postcode: "SW16 2HB",
+    addressLine: "1 DEMO Road",
+    property: { type: "semi-detached", era: "1930-1950", bedrooms: 3, ownership: "owner" },
+    rooms: [{ id: "r1", name: "Bedroom", type: "bedroom", size: "medium", floor: "first", glazing: "medium", orientation: "south", hasExternalWall: true, photos: Array.from({ length: 55 }, (_, i) => photo(i)) }],
+    outdoor: { location: "ground-rear", photos: [] },
+    electrics: { condition: "unsure", photos: [] },
+  };
+  const parsed = surveySchema.parse(survey);
+  assert.equal(parsed.rooms[0]!.photos.length, 40);
+  assert.equal(surveySchema.safeParse({ ...survey, rooms: [{ ...survey.rooms[0]!, photos: [{ ...photo(1), storagePath: "x".repeat(301) }] }] }).success, false);
+  assert.equal(surveySchema.safeParse({ ...survey, rooms: [{ ...survey.rooms[0]!, photos: [{ ...photo(1), fileName: "x".repeat(256) }] }] }).success, false);
+  assert.equal(surveySchema.safeParse({ ...survey, rooms: [{ ...survey.rooms[0]!, id: "r".repeat(81) }] }).success, false);
+});

@@ -130,12 +130,20 @@ export async function saveDraftAction(projectId: string, proposalId: string, pat
   }
 }
 
-export async function issueAction(projectId: string, proposalId: string, revision?: number): Promise<IssueResult> {
+/** Per option (design variant): the customer total and the cost the issuer's screen showed. */
+const seenTotalsSchema = z.record(z.string().max(120), z.object({ totalPence: z.number().int().min(0).max(100_000_000), costPence: z.number().int().min(0).max(100_000_000) }));
+
+export async function issueAction(projectId: string, proposalId: string, revision?: number, totals?: unknown): Promise<IssueResult> {
   const staff = await staffFor(projectId, "proposal.issue");
   if (!staff) return NOT_FOUND;
   if (!uuid.safeParse(proposalId).success) return { ok: false, error: "Proposal not found" };
-  // The draft revision the issuer's builder saw: what they see is what's issued.
-  const seen = Number.isSafeInteger(revision) && (revision as number) >= 0 ? { revision: revision as number } : {};
+  // The draft revision and the prices the issuer's builder saw: what they see is what's issued.
+  const shown = totals === undefined ? null : seenTotalsSchema.safeParse(totals);
+  if (shown && !shown.success) return { ok: false, error: "The prices on this page couldn't be read. Nothing was issued: reload, then issue." };
+  const seen = {
+    ...(Number.isSafeInteger(revision) && (revision as number) >= 0 ? { revision: revision as number } : {}),
+    ...(shown?.success ? { totals: shown.data } : {}),
+  };
   try {
     const result = await issueDraft(projectId, proposalId, staff, seen);
     if (result.ok) {

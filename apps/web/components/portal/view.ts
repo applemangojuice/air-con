@@ -7,6 +7,7 @@ import {
   currentStage,
   earlyStartWording,
   hasCurrentQualification,
+  isStageComplete,
   rescheduleFeeGbp,
   stageInfo,
   type PilotSettings,
@@ -21,6 +22,7 @@ import {
 import { blockLabel, shortDay } from "./schedule.ts";
 import type { HubFacts, PersonCard } from "./types.ts";
 import { realPhone } from "@/components/site/claims";
+import { fmtDay, fmtInstantDay, money } from "@/lib/format";
 
 /**
  * Pure pieces of the customer hub: what to strip before anything reaches a
@@ -175,10 +177,10 @@ export function onTheWayPromise(onTheWay: HubFacts["onTheWay"]): string {
  */
 export function waitingCopy(project: Project, onTheWay: HubFacts["onTheWay"] = null, today?: string): { title: string; body: string } {
   const p = project;
+  const cancelled = cancelledCopy(p);
+  if (cancelled) return cancelled;
   if (p.closure.closed) {
-    return p.closure.reason === "cancelled"
-      ? { title: "This project is closed", body: "Nothing more to do here. Get in touch any time if you'd like to pick it up again." }
-      : { title: "All wrapped up", body: "If anything isn't right with your system, report it below and we'll call you back." };
+    return { title: "All wrapped up", body: "If anything isn't right with your system, report it below and we'll call you back." };
   }
   switch (currentStage(p)) {
     case "price":
@@ -327,4 +329,71 @@ export function outstandingOf(invoices: { status: string; totalPence: number; pa
   return invoices
     .filter((i) => i.status === "issued" || i.status === "part-paid")
     .reduce((sum, i) => sum + Math.max(0, i.totalPence - i.paidPence), 0);
+}
+
+/* ------------------------------------------------------------------ */
+/* Cancelled                                                           */
+/* ------------------------------------------------------------------ */
+
+/** The contract was cancelled, or the project closed as cancelled before there was one. */
+export function isCancelledProject(p: Pick<Project, "cancellation" | "closure">): boolean {
+  return Boolean(p.cancellation) || (p.closure.closed && p.closure.reason === "cancelled");
+}
+
+/** Supplied kit that's reached the home (or gone to it): we collect it after a cancellation (cancellation-server's rule). */
+const KIT_AT_HOME = new Set<Project["kit"]["status"]>(["dispatched", "delivered", "inspected"]);
+
+/**
+ * What the hub says about a cancelled project, or null when it isn't one:
+ * when the cancellation reached us and what happens now, as the
+ * acknowledgement email put it. Inside the period, the refund (with its
+ * deadline) and the collection; after it, only that we'll be in touch:
+ * nothing is promised before anyone has checked.
+ */
+export function cancelledCopy(p: Project): { title: string; body: string } | null {
+  if (!isCancelledProject(p)) return null;
+  const c = p.cancellation;
+  if (!c) return { title: "This project is closed", body: "Nothing more to do here. Get in touch any time if you'd like to pick it up again." };
+  const on = fmtInstantDay(c.receivedAt);
+  if (!c.withinPeriod) {
+    return {
+      title: "We've received your cancellation",
+      body: `It reached us on ${on}, after your cancellation period had ended. We'll be in touch in writing about what happens next.`,
+    };
+  }
+  const paid = Math.max(0, p.money.paidPence);
+  const collect = p.proposal.contractType !== "install-only" && (KIT_AT_HOME.has(p.kit.status) || p.install.status !== "not-started");
+  return {
+    title: "Your contract is cancelled",
+    body: [
+      `We received your cancellation on ${on}.`,
+      paid > 0 ? `We'll refund the ${money(paid)} you've paid by ${fmtDay(c.refundDueBy)} at the latest, the same way you paid.` : "Nothing more is due from you.",
+      collect ? "We'll collect the equipment we supplied, at our cost, at a time that suits you." : "",
+      "Your contract and any invoices stay in your documents.",
+    ]
+      .filter(Boolean)
+      .join(" "),
+  };
+}
+
+/**
+ * A stage that won't happen now the project is cancelled: shown as
+ * cancelled, never "now", "planned" or with a date. What was done before
+ * the cancellation stays done, except aftercare (its tick only meant the
+ * project closed).
+ */
+export function stageCancelled(p: Project, stage: ProjectStageId): boolean {
+  if (!isCancelledProject(p)) return false;
+  return stage === "aftercare" || !isStageComplete(p, stage);
+}
+
+/**
+ * Whether a stage's panel gives way to the cancellation notice: every stage
+ * that won't happen, and from the proposal on whatever its state, since
+ * those panels describe the plans (install days, prep, the power-off
+ * notice, the right to cancel) that no longer apply.
+ */
+export function showsCancelledPanel(p: Project, stage: ProjectStageId): boolean {
+  if (!isCancelledProject(p)) return false;
+  return stageCancelled(p, stage) || PROJECT_STAGES.indexOf(stage) >= PROJECT_STAGES.indexOf("proposal");
 }

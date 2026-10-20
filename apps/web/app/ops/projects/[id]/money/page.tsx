@@ -15,7 +15,7 @@ import {
 import { Badge, Card, EmptyState, Money, Section, Stat, StatusChip } from "@/components/kit";
 import { requireProjectAccess, requireStaff } from "@/lib/auth/server";
 import { fmtDate } from "@/lib/format";
-import { loadMoney, type InvoicePlan } from "@/lib/money-server";
+import { billingStopped, loadMoney, type InvoicePlan } from "@/lib/money-server";
 import { isUuid } from "@/lib/repo/base";
 import { ActionForm } from "../booking/_f5/action-form";
 import { JobHeader } from "../booking/_f5/job-header";
@@ -61,7 +61,7 @@ export default async function MoneyPage({ params }: { params: Promise<{ id: stri
       <JobHeader project={p} current="money" title="Money" subtitle="Invoices, payments and receipts. Nothing is marked paid until the money is seen." />
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat label="Contract" value={s.contractTotalPence !== null ? <Money pence={s.contractTotalPence} /> : "Not accepted"} hint={s.toInvoicePence ? <>Still to invoice: <Money pence={s.toInvoicePence} /></> : undefined} />
+        <Stat label="Contract" value={s.contractTotalPence !== null ? <Money pence={s.contractTotalPence} /> : "Not accepted"} hint={billingStopped(p) ? "Cancelled: nothing more is billed" : s.toInvoicePence ? <>Still to invoice: <Money pence={s.toInvoicePence} /></> : undefined} />
         <Stat label="Invoiced" value={<Money pence={s.invoicedPence} />} hint={`${live.length} invoice${live.length === 1 ? "" : "s"}`} />
         <Stat label="Received" value={<Money pence={s.receivedPence - s.refundedPence} />} tone={s.receivedPence > 0 ? "success" : "neutral"} hint={
             payments.some((x) => x.provider === "demo")

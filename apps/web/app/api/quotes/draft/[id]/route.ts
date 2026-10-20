@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { QUOTE_BODY_MAX_BYTES, readJsonCapped } from "@/lib/http-body";
 import { generateQuote, type Survey } from "@aircon/domain";
 import { coverageFor } from "@/components/site/claims";
 import { getPublicSettings } from "@/lib/public-settings";
@@ -23,7 +24,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   // Fires once per funnel step; 60/10min is far above honest usage.
   const limited = enforceRateLimit(request, "draft-sync", 60, 600_000);
   if (limited) return limited;
-  const parsed = bodySchema.safeParse(await request.json().catch(() => null));
+  // A whole survey is a few kilobytes: a body far bigger is refused before it's read (lib/http-body).
+  const body = await readJsonCapped(request, QUOTE_BODY_MAX_BYTES);
+  if (body.tooLarge) return NextResponse.json({ error: "Too large" }, { status: 413 });
+  const parsed = bodySchema.safeParse(body.value);
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid draft" }, { status: 400 });
   }

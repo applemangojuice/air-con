@@ -84,6 +84,16 @@ test("clearing the email detaches whoever owned it: no access, no sign-in link, 
   // The row's customer_id (the access authority) is cleared in the same save.
   assert.equal(await customerIdOf(id), null);
   assert.deepEqual(await customersRepo.projectIdsFor(owner.id), [], "their /portal no longer lists it");
+  // A session they signed in to before the clear (its cookie lists the project) opens it no more:
+  // the live row decides, never the cookie's list.
+  const { customerCanAccessProject, decideProjectAccess } = await import("../lib/auth/access.ts");
+  const cookie = { kind: "customer" as const, customerId: owner.id, email: wrong, name: "DEMO Sam", projectIds: [id], exp: Date.now() + 86_400_000 };
+  assert.equal(customerCanAccessProject(cookie, id, await customerIdOf(id)), false);
+  assert.equal(
+    decideProjectAccess({ session: cookie as never, staff: null, projectId: id, project: { customerId: await customerIdOf(id), quoteId: null }, allowCustomer: true, customerSide: true }),
+    null,
+    "the old session gets the 404: the page, its photos and every customer action",
+  );
 
   // "Email me a sign-in link" on the project or one of its documents sends nothing, to anyone.
   await sendSignInLink({ kind: "project", projectId: id });
@@ -226,4 +236,18 @@ test("the database refuses a second household on a pilot number, even when the c
   // Its own number again is fine.
   const again = await dispatch(first.id, { type: "set-pilot", number: 717, label: "DEMO seventeen (renamed)" }, OPS);
   assert.ok(!("error" in again), JSON.stringify(again));
+});
+
+test("a corrected name, address and postcode: the project, its board columns and what follows use them", async () => {
+  const id = await projectFor("typo.family@example.test");
+  const result = await dispatch(id, { type: "set-customer-contact", name: "DEMO Mary-Jane O'Connor", addressLine: "Flat 2, 14 Mitcham Lane", postcode: "SW16 2HB" }, OPS);
+  assert.ok("project" in result, JSON.stringify(result));
+  const p = (await loadProject(id))!;
+  assert.deepEqual([p.customer.name, p.customer.addressLine, p.customer.postcode], ["DEMO Mary-Jane O'Connor", "Flat 2, 14 Mitcham Lane", "SW16 2HB"]);
+  assert.equal(p.customer.email, "typo.family@example.test", "the email is untouched");
+  const { data: row } = await requireDb().from("projects").select("customer_name, postcode").eq("id", id).single();
+  assert.deepEqual([row?.customer_name, row?.postcode], ["DEMO Mary-Jane O'Connor", "SW16 2HB"], "the board's columns follow in the same save");
+  assert.ok(p.events.some((e) => e.type === "customer-details-corrected" && e.internal));
+  const blank = await dispatch(id, { type: "set-customer-contact", name: " " }, OPS);
+  assert.ok("error" in blank && /can't be blank/.test(blank.error));
 });

@@ -164,7 +164,7 @@ are fixed in `069775e`, each with tests that fail without the fix
   here uses. It's now 15.5.28, with the hydration patch carried over
   unchanged. `pnpm audit` lists nothing against Next itself for the web app
   any more (two warnings remain inside Next's bundled PostCSS and `sharp`,
-  neither reachable here: known limitation 34).
+  neither reachable here: known limitation 35).
 
 The earlier final pass (on `e21f042`) had found two problems where the
 go-live pack met the Supabase compatibility work: a demo site switching

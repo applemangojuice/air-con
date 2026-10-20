@@ -107,7 +107,9 @@ says what to do instead. Approvals that need a professional are in
 21. **No accounting-software link** (Xero, QuickBooks). The Pilots page
     downloads a CSV.
 22. **Payments are never deleted.** Mistakes are corrected with a refund or a
-    credit note, so the history stays true.
+    credit note, so the history stays true. Recording a refund doesn't
+    email the family by itself (their page shows the invoice as refunded):
+    tell them it's on its way, or send the receipt from **Messages**.
 
 ## Customers and messages
 
@@ -119,45 +121,66 @@ says what to do instead. Approvals that need a professional are in
     addresses uses the one on the project (change it on the project to move
     access). Removing the email takes the project away from whoever owned
     it at once: until a new address is typed, only the office can open the
-    project, and nothing is emailed. After a correction, messages still
+    project, and nothing is emailed; anyone already signed in with it loses
+    the project too. After a correction, messages still
     waiting (and **Retry** / **Send again**) go to the new address with the
     wording they were written with; the old address never gets them again.
+    There's no bounce tracking: an email the provider accepted reads as
+    **Sent** even if the address was mistyped, so check the address before
+    issuing a proposal. A proposal email that went to an address you've
+    since corrected no longer counts as their pre-contract information
+    (they can't accept until it's sent again to the new one).
 25. **No WhatsApp or live chat.** Families reply by email or phone you.
-26. **Service-level promises (credits for missed dates) are switched off**
+26. **Emails anyone can trigger from the website have a daily budget**, so a
+    script can't use up the email plan's quota (Resend Free: 100 a day,
+    shared with your own proposals, invoices and alerts). The quote form's
+    two emails (the family's price, your lead alert) and the sign-in link a
+    new project sends share 30 a day (12 an hour); sign-in links asked for
+    on `/portal` or a project page have 25 a day (10 an hour). Days are
+    London days. Over it, nothing more of that kind is sent until the next
+    hour or day: quotes still save and show under **Quotes**, and a family
+    can ask for a link again later. Emails you send from the office are
+    never held back by it. If real leads ever get near it, move to a paid
+    Resend plan and raise the numbers in `lib/email-budget.ts`.
+27. **Service-level promises (credits for missed dates) are switched off**
     until they're worked out; the website makes no such promise.
-27. **No finance offers** until an FCA-authorised lender or broker is in
+28. **No finance offers** until an FCA-authorised lender or broker is in
     place.
 
 ## Legal text
 
-28. **The terms (`pilot-draft-1`) and the cancellation wording haven't been
+29. **The terms (`pilot-draft-1`) and the cancellation wording haven't been
     reviewed by a solicitor.** The model cancellation form was
     reconstructed from research, not copied from the official PDF.
     `/ops/launch` stays amber until it's reviewed and ticked in Settings.
 
 ## Running the site
 
-29. **No error-alert service** (such as Sentry) is connected. Errors are in
+30. **No error-alert service** (such as Sentry) is connected. Errors are in
     Vercel's logs; the daily GitHub health check and `/api/health` catch a
     broken or missing database.
-30. **Database backups don't include photo files** (Supabase backs up the
+31. **Database backups don't include photo files** (Supabase backs up the
     database only). The app never deletes customer photos.
-31. **Roles are fixed** (admin, technical lead, surveyor, installer,
+32. **Roles are fixed** (admin, technical lead, surveyor, installer,
     electrician, plus "subcontractor"); there's no screen to customise what
     each can do. Installers and the electrician see the job in the field app
     but, like subcontractors, never the family's own pages (prices, contract,
     invoices); the commissioning certificate and handover pack open from
     the job. Use **Customer view** from the office to see what the family
     sees.
-32. **The phone video-walkthrough app** (`apps/mobile`) isn't part of the
+33. **The phone video-walkthrough app** (`apps/mobile`) isn't part of the
     pilots and its endpoints are off on the live site.
-33. **Admin break-glass relies on its password.** Attempts are slowed per
+34. **Admin break-glass relies on its password.** Attempts are slowed per
     network (5 a quarter hour) and every failure is logged, but there's no
     site-wide cap any more: one would let a stranger lock you out on launch
     day. So `OPS_PASSWORD` must be long and random (`openssl rand -base64
     24`), and once email sign-in works you can remove it in Vercel.
-34. **Two dependency warnings remain** in `pnpm audit` after the Next.js
+35. **Two dependency warnings remain** in `pnpm audit` after the Next.js
     15.5.28 update, both inside Next itself and neither reachable here: its
     bundled PostCSS (only ever runs on our own stylesheets, at build time)
     and `sharp` (only for Next's image optimiser, which the app doesn't use;
     Vercel serves images itself). They go when Next ships newer copies.
+36. **Website analytics keep at most 20,000 events a London day**, each a
+    few hundred bytes (a beacon over 4 KB, or with more than 20 facts, is
+    refused), so nobody can fill the database through it. Past that,
+    page views for the rest of the day aren't counted.

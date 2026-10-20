@@ -2107,3 +2107,66 @@ changelog and the reasons, so nobody "fixes" a deliberate choice back.
       of the same slot) waits for it. Sync requests time out after 30 s,
       media requests after 30 s, and an upload with no progress for a minute
       is aborted and retried (`STALL_TIMEOUT_MS`).
+40. **Pre-launch review, round 4 (nine findings, fixed before the first
+    real customers).**
+    - *Issuing reprices* (`issueDraft`): every option of the stored draft is
+      rebuilt exactly as a save builds it (`assembleOptions`, shared with
+      `saveDraft`) on today's catalogue and settings (`optionContext`)
+      before the gates and the lock, so the issued version, its email and
+      the minimum-margin gate use today's costs. The builder sends the
+      total and cost it showed for each option (`IssueSeen.totals`); if the
+      repriced figures differ (`pricesMoved`), nothing is issued and the
+      issuer is told the new figures. Without `totals` the stored figures
+      are the comparison. The builder also saves on load when today's
+      prices differ from the stored draft, and says so.
+    - *Name, address and postcode can be corrected*: `set-customer-contact`
+      takes `name`, `addressLine` and `postcode` (never blank; the action
+      validates the postcode as New pilot does and normalises it), logs
+      `customer-details-corrected` (internal), and dispatch's denormalise
+      refreshes `customer_name` and `postcode`. Issued documents keep their
+      frozen copy.
+    - *An email corrected before acceptance resets the pre-contract
+      record*: on an issued (or changes-requested) proposal, a new address
+      clears `preContractInfoSentAt` (`pre-contract-info-reset`, internal,
+      saying to press Send again), and the `proposal-accept` gate also
+      blocks when `documentsConsentCovers` is false, so acceptance waits for
+      consent at the new address and a delivery there.
+    - *Nothing is billed after a cancellation* (`billingStopped`):
+      `planInvoices` offers no plan and `issueInvoice` refuses anything but a
+      credit note once `p.cancellation` is set or the project closed as
+      cancelled. `creditedInFull` counts only correcting credit notes, so a
+      deposit paid and then refunded never makes way for a fresh one. The
+      hub labels an invoice covered by credit notes `refunded` or
+      `credited` (`HubInvoice.settled`), never "due".
+    - *A late cancellation promises nothing*: when `withinPeriod` is false,
+      `recordCancellation` raises one review task instead of the refund and
+      collection tasks, `cancellation-confirmed` only acknowledges, the team
+      alert says nothing was promised, the reducer's customer-visible line
+      drops the refund, and the office form warns before recording
+      (`periodEndsOn`).
+    - *The hub has a cancelled state* (`isCancelledProject`,
+      `cancelledCopy`, `stageCancelled`, `showsCancelledPanel` in
+      `components/portal/view.ts`): the next step says the contract is
+      cancelled (with the refund and collection inside the period, nothing
+      promised after it); stages that won't happen, and aftercare, show
+      "cancelled" with no date; panels from the proposal on show the
+      cancellation notice instead of plans; the contract total reads
+      cancelled.
+    - *Customer access is the live row only* (`customerCanAccessProject`):
+      the session cookie's `projectIds` snapshot never grants access, so a
+      project detached by clearing its email (customer_id null) drops out
+      of sessions issued before the clear.
+    - *A daily budget for emails anyone can trigger* (`lib/email-budget.ts`):
+      `public` (quote emails, the /api/projects sign-in link) 30 a London
+      day and 12 an hour; `sign-in` (/api/portal/link) 25 and 10. Counted
+      with `sharedRateLimits` (rate_limits, migration 0012) on a key per
+      London day (window 26 h) and per UTC hour; only when email is live.
+      `issueMagicLink({ budget })` spends it once a link would really go
+      (`heldBack`). /api/quotes and /api/projects use the shared per-IP
+      limit.
+    - *Bounded public bodies* (`lib/http-body.ts`): /api/track reads at most
+      4 KB (413 beyond), takes flat `meta` (20 keys of 40 characters,
+      strings of 300, numbers, booleans), trims the user agent to 300 and
+      stores at most 20,000 events a London day (shared count); quote and
+      draft bodies are capped at 256 KB, and photo lists keep 40 each with
+      bounded ids, paths and file names (`lib/schemas.ts`).

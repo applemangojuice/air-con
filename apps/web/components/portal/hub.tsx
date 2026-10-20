@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { currentStage, customerNextAction, projectTimeline, stageState, type Project, type ProjectStageId } from "@aircon/domain";
+import { currentStage, customerNextAction, isStageComplete, projectTimeline, stageState, type Project, type ProjectStageId } from "@aircon/domain";
 import { ProjectStepper } from "@/components/project/timeline";
 import { fmtDay, fmtDayTime, money } from "@/lib/format";
 import { NextStepContext, primaryCls } from "./bits";
@@ -14,7 +14,7 @@ import { AftercarePanel, HandoverPanel, InstallPanel } from "./panels-late";
 import { blockLabel } from "./schedule";
 import { ContactCard, DocumentsCard, PaymentsCard, UpdatesFeed } from "./side";
 import type { HubData } from "./types";
-import { defaultStage, stageForHash, toPayLine, waitingCopy } from "./view";
+import { cancelledCopy, defaultStage, showsCancelledPanel, stageCancelled, stageForHash, toPayLine, waitingCopy } from "./view";
 
 /**
  * The customer hub (contract §G F1): one page for the whole journey.
@@ -149,6 +149,37 @@ function NextStep({ data, go }: { data: HubData; go: (stage: ProjectStageId, anc
   );
 }
 
+/**
+ * A stage of a cancelled project: what happened to the contract instead of
+ * the plans (no install days, prep list or power-off notice for work that
+ * won't happen).
+ */
+function CancelledPanel({ data, stage }: { data: HubData; stage: ProjectStageId }) {
+  const p = data.project;
+  const info = data.stages[stage];
+  const copy = cancelledCopy(p);
+  const done = stage !== "aftercare" && isStageComplete(p, stage);
+  return (
+    <section aria-labelledby={`stage-${stage}-title`} className="rounded-3xl border border-line bg-white p-5 shadow-sm sm:p-7">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 id={`stage-${stage}-title`} className="font-display text-2xl leading-tight text-ink-900 sm:text-[28px]">
+          {info.title}
+        </h2>
+        <span className="inline-flex items-center rounded-full border border-line bg-surface px-2.5 py-0.5 text-xs font-semibold text-ink-700">{done ? "Done before you cancelled" : "Cancelled"}</span>
+      </div>
+      <p className="mt-3 text-[15px] leading-relaxed text-ink-700">
+        {done ? "This was done before the cancellation. Nothing more happens here." : "This won't go ahead: the contract is cancelled."}
+      </p>
+      {copy && (
+        <div className="mt-4 rounded-2xl bg-surface/70 p-4 sm:p-5">
+          <p className="font-semibold text-ink-900">{copy.title}</p>
+          <p className="mt-1 text-[15px] leading-relaxed text-ink-700">{copy.body}</p>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function StaffStrip({ data }: { data: HubData }) {
   if (data.viewer.kind !== "staff") return null;
   return (
@@ -163,7 +194,11 @@ export function Hub({ data, slots, controls, refLabel }: { data: HubData; slots?
   const p: Project = data.project;
   const current = currentStage(p);
   const [selected, setSelected] = useState<ProjectStageId>(() => defaultStage(p));
-  const entries = useMemo(() => projectTimeline(p, data.today), [p, data.today]);
+  // A cancelled project: the stages that won't happen say so, with no date (never "now" or "planned").
+  const entries = useMemo(
+    () => projectTimeline(p, data.today).map((e) => (stageCancelled(p, e.stage) ? { stage: e.stage, state: "upcoming" as const, cancelled: true } : e)),
+    [p, data.today],
+  );
 
   /** Open a stage. From a button or link: bring it into view. From the timeline itself: only keep the tapped row in view on a phone. */
   const go = useCallback((stage: ProjectStageId, anchor?: string, fromTimeline = false) => {
@@ -195,7 +230,11 @@ export function Hub({ data, slots, controls, refLabel }: { data: HubData; slots?
   }, [go]);
 
   const Panel = PANELS[selected];
-  const panel = <Panel data={data} state={stageState(p, selected)} goTo={go} slots={slots} />;
+  const panel = showsCancelledPanel(p, selected) ? (
+    <CancelledPanel data={data} stage={selected} />
+  ) : (
+    <Panel data={data} state={stageState(p, selected)} goTo={go} slots={slots} />
+  );
   // The card's action is the one filled button; panels repeating it draw theirs quietly.
   const nextLabel = customerNextAction(p)?.label ?? null;
 

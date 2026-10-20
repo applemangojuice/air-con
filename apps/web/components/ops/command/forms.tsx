@@ -275,11 +275,29 @@ export function PilotForm({ action, current }: { action: Action; current?: { num
   );
 }
 
-export function ContactForm({ action, current }: { action: Action; current: { email?: string; phone?: string; accessNotes?: string; parkingNotes?: string } }) {
+export function ContactForm({
+  action,
+  current,
+}: {
+  action: Action;
+  current: { name?: string; addressLine?: string; postcode?: string; email?: string; phone?: string; accessNotes?: string; parkingNotes?: string };
+}) {
   const id = useId();
   return (
     <ActionForm action={action}>
       <div className="grid gap-3 sm:grid-cols-2">
+        <div className="sm:col-span-2">
+          <L htmlFor={`${id}-n`}>Name</L>
+          <input id={`${id}-n`} name="name" required minLength={2} maxLength={120} autoComplete="off" defaultValue={current.name ?? ""} className={compactInput} />
+        </div>
+        <div>
+          <L htmlFor={`${id}-l`}>Address (first line)</L>
+          <input id={`${id}-l`} name="addressLine" required minLength={3} maxLength={200} autoComplete="off" defaultValue={current.addressLine ?? ""} className={compactInput} />
+        </div>
+        <div>
+          <L htmlFor={`${id}-pc`}>Postcode</L>
+          <input id={`${id}-pc`} name="postcode" required maxLength={10} autoComplete="off" defaultValue={current.postcode ?? ""} className={compactInput} />
+        </div>
         <div>
           <L htmlFor={`${id}-e`}>Email</L>
           <input id={`${id}-e`} name="email" type="email" autoComplete="off" defaultValue={current.email ?? ""} className={compactInput} />
@@ -297,7 +315,10 @@ export function ContactForm({ action, current }: { action: Action; current: { em
           <textarea id={`${id}-k`} name="parkingNotes" rows={2} maxLength={500} defaultValue={current.parkingNotes ?? ""} className={CONTROL} />
         </div>
       </div>
-      <p className="mt-2 text-xs text-ink-500">Changing the email moves the project to that address&apos;s customer record: sign-in links go there from now on.</p>
+      <p className="mt-2 text-xs text-ink-500">
+        Changing the email moves the project to that address&apos;s customer record: sign-in links go there from now on. A corrected name or address is used
+        from now on; documents already issued keep the details they were issued with.
+      </p>
       <div className="mt-2">
         <SubmitButton variant="secondary">Save contact details</SubmitButton>
       </div>
@@ -305,21 +326,37 @@ export function ContactForm({ action, current }: { action: Action; current: { em
   );
 }
 
-/** The customer cancelled their contract: when and how it reached us, and where it's on file. */
-export function CancellationForm({ action, today }: { action: Action; today: string }) {
+/**
+ * The customer cancelled their contract: when and how it reached us, and where it's on file.
+ * `periodEndsOn` is the last day of their cancellation period, when it's known: a notice that
+ * reached us after it gets no refund or collection promised (cancellation-server), and the
+ * confirm says so before anything is sent.
+ */
+export function CancellationForm({ action, today, periodEndsOn }: { action: Action; today: string; periodEndsOn?: string }) {
   const id = useId();
+  const [receivedOn, setReceivedOn] = useState(today);
+  const late = Boolean(periodEndsOn && receivedOn && receivedOn > periodEndsOn);
   return (
     <ActionForm
       action={action}
-      confirm="Record the cancellation? The project closes as cancelled, unpaid invoices are voided, the refund and collection tasks are raised and the customer is emailed an acknowledgement."
+      confirm={
+        late
+          ? `This reached us after the cancellation period ended (on ${periodEndsOn}), so there's no statutory refund. Record it? The project closes as cancelled and unpaid invoices are voided. The customer is emailed that we've received it and will be in touch, with no refund or collection promised, and a task is raised to take advice first.`
+          : "Record the cancellation? The project closes as cancelled, unpaid invoices are voided, the refund and collection tasks are raised and the customer is emailed an acknowledgement."
+      }
     >
       <p className="mb-2 text-xs text-ink-500">
-        Any clear statement counts: an email, a letter, a call. The refund is due within 14 days of the day it reached us.
+        Any clear statement counts: an email, a letter, a call. Within the cancellation period{periodEndsOn ? ` (it ends on ${periodEndsOn})` : ""}, the refund is due within 14 days of the day it reached us.
       </p>
+      {late && (
+        <p role="status" className="mb-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900">
+          That&apos;s after the cancellation period ended: there&apos;s no statutory refund. The customer is told we&apos;ll be in touch, nothing more, and you get a task to take advice first.
+        </p>
+      )}
       <div className="grid gap-2 sm:grid-cols-2">
         <div>
           <L htmlFor={`${id}-d`}>Reached us on</L>
-          <input id={`${id}-d`} name="receivedOn" type="date" required max={today} defaultValue={today} className={compactInput} />
+          <input id={`${id}-d`} name="receivedOn" type="date" required max={today} value={receivedOn} onChange={(e) => setReceivedOn(e.target.value)} className={compactInput} />
         </div>
         <div>
           <L htmlFor={`${id}-t`} hint="(if known)">

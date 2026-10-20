@@ -929,7 +929,7 @@ export default async function CommandCentrePage({
               )}
               {!p.closure.closed && p.proposal.status === "accepted" && (
                 <Disclosure summary="Record a cancellation">
-                  <CancellationForm action={bind(cancellationAction)} today={today} />
+                  <CancellationForm action={bind(cancellationAction)} today={today} {...(cs.endsOn ? { periodEndsOn: cs.endsOn } : {})} />
                 </Disclosure>
               )}
               {!p.closure.closed && (

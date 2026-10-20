@@ -715,6 +715,58 @@ test("pre-contract-info-sent: only the current version's email, the first send c
   assert.equal(retried.proposal.preContractInfoSentAt, "2026-10-26T09:01:00.000Z");
 });
 
+test("a corrected email before acceptance: the proposal email to the old address stops counting, and acceptance waits for consent and a resend there", () => {
+  const sent = walk("proposal-viewed");
+  assert.ok(sent.proposal.preContractInfoSentAt, "the proposal email reached alex@example.test");
+  const moved = step(sent, { type: "set-customer-contact", email: "alex.corrected@example.test" }, "2026-10-26T20:00:00.000Z", { actor: ADMIN });
+  assert.equal(moved.proposal.preContractInfoSentAt, undefined, "it went to someone else: it no longer counts");
+  const reset = moved.events.find((e) => e.type === "pre-contract-info-reset")!;
+  assert.equal(reset.internal, true);
+  assert.match(reset.label, /went to alex@example\.test, not alex\.corrected@example\.test/);
+  assert.match(reset.label, /Send again on the proposal email/);
+  const r = refuses(moved, ACCEPT, T.accept, {}, /./);
+  assert.ok(!r.ok && r.blockers?.some((b) => b.code === "pre-contract-info-not-sent"));
+  // Resent to the new address (the outbox records it), but their agreement is still for the old one.
+  const resent = step(moved, { type: "pre-contract-info-sent", proposalId: "pr-1", messageId: "m-2" }, "2026-10-26T20:05:00.000Z");
+  assert.equal(resent.proposal.preContractInfoSentAt, "2026-10-26T20:05:00.000Z");
+  const noConsent = refuses(resent, ACCEPT, T.accept, {}, /./);
+  assert.ok(!noConsent.ok && noConsent.blockers?.some((b) => b.code === "documents-consent-missing" && b.owner === "customer" && /alex\.corrected@example\.test/.test(b.message)));
+  const agreed = step(resent, { type: "documents-consent-recorded", channel: "portal" }, "2026-10-26T20:10:00.000Z");
+  assert.equal(step(agreed, ACCEPT, T.accept).proposal.status, "accepted");
+  // Only the address matters: the same address in another case, a phone change, or the address
+  // corrected after acceptance (the contract is made) leave it alone.
+  assert.ok(step(sent, { type: "set-customer-contact", email: "ALEX@example.test" }, T.accept, { actor: ADMIN }).proposal.preContractInfoSentAt);
+  assert.ok(step(sent, { type: "set-customer-contact", phone: "07700 900123" }, T.accept, { actor: ADMIN }).proposal.preContractInfoSentAt);
+  const contracted = walk("proposal-accepted");
+  assert.equal(
+    step(contracted, { type: "set-customer-contact", email: "new@example.test" }, T.dates, { actor: ADMIN }).proposal.preContractInfoSentAt,
+    contracted.proposal.preContractInfoSentAt,
+  );
+  // Removing the address altogether: nothing counts until there's one again.
+  assert.equal(step(sent, { type: "set-customer-contact", email: "" }, T.accept, { actor: ADMIN }).proposal.preContractInfoSentAt, undefined);
+});
+
+test("set-customer-contact corrects the name, address and postcode, never blanks them, and logs what changed", () => {
+  const p = walk("proposal-viewed");
+  const fixed = step(p, { type: "set-customer-contact", name: "  Alexandra   Demo ", addressLine: "14 Mitcham Lane, Flat 2", postcode: "SW16 2HB" }, T.accept, { actor: ADMIN });
+  assert.deepEqual([fixed.customer.name, fixed.customer.addressLine, fixed.customer.postcode], ["Alexandra Demo", "14 Mitcham Lane, Flat 2", "SW16 2HB"]);
+  assert.equal(fixed.customer.email, p.customer.email, "the rest stays");
+  assert.equal(fixed.proposal.preContractInfoSentAt, p.proposal.preContractInfoSentAt, "the same address: the proposal email still counts");
+  const ev = fixed.events.find((e) => e.type === "customer-details-corrected")!;
+  assert.equal(ev.internal, true);
+  assert.match(ev.label, /name, address, postcode corrected: "Alex Demo" to "Alexandra Demo"/);
+  assert.match(ev.label, /Documents already issued keep the details they were issued with/);
+  for (const key of ["name", "addressLine", "postcode"] as const) {
+    refuses(p, { type: "set-customer-contact", [key]: "   " }, T.accept, { actor: ADMIN }, /can't be blank/);
+  }
+  // Unchanged values aren't logged as a correction.
+  const same = step(p, { type: "set-customer-contact", name: p.customer.name, phone: "07700 900123" }, T.accept, { actor: ADMIN });
+  assert.ok(!same.events.some((e) => e.type === "customer-details-corrected"));
+  // After the project closes, a typo can still be put right.
+  const closed = step(walk("proposal-viewed"), { type: "project-closed", reason: "cancelled" }, T.accept, { actor: ADMIN });
+  assert.equal(step(closed, { type: "set-customer-contact", name: "Alexandra Demo" }, T.accept, { actor: ADMIN }).customer.name, "Alexandra Demo");
+});
+
 test("reg 31: when the pre-contract information went after acceptance, the period runs from the confirmation", () => {
   // Information delivered before the contract: the normal period.
   const normal = walk("contract-confirmation-sent", { contractType: "install-only", early: false });
@@ -1943,4 +1995,43 @@ test("cancellation-received: when and how it reached us, the refund deadline, an
   // Late at night still counts as that day.
   const late = step(accepted, { ...c, receivedAt: "2026-10-28T23:30:00.000Z" }, "2026-10-30T09:00:00.000Z", { actor: ADMIN });
   assert.equal(late.cancellation?.refundDueBy, "2026-11-11");
+});
+
+test("cancellation-received across the clocks going back (25 Oct 2026): the London day decides the period, and a late one promises no refund", () => {
+  // An install-only contract made on Sat 10 Oct, its pre-contract information beforehand: the period ends on a given day.
+  const contractEndingOn = (endsOn: string): Project => {
+    const p = structuredClone(walk("contract-confirmation-sent", INSTALL_ONLY));
+    p.proposal.acceptedAt = "2026-10-10T10:00:00.000Z";
+    p.proposal.preContractInfoSentAt = "2026-10-09T10:00:00.000Z";
+    p.proposal.confirmationSentAt = "2026-10-10T10:05:00.000Z";
+    p.proposal.cancellationEndsOn = endsOn;
+    return p;
+  };
+  const cancel = (receivedAt: string) => ({ type: "cancellation-received", receivedAt, channel: "email", evidenceRef: "DEMO email, 'cancel please'" }) as const;
+  const at = "2026-10-27T09:00:00.000Z";
+
+  // The period ends Sat 24 Oct (still BST). 23:30 BST that day is inside; 00:30 BST on the 25th
+  // (23:30 UTC on the 24th) is the next London day, so outside, whatever the UTC date says.
+  const lastEvening = step(contractEndingOn("2026-10-24"), cancel("2026-10-24T22:30:00.000Z"), at, { actor: ADMIN });
+  assert.equal(lastEvening.cancellation?.withinPeriod, true);
+  assert.equal(lastEvening.cancellation?.refundDueBy, "2026-11-07");
+  const afterMidnight = step(contractEndingOn("2026-10-24"), cancel("2026-10-24T23:30:00.000Z"), at, { actor: ADMIN });
+  assert.equal(afterMidnight.cancellation?.withinPeriod, false, "00:30 BST on Sun 25 Oct is after the period");
+  assert.equal(afterMidnight.cancellation?.refundDueBy, "2026-11-08", "14 days from the London day it reached us");
+
+  // The period ends Sun 25 Oct, the 25-hour day: 23:30 GMT is still that day; 00:30 GMT on the 26th isn't.
+  assert.equal(step(contractEndingOn("2026-10-25"), cancel("2026-10-25T23:30:00.000Z"), at, { actor: ADMIN }).cancellation?.withinPeriod, true);
+  // 01:30 BST and 01:30 GMT both happen on the 25th: both inside.
+  assert.equal(step(contractEndingOn("2026-10-25"), cancel("2026-10-25T00:30:00.000Z"), at, { actor: ADMIN }).cancellation?.withinPeriod, true);
+  assert.equal(step(contractEndingOn("2026-10-25"), cancel("2026-10-25T01:30:00.000Z"), at, { actor: ADMIN }).cancellation?.withinPeriod, true);
+  const nextDay = step(contractEndingOn("2026-10-25"), cancel("2026-10-26T00:30:00.000Z"), at, { actor: ADMIN });
+  assert.equal(nextDay.cancellation?.withinPeriod, false);
+
+  // What the family reads on their page: inside, the refund deadline; after, no refund promised.
+  assert.match(lastEvening.events.at(-1)!.label, /Your contract is cancelled\. Any refund is due by/);
+  const lateLine = afterMidnight.events.at(-1)!;
+  assert.equal(lateLine.internal, undefined, "customer-facing");
+  assert.match(lateLine.label, /We received your cancellation on Sun 25 Oct, after your cancellation period had ended\. We'll be in touch in writing/);
+  assert.doesNotMatch(lateLine.label, /refund/i);
+  assert.deepEqual(afterMidnight.closure, { closed: true, closedAt: at, reason: "cancelled" });
 });

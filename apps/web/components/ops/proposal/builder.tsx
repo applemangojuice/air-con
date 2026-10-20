@@ -88,6 +88,19 @@ export function ProposalBuilder(props: BuilderProps) {
   const belowMin = previews.some(
     (p) => p.preview.option.pricing.netPence > 0 && (p.preview.option.pricing.belowMinMargin || p.preview.option.pricing.unpricedCostLines > 0),
   );
+  // The figures on screen are worked out on today's catalogue and settings. A
+  // draft saved before either changed still holds the old ones, so it saves
+  // straight away instead of reading "Saved" over prices it doesn't hold
+  // (issuing reprices on the server and refuses if they don't match).
+  const [pricesMoved] = useState(
+    () =>
+      canSeeMargins &&
+      previews.some(({ form: o, preview }) => {
+        const stored = proposal.options.find((x) => x.designVariantId === o.designVariantId);
+        const now = preview.option.pricing;
+        return !stored || stored.pricing.totalPence !== now.totalPence || stored.pricing.costPence !== now.costPence || stored.pricing.unpricedCostLines !== now.unpricedCostLines;
+      }),
+  );
 
   /* ---------------- saving ---------------- */
 
@@ -127,14 +140,14 @@ export function ProposalBuilder(props: BuilderProps) {
   useEffect(() => {
     if (first.current) {
       first.current = false;
-      return;
+      if (!pricesMoved) return;
     }
     setSave((s) => (s.kind === "error" && s.conflict ? s : { kind: "dirty" }));
     const t = setTimeout(() => {
       void runSave();
     }, 1200);
     return () => clearTimeout(t);
-  }, [form, runSave]);
+  }, [form, runSave, pricesMoved]);
 
   // Retry a failed save when the connection comes back.
   useEffect(() => {
@@ -189,7 +202,11 @@ export function ProposalBuilder(props: BuilderProps) {
       return;
     }
     try {
-      const result = await issueAction(projectId, proposal.id, revision.current);
+      // What this screen shows for each option: the server reprices and refuses if it differs.
+      const totals = Object.fromEntries(
+        previews.map(({ form: o, preview }) => [o.designVariantId, { totalPence: preview.option.pricing.totalPence, costPence: preview.option.pricing.costPence }]),
+      );
+      const result = await issueAction(projectId, proposal.id, revision.current, totals);
       if (result.ok) {
         // Stay busy while the page reloads into the issued version (see reload.ts).
         setIssue({ busy: true, result });
@@ -305,6 +322,11 @@ export function ProposalBuilder(props: BuilderProps) {
             <p className="text-sm font-semibold text-ink-900">Draft · version {proposal.version}</p>
             <SaveStatus state={save} onRetry={() => void runSave()} />
           </div>
+          {pricesMoved && (
+            <p role="status" className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              The catalogue or settings changed since this draft was last saved, so the prices here are worked out again on today&apos;s figures and saved. Check them before you issue.
+            </p>
+          )}
           <div className="mt-4 space-y-3">
             {liveErrors.length === 0 && blocking.length === 0 ? (
               <p className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">Ready to issue.</p>

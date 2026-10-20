@@ -31,6 +31,7 @@ import { audit } from "./audit";
 import { isPlausibleEmail, normaliseEmail } from "./auth/access";
 import { demoModeAllowed } from "./auth/demo-guard";
 import { issueMagicLink } from "./auth/magic";
+import type { EmailPool } from "./email-budget";
 import { getSession, requireProjectAccess, type ProjectAccess } from "./auth/server";
 import { notify } from "./comms/outbox";
 import { onTheWayChannel } from "./comms/on-the-way";
@@ -280,8 +281,17 @@ export async function loadHub(projectId: string, access: ProjectAccess): Promise
       : { name: m.name, role: m.role === "tech-lead" ? "Technical lead" : m.role.charAt(0).toUpperCase() + m.role.slice(1), photoUrl: null, qualifications: [] };
   });
 
-  const liveInvoices: HubInvoice[] = invoices
-    .filter((i) => i.status !== "draft" && i.status !== "void")
+  const counted = invoices.filter((i) => i.status !== "draft" && i.status !== "void");
+  // An invoice nothing is owed on because credit notes cover it: refunded (the refund's own
+  // credit note) or credited. It reads as that, never as a bill "due" on its old date.
+  const settledBy = (i: (typeof invoices)[number]): HubInvoice["settled"] => {
+    if (i.kind === "credit-note" || i.status === "paid") return undefined;
+    const against = counted.filter((c) => c.kind === "credit-note" && c.creditsInvoiceId === i.id);
+    const credited = -against.reduce((sum, c) => sum + c.totalPence, 0);
+    if (!against.length || credited < i.totalPence - Math.max(0, i.paidPence)) return undefined;
+    return against.some((c) => /^Refunded:/.test(c.reason ?? "")) ? "refunded" : "credited";
+  };
+  const liveInvoices: HubInvoice[] = counted
     .map((i) => ({
       id: i.id,
       number: i.number,
@@ -289,6 +299,7 @@ export async function loadHub(projectId: string, access: ProjectAccess): Promise
       status: i.status,
       totalPence: i.totalPence,
       paidPence: i.paidPence,
+      ...(settledBy(i) ? { settled: settledBy(i) } : {}),
       ...(i.dueOn ? { dueOn: i.dueOn } : {}),
       ...(i.issuedAt ? { issuedAt: i.issuedAt } : {}),
       ...(i.documentId ? { documentId: i.documentId } : {}),
@@ -484,6 +495,8 @@ export interface LinkResult {
   /** Development, or a DEMO address on a demo deployment: the link itself, since nothing was emailed. */
   devLink?: string;
   emailLive: boolean;
+  /** The shared email budget for links asked for from the website was used up: nothing went. */
+  heldBack?: boolean;
 }
 
 /**
@@ -521,7 +534,7 @@ async function customerEmailForProject(projectId: string): Promise<string | null
  * a customer or what exists); the address is never shown back. Failures
  * are logged, never surfaced.
  */
-export async function sendSignInLink(target: LinkTarget): Promise<LinkResult> {
+export async function sendSignInLink(target: LinkTarget, opts: { budget?: EmailPool } = {}): Promise<LinkResult> {
   const emailLive = emailConfigured();
   try {
     let email: string | null = null;
@@ -539,8 +552,8 @@ export async function sendSignInLink(target: LinkTarget): Promise<LinkResult> {
       }
     }
     if (!email || !isPlausibleEmail(email)) return { emailLive };
-    const result = await issueMagicLink({ email, kind: "customer", next });
-    return { emailLive, ...(result.devLink ? { devLink: result.devLink } : {}) };
+    const result = await issueMagicLink({ email, kind: "customer", next, ...(opts.budget ? { budget: opts.budget } : {}) });
+    return { emailLive, ...(result.devLink ? { devLink: result.devLink } : {}), ...(result.heldBack ? { heldBack: true } : {}) };
   } catch (err) {
     console.error("[portal] sign-in link failed:", err);
     return { emailLive };

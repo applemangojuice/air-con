@@ -53,6 +53,7 @@ export async function POST(request: Request): Promise<Response> {
   ]);
   if (!perTarget.ok) return portalJson({ ok: true, emailLive: emailConfigured() });
 
-  const result = await sendSignInLink(target);
+  // Each link is an email anyone can ask for: from the shared daily budget for those (lib/email-budget).
+  const result = await sendSignInLink(target, { budget: "sign-in" });
   return portalJson({ ok: true, emailLive: result.emailLive, ...(result.devLink ? { devLink: result.devLink } : {}) });
 }

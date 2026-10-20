@@ -19,6 +19,9 @@ const COL = ["md:col-start-1", "md:col-start-2", "md:col-start-3", "md:col-start
 
 const STATE_WORD: Record<TimelineEntry["state"], string> = { complete: "done", current: "now", upcoming: "coming up" };
 
+/** A stage on the stepper; `cancelled` when the project was cancelled and it won't happen (no date, never "now"). */
+export type StepperEntry = TimelineEntry & { cancelled?: boolean };
+
 function DateLine({ date }: { date: TimelineEntry["date"] }) {
   if (!date) return null;
   if (date.kind === "estimated") return <span className="text-ink-500">est. {fmtDay(date.iso)}</span>;
@@ -63,7 +66,7 @@ export function ProjectStepper({
   panel,
   aside,
 }: {
-  entries: TimelineEntry[];
+  entries: StepperEntry[];
   selected: ProjectStageId;
   onSelect: (stage: ProjectStageId) => void;
   panelId: string;
@@ -72,9 +75,10 @@ export function ProjectStepper({
   /** Supporting cards: after the stages on a phone, beside the panel on a wide screen. */
   aside?: ReactNode;
 }) {
+  // The rail fills to the current stage; on a cancelled project (no current one), to the last one done.
   const currentIndex = Math.max(
     0,
-    entries.findIndex((e) => e.state === "current"),
+    entries.some((e) => e.state === "current") ? entries.findIndex((e) => e.state === "current") : entries.map((e) => e.state).lastIndexOf("complete"),
   );
   const doneShare = entries.every((e) => e.state === "complete") ? 1 : currentIndex / Math.max(1, entries.length - 1);
 
@@ -122,10 +126,10 @@ export function ProjectStepper({
                   }`}
                 >
                   {info.label}
-                  <span className="sr-only">, {STATE_WORD[entry.state]}</span>
+                  <span className="sr-only">, {entry.cancelled ? "cancelled" : STATE_WORD[entry.state]}</span>
                 </span>
                 <span className="shrink-0 text-sm md:text-xs">
-                  <DateLine date={entry.date} />
+                  {entry.cancelled ? <span className="text-ink-500 line-through decoration-ink-300">cancelled</span> : <DateLine date={entry.date} />}
                 </span>
               </span>
             </button>

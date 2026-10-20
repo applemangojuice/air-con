@@ -1,13 +1,16 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { QUOTE_BODY_MAX_BYTES, readJsonCapped } from "@/lib/http-body";
 import { generateQuote, type Survey } from "@aircon/domain";
 import { logServerEvent } from "@/lib/analytics-server";
 import { appUrl } from "@/lib/brand";
 import { escapeHtml, quoteEmail, sendEmail, sendTeamEmail } from "@/lib/email";
 import { QUOTE_OWNER_COOKIE, quoteOwnerCookieOptions, readQuoteOwner, signQuoteOwner } from "@/lib/auth/quote-owner";
 import { personNameProblem } from "@/lib/person-name";
-import { enforceRateLimit, rateLimit } from "@/lib/rate-limit";
+import { spendEmailBudget } from "@/lib/email-budget";
+import { rateLimit } from "@/lib/rate-limit";
+import { enforceSharedRateLimit } from "@/lib/rate-limit-shared";
 import { UUID_RE, surveySchema } from "@/lib/schemas";
 import { getServiceClient } from "@/lib/supabase-server";
 import { getPublicSettings } from "@/lib/public-settings";
@@ -127,10 +130,13 @@ export async function POST(request: Request) {
   // A brake on scripted spam, sized for shared IPs (CGNAT, office wifi): a
   // whole household or demo room fits, a bot loop doesn't. The save-early
   // draft row is the backstop if a legitimate burst ever trips this.
-  const limited = enforceRateLimit(request, "quotes", 30, 600_000);
+  const limited = await enforceSharedRateLimit(request, "quotes", 30, 600_000);
   if (limited) return limited;
 
-  const parsed = bodySchema.safeParse(await request.json().catch(() => null));
+  // A whole survey is a few kilobytes: a body far bigger is refused before it's read (lib/http-body).
+  const body = await readJsonCapped(request, QUOTE_BODY_MAX_BYTES);
+  if (body.tooLarge) return NextResponse.json({ error: "Too large" }, { status: 413 });
+  const parsed = bodySchema.safeParse(body.value);
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid survey" }, { status: 400 });
   }
@@ -251,9 +257,12 @@ export async function POST(request: Request) {
     supportPhone: settings.company.phone,
   });
   const allowed = await emailAllowance(supabase, contact.email, id, Date.now());
-  const emailed = allowed.customer ? await sendEmail(contact.email, email.subject, email.html, { replyTo: settings.company.email }) : false;
+  // Both emails come out of the shared daily budget for emails anyone can trigger (lib/email-budget),
+  // so a flood can't spend the quota the office's own emails need. Over it, the quote still saves.
+  const emailed =
+    allowed.customer && (await spendEmailBudget("public")) ? await sendEmail(contact.email, email.subject, email.html, { replyTo: settings.company.email }) : false;
   // Ping the team so a real submission is never missed (unless a flood is on: it's all in ops anyway).
-  if (allowed.team) await notifyNewLead(contact, quote.totalGbp, survey.postcode, id, attribution, consents.marketing);
+  if (allowed.team && (await spendEmailBudget("public"))) await notifyNewLead(contact, quote.totalGbp, survey.postcode, id, attribution, consents.marketing);
   const res = NextResponse.json({ ok: true, demo: false, id, emailed });
   // This browser saved this quote, so "Book my home survey" can open the
   // project made from it without an email round trip (lib/auth/quote-owner.ts).

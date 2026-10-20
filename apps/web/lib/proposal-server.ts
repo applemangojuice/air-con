@@ -52,6 +52,7 @@ import { CANCELLATION_NOTICE_VERSION, LEGAL_REVIEW_NOTE, cancellationForm, cance
 import { notify } from "./comms/outbox";
 import { createDocument, listDocuments } from "./documents-server";
 import { emailConfigured } from "./email";
+import { money } from "./format";
 import { signedMediaUrls, updateMedia } from "./media-server";
 import { buildReadinessContext, dispatch, loadProject, londonToday } from "./project-service";
 import { db, isUuid } from "./repo/base";
@@ -467,6 +468,60 @@ function unpriced(ctx: OptionContext, option: ProposalOption): ProposalOption {
 }
 
 /**
+ * The draft's options as a save stores them: the design's defaults, the
+ * builder's edits, repriced on the server from `ctx` (today's catalogue and
+ * settings). Staff who can't see margins change the wording only: the labour
+ * and pricing inputs stay as stored. An option whose inputs can't be priced
+ * keeps its build-up with the price unset, and `pricingErrors` says why.
+ * Issuing runs the same assembly on the stored draft (`issueDraft`), so what
+ * goes out is priced exactly as the builder previews it.
+ */
+function assembleOptions(
+  ctx: OptionContext,
+  design: DesignRecord,
+  stored: ProposalRecord,
+  edits: DraftPatch["options"],
+  canPrice: boolean,
+): { options: ProposalOption[]; pricingErrors: Record<string, string> } {
+  const pricingErrors: Record<string, string> = {};
+  const options = edits.map((o) => {
+    const variant = design.variants.find((v) => v.id === o.designVariantId)!;
+    const base = defaultOptionFor(ctx, variant);
+    const before = stored.options.find((s) => s.designVariantId === o.designVariantId);
+    const cards = base.roomCards.map((card) => {
+      const edit = o.roomCards.find((c) => c.roomId === card.roomId);
+      return edit
+        ? {
+            ...card,
+            unitName: clean(edit.unitName) || card.unitName,
+            why: clean(edit.why) || card.why,
+            highlights: cleanList(edit.highlights),
+            ...(edit.pipeNote !== undefined ? { pipeNote: clean(edit.pipeNote) } : {}),
+          }
+        : card;
+    });
+    const option: ProposalOption = {
+      ...base,
+      label: clean(o.label) || base.label,
+      summary: clean(o.summary),
+      highlights: cleanList(o.highlights),
+      roomCards: cards,
+      installDays: o.installDays,
+      labour: canPrice ? o.labour : (before?.labour ?? base.labour),
+      pricingInputs: canPrice ? o.pricingInputs : before ? pricingInputsOf(before) : base.pricingInputs,
+    };
+    try {
+      return recomputeOption(ctx, option);
+    } catch (err) {
+      if (!(err instanceof PricingError)) throw err;
+      pricingErrors[o.designVariantId] = err.message;
+      return unpriced(ctx, option);
+    }
+  });
+  return { options, pricingErrors };
+}
+
+/**
  * Apply the builder's edits to a draft and reprice every option on the
  * server (the browser's preview is never trusted). Staff who can't see
  * margins can change the wording but not the pricing. An option whose
@@ -505,43 +560,7 @@ export async function saveDraft(
   const settings = await settingsForWrite();
   if (!settings) return fail(SETTINGS_UNAVAILABLE, 503);
   const { ctx } = await optionContext(project, design, settings, patch.contractType);
-  const canPrice = can(staff, "finance.view-margin");
-
-  const pricingErrors: Record<string, string> = {};
-  const options = patch.options.map((o) => {
-    const variant = design.variants.find((v) => v.id === o.designVariantId)!;
-    const base = defaultOptionFor(ctx, variant);
-    const before = stored.options.find((s) => s.designVariantId === o.designVariantId);
-    const cards = base.roomCards.map((card) => {
-      const edit = o.roomCards.find((c) => c.roomId === card.roomId);
-      return edit
-        ? {
-            ...card,
-            unitName: clean(edit.unitName) || card.unitName,
-            why: clean(edit.why) || card.why,
-            highlights: cleanList(edit.highlights),
-            ...(edit.pipeNote !== undefined ? { pipeNote: clean(edit.pipeNote) } : {}),
-          }
-        : card;
-    });
-    const option: ProposalOption = {
-      ...base,
-      label: clean(o.label) || base.label,
-      summary: clean(o.summary),
-      highlights: cleanList(o.highlights),
-      roomCards: cards,
-      installDays: o.installDays,
-      labour: canPrice ? o.labour : (before?.labour ?? base.labour),
-      pricingInputs: canPrice ? o.pricingInputs : before ? pricingInputsOf(before) : base.pricingInputs,
-    };
-    try {
-      return recomputeOption(ctx, option);
-    } catch (err) {
-      if (!(err instanceof PricingError)) throw err;
-      pricingErrors[o.designVariantId] = err.message;
-      return unpriced(ctx, option);
-    }
-  });
+  const { options, pricingErrors } = assembleOptions(ctx, design, stored, patch.options, can(staff, "finance.view-margin"));
 
   const next: ProposalRecord = {
     ...stored,
@@ -623,6 +642,31 @@ async function showProposalMedia(record: ProposalRecord): Promise<void> {
   }
 }
 
+export interface IssueSeen {
+  /** The draft revision the issuer's builder saw. */
+  revision?: number;
+  /** Per design variant: the customer total and the cost the issuer's screen showed. */
+  totals?: Record<string, { totalPence: number; costPence: number }>;
+}
+
+/** The options whose repriced figures differ from what the issuer saw (or the stored draft held). */
+export function pricesMoved(
+  repriced: readonly ProposalOption[],
+  seen: Record<string, { totalPence: number; costPence: number }>,
+): { label: string; now: { totalPence: number; costPence: number }; was?: { totalPence: number; costPence: number } }[] {
+  const out: { label: string; now: { totalPence: number; costPence: number }; was?: { totalPence: number; costPence: number } }[] = [];
+  for (const o of repriced) {
+    const was = seen[o.designVariantId];
+    const now = { totalPence: o.pricing.totalPence, costPence: o.pricing.costPence };
+    if (!was || was.totalPence !== now.totalPence || was.costPence !== now.costPence) out.push({ label: o.label, now, ...(was ? { was } : {}) });
+  }
+  // An option the issuer saw that's no longer there moved too.
+  for (const id of Object.keys(seen)) {
+    if (!repriced.some((o) => o.designVariantId === id)) out.push({ label: "An option", now: { totalPence: 0, costPence: 0 }, was: seen[id]! });
+  }
+  return out;
+}
+
 /**
  * Issue a draft: the proposal's own checks, the project's gate (via
  * dispatch, which sends the issue email with the pre-contract information),
@@ -637,12 +681,22 @@ async function showProposalMedia(record: ProposalRecord): Promise<void> {
  * from the stored row during dispatch) and the frozen document therefore
  * carry the same prices the customer accepts. If the issue is refused after
  * the lock, the revision goes back so the issuer's builder keeps saving.
+ *
+ * Every option is repriced first, exactly as a save would, on today's
+ * catalogue and settings: the builder previews on those, and a draft saved
+ * before a catalogue or settings change still holds yesterday's figures.
+ * The issued version, its email and the minimum-margin gate all use the
+ * repriced figures. `totals` is what the issuer's screen showed for each
+ * option (from the builder): if the repriced figures differ (someone saved
+ * the catalogue or settings since the page loaded), nothing is issued and
+ * the issuer is told to check the new prices. Without `totals` the stored
+ * draft's own figures are the comparison.
  */
 export async function issueDraft(
   projectId: string,
   proposalId: string,
   staff: StaffMember,
-  opts: { revision?: number } = {},
+  opts: IssueSeen = {},
 ): Promise<Result<{ version: number }>> {
   const read = await proposalsRepo.getStamped(proposalId);
   const stored = read?.record;
@@ -675,9 +729,30 @@ export async function issueDraft(
   const settings = await settingsForWrite();
   if (!settings) return fail(SETTINGS_UNAVAILABLE, 503);
   const today = londonToday();
+  // Repriced on today's catalogue and settings, exactly as a save would (see above).
+  const { ctx: priceCtx } = await optionContext(project, approved, settings, stored.contractType ?? "supply-and-install");
+  const { options: repriced } = assembleOptions(priceCtx, approved, stored, formFromRecord(stored).options, can(staff, "finance.view-margin"));
+  const seenTotals =
+    opts.totals ??
+    Object.fromEntries(stored.options.map((o) => [o.designVariantId, { totalPence: o.pricing.totalPence, costPence: o.pricing.costPence }]));
+  const moved = pricesMoved(repriced, seenTotals);
+  if (moved.length) {
+    const lines = moved.map((m) =>
+      m.was
+        ? `${m.label}: now ${money(m.now.totalPence)} to the customer, cost ${money(m.now.costPence)} (${opts.totals ? "your screen showed" : "the saved draft has"} ${money(m.was.totalPence)}, cost ${money(m.was.costPence)}).`
+        : `${m.label}: now ${money(m.now.totalPence)} to the customer, cost ${money(m.now.costPence)}.`,
+    );
+    return fail(
+      opts.totals
+        ? "The prices changed since this page worked them out (the catalogue or settings were saved meanwhile). Nothing was issued: reload to see today's prices, check them, then issue."
+        : "The catalogue or settings changed since this draft was last saved, so its prices have moved. Nothing was issued: open the proposal builder, check the new prices (it saves them), then issue.",
+      409,
+      { errors: lines },
+    );
+  }
   // Settings saved since the draft's last edit (guarantees, warranty, terms, payment terms) still
   // reach the customer, and are frozen with this version from here on, with the full terms text.
-  let record = withSettingsWording(stored, settings);
+  let record = withSettingsWording({ ...stored, options: repriced }, settings);
   if (record.status === "draft") record = { ...record, termsText: termsSections(toPublicSettings(settings, today)) };
   const errors = proposalIssueErrors(record, settings, today);
   if (errors.length) return fail("The proposal isn't ready to issue yet.", 422, { errors });

@@ -395,3 +395,84 @@ test("issuing while a colleague's autosave lands: one set of prices issued, emai
   assert.ok(!behind.ok && /since you last loaded it/.test(behind.error));
   assert.equal((await proposalsRepo.get(draftId))!.status, "draft");
 });
+
+test("issuing reprices on today's catalogue: a draft saved before a cost change is never issued at the old price, and the margin gate uses today's costs", async () => {
+  await fresh();
+  const catalogueRepo = await import("../lib/repo/catalogue.ts");
+  const designsRepo = await import("../lib/repo/designs.ts");
+  const { formFromRecord, previewOption } = await import("../components/ops/proposal/model.ts");
+  const v1 = (await proposalsRepo.listForProject(DEMO2))[0]!;
+  const draftId = ((await server.reviseFrom(DEMO2, v1.id, ADMIN)) as { proposalId: string }).proposalId;
+  const s = await server.saveDraft(DEMO2, draftId, patchFrom(await proposalsRepo.get(draftId), { increaseReason: "DEMO" }), ADMIN);
+  assert.ok(s.ok);
+  const revision = s.proposal.draftRevision ?? 0;
+  const first = s.proposal.options[0]!;
+  const saved = { totalPence: first.pricing.totalPence, costPence: first.pricing.costPence };
+  const savedTotals = () => Object.fromEntries(s.proposal.options.map((o) => [o.designVariantId, { totalPence: o.pricing.totalPence, costPence: o.pricing.costPence }]));
+
+  // The supplier's price for the option's outdoor unit goes up by £300 after the draft was saved.
+  const design = (await designsRepo.approvedForProject(DEMO2))!;
+  const itemId = design.variants.find((v) => v.id === first.designVariantId)!.systems[0]!.outdoorItemId;
+  const item = (await catalogueRepo.get(itemId))!;
+  assert.ok(typeof item.costPence === "number" && item.costPence > 0, "the unit has a cost");
+  await catalogueRepo.upsert({ ...item, costPence: item.costPence + 30_000 });
+
+  // The builder works today's figures out, as the page does.
+  const screenTotals = async () => {
+    const data = (await server.loadBuilder(DEMO2, ADMIN))!;
+    const form = formFromRecord(data.current!);
+    return Object.fromEntries(
+      form.options.map((o) => {
+        const p = previewOption({ ...data.ctx!, contractType: form.contractType }, o)!;
+        return [o.designVariantId, { totalPence: p.option.pricing.totalPence, costPence: p.option.pricing.costPence }];
+      }),
+    );
+  };
+  const screen = await screenTotals();
+  const today = screen[first.designVariantId]!;
+  assert.ok(today.costPence >= saved.costPence + 30_000, "the screen shows today's cost (the unit, plus any contingency on it)");
+  assert.ok(today.totalPence > saved.totalPence, "cost-plus: and a higher price");
+  const issueEmails = async () => (await messagesRepo.listForProject(DEMO2)).filter((m) => m.event === "proposal-issued" && m.idempotencyKey.includes(draftId));
+
+  // Without the screen's figures, the saved draft's are the comparison: out of date, so nothing goes.
+  const stale = await server.issueDraft(DEMO2, draftId, ADMIN, { revision });
+  assert.ok(!stale.ok && /changed since this draft was last saved/.test(stale.error), JSON.stringify(stale));
+  assert.ok(stale.errors!.join(" ").includes(money(today.totalPence)), "it names today's price");
+  // A screen loaded before the change (showing the saved figures) is refused too.
+  const behind = await server.issueDraft(DEMO2, draftId, ADMIN, { revision, totals: savedTotals() });
+  assert.ok(!behind.ok && /changed since this page worked them out/.test(behind.error), JSON.stringify(behind));
+  const still = (await proposalsRepo.get(draftId))!;
+  assert.equal(still.status, "draft");
+  assert.equal(still.draftRevision, revision, "refused before the lock: the builder keeps saving");
+  assert.equal((await issueEmails()).length, 0, "no email");
+
+  // The screen showing today's figures issues exactly them: record, email and frozen document.
+  const issued = await server.issueDraft(DEMO2, draftId, ADMIN, { revision, totals: screen });
+  assert.deepEqual(issued, { ok: true, version: 2 });
+  const rec = (await proposalsRepo.get(draftId))!;
+  assert.equal(rec.options[0]!.pricing.totalPence, today.totalPence);
+  assert.equal(rec.options[0]!.pricing.costPence, today.costPence);
+  const email = (await issueEmails())[0]!;
+  assert.ok(email.bodyText.includes(money(today.totalPence)), "the customer is sent the price the issuer saw");
+  assert.ok(!email.bodyText.includes(money(saved.totalPence)), "never the old one");
+  const doc = (await listDocuments(DEMO2, { kind: "proposal" }))[0]!;
+  assert.equal((doc.snapshot as { proposal: { options: { pricing: { totalPence: number } }[] } }).proposal.options[0]!.pricing.totalPence, today.totalPence);
+
+  // A fixed (manual) price: a cost rise moves only the margin, and the minimum-margin gate checks today's costs.
+  await fresh();
+  const w1 = (await proposalsRepo.listForProject(DEMO2))[0]!;
+  const d2 = ((await server.reviseFrom(DEMO2, w1.id, ADMIN)) as { proposalId: string }).proposalId;
+  const manual = patchFrom(await proposalsRepo.get(d2), { increaseReason: "DEMO" });
+  manual.options = manual.options.map((o) => ({ ...o, pricingInputs: { basis: "manual", manualNetPence: 900_000, manualReason: "DEMO fixed price" } }));
+  const m = await server.saveDraft(DEMO2, d2, manual, ADMIN);
+  assert.ok(m.ok);
+  assert.equal(m.proposal.options[0]!.pricing.belowMinMargin, false, "comfortably above the minimum as saved");
+  const unit = (await catalogueRepo.get(itemId))!;
+  await catalogueRepo.upsert({ ...unit, costPence: (unit.costPence ?? 0) + 600_000 });
+  const fixed = await screenTotals();
+  assert.equal(fixed[first.designVariantId]!.totalPence, m.proposal.options[0]!.pricing.totalPence, "the price doesn't move");
+  const gated = await server.issueDraft(DEMO2, d2, ADMIN, { revision: m.proposal.draftRevision ?? 0, totals: fixed });
+  assert.ok(!gated.ok && /isn't ready to issue/.test(gated.error), JSON.stringify(gated));
+  assert.match(gated.errors!.join(" "), /minimum/, "below the minimum on today's costs");
+  assert.equal((await proposalsRepo.get(d2))!.status, "draft");
+});

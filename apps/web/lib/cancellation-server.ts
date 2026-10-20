@@ -18,7 +18,9 @@ import * as purchaseOrdersRepo from "./repo/purchaseOrders";
  *     taking money;
  *  3. tasks with owners and due dates: the refund (within 14 days of the
  *     notice, reg 34) when anything was paid, and collecting the equipment
- *     when we supplied it (at our cost);
+ *     when we supplied it (at our cost). A notice that arrived after the
+ *     period ended (`withinPeriod` false) promises neither: one review task
+ *     instead, to take advice and write to the customer;
  *  4. orders not yet placed are cancelled, and the team is told about any
  *     already with a supplier;
  *  5. the customer gets an acknowledgement by email, and the team an alert.
@@ -87,7 +89,20 @@ export async function recordCancellation(projectId: string, input: CancellationI
   const collect = supplied && (KIT_WITH_CUSTOMER.has(project.kit.status) || project.install.status !== "not-started");
   const tasks: Issue[] = [];
   try {
-    if (paid > 0) {
+    if (!c.withinPeriod) {
+      // After the period there's no statutory refund or collection to promise: someone decides
+      // (with advice) what the contract says now, and writes to the customer.
+      tasks.push(
+        await task(
+          project,
+          staff,
+          "Late cancellation: take advice, then write to the customer",
+          `The customer cancelled (${c.channel}, received ${c.receivedAt.slice(0, 10)}; on file: ${c.evidenceRef}) after the cancellation period had ended, so the 14-day refund doesn't apply as it stands. Nothing has been promised: they were told we'd be in touch. Take advice on what the contract allows${paid > 0 ? ` (they've paid ${money(paid)})` : ""}${collect ? " and on the equipment we supplied" : ""}, then write to them and record any refund on the money page.`,
+          c.refundDueBy,
+          "admin",
+        ),
+      );
+    } else if (paid > 0) {
       tasks.push(
         await task(
           project,
@@ -99,7 +114,7 @@ export async function recordCancellation(projectId: string, input: CancellationI
         ),
       );
     }
-    if (collect) {
+    if (collect && c.withinPeriod) {
       tasks.push(
         await task(
           project,
@@ -150,9 +165,11 @@ export async function recordCancellation(projectId: string, input: CancellationI
         title: `Cancelled: ${project.customer.name || "a customer"}`,
         lines: [
           `Received ${c.receivedAt.slice(0, 10)} by ${c.channel} (${c.evidenceRef}).${c.withinPeriod ? "" : " It arrived after the cancellation period ended: take advice before refunding."}`,
-          paid > 0 ? `Refund ${money(paid)} by ${c.refundDueBy}.` : "Nothing was paid, so there's nothing to refund.",
+          ...(!c.withinPeriod
+            ? [`The customer was told we'd be in touch: no refund or collection was promised.${paid > 0 ? ` They've paid ${money(paid)}.` : ""}`]
+            : [paid > 0 ? `Refund ${money(paid)} by ${c.refundDueBy}.` : "Nothing was paid, so there's nothing to refund."]),
           ...(voided.length ? [`Voided: ${voided.join(", ")}.`] : []),
-          ...(collect ? ["Collect the equipment we supplied, at our cost."] : []),
+          ...(collect && c.withinPeriod ? ["Collect the equipment we supplied, at our cost."] : []),
           ...(placed.length ? [`Orders already placed with ${[...new Set(placed)].join(", ")}: call the supplier to cancel or return them.`] : []),
         ],
         urgent: true,

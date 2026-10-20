@@ -110,11 +110,11 @@ test("staff project access: a required permission is checked on top of assignmen
   assert.equal(can(subSurveyor, "projects.view-all"), false, "external drops the board-wide view");
 });
 
-test("customer access: the project's customer_id is the authority; else the session list", () => {
+test("customer access: the live row's customer_id is the only authority, never the cookie's list", () => {
   assert.equal(customerCanAccessProject(customer, PROJECT_ID, "cust-1"), true);
   assert.equal(customerCanAccessProject(customer, PROJECT_ID, "cust-2"), false, "re-assigned: listed but not theirs");
   assert.equal(customerCanAccessProject(customer, "p-new", "cust-1"), true, "fresh grant via the row");
-  assert.equal(customerCanAccessProject(customer, PROJECT_ID, null), true, "row unset: session list decides");
+  assert.equal(customerCanAccessProject(customer, PROJECT_ID, null), false, "row unset (detached): the cookie's list never decides");
   assert.equal(customerCanAccessProject(customer, "p-other", null), false);
 });
 

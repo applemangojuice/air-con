@@ -38,17 +38,19 @@ export function staffCanAccessProject(
 }
 
 /**
- * May this customer open this project? The project row's customer_id is the
- * authority when it's set (so a re-assigned project drops out of an old
- * session at once); otherwise the session's own project list decides.
+ * May this customer open this project? Only when the project row's
+ * customer_id, read live, is theirs: a re-assigned project, or one detached
+ * because staff removed a wrong email (customer_id null), drops out of every
+ * session at once. The cookie's project list is a snapshot from sign-in and
+ * never grants anything (a project made from a quote this browser saved
+ * opens through the quote-owner grant instead).
  */
 export function customerCanAccessProject(
   session: Pick<CustomerSession, "customerId" | "projectIds">,
-  projectId: string,
+  _projectId: string,
   projectCustomerId: string | null | undefined,
 ): boolean {
-  if (projectCustomerId) return projectCustomerId === session.customerId;
-  return session.projectIds.includes(projectId);
+  return Boolean(projectCustomerId) && projectCustomerId === session.customerId;
 }
 
 /**

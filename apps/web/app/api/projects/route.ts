@@ -3,7 +3,7 @@ import { z } from "zod";
 import { requireProjectAccess } from "@/lib/auth/server";
 import { sendSignInLink } from "@/lib/portal-server";
 import { createProjectForQuote } from "@/lib/project-service";
-import { enforceRateLimit } from "@/lib/rate-limit";
+import { enforceSharedRateLimit } from "@/lib/rate-limit-shared";
 
 /**
  * Start (or resume) the project for a saved quote: the /q page's "Start my
@@ -27,7 +27,8 @@ export const runtime = "nodejs";
 const bodySchema = z.object({ quoteId: z.string().uuid() });
 
 export async function POST(request: Request) {
-  const limited = enforceRateLimit(request, "projects", 20, 600_000);
+  // Counted across every instance: each new project can be a sign-in email to the quote's address.
+  const limited = await enforceSharedRateLimit(request, "projects", 20, 600_000);
   if (limited) return limited;
 
   const parsed = bodySchema.safeParse(await request.json().catch(() => null));
@@ -46,8 +47,10 @@ export async function POST(request: Request) {
   let linkSent = false;
   let devLink: string | undefined;
   if (result.created && !canOpen) {
-    const link = await sendSignInLink({ kind: "project", projectId: result.id });
-    linkSent = true;
+    // From the shared budget for emails anyone can trigger (lib/email-budget): over it, nothing
+    // goes and they land on the project's sign-in page, which can send one later.
+    const link = await sendSignInLink({ kind: "project", projectId: result.id }, { budget: "public" });
+    linkSent = !link.heldBack;
     devLink = link.devLink;
   }
   return NextResponse.json({ ok: true, demo: false, id: result.id, canOpen, linkSent, ...(devLink ? { devLink } : {}) });

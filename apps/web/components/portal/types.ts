@@ -78,6 +78,8 @@ export interface HubInvoice {
   status: string;
   totalPence: number;
   paidPence: number;
+  /** Nothing is owed on it because credit notes cover it: a refund's, or a correction's. */
+  settled?: "refunded" | "credited";
   dueOn?: string;
   issuedAt?: string;
   documentId?: string;

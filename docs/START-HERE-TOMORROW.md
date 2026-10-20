@@ -499,7 +499,8 @@ every email carries a fresh link.
 
 | Wrong | Where to fix it |
 | --- | --- |
-| Name, email, phone, access or parking notes | The project → **Admin** box → **Edit contact and access**. Changing the email moves access to the new address |
+| Name, address, postcode, email, phone, access or parking notes | The project → **Admin** box → **Edit contact and access**. Changing the email moves access to the new address. A corrected name or address is used from then on; documents already issued keep the details they went out with |
+| The email was wrong when the proposal went | Correct it as above, then once the family has agreed to documents at the new address (their page asks), **Messages** → the proposal email → **Send again**. Until it has gone to the new address they can't accept |
 | Pilot number or label | The project → **Change pilot tag** |
 | Survey time or surveyor | The project → Survey box → **Move the survey** / **Change surveyor** |
 | Install dates or crew | The project → **Booking** → move the dates or change the crew (the family is told) |

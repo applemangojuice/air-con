@@ -1164,12 +1164,22 @@ export function blockersFor(project: Project, ctx: ReadinessContext, gate: GateI
         // Schedule 2 information, the cancellation instructions and the
         // model form must reach the customer on a durable medium before the
         // contract (CCR regs 10 and 12): the outbox records it once the
-        // issue email has gone.
+        // issue email has gone (to the project's current address).
         block(
           "pre-contract-info-not-sent",
           "The proposal email (the pre-contract information and cancellation form) hasn't been delivered yet, so it can't be accepted.",
           "ops",
           "Check the proposal email in messages and resend it",
+        );
+      } else if (!documentsConsentCovers(p)) {
+        // The durable medium is their email only with their agreement for that address (reg 10(2)).
+        block(
+          "documents-consent-missing",
+          p.proposal.documentsByEmailConsent?.email
+            ? `The customer agreed to get documents by email at ${p.proposal.documentsByEmailConsent.email}, not at ${p.customer.email}.`
+            : "The customer hasn't agreed to get the contract documents by email.",
+          "customer",
+          "Confirm you're happy to get your documents by email at your current address",
         );
       } else if (lapsed) {
         block(
@@ -1890,7 +1900,21 @@ export type ProjectAction =
   | { type: "set-pilot"; number: number; label: string }
   /** The staff member who owns the project on the board; an empty staffId clears it. */
   | { type: "set-owner"; staffId: string; name: string }
-  | { type: "set-customer-contact"; email?: string; phone?: string; accessNotes?: string; parkingNotes?: string }
+  /**
+   * Staff correct the customer's details. Name, address line and postcode
+   * can be corrected but never blanked; documents already issued keep the
+   * copy they were issued with.
+   */
+  | {
+      type: "set-customer-contact";
+      email?: string;
+      phone?: string;
+      accessNotes?: string;
+      parkingNotes?: string;
+      name?: string;
+      addressLine?: string;
+      postcode?: string;
+    }
   | { type: "project-closed"; reason?: string }
   /** Ops: the customer's cancellation reached us (when, how, where it's on file). Closes the project as cancelled. */
   | { type: "cancellation-received"; receivedAt: string; channel: CancellationChannel; evidenceRef: string }
@@ -2935,8 +2959,20 @@ export function applyProjectAction(project: Project, action: ProjectAction, now:
     }
 
     case "set-customer-contact": {
-      const patch = { email: action.email, phone: action.phone, accessNotes: action.accessNotes, parkingNotes: action.parkingNotes };
+      const before = { ...p.customer };
+      // The household's identity on every document: corrected, never blanked.
+      const identity = { name: action.name, addressLine: action.addressLine, postcode: action.postcode };
+      const blank = { name: "The customer's name", addressLine: "The first line of the address", postcode: "The postcode" } as const;
+      for (const [key, value] of Object.entries(identity) as [keyof typeof identity, string | undefined][]) {
+        if (value !== undefined && !value.replace(/\s+/g, " ").trim()) return err(`${blank[key]} can't be blank.`);
+      }
       let changed = false;
+      for (const [key, value] of Object.entries(identity) as [keyof typeof identity, string | undefined][]) {
+        if (value === undefined) continue;
+        p.customer[key] = value.replace(/\s+/g, " ").trim();
+        changed = true;
+      }
+      const patch = { email: action.email, phone: action.phone, accessNotes: action.accessNotes, parkingNotes: action.parkingNotes };
       for (const [key, value] of Object.entries(patch) as [keyof typeof patch, string | undefined][]) {
         if (value === undefined) continue;
         const v = value.trim();
@@ -2946,6 +2982,37 @@ export function applyProjectAction(project: Project, action: ProjectAction, now:
       }
       if (!changed) return err("Nothing to update.");
       log("customer-contact-updated", "Contact and access details updated.", "customer", { internal: true });
+      const corrected = (["name", "addressLine", "postcode"] as const).filter((k) => before[k] !== p.customer[k]);
+      if (corrected.length) {
+        const words = { name: "name", addressLine: "address", postcode: "postcode" } as const;
+        log(
+          "customer-details-corrected",
+          `Customer ${corrected.map((k) => words[k]).join(", ")} corrected: ${corrected.map((k) => `"${before[k] || "-"}" to "${p.customer[k]}"`).join("; ")}. Documents already issued keep the details they were issued with.`,
+          "ops",
+          { internal: true },
+        );
+      }
+      // The pre-contract information counts only where it reached the
+      // customer: a proposal email that went to an address since changed
+      // reached someone else (or nobody), so before acceptance it no longer
+      // counts. Acceptance waits until it has gone to the new address (Send
+      // again on the proposal email), and the documents-by-email agreement
+      // has to cover the new address too (proposal-accept gate).
+      const addr = (e: string | undefined) => (e ?? "").trim().toLowerCase();
+      const open = p.proposal.status === "issued" || p.proposal.status === "changes-requested";
+      if (open && addr(before.email) !== addr(p.customer.email) && p.proposal.preContractInfoSentAt) {
+        delete p.proposal.preContractInfoSentAt;
+        log(
+          "pre-contract-info-reset",
+          `The proposal email went to ${before.email || "the old address"}, not ${p.customer.email || "a current address"}, so it no longer counts as their pre-contract information. ${
+            p.customer.email
+              ? `Once they've agreed to documents at ${p.customer.email}, press Send again on the proposal email in Messages: they can accept once it has gone.`
+              : "Add their email, then send the proposal email again."
+          }`,
+          "ops",
+          { internal: true },
+        );
+      }
       return ok();
     }
 
@@ -2987,7 +3054,10 @@ export function applyProjectAction(project: Project, action: ProjectAction, now:
       p.closure = { closed: true, closedAt: now, reason: "cancelled" };
       log(
         "cancellation-received",
-        `We received your cancellation on ${fmtDate(receivedOn)}. Your contract is cancelled. Any refund is due by ${fmtDate(p.cancellation.refundDueBy)}.`,
+        p.cancellation.withinPeriod
+          ? `We received your cancellation on ${fmtDate(receivedOn)}. Your contract is cancelled. Any refund is due by ${fmtDate(p.cancellation.refundDueBy)}.`
+          : // After the period there's no statutory refund to promise: an acknowledgement, and we're in touch.
+            `We received your cancellation on ${fmtDate(receivedOn)}, after your cancellation period had ended. We'll be in touch in writing about what happens next.`,
         "ops",
       );
       return ok();

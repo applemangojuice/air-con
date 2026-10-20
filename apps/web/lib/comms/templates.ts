@@ -1293,23 +1293,39 @@ const TEMPLATES: { [E in CommsEventId]: Renderer<E> } = {
   },
 
   // The acknowledgement of a cancellation: a durable record of when it reached us and what happens next.
-  "cancellation-confirmed": (ctx, d) => ({
-    subject: "We've received your cancellation",
-    body: [
-      { p: `Thanks for letting us know. We received your cancellation on ${dayLong(d.receivedAt.slice(0, 10))}${d.channel ? ` (by ${d.channel === "in-person" ? "telling us in person" : d.channel})` : ""}, and your contract for the work at ${place(ctx)} is cancelled.` },
-      {
-        p: d.paidPence > 0
-          ? `We'll refund the ${money(d.paidPence)} you've paid by ${dayLong(d.refundDueBy)} at the latest, the same way you paid. If you'd asked us to start early and work was done, we'll explain any deduction for that work in writing first.`
-          : "You haven't paid us anything, so there's nothing to refund, and nothing more is due.",
-      },
-      ...(d.collectEquipment ? [{ p: "We'll collect the equipment we supplied, at our cost. We'll be in touch to agree a time." } as Block] : []),
-      ...(d.withinPeriod === false
-        ? [{ p: "Your cancellation reached us after the cancellation period had ended. We'll be in touch about what that means for your contract." } as Block]
-        : []),
-      { p: `Any questions, ${reach(ctx.settings)}.` },
-    ],
-    cta: "Open your project",
-  }),
+  // After the period ended (`withinPeriod` false) it only acknowledges: no refund or collection is promised
+  // in writing before anyone has checked what the contract allows (cancellation-server raises that review).
+  "cancellation-confirmed": (ctx, d) => {
+    const how = d.channel ? ` (by ${d.channel === "in-person" ? "telling us in person" : d.channel})` : "";
+    const on = dayLong(d.receivedAt.slice(0, 10));
+    if (d.withinPeriod === false) {
+      return {
+        subject: "We've received your cancellation",
+        body: [
+          { p: `Thanks for letting us know. We received your message cancelling your contract for the work at ${place(ctx)} on ${on}${how}.` },
+          {
+            p: "It reached us after your cancellation period had ended, so we're checking what that means for your contract, including anything you've paid and any equipment we've supplied. We'll be in touch in writing to explain what happens next.",
+          },
+          { p: `Any questions in the meantime, ${reach(ctx.settings)}.` },
+        ],
+        cta: "Open your project",
+      };
+    }
+    return {
+      subject: "We've received your cancellation",
+      body: [
+        { p: `Thanks for letting us know. We received your cancellation on ${on}${how}, and your contract for the work at ${place(ctx)} is cancelled.` },
+        {
+          p: d.paidPence > 0
+            ? `We'll refund the ${money(d.paidPence)} you've paid by ${dayLong(d.refundDueBy)} at the latest, the same way you paid. If you'd asked us to start early and work was done, we'll explain any deduction for that work in writing first.`
+            : "You haven't paid us anything, so there's nothing to refund, and nothing more is due.",
+        },
+        ...(d.collectEquipment ? [{ p: "We'll collect the equipment we supplied, at our cost. We'll be in touch to agree a time." } as Block] : []),
+        { p: `Any questions, ${reach(ctx.settings)}.` },
+      ],
+      cta: "Open your project",
+    };
+  },
 
   "issue-update": (ctx, d) => ({
     subject: `Update: ${d.title}`,

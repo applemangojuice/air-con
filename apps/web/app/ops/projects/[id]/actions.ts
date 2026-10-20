@@ -34,6 +34,7 @@ import { recordCancellation } from "@/lib/cancellation-server";
 import { recordCertificate } from "@/lib/certificates-server";
 import { resend } from "@/lib/comms/outbox";
 import { emailConfigured } from "@/lib/email";
+import { isValidUkPostcode, normalisePostcode } from "@/lib/format";
 import { sendVariation } from "@/lib/variation-server";
 import { DEMO_PILOT_FROM, dispatch, loadProject, pilotNumberHolder, pilotTakenMessage } from "@/lib/project-service";
 import * as issuesRepo from "@/lib/repo/issues";
@@ -285,6 +286,10 @@ export async function setPilotAction(projectId: string, fd: FormData): Promise<A
 }
 
 const contactSchema = z.object({
+  // The household as every document names it: corrected here, never blanked (the same rules as New pilot).
+  name: z.string().trim().min(2, "Enter their name").max(120).optional(),
+  addressLine: z.string().trim().min(3, "Enter the first line of the address").max(200).optional(),
+  postcode: z.string().trim().refine(isValidUkPostcode, "Enter a full UK postcode, like SW16 2BE").optional(),
   email: z.union([z.string().trim().email("That email doesn't look right").max(200), z.literal("")]),
   phone: z.union([z.string().trim().regex(/^\+?[\d\s()-]{7,20}$/, "That phone number doesn't look right"), z.literal("")]),
   accessNotes: text(500),
@@ -292,14 +297,48 @@ const contactSchema = z.object({
 });
 
 export async function setContactAction(projectId: string, fd: FormData): Promise<ActionResult> {
+  const staff = await guard(projectId);
+  if (!staff) return notFound();
+  // A field the form didn't send stays as it is.
+  const sent = (key: string) => (fd.has(key) ? { [key]: field(fd, key) } : {});
   const parsed = contactSchema.safeParse({
+    ...sent("name"),
+    ...sent("addressLine"),
+    ...sent("postcode"),
     email: field(fd, "email").trim(),
     phone: field(fd, "phone").trim(),
     accessNotes: field(fd, "accessNotes"),
     parkingNotes: field(fd, "parkingNotes"),
   });
   if (!parsed.success) return refused(firstIssue(parsed.error));
-  return run(projectId, { type: "set-customer-contact", ...parsed.data, email: parsed.data.email.toLowerCase() }, "Contact details saved.");
+  const d = parsed.data;
+  const before = await loadProject(projectId);
+  if (!before) return notFound();
+  const result = await dispatch(
+    projectId,
+    {
+      type: "set-customer-contact",
+      ...d,
+      ...(d.postcode !== undefined ? { postcode: normalisePostcode(d.postcode) } : {}),
+      email: d.email.toLowerCase(),
+    },
+    staff,
+  );
+  if ("error" in result) return refused(result.error, result.blockers);
+  refresh(projectId);
+  const after = result.project;
+  const lines = ["Contact details saved."];
+  if (["name", "addressLine", "postcode"].some((k) => before.customer[k as "name"] !== after.customer[k as "name"])) {
+    lines.push("Documents already issued keep the name and address they were issued with; everything from now on uses the corrected ones.");
+  }
+  if (before.proposal.preContractInfoSentAt && !after.proposal.preContractInfoSentAt) {
+    lines.push(
+      after.customer.email
+        ? `The proposal email went to the old address, so it no longer counts: once they've agreed to documents at ${after.customer.email}, press Send again on the proposal email in Messages. They can accept once it has gone.`
+        : "The proposal email went to the old address, so it no longer counts: add their email and send it again before they can accept.",
+    );
+  }
+  return done(lines.join(" "));
 }
 
 /**
@@ -361,7 +400,9 @@ export async function cancellationAction(projectId: string, fd: FormData): Promi
   const c = result.project.cancellation!;
   return done(
     [
-      `Cancellation recorded. Refund due by ${c.refundDueBy}.`,
+      c.withinPeriod
+        ? `Cancellation recorded. Refund due by ${c.refundDueBy}.`
+        : "Cancellation recorded. It reached us after the cancellation period ended, so the customer was only told we'd be in touch: no refund or collection was promised. Take advice (see the task), then write to them.",
       result.voided.length ? `Voided ${result.voided.join(", ")}.` : "",
       result.tasks.length ? `${result.tasks.length} task${result.tasks.length === 1 ? "" : "s"} raised.` : "",
       ...result.warnings,

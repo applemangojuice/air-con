@@ -152,15 +152,31 @@ const contractDepositPence = (contract: DocumentRecord | undefined): number | un
 const live = (i: Invoice) => i.status !== "void" && i.status !== "draft";
 
 /**
- * Cancelled by credit notes raised against it for its whole amount, with
- * nothing paid on it: as good as never issued (a deposit raised at the wrong
- * figure, then credited).
+ * Cancelled by correcting credit notes raised against it for its whole
+ * amount, with nothing paid on it: as good as never issued (a deposit raised
+ * at the wrong figure, then credited). A refund's credit note doesn't count
+ * (money off the price, `creditPurposeOf` "reduction"): a deposit that was
+ * paid and then refunded was a real deposit, so it never makes way for a
+ * fresh one.
  */
 export function creditedInFull(inv: Invoice, all: Invoice[]): boolean {
   if (inv.kind === "credit-note" || inv.paidPence > 0) return false;
-  const credited = -all.filter((c) => live(c) && c.kind === "credit-note" && c.creditsInvoiceId === inv.id).reduce((sum, c) => sum + c.totalPence, 0);
+  const against = all.filter((c) => live(c) && c.kind === "credit-note" && c.creditsInvoiceId === inv.id);
+  if (against.some((c) => creditPurposeOf(c) !== "correction")) return false;
+  const credited = -against.reduce((sum, c) => sum + c.totalPence, 0);
   return credited >= inv.totalPence;
 }
+
+/**
+ * The contract was cancelled (or the project closed as cancelled): nothing
+ * more is ever billed. Only refunds and credit notes are left (CCR reg 34;
+ * recordCancellation's "no more money is asked for").
+ */
+export function billingStopped(p: Pick<Project, "cancellation" | "closure">): boolean {
+  return Boolean(p.cancellation) || (p.closure.closed && p.closure.reason === "cancelled");
+}
+
+export const CANCELLED_NOTHING_TO_BILL = "The contract was cancelled, so nothing more is billed: only refunds and credit notes.";
 
 /** Accepted variations, from the issues list. */
 function acceptedVariations(issues: Issue[]): Issue[] {
@@ -179,6 +195,10 @@ export function planInvoices(input: {
   contractDepositPence?: number;
 }): MoneyView["plans"] {
   const { project: p, invoices, issues, settings, taxCode } = input;
+  if (billingStopped(p)) {
+    const none = (kind: InvoicePlan["kind"]): InvoicePlan => ({ kind, available: false, reason: CANCELLED_NOTHING_TO_BILL, lines: [], totalPence: 0 });
+    return { deposit: none("deposit"), balance: none("balance"), variation: { ...none("variation"), variations: [] }, "survey-fee": none("survey-fee"), "change-fee": none("change-fee") };
+  }
   const issued = invoices.filter(live);
   const contract = p.money.contractTotalPence ?? (p.proposal.status === "accepted" ? p.proposal.contractTotalPence : undefined);
   const plan = (kind: InvoicePlan["kind"], lines: InvoiceLine[], reason?: string, extra: Partial<InvoicePlan> = {}): InvoicePlan => {
@@ -365,6 +385,8 @@ export async function issueInvoice(projectId: string, input: IssueInput, staff: 
     if (again) return { ok: true, value: again, message: `Invoice ${again.number} is issued.` };
   }
   const taxCode = taxCodeFor(proposal, settings);
+  // After a cancellation only money going back: never an invoice, nor a variation's credit.
+  if (billingStopped(project) && input.kind !== "credit-note") return fail(CANCELLED_NOTHING_TO_BILL);
   let lines: InvoiceLine[];
   let extra: Partial<Invoice> = {};
   // What it's issued as: a variation that takes money off becomes a credit note (never a negative invoice).

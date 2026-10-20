@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { londonDayKey } from "@/lib/email-budget";
+import { readTextCapped } from "@/lib/http-body";
 import { enforceRateLimit } from "@/lib/rate-limit";
+import { sharedRateLimit } from "@/lib/rate-limit-shared";
 import { getServiceClient } from "@/lib/supabase-server";
 
 /**
@@ -9,6 +12,19 @@ import { getServiceClient } from "@/lib/supabase-server";
  * (never the raw IP) and write it with the service-role key. Unconfigured
  * Supabase → a quiet 200 so the beacon never errors in the client console.
  */
+
+/**
+ * One beacon is one small event (a few hundred bytes). Anything bigger is
+ * refused unread, so nobody can fill the database through this endpoint:
+ * bounded rows, and a shared cap on how many a London day stores.
+ */
+const MAX_EVENT_BYTES = 4096;
+const MAX_META_KEYS = 20;
+const MAX_META_KEY = 40;
+const MAX_META_STRING = 300;
+const MAX_USER_AGENT = 300;
+/** Events stored per London day, across every instance: far above the pilot site's traffic. */
+const EVENTS_PER_DAY = 20_000;
 
 const eventSchema = z.object({
   type: z.string().min(1).max(60),
@@ -22,7 +38,11 @@ const eventSchema = z.object({
   utmCampaign: z.string().max(200).optional(),
   utmTerm: z.string().max(200).optional(),
   utmContent: z.string().max(200).optional(),
-  meta: z.record(z.string(), z.unknown()).optional(),
+  // What track() sends: a few flat facts (a step, a count, a postcode). Never a blob.
+  meta: z
+    .record(z.string().max(MAX_META_KEY), z.union([z.string().max(MAX_META_STRING), z.number().finite(), z.boolean(), z.null()]))
+    .refine((m) => Object.keys(m).length <= MAX_META_KEYS, "too many facts")
+    .optional(),
 });
 
 function hostOf(referrer?: string): string | null {
@@ -40,8 +60,9 @@ export async function POST(request: Request) {
   const limited = enforceRateLimit(request, "track", 600, 60_000);
   if (limited) return limited;
 
-  // Beacons arrive as text/plain; parse defensively either way.
-  const raw = await request.text().catch(() => "");
+  // Beacons arrive as text/plain; parse defensively either way, and never read more than one event's worth.
+  const raw = await readTextCapped(request, MAX_EVENT_BYTES);
+  if (raw === null) return NextResponse.json({ ok: false }, { status: 413 });
   let json: unknown;
   try {
     json = JSON.parse(raw);
@@ -58,6 +79,10 @@ export async function POST(request: Request) {
     // Demo mode: acknowledge so the client never sees an error.
     return NextResponse.json({ ok: true, demo: true });
   }
+
+  // A day's worth of events, then nothing more is stored until tomorrow (London).
+  const day = await sharedRateLimit(`track-day:${londonDayKey(new Date())}`, EVENTS_PER_DAY, 26 * 3600_000);
+  if (!day.ok) return NextResponse.json({ ok: false }, { status: 429 });
 
   const e = parsed.data;
   const h = request.headers;
@@ -83,7 +108,7 @@ export async function POST(request: Request) {
     region: geo.region,
     city: geo.city,
     device: e.device ?? null,
-    user_agent: h.get("user-agent"),
+    user_agent: h.get("user-agent")?.slice(0, MAX_USER_AGENT) || null,
     meta: e.meta ?? null,
   });
 

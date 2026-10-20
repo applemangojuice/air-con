@@ -299,12 +299,23 @@ time if known) it reached us, how, and where it's on file → **Record the
 cancellation**. The project closes as cancelled, unpaid invoices are
 voided, refund and collection tasks are raised, and the family gets an
 acknowledgement. The refund is due within 14 days of the day it reached us.
+Once it's recorded, nothing more can be invoiced on the project: only
+refunds and credit notes. The family's page says the contract is
+cancelled (with the refund and its date), and the install, handover and
+aftercare stages show as cancelled.
+
+If it reached us **after the cancellation period ended**, the form warns
+you before you record it. Then the family is only told we've received it
+and will be in touch in writing: no refund or collection is promised, and
+instead of the refund task you get one to take advice first, then write to
+them.
 
 **Fixing wrong details**
 
 | Wrong | Fix |
 | --- | --- |
-| Name, email, phone, access, parking | Admin box → **Edit contact and access** → **Save contact details**. A new email moves their access to that address |
+| Name, address, postcode, email, phone, access, parking | Admin box → **Edit contact and access** → **Save contact details**. A new email moves their access to that address. A corrected name or address is used from then on; documents already issued keep the details they were issued with |
+| An email that was wrong when the proposal went | Correct it as above. The proposal email to the old address no longer counts, so they can't accept until they've agreed to documents at the new address (their page asks) and you've pressed **Send again** on the proposal email in **Messages** |
 | Pilot number or label | **Change pilot tag** |
 | Survey time or surveyor | Survey box → **Move the survey** / **Change surveyor** |
 | Install dates or crew | **Booking** → **Move the install**, or change the crew and **Save the crew** |

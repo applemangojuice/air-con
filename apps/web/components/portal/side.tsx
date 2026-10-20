@@ -7,6 +7,7 @@ import { fmtDay, fmtInstantDay, money } from "@/lib/format";
 import { primaryCls, secondaryCls, useEchoesNextStep } from "./bits";
 import { useHub } from "./controller";
 import type { HubData } from "./types";
+import { isCancelledProject } from "./view";
 
 /**
  * The hub's supporting cards: updates, contact, documents and money. Each
@@ -107,7 +108,13 @@ export function PaymentsCard({ data, payButton }: { data: HubData; payButton?: R
         {contract !== undefined && (
           <div className="flex justify-between gap-3 py-2">
             <dt className="text-ink-500">Contract total</dt>
-            <dd className="font-semibold tabular-nums text-ink-900">{money(contract)}</dd>
+            {isCancelledProject(data.project) ? (
+              <dd className="tabular-nums text-ink-700">
+                <span className="text-ink-500 line-through">{money(contract)}</span> <span className="font-semibold">cancelled</span>
+              </dd>
+            ) : (
+              <dd className="font-semibold tabular-nums text-ink-900">{money(contract)}</dd>
+            )}
           </div>
         )}
         <div className="flex justify-between gap-3 py-2">
@@ -127,7 +134,9 @@ export function PaymentsCard({ data, payButton }: { data: HubData; payButton?: R
         <ul className="mt-3 space-y-1.5 text-sm">
           {data.invoices.map((i) => {
             const href = i.documentId ? hub.hrefs.document(i.documentId) : null;
-            const label = `${i.number} · ${money(i.totalPence)}${i.status === "paid" ? " · paid" : i.dueOn ? ` · due ${fmtDay(i.dueOn)}` : ""}`;
+            const label = `${i.number} · ${money(i.totalPence)}${
+              i.status === "paid" ? " · paid" : i.settled ? ` · ${i.settled}` : i.kind === "credit-note" ? " · credit note" : i.dueOn ? ` · due ${fmtDay(i.dueOn)}` : ""
+            }`;
             return (
               <li key={i.id} className="text-ink-700">
                 {href ? (
