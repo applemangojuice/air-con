@@ -841,6 +841,18 @@ try {
       check(`${tab}: margin above the 25% minimum after the discount`, /GROSS MARGIN\s*(2[5-9]|[3-9]\d)\.\d%/.test(t), t.match(/GROSS MARGIN[\s\S]{0,40}/)?.[0]);
     }
     check("units read as quantities (no 'per ms')", !(await has(admin, /per ms\b/)));
+    // The design's own planning or noise check (Class G unit count and size, 42 dB(A)) is flagged for an
+    // option: the office tells the family in a note on the proposal (never "planning isn't needed").
+    const suggest = m.getByRole("button", { name: "Start from the suggested note" });
+    if (await suggest.count()) {
+      check("planning or noise: the option says its design check needs a look", await has(admin, /Planning or noise: this option's design check needs a look/));
+      check("issue waits for the planning and noise note", await has(admin, /planning or noise check is in review or blocked for/));
+      await suggest.click();
+      await admin.waitForTimeout(600);
+      const note = await m.getByLabel("Note for the customer").inputValue();
+      check("the suggested note says an application may be needed, never that it isn't", /may be needed/.test(note) && !/not needed|isn't needed/i.test(note), note);
+      ids.planningNote = note;
+    }
     await waitFor(admin, /All changes saved/);
     await shot(admin, "E-builder");
     await m.getByRole("button", { name: "Issue proposal" }).click();
@@ -888,6 +900,7 @@ try {
     check("proposal page shows both options and the pilot price", (await waitFor(customer, /Choose an option/)) && (await has(customer, /Founding pilot price/)));
     check("rooms drawn on their own photos", await has(customer, /Your rooms[\s\S]*LIVING ROOM[\s\S]*MAIN BEDROOM/));
     check("our 2-year workmanship guarantee is in the proposal", await has(customer, /Our workmanship guarantee: 2 years/));
+    if (ids.planningNote) check("the planning and noise note is on their proposal", await has(customer, /Planning and noise[\s\S]*may be needed/));
     check("the deposit is stated", await has(customer, /A 20% deposit of £[\d,]+, when you accept/));
     await shot(customer, "F-proposal");
     await customer.getByRole("button", { name: "Continue", exact: true }).click();
