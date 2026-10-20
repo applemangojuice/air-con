@@ -4943,7 +4943,7 @@ export const RESEARCHED_CATALOGUE: CatalogueItem[] = [
       "maxHeightDiffM": 12,
       "prechargedPipeM": 7,
       "additionalChargeGPerM": 20,
-      "factoryChargeKg": null,
+      "factoryChargeKg": 0.8,
       "releaseHeightM": null,
       "powerSupply": "220-240 V, 50 Hz, single phase",
       "recommendedBreakerA": 10,
