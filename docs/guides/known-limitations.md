@@ -200,6 +200,23 @@ says what to do instead. Approvals that need a professional are in
    the block; the height is the surveyor's estimate. *Instead:* confirm the
    route with building control (or the Regulator) for any flat before
    booking, and keep the fire-stopping product's data sheet with the job.
+9h. **A design can't change once the proposal is accepted** (round 10).
+   Everything the design checks (the R32 room size per room, the
+   manufacturer's limits, noise and planning) and everything built from it
+   (the kit, the runsheet's steps per unit, the commissioning certificate,
+   the handover pack) comes from the approved design, and a variation is
+   only a description and a price. So the crew's variation sheet asks first
+   whether the change adds, removes or swaps a unit, or moves one to another
+   room or outdoor position: **Yes** is refused as a variation and goes to
+   the office as a question; the office ticks the same before any variation
+   goes to the family. But: *there's no design-change route* (a new design
+   version after acceptance, its own sign-off, the purchase orders and the
+   runsheet rebuilt): a variation from an older phone carries no answer (the
+   office's tick still holds it), and the tick is the office's word, not a
+   check of the change. *Instead:* install what was designed and quote the
+   change as a new job for the same home (**New pilot**: its own design,
+   signed off by the technical lead, its own proposal); if the family won't
+   go ahead without it, talk it through before day 1.
 
 ## The field app
 

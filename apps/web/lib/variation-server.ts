@@ -66,12 +66,14 @@ export async function notifyVariation(issue: Issue): Promise<void> {
 
 /**
  * The office checked a variation proposed on site: send it to the customer
- * at the price as corrected. Permission (proposal.issue) is the caller's job.
+ * at the price as corrected, once they confirm it keeps the designed units
+ * where they are (a change to them is a new design, never a variation).
+ * Permission (proposal.issue) is the caller's job.
  */
 export async function sendVariation(
   projectId: string,
   issueId: string,
-  input: { title?: string; description: string; priceDeltaNetPence: number },
+  input: { title?: string; description: string; priceDeltaNetPence: number; unitsUnchanged: boolean },
   staff: StaffMember,
 ): Promise<Outcome<Issue>> {
   const issue = await issuesRepo.get(issueId);
@@ -89,7 +91,7 @@ export async function sendVariation(
     action: "issue.variation-sent",
     entity: "issue",
     entityId: issue.id,
-    detail: { projectId, estimatedNetPence: issue.variation?.priceDeltaNetPence, sentNetPence: saved.variation?.priceDeltaNetPence },
+    detail: { projectId, estimatedNetPence: issue.variation?.priceDeltaNetPence, sentNetPence: saved.variation?.priceDeltaNetPence, unitsUnchanged: true },
   });
   await notifyVariation(saved);
   return { ok: true, value: saved, message: `Variation #${saved.number} sent to the customer for their OK.` };

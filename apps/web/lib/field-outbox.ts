@@ -73,7 +73,8 @@ export type SyncOp = (
       severity: Severity;
       blocking: boolean;
       mediaIds: string[];
-      variation?: { description: string; priceDeltaNetPence: number };
+      /** unitsUnchanged: the crew's answer to DESIGN_CHANGE_QUESTION (missing from an older phone). */
+      variation?: { description: string; priceDeltaNetPence: number; unitsUnchanged?: boolean };
       at: string;
     }
 ) & { by?: CapturedBy };

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import {
   CANCELLATION_CHANNELS,
+  DESIGN_CHANGE_CONFIRMATION,
   GATE_IDS,
   ISSUE_KIND_LABEL,
   LEARNING_PROMPTS,
@@ -553,16 +554,23 @@ const sendVariationSchema = z.object({
     .string()
     .trim()
     .regex(/^-?£?\d{1,6}(\.\d{1,2})?$/, "Enter the price change in pounds, like 120 or -40.50."),
+  unitsUnchanged: z.literal("on", { message: `Tick "${DESIGN_CHANGE_CONFIRMATION}" to send it. If it does change them, reject this variation: the change needs a new design.` }),
 });
 
 /** The office checked a variation proposed on site: it goes to the customer, at this price. */
 export async function sendVariationAction(projectId: string, fd: FormData): Promise<ActionResult> {
   const staff = await guard(projectId, "proposal.issue");
   if (!staff) return notFound();
-  const parsed = sendVariationSchema.safeParse({ issueId: field(fd, "issueId"), title: field(fd, "title"), description: field(fd, "description"), pounds: field(fd, "pounds") });
+  const parsed = sendVariationSchema.safeParse({
+    issueId: field(fd, "issueId"),
+    title: field(fd, "title"),
+    description: field(fd, "description"),
+    pounds: field(fd, "pounds"),
+    unitsUnchanged: field(fd, "unitsUnchanged"),
+  });
   if (!parsed.success) return refused(firstIssue(parsed.error));
   const pence = Math.round(Number(parsed.data.pounds.replace("£", "")) * 100);
-  const result = await sendVariation(projectId, parsed.data.issueId, { title: parsed.data.title, description: parsed.data.description, priceDeltaNetPence: pence }, staff);
+  const result = await sendVariation(projectId, parsed.data.issueId, { title: parsed.data.title, description: parsed.data.description, priceDeltaNetPence: pence, unitsUnchanged: true }, staff);
   if (!result.ok) return refused(result.error);
   refresh(projectId);
   return done(result.message ?? "Sent to the customer.");

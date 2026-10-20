@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useState, type ReactNode } from "react";
-import { ISSUE_KIND_LABEL, LEARNING_PROMPTS, PROJECT_STAGES, ROLE_LABEL, STAFF_ROLES, STAGE_INFO, TIME_KINDS, TIME_KIND_LABEL, GATE_IDS, GATE_LABEL, type IssueKind } from "@aircon/domain";
+import { DESIGN_CHANGE_CONFIRMATION, ISSUE_KIND_LABEL, LEARNING_PROMPTS, PROJECT_STAGES, ROLE_LABEL, STAFF_ROLES, STAGE_INFO, TIME_KINDS, TIME_KIND_LABEL, GATE_IDS, GATE_LABEL, type IssueKind } from "@aircon/domain";
 import { ActionForm, SubmitButton } from "./action-form";
 import type { ActionResult } from "./types";
 
@@ -654,6 +654,10 @@ export function VariationSendForm({
           </L>
           <input id={`${id}-p`} name="pounds" inputMode="decimal" required defaultValue={(netPence / 100).toFixed(2)} className={compactInput} />
         </div>
+        <label className="flex items-start gap-2 text-sm text-ink-900 sm:col-span-2">
+          <input type="checkbox" name="unitsUnchanged" required className="mt-0.5 h-4 w-4 accent-accent-600" />
+          <span>{DESIGN_CHANGE_CONFIRMATION}</span>
+        </label>
         <div className="flex items-end">
           <SubmitButton busyLabel="Sending…">Send to the customer for their OK</SubmitButton>
         </div>

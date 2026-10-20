@@ -334,9 +334,19 @@ you. Pick what kind and how serious, add a title, details and a photo. Tick
 
 **Request a variation** (**Actions** → **Request a variation**) when the
 customer asks for more, or the job needs something that isn't in the scope:
-a longer pipe run, a pump, a unit moved. Write **The change, in a few
+a longer pipe run, a pump, trunking, a unit moved along the same wall.
+First answer **Does it add, remove or swap a unit, or move one to another
+room or outdoor position?** → **No**. Then write **The change, in a few
 words**, **Why it's needed (the customer reads this)**, and an **Estimated
 price change, £ before VAT** → **Send to the office**.
+
+> **A unit added, swapped, removed or moved to another room or outdoor
+> position is a design change, not a variation.** Answer **Yes** and the
+> sheet says so: the R32 room size, the manufacturer's limits, the kit, the
+> runsheet and the certificate all come from the approved design, so a
+> variation can't carry it. **Send to the office as a question** (say what
+> the customer asked for), install what was designed, and the office quotes
+> the change as a new job, designed and signed off by the technical lead.
 
 > **Then wait.** The office checks the price, the family approves or
 > declines it on their page, and its status shows under **Issues**. Never do

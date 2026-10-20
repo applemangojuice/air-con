@@ -1169,6 +1169,17 @@ try {
     sheet = await openActions(installer);
     await sheet.getByRole("button", { name: /^Request a variation/ }).click();
     sheet = installer.locator('[role="dialog"]').last();
+    // Round 10: one question first. "Yes" (a unit added, swapped or moved to another room) is a new
+    // design: the sheet says so and sends it as a question, never priced as a variation.
+    const unitsQ = sheet.locator("fieldset").filter({ hasText: "Does it add, remove or swap a unit" });
+    await unitsQ.getByRole("button", { name: "Yes", exact: true }).click();
+    check(
+      "a change to the units is refused as a variation, with what to do instead",
+      (await sheet.getByText(/That's a design change, not a variation/).count()) === 1 &&
+        (await sheet.getByLabel("Estimated price change, £ before VAT").count()) === 0 &&
+        (await sheet.getByRole("button", { name: "Send to the office as a question" }).count()) === 1,
+    );
+    await unitsQ.getByRole("button", { name: "No", exact: true }).click();
     await sheet.getByLabel("The change, in a few words").fill("DEMO: 2 m more trunking round the bay");
     await sheet.getByLabel("Why it's needed (the customer reads this)").fill("The pipe run round the bay window is longer than measured, so it needs 2 m more trunking to stay neat.");
     // A stray tap on the backdrop doesn't lose what's been written.
@@ -1197,6 +1208,8 @@ try {
     const review = admin.locator("main form").filter({ has: admin.getByLabel("Price change, £ before VAT") });
     check("…with the installer's estimate to check", (await review.getByLabel("Price change, £ before VAT").inputValue()) === "150.00");
     await review.getByLabel("Price change, £ before VAT").fill("120");
+    check("…with the crew's answer on the units", await has(admin, /The crew says it doesn't add, remove or swap a unit/));
+    await review.getByLabel(/^It doesn't add, remove or swap a unit/).check();
     await review.getByRole("button", { name: "Send to the customer for their OK" }).click();
     check("the office sends it at the checked price", await waitFor(admin, /£120 before VAT · Waiting for the customer/));
 

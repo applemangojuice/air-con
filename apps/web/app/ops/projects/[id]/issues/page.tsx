@@ -161,6 +161,12 @@ export default async function ProjectIssuesPage({ params }: { params: Promise<{ 
                       {i.variation?.status === "draft" && isOpen(i) && canPrice && (
                         <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50/60 p-3">
                           <p className="mb-2 text-sm font-semibold text-ink-900">Check it, then send it to the customer</p>
+                          <p className="mb-2 text-sm text-ink-700">
+                            {i.variation.unitsUnchangedOnSite
+                              ? "The crew says it doesn't add, remove or swap a unit, or move one to another room or outdoor position."
+                              : "The crew wasn't asked whether it changes the units (an older phone): check with them."}{" "}
+                            A change to the units or where they go needs a new design (the R32 room size, the manufacturer&apos;s limits, the kit, the runsheet and the certificate come from it): reject this and quote it as a new job.
+                          </p>
                           <VariationSendForm
                             action={sendVariationAction.bind(null, id)}
                             issueId={i.id}

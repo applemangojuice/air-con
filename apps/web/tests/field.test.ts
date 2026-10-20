@@ -544,10 +544,18 @@ test("variations from site wait for the office, then go to the customer at the c
   const seeded = await seed("in-progress");
   // A customer to email.
   await requireDb().from("projects").update({ project: { ...seeded, customer: { ...seeded.customer, email: "demo.customer@example.com" } } }).eq("id", PROJECT);
+  // Round 10: a change to the units ("yes" to the question) is a new design, refused as a variation.
+  const unit: SyncOp = { type: "issue", id: "7f7f7f7f-cccc-4ccc-8ccc-00000000f60b", projectId: PROJECT, kind: "variation", title: "An extra unit in the box room", severity: "medium", blocking: false, mediaIds: [], variation: { description: "They'd like the box room done too.", priceDeltaNetPence: 90_000, unitsUnchanged: false }, at: AT };
+  const [ru] = await field.processSyncBatch(INSTALLER, [unit]);
+  assert.equal(ru!.ok, false);
+  assert.ok(!ru!.ok && ru!.permanent && /changes the design, so it can't be a variation[\s\S]*new job/.test(ru!.error), JSON.stringify(ru));
+  assert.equal((await issuesRepo.listForProject(PROJECT)).length, 0, "nothing priced reaches the office");
+  // An older phone sends no answer: it still lands, and the office's tick is the gate.
   const v: SyncOp = { type: "issue", id: "7f7f7f7f-cccc-4ccc-8ccc-00000000f60c", projectId: PROJECT, kind: "variation", title: "Condensate pump in the bedroom", severity: "medium", blocking: false, mediaIds: [], variation: { description: "No fall to the outside: a pump is needed.", priceDeltaNetPence: 18_000 }, at: AT };
   const [r] = await field.processSyncBatch(INSTALLER, [v]);
   assert.equal(r!.ok, true);
   const [issue] = await issuesRepo.listForProject(PROJECT);
+  assert.equal(issue!.variation?.unitsUnchangedOnSite, undefined);
   assert.equal(issue!.variation?.status, "draft");
   assert.equal(issue!.customerVisible, false, "an estimate from site never reaches the customer unchecked");
   assert.equal(issue!.status, "open");
@@ -557,18 +565,22 @@ test("variations from site wait for the office, then go to the customer at the c
   assert.ok((await messages()).some((m) => m.event === "team-alert"), "the office hears about it");
 
   const { sendVariation } = await import("../lib/variation-server.ts");
-  const refusedSub = await sendVariation(PROJECT, issue!.id, { description: "Pump", priceDeltaNetPence: 1 }, SUB);
+  const refusedSub = await sendVariation(PROJECT, issue!.id, { description: "Pump", priceDeltaNetPence: 1, unitsUnchanged: true }, SUB);
   assert.equal(refusedSub.ok, false, "subcontractors can't send prices");
   const office = staffMember("aa000000-0000-4000-8000-0000000000f9", { roles: ["admin"] });
-  const sent = await sendVariation(PROJECT, issue!.id, { description: "No fall to the outside, so a condensate pump is needed.", priceDeltaNetPence: 15_000 }, office);
+  const unticked = await sendVariation(PROJECT, issue!.id, { description: "No fall to the outside, so a condensate pump is needed.", priceDeltaNetPence: 15_000, unitsUnchanged: false }, office);
+  assert.ok(!unticked.ok && /Confirm it doesn't add, remove or swap a unit/.test(unticked.error), "the office confirms the units are unchanged first");
+  assert.equal((await issuesRepo.get(issue!.id))!.variation?.status, "draft");
+  const sent = await sendVariation(PROJECT, issue!.id, { description: "No fall to the outside, so a condensate pump is needed.", priceDeltaNetPence: 15_000, unitsUnchanged: true }, office);
   assert.equal(sent.ok, true);
+  assert.equal((await issuesRepo.get(issue!.id))!.variation?.unitsUnchangedConfirmed?.by, office.name);
   const after = (await issuesRepo.get(issue!.id))!;
   assert.equal(after.variation?.status, "proposed");
   assert.equal(after.variation?.priceDeltaNetPence, 15_000, "the office's price, not the estimate");
   assert.equal(after.customerVisible, true);
   assert.equal(after.status, "awaiting-customer");
   assert.ok((await messages()).some((m) => m.event === "variation-approval"), "now the customer is asked");
-  const again = await sendVariation(PROJECT, issue!.id, { description: "Again", priceDeltaNetPence: 1 }, office);
+  const again = await sendVariation(PROJECT, issue!.id, { description: "Again", priceDeltaNetPence: 1, unitsUnchanged: true }, office);
   assert.equal(again.ok, false, "sent once");
 });
 

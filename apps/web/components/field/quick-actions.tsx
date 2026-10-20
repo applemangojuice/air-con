@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
+  DESIGN_CHANGE_QUESTION,
   ISSUE_KIND_LABEL,
   LEARNING_PROMPTS,
   SEVERITY_LABEL,
@@ -566,6 +567,9 @@ function IssueSheet({ open, onClose, data, variation }: { open: boolean; onClose
   const [severity, setSeverity] = useState<Severity>(defaultsForKind(variation ? "variation" : "defect").severity);
   const [blocking, setBlocking] = useState(defaultsForKind(variation ? "variation" : "defect").blocking);
   const [pounds, setPounds] = useState("");
+  // A variation's one question: does it change the units or where they go? "yes" is a new design, sent as a question.
+  const [unitsChange, setUnitsChange] = useState<null | "no" | "yes">(null);
+  const designChange = variation && unitsChange === "yes";
   const [photo, setPhoto] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -581,6 +585,7 @@ function IssueSheet({ open, onClose, data, variation }: { open: boolean; onClose
       setTitle("");
       setDetail("");
       setPounds("");
+      setUnitsChange(null);
       setPhoto(null);
       setSaved(false);
       const d = defaultsForKind(variation ? "variation" : "defect");
@@ -589,7 +594,7 @@ function IssueSheet({ open, onClose, data, variation }: { open: boolean; onClose
     }
     if (!open) setError(null);
   }, [open, variation, saved]);
-  const dirty = !saved && Boolean(title.trim() || detail.trim() || pounds.trim() || photo);
+  const dirty = !saved && Boolean(title.trim() || detail.trim() || pounds.trim() || photo || unitsChange);
 
   function pick(k: IssueKind) {
     setKind(k);
@@ -602,7 +607,10 @@ function IssueSheet({ open, onClose, data, variation }: { open: boolean; onClose
     setError(null);
     if (title.trim().length < 3) return setError("Give it a short title.");
     let pence = 0;
-    if (variation) {
+    if (variation && !unitsChange) return setError("Answer the question about the units first.");
+    if (designChange) {
+      if (detail.trim().length < 3) return setError("Say what the customer asked for, for the office.");
+    } else if (variation) {
       const v = parseReading(pounds);
       if (v === null) return setError("Enter your estimate in pounds (before any VAT).");
       pence = Math.round(v * 100);
@@ -621,21 +629,24 @@ function IssueSheet({ open, onClose, data, variation }: { open: boolean; onClose
           ),
         );
       }
+      // A change to the units is a new design: it goes to the office as a question, never priced as a variation.
+      const asKind: IssueKind = designChange ? "clarification" : kind;
+      const asTitle = designChange ? `Design change asked for: ${title.trim()}`.slice(0, 140) : title.trim();
       await outbox.enqueue(
         {
           type: "issue",
           id: newOpId(),
           projectId: data.header.projectId,
-          kind,
-          title: title.trim(),
+          kind: asKind,
+          title: asTitle,
           ...(detail.trim() ? { detail: detail.trim() } : {}),
-          severity,
-          blocking,
+          severity: designChange ? "medium" : severity,
+          blocking: designChange ? false : blocking,
           mediaIds,
-          ...(variation ? { variation: { description: detail.trim(), priceDeltaNetPence: pence } } : {}),
+          ...(variation && !designChange ? { variation: { description: detail.trim(), priceDeltaNetPence: pence, unitsUnchanged: true } } : {}),
           at: nowIso(),
         },
-        `${variation ? "Variation" : ISSUE_KIND_LABEL[kind]}: ${title.trim()}`,
+        `${variation && !designChange ? "Variation" : ISSUE_KIND_LABEL[asKind]}: ${asTitle}`,
       );
       setSaved(true);
     } catch (err) {
@@ -663,7 +674,7 @@ function IssueSheet({ open, onClose, data, variation }: { open: boolean; onClose
           </button>
         ) : (
           <button type="button" disabled={busy} onClick={save} className={`${PRIMARY} w-full`}>
-            {busy ? "Saving…" : variation ? "Send to the office" : "Raise it"}
+            {busy ? "Saving…" : designChange ? "Send to the office as a question" : variation ? "Send to the office" : "Raise it"}
           </button>
         )
       }
@@ -674,10 +685,16 @@ function IssueSheet({ open, onClose, data, variation }: { open: boolean; onClose
             Saved on the phone.{" "}
             {state.online ? "Sending now: check the badge at the top." : "It goes to the office when you're back in signal."}
           </p>
-          {variation && (
+          {designChange ? (
             <p className="rounded-2xl bg-amber-50 px-4 py-3 text-base font-semibold text-amber-900">
-              Don&apos;t do this work until the customer approves it. The office checks the price and sends it to them; its status shows under Issues.
+              Sent as a question. Don&apos;t fit, remove or move a unit that isn&apos;t in the design: install what was designed. The office quotes the change as a new job.
             </p>
+          ) : (
+            variation && (
+              <p className="rounded-2xl bg-amber-50 px-4 py-3 text-base font-semibold text-amber-900">
+                Don&apos;t do this work until the customer approves it. The office checks the price and sends it to them; its status shows under Issues.
+              </p>
+            )
           )}
         </div>
       ) : (
@@ -695,6 +712,24 @@ function IssueSheet({ open, onClose, data, variation }: { open: boolean; onClose
               {kind === "safety" && <p className="mt-2 rounded-xl bg-red-50 px-3 py-2 text-sm font-semibold text-red-900">Safety: stop work in that area now. Suspected asbestos is never drilled.</p>}
             </fieldset>
           )}
+          {variation && (
+            <fieldset>
+              <legend className="mb-2 text-sm font-semibold text-ink-900">{DESIGN_CHANGE_QUESTION}</legend>
+              <div className="grid grid-cols-2 gap-2">
+                {(["no", "yes"] as const).map((v) => (
+                  <button key={v} type="button" aria-pressed={unitsChange === v} onClick={() => setUnitsChange(v)} className={`min-h-12 rounded-2xl border px-3 text-base font-semibold ${unitsChange === v ? "border-accent-600 bg-accent-50 text-accent-700" : "border-line bg-white text-ink-900"}`}>
+                    {v === "no" ? "No" : "Yes"}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-1.5 text-xs text-ink-500">A longer pipe run, a pump, trunking or a unit moved along the same wall is a No.</p>
+              {designChange && (
+                <p role="note" className="mt-2 rounded-xl bg-red-50 px-3 py-2 text-sm font-semibold text-red-900">
+                  That&apos;s a design change, not a variation: the R32 room size, the manufacturer&apos;s limits, the kit, the runsheet and the certificate all come from the approved design. Install what was designed, and send this to the office as a question: they quote it as a new job, designed and signed off by the technical lead.
+                </p>
+              )}
+            </fieldset>
+          )}
           <div>
             <label htmlFor="issue-title" className="mb-1.5 block text-sm font-semibold text-ink-900">
               {variation ? "The change, in a few words" : "Title"}
@@ -703,11 +738,11 @@ function IssueSheet({ open, onClose, data, variation }: { open: boolean; onClose
           </div>
           <div>
             <label htmlFor="issue-detail" className="mb-1.5 block text-sm font-semibold text-ink-900">
-              {variation ? "Why it's needed (the customer reads this)" : "Details (optional)"}
+              {designChange ? "What the customer asked for (for the office)" : variation ? "Why it's needed (the customer reads this)" : "Details (optional)"}
             </label>
             <textarea id="issue-detail" rows={3} value={detail} onChange={(e) => setDetail(e.target.value)} className={INPUT} />
           </div>
-          {variation && (
+          {variation && !designChange && (
             <div>
               <label htmlFor="issue-price" className="mb-1.5 block text-sm font-semibold text-ink-900">
                 Estimated price change, £ before VAT

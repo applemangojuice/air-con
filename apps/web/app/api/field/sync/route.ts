@@ -70,7 +70,9 @@ const opSchema = z.discriminatedUnion("type", [
     severity: z.enum(["low", "medium", "high", "critical"]),
     blocking: z.boolean(),
     mediaIds: z.array(uuid).max(6),
-    variation: z.object({ description: z.string().trim().min(3).max(2000), priceDeltaNetPence: z.number().int().min(-10_000_000).max(10_000_000) }).optional(),
+    variation: z
+      .object({ description: z.string().trim().min(3).max(2000), priceDeltaNetPence: z.number().int().min(-10_000_000).max(10_000_000), unitsUnchanged: z.boolean().optional() })
+      .optional(),
     by,
     at,
   }),

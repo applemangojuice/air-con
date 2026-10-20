@@ -93,7 +93,7 @@ async function acceptReduction(id: string): Promise<string> {
       variation: { description: "DEMO: no trunking needed", priceDeltaNetPence: -4_050, taxCode: "outside-scope", officeReview: true },
     }),
   );
-  const sent = await sendVariation(id, draft.id, { description: "DEMO: no trunking needed", priceDeltaNetPence: -4_050 }, OFFICE);
+  const sent = await sendVariation(id, draft.id, { description: "DEMO: no trunking needed", priceDeltaNetPence: -4_050, unitsUnchanged: true }, OFFICE);
   assert.ok(sent.ok, !sent.ok ? sent.error : "");
   const accepted = await decideVariation(id, { customerId: project.customer.customerId! }, draft.id, "accept", { name: "Jordan Okafor", agreed: true });
   assert.ok(accepted.ok, JSON.stringify(accepted));

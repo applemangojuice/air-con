@@ -44,6 +44,7 @@ import {
   TWO_PERSON_LIFT_KG,
   transitionIssue,
   variationStart,
+  DESIGN_CHANGE_REFUSAL,
   withExceptionReview,
   asBuiltRunsFromJob,
   healthSafetyFileFor,
@@ -1095,7 +1096,7 @@ async function raiseIssue(
     blocking?: boolean;
     mediaIds?: string[];
     at: string;
-    variation?: { description: string; priceDeltaNetPence: number };
+    variation?: { description: string; priceDeltaNetPence: number; unitsUnchanged?: boolean };
   },
 ): Promise<{ issue: Issue; created: boolean }> {
   const existing = await issuesRepo.get(input.id);
@@ -1127,6 +1128,7 @@ async function raiseIssue(
             priceDeltaNetPence: input.variation.priceDeltaNetPence,
             taxCode,
             officeReview: true,
+            ...(input.variation.unitsUnchanged !== undefined ? { unitsUnchanged: input.variation.unitsUnchanged } : {}),
           },
         }
       : {}),
@@ -1231,6 +1233,8 @@ async function syncIssue(ctx: BatchContext, op: Extract<SyncOp, { type: "issue" 
     const media = await mediaRepo.get(id);
     if (!media || media.projectId !== op.projectId) return PERMANENT(op.id, "A photo on this issue didn't arrive. Raise it again with the photo.");
   }
+  // A change to the units or where they go is a new design, never a variation (issues.ts).
+  if (op.variation?.unitsUnchanged === false) return PERMANENT(op.id, DESIGN_CHANGE_REFUSAL);
   const { created } = await raiseIssue(project, ctx.staff, {
     id: op.id,
     kind: op.kind,

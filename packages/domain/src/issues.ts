@@ -72,6 +72,14 @@ export interface Issue {
     acceptance?: VariationAcceptance;
     /** The customer's written request to start the extra work inside its own cancellation period, as the office recorded it. */
     earlyStart?: VariationEarlyStart;
+    /**
+     * The crew's answer on site to DESIGN_CHANGE_QUESTION: true when they
+     * said the change keeps the designed units where they are. Missing on a
+     * variation from an older phone, or from before the question.
+     */
+    unitsUnchangedOnSite?: boolean;
+    /** Who in the office confirmed the same before it went to the customer, and when. */
+    unitsUnchangedConfirmed?: { by: string; at: string };
   };
   resolution?: string;
   resolvedAt?: string;
@@ -120,6 +128,27 @@ export interface VariationEarlyStart {
   recordedBy: string;
   recordedAt: string;
 }
+
+/* ---------------- a variation never changes the design ---------------- */
+
+/**
+ * A variation is a description and a price. Everything the design checked
+ * (the R32 room size for each room, the manufacturer's limits, noise and
+ * planning for the outdoor position) and everything built from it (the
+ * kit, the runsheet's steps per unit, the commissioning certificate, the
+ * handover pack) comes from the approved design, which is locked once the
+ * proposal is accepted. So a change that adds, removes or swaps a unit, or
+ * moves one to another room or outdoor position, can't be a variation: it
+ * needs a new design and the technical lead's sign-off.
+ */
+export const DESIGN_CHANGE_QUESTION = "Does it add, remove or swap a unit, or move one to another room or outdoor position?";
+
+/** Why such a change is refused as a variation, and what to do instead. */
+export const DESIGN_CHANGE_REFUSAL =
+  "That changes the design, so it can't be a variation: the R32 room size, the manufacturer's limits, the noise and planning checks, the kit, the runsheet and the certificate all come from the approved design. Install what was designed, and the office quotes the change as a new job (its own design, signed off by the technical lead).";
+
+/** The office's confirmation, before a variation goes to the customer. */
+export const DESIGN_CHANGE_CONFIRMATION = "It doesn't add, remove or swap a unit, or move one to another room or outdoor position";
 
 /* ---------------- a change's own right to cancel ---------------- */
 
@@ -382,18 +411,21 @@ export function createIssue(input: {
    * waits for the office to check its price; only then does the customer see
    * it (sendVariationToCustomer).
    */
-  variation?: { description: string; priceDeltaNetPence: number; taxCode: TaxCodeId; officeReview?: boolean };
+  variation?: { description: string; priceDeltaNetPence: number; taxCode: TaxCodeId; officeReview?: boolean; unitsUnchanged?: boolean };
 }): Issue {
   const d = defaultsForKind(input.kind);
   const title = input.title.trim();
   if (!title) throw new Error("An issue needs a title.");
   const detail = input.detail?.trim();
   const review = Boolean(input.variation?.officeReview);
+  // The crew said it changes the units or where they go: that's a new design, never a variation.
+  if (input.variation?.unitsUnchanged === false) throw new Error(DESIGN_CHANGE_REFUSAL);
   const variation = input.variation
     ? {
         description: input.variation.description.trim() || title,
         ...variationPricing(input.variation.priceDeltaNetPence, input.variation.taxCode),
         status: review ? ("draft" as const) : ("proposed" as const),
+        ...(input.variation.unitsUnchanged === true ? { unitsUnchangedOnSite: true } : {}),
       }
     : undefined;
   const toCustomer = Boolean(variation) && !review;
@@ -434,17 +466,22 @@ export const CUSTOMER_DECIDES_ACTION = "Customer to approve or decline in their 
  * The office has checked a variation proposed on site: it goes to the
  * customer with the price as corrected (re-priced on the contract's tax
  * code), customer-visible, waiting for their yes or no. Only a draft,
- * still-open variation can be sent; anything else throws.
+ * still-open variation can be sent, and only once the office confirms it
+ * keeps the designed units where they are (DESIGN_CHANGE_CONFIRMATION):
+ * anything else throws.
  */
 export function sendVariationToCustomer(
   issue: Issue,
-  input: { title?: string; description: string; priceDeltaNetPence: number; taxCode: TaxCodeId },
+  input: { title?: string; description: string; priceDeltaNetPence: number; taxCode: TaxCodeId; unitsUnchanged: boolean },
   by: string,
   now: string,
 ): Issue {
   if (issue.kind !== "variation" || !issue.variation) throw new Error("That isn't a variation.");
   if (issue.variation.status !== "draft") throw new Error("That variation has already gone to the customer.");
   if (!isOpen(issue)) throw new Error("That variation was withdrawn. Reopen it first.");
+  if (input.unitsUnchanged !== true) {
+    throw new Error(`Confirm it doesn't add, remove or swap a unit, or move one to another room or outdoor position. If it does, reject this variation: ${DESIGN_CHANGE_REFUSAL}`);
+  }
   if (!Number.isFinite(input.priceDeltaNetPence)) throw new Error("Enter the price change.");
   const description = input.description.trim();
   if (description.length < 3) throw new Error("Describe the change for the customer.");
@@ -459,13 +496,19 @@ export function sendVariationToCustomer(
   delete next.ownerStaffId;
   delete next.ownerName;
   next.nextAction = CUSTOMER_DECIDES_ACTION;
-  next.variation = { description, ...amounts, status: "proposed" };
+  next.variation = {
+    description,
+    ...amounts,
+    status: "proposed",
+    ...(issue.variation.unitsUnchangedOnSite ? { unitsUnchangedOnSite: true } : {}),
+    unitsUnchangedConfirmed: { by: by.trim() || "Unknown", at: now },
+  };
   next.history = [
     ...(next.history ?? []),
     {
       at: now,
       by: by.trim() || "Unknown",
-      note: `Checked and sent to the customer at ${gbp(amounts.priceDeltaNetPence)}${amounts.priceDeltaNetPence < 0 ? " off" : ""} before VAT${changed ? ` (estimated on site at ${gbp(issue.variation.priceDeltaNetPence)})` : ""}.`,
+      note: `Checked and sent to the customer at ${gbp(amounts.priceDeltaNetPence)}${amounts.priceDeltaNetPence < 0 ? " off" : ""} before VAT${changed ? ` (estimated on site at ${gbp(issue.variation.priceDeltaNetPence)})` : ""}. Confirmed it keeps the designed units where they are.`,
       status: "awaiting-customer",
     },
   ];

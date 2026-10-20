@@ -139,7 +139,7 @@ test("a variation is priced and invoiced on the contract's tax code, never on th
   assert.equal(draft.variation?.taxCode, "standard-20");
   // Settings change after acceptance (VAT unticked by mistake): the contract's code still rules.
   await settingsRepo.setValue(settingsRepo.PILOT_SETTINGS_KEY, mergeSettings({ ...registered, tax: { ...registered.tax, vatRegistered: false } }), "test");
-  const sent = await sendVariation(demo3.id, draft.id, { description: "A condensate pump in the loft (DEMO)", priceDeltaNetPence: 10_000 }, OFFICE);
+  const sent = await sendVariation(demo3.id, draft.id, { description: "A condensate pump in the loft (DEMO)", priceDeltaNetPence: 10_000, unitsUnchanged: true }, OFFICE);
   assert.ok(sent.ok, !sent.ok ? sent.error : "");
   assert.deepEqual([sent.value.variation?.priceDeltaNetPence, sent.value.variation?.taxPence, sent.value.variation?.totalDeltaPence, sent.value.variation?.taxCode], [10_000, 2_000, 12_000, "standard-20"]);
   const accepted = await decideVariation(demo3.id, { customerId: project.customer.customerId! }, draft.id, "accept", { name: "Jordan Okafor", agreed: true });

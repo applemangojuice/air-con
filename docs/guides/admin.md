@@ -331,9 +331,21 @@ with their names; the planning consent item adds itself before day 1.
 - During the day the **Install** box shows the runsheet's progress, the
   photos and any issues. A blocking issue holds the job: answer it fast.
 - **A variation** (extra work): the crew sends it to you with an estimate.
-  Check the price → **Send to the customer for their OK**. The family
-  approves or declines on their page. Tell the crew not to start until it
-  says approved.
+  Check the price, tick **It doesn't add, remove or swap a unit, or move one
+  to another room or outdoor position** → **Send to the customer for their
+  OK**. The family approves or declines on their page. Tell the crew not to
+  start until it says approved.
+- **A design change** (a unit added, removed or swapped, or moved to another
+  room or outdoor position) can't be a variation: the design is locked once
+  the proposal is accepted, and the R32 room size, the manufacturer's limits,
+  noise and planning, the kit, the runsheet and the certificate all come from
+  it. The crew's phone sends it to you as a question ("Design change asked
+  for: …"); a variation that turns out to be one, **Reject** it with the
+  reason. The job goes ahead as designed; quote the change as a new job for
+  the same home (**New pilot**: its own survey notes, design signed off by the
+  technical lead, proposal and cancellation rights). If the family won't go
+  ahead without it before day 1, talk it through with them (§5 if they
+  cancel).
 - **A variation over £42** is treated as its own off-premises contract
   until a solicitor says otherwise: its emails carry the cancellation
   information and the model form, and the family can cancel it within 14
@@ -503,7 +515,7 @@ them.
 | Survey time or surveyor | Survey box → **Move the survey** / **Change surveyor** |
 | Install dates or crew | **Booking** → **Move the install**, or change the crew and **Save the crew** |
 | A proposal not yet accepted | **Revise: start version 2** |
-| A proposal already accepted | It's the contract: use a variation (the family approves the change and its price) |
+| A proposal already accepted | It's the contract: use a variation (the family approves the change and its price). A change to the units or the rooms they serve isn't a variation: quote it as a new job (§3.9) |
 | A payment | **Record a refund** or a credit note |
 | An issue closed by mistake | **Issues** → **Reopen** |
 

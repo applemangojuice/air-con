@@ -1,6 +1,9 @@
 import { strict as assert } from "node:assert";
 import { test } from "node:test";
 import {
+  DESIGN_CHANGE_CONFIRMATION,
+  DESIGN_CHANGE_QUESTION,
+  DESIGN_CHANGE_REFUSAL,
   ISSUE_KIND_LABEL,
   ISSUE_STATUS_LABEL,
   createIssue,
@@ -13,6 +16,7 @@ import {
   variationCancellationEndsOn,
   variationHasOwnRight,
   variationPricing,
+  variationContent,
   variationStart,
   type Issue,
   type IssueKind,
@@ -121,7 +125,7 @@ test("a variation proposed on site waits for the office; sending it re-prices it
   assert.match(draft.nextAction ?? "", /Check the price and send it to the customer/);
   assert.match(draft.history[0]!.note, /office checks the price/);
 
-  const sent = sendVariationToCustomer(draft, { description: "  2 m of trunking round the bay window.  ", priceDeltaNetPence: 12_000, taxCode: "standard-20" }, "DEMO Ada", "2026-11-10T12:00:00.000Z");
+  const sent = sendVariationToCustomer(draft, { description: "  2 m of trunking round the bay window.  ", priceDeltaNetPence: 12_000, taxCode: "standard-20", unitsUnchanged: true }, "DEMO Ada", "2026-11-10T12:00:00.000Z");
   assert.equal(draft.variation?.status, "draft", "pure");
   assert.equal(sent.variation?.status, "proposed");
   assert.equal(sent.status, "awaiting-customer");
@@ -132,10 +136,44 @@ test("a variation proposed on site waits for the office; sending it re-prices it
   assert.equal(sent.variation?.taxCode, "standard-20", "re-priced on the contract's code, and the code kept");
   assert.match(sent.history.at(-1)!.note, /sent to the customer at £120 before VAT \(estimated on site at £180\)/);
 
-  assert.throws(() => sendVariationToCustomer(sent, { description: "Again", priceDeltaNetPence: 1, taxCode: "outside-scope" }, "Ada", AT), /already gone to the customer/);
+  assert.throws(() => sendVariationToCustomer(sent, { description: "Again", priceDeltaNetPence: 1, taxCode: "outside-scope", unitsUnchanged: true }, "Ada", AT), /already gone to the customer/);
   const withdrawn = transitionIssue(draft, "rejected", "Ada", "Not needed", AT);
-  assert.throws(() => sendVariationToCustomer(withdrawn, { description: "Trunking", priceDeltaNetPence: 1, taxCode: "outside-scope" }, "Ada", AT), /withdrawn/);
-  assert.throws(() => sendVariationToCustomer(draft, { description: " ", priceDeltaNetPence: 1, taxCode: "outside-scope" }, "Ada", AT), /Describe the change/);
+  assert.throws(() => sendVariationToCustomer(withdrawn, { description: "Trunking", priceDeltaNetPence: 1, taxCode: "outside-scope", unitsUnchanged: true }, "Ada", AT), /withdrawn/);
+  assert.throws(() => sendVariationToCustomer(draft, { description: " ", priceDeltaNetPence: 1, taxCode: "outside-scope", unitsUnchanged: true }, "Ada", AT), /Describe the change/);
+});
+
+test("a variation never changes the design: the crew's 'yes' is refused, and the office confirms before it goes", () => {
+  // Round 10: a box room added on install day (5.5 m², 2.7 kg of R32) would fail the design's
+  // room-size check, but a variation is only text and a price, so it must never carry a unit.
+  const base = {
+    id: "v3",
+    projectId: "p1",
+    number: 5,
+    kind: "variation" as const,
+    title: "An extra unit in the box room",
+    raisedBy: RAISER,
+    raisedAt: AT,
+  };
+  assert.throws(
+    () => createIssue({ ...base, variation: { description: "They'd like the box room done too.", priceDeltaNetPence: 90_000, taxCode: "outside-scope", officeReview: true, unitsUnchanged: false } }),
+    (e: Error) => e.message === DESIGN_CHANGE_REFUSAL && /new job/.test(e.message) && /technical lead/.test(e.message),
+  );
+  const said = createIssue({ ...base, title: "Condensate pump", variation: { description: "No fall outside.", priceDeltaNetPence: 15_000, taxCode: "outside-scope", officeReview: true, unitsUnchanged: true } });
+  assert.equal(said.variation?.unitsUnchangedOnSite, true, "the crew's answer is kept");
+  const older = createIssue({ ...base, title: "Condensate pump", variation: { description: "No fall outside.", priceDeltaNetPence: 15_000, taxCode: "outside-scope", officeReview: true } });
+  assert.equal(older.variation?.unitsUnchangedOnSite, undefined, "an older phone didn't ask");
+  // The office's tick is the gate: without it nothing goes to the customer.
+  assert.throws(
+    () => sendVariationToCustomer(older, { description: "No fall outside.", priceDeltaNetPence: 15_000, taxCode: "outside-scope", unitsUnchanged: false }, "DEMO Ada", AT),
+    /Confirm it doesn't add, remove or swap a unit[\s\S]*reject this variation/,
+  );
+  const sent = sendVariationToCustomer(said, { description: "No fall outside.", priceDeltaNetPence: 15_000, taxCode: "outside-scope", unitsUnchanged: true }, "DEMO Ada", "2026-11-10T12:00:00.000Z");
+  assert.equal(sent.variation?.unitsUnchangedOnSite, true);
+  assert.deepEqual(sent.variation?.unitsUnchangedConfirmed, { by: "DEMO Ada", at: "2026-11-10T12:00:00.000Z" });
+  assert.match(sent.history.at(-1)!.note, /keeps the designed units where they are/);
+  assert.deepEqual(Object.keys(variationContent(sent)).sort(), ["description", "id", "number", "priceDeltaNetPence", "taxPence", "title", "totalDeltaPence"], "the customer's fingerprint is unchanged");
+  assert.match(DESIGN_CHANGE_QUESTION, /another room or outdoor position\?$/);
+  assert.match(DESIGN_CHANGE_CONFIRMATION, /^It doesn't add, remove or swap a unit/);
 });
 
 test("transitionIssue: history appended, resolvedAt stamped once, reopening clears it, pure", () => {
