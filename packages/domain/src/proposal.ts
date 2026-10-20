@@ -899,6 +899,19 @@ export function planningNoteErrors(
   ];
 }
 
+/**
+ * The technical lead recorded that planning permission or listed building
+ * consent is needed: the proposal tells the family before they accept, in
+ * its planning note (the terms promise it). A recorded reason not to
+ * doesn't stand in for it (round 10).
+ */
+export function planningConsentNoteErrors(p: Pick<ProposalRecord, "planningNote">, planningOutcome: "pd" | "consent-needed" | undefined): string[] {
+  if (planningOutcome !== "consent-needed" || p.planningNote?.trim()) return [];
+  return [
+    "The technical lead recorded that planning permission or listed building consent is needed: add the planning note for the customer, saying so and that nothing is installed until it's granted.",
+  ];
+}
+
 /** The last day of the zero rate for energy-saving materials in homes (TAX_CODES["zero-esm"]): accountant to confirm. */
 export const ZERO_ESM_LAST_DAY = "2027-03-31";
 

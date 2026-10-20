@@ -1474,7 +1474,8 @@ function buildProject(sc: Scenario, today: string, settings: PilotSettings, invo
     "design-approval": approved(TECH, at(cal.approved!, "16:30")),
     "noise-assessment": approved(TECH, at(cal.approved!, "16:10"), "36 dB(A) at the nearest window (DEMO).", Object.values(outdoorMedia)),
     "outdoor-siting": approved(TECH, at(cal.approved!, "16:10"), undefined, Object.values(outdoorMedia)),
-    "planning-pd": { status: "under-review", note: "Checklist answered at the survey; tech lead to confirm (DEMO)." },
+    // Round 10: the planning outcome is recorded before a proposal goes (the terms promise it before acceptance).
+    "planning-pd": approved(TECH, at(cal.approved!, "16:40"), "PD checks passed: rear wall, under 1.5 m³, MCS 020(a) estimate passes (DEMO)."),
   };
 
   if (sc.stop === "proposal-issued") {

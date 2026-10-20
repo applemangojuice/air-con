@@ -1173,6 +1173,17 @@ export function blockersFor(project: Project, ctx: ReadinessContext, gate: GateI
       (ctx.design?.compatibilityErrors ?? []).forEach((e, i) =>
         block(`design-compatibility:${i + 1}`, `Design: ${e}`, "tech-lead", "Fix the equipment combination"),
       );
+      // The terms promise the family hears whether planning permission is needed before they accept
+      // (round 10): the technical lead's outcome is on the checklist before the proposal goes.
+      const pd = ctx.compliance.find((i) => i.key === "planning-pd");
+      if (pd && pd.status !== "approved" && pd.status !== "not-applicable") {
+        block(
+          "compliance:planning-pd",
+          "The planning outcome isn't recorded: the terms promise the family hears whether planning permission is needed before they accept.",
+          "tech-lead",
+          "Record the planning outcome on the checklist (Permitted development checks)",
+        );
+      }
       const taxOk = !s.tax.vatRegistered || s.tax.accountantConfirmed || Boolean(pc?.taxConfirmed) || Boolean(pc?.taxOverride);
       if (!taxOk) {
         block(

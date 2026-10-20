@@ -24,6 +24,7 @@ import {
   hasCurrentQualification,
   measuredToEngineSurvey,
   pricingInputsOf,
+  planningConsentNoteErrors,
   planningNoteErrors,
   proposalIssueErrors,
   recomputeOption,
@@ -58,6 +59,7 @@ import { signedMediaUrls, updateMedia } from "./media-server";
 import { buildReadinessContext, dispatch, loadProject, londonToday } from "./project-service";
 import { db, isUuid } from "./repo/base";
 import * as catalogueRepo from "./repo/catalogue";
+import * as complianceRepo from "./repo/compliance";
 import * as designsRepo from "./repo/designs";
 import * as mediaRepo from "./repo/media";
 import * as proposalsRepo from "./repo/proposals";
@@ -769,7 +771,9 @@ export async function issueDraft(
   let record = withSettingsWording({ ...stored, options: repriced }, settings);
   if (record.status === "draft") record = { ...record, termsText: termsSections(toPublicSettings(settings, today)) };
   // The approved design's own planning or noise check flagged an option: the customer is told, or someone says why not.
-  const errors = [...proposalIssueErrors(record, settings, today), ...planningNoteErrors(record, approved)];
+  // The technical lead's planning outcome (the gate below needs it recorded): "consent needed" is told in the note.
+  const pd = (await complianceRepo.listForProject(projectId).catch(() => [])).find((i) => i.key === "planning-pd" && i.status === "approved");
+  const errors = [...proposalIssueErrors(record, settings, today), ...planningNoteErrors(record, approved), ...planningConsentNoteErrors(record, pd?.planningOutcome)];
   if (errors.length) return fail("The proposal isn't ready to issue yet.", 422, { errors });
 
   // The gate first, without writing anything: the same check the reducer makes.

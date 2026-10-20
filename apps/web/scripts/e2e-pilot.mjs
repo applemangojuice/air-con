@@ -912,6 +912,10 @@ try {
     const signedShown = await waitFor(tech, /Signed by DEMO Tess/, 30_000);
     check("after signing the studio is read-only (no 'changing an approved design' banner)", signedShown && !(await has(tech, /You're changing an approved design/)));
     await shot(tech, "D-approved");
+    // Round 10: the planning outcome is recorded before the proposal goes (the terms promise it before acceptance).
+    await go(tech, `/ops/projects/${ids.pid}/compliance`);
+    const pdDone = await reviewCompliance(tech, /^(?!Permitted development checks)/);
+    check("the tech lead records the planning outcome before the proposal", pdDone.length === 1 && /Outcome: PD checks passed/.test(await tech.locator("main li").filter({ has: tech.locator("h3", { hasText: /^Permitted development checks/ }) }).innerText()), pdDone.join("; "));
   });
 
   await phase("E · Proposal: two options, PILOT15, Schedule 2 settings, issue", async () => {

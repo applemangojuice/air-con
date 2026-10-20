@@ -497,8 +497,12 @@ What you do the day before:
    **Failed**. If the daily jobs haven't run, **Run daily jobs now** on the
    Messages page is safe: nothing is ever sent twice.
 4. For an install: the booking is **Confirmed**, the kit is **Delivered**
-   and **Checked**, and the project's checklist (**Compliance**) is approved.
-   Three items now hold day 1 with their reason until they're in:
+   and **Checked** (from the boxes, by whoever saw them; a delivery to the
+   family's home can wait for the crew's day-1 kit check), and the
+   project's checklist (**Compliance**) is approved. Set the job's
+   commissioning targets on the field app's **Commission** tab now, before
+   day 1 (the crew's pressure and vacuum steps show the hold time). Four
+   items hold day 1 with their reason until they're in:
    - **Planning permission or listed building consent granted**, when the
      technical lead chose "consent needed" on **Permitted development
      checks** (or the home is listed): attach the council's decision notice
@@ -508,9 +512,12 @@ What you do the day before:
      attach the freeholder's or landlord's written consent.
    - **Asbestos check before drilling**, when the survey suspected it: the
      test result (or the route that avoids it), attached, with a note.
-   Before the booking, the electrician writes the supply check and the
-   network operator's route on **Supply capacity and the network operator
-   (DNO)**: it holds install day 1 until it's approved.
+   - **Supply capacity and the network operator (DNO)**: before the
+     booking, the electrician writes the supply check and the network
+     operator's route.
+   Before the proposal goes, the technical lead records the planning outcome
+   on **Permitted development checks** ("PD checks passed" or "consent
+   needed"): the proposal can't be issued without it.
    - **Asbestos**: **Not applicable** is only for a home the survey dates
      2000 or later with nothing suspected; an older home is approved with
      what was checked.

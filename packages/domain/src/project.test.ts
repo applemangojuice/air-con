@@ -510,6 +510,19 @@ test("design-approved needs a qualified, permitted tech lead", () => {
 /* Proposal guards + the proposal-issue gate                           */
 /* ------------------------------------------------------------------ */
 
+test("round 10: the proposal waits for the technical lead's planning outcome (the terms promise it before acceptance)", async () => {
+  const p = step(walk("design-updated"), { type: "documents-consent-recorded", channel: "portal" }, T.design);
+  const pd = (status: "under-review" | "approved") => ({ key: "planning-pd", label: "Permitted development checks (Class G)", status, statutory: true, gate: "proposal-issue" as const });
+  const open = blockersFor(p, ctx(T.issue, { design: { status: "approved", compatibilityErrors: [] }, compliance: [pd("under-review")] }), "proposal-issue");
+  assert.equal(severityOf(open, "compliance:planning-pd"), "block");
+  assert.match(open.find((b) => b.code === "compliance:planning-pd")!.message, /hears whether planning permission is needed before they accept/);
+  assert.ok(!codes(blockersFor(p, ctx(T.issue, { design: { status: "approved", compatibilityErrors: [] }, compliance: [pd("approved")] }), "proposal-issue")).includes("compliance:planning-pd"));
+  const { planningConsentNoteErrors } = await import("./proposal.ts");
+  assert.match(planningConsentNoteErrors({}, "consent-needed").join(" "), /add the planning note for the customer/);
+  assert.deepEqual(planningConsentNoteErrors({ planningNote: "Listed building consent is needed (DEMO)." }, "consent-needed"), []);
+  assert.deepEqual(planningConsentNoteErrors({}, "pd"), []);
+});
+
 test("proposal-issue gate: design sign-off, compatibility, tax, margin; terms only warn", () => {
   const p = step(walk("design-updated"), { type: "documents-consent-recorded", channel: "portal" }, T.design);
   const c = (over: Partial<ReadinessContext>) => ctx(T.issue, over);

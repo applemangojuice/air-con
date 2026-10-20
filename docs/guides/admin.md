@@ -195,10 +195,15 @@ The project → **Build the proposal** → **Start the proposal**.
    online estimate**, in words they'll understand ("you added a room").
 5. The panel on the right lists anything stopping it under **Before it can
    go**: Schedule 2 settings, documents-by-email agreement, design signed,
-   email working, margin below the minimum (an admin can override, with a
-   reason).
-   - **Planning and noise**: when an option's approved design has its
-     outdoor-unit count (permitted development, Class G), unit size or noise
+   **the planning outcome recorded** (the technical lead approves
+   **Permitted development checks** on the compliance page, choosing "PD
+   checks passed" or "consent needed": the terms promise the family hears
+   before they accept), email working, margin below the minimum (an admin
+   can override, with a reason). With "consent needed", the proposal needs
+   the **Note for the customer** saying so (a reason it doesn't apply isn't
+   enough).
+   - **Planning and noise**: when an option's approved design has its planning
+     check, outdoor-unit count (permitted development, Class G), unit size or noise
      at the neighbour's window (MCS 020(a)) in review or blocked, the option
      shows an amber warning with the design's own words, and the proposal
      can't go until you either write a **Note for the customer** (**Start
