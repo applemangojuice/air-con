@@ -294,6 +294,10 @@ whenever you change anything.
    blank means "not decided") and **Manufacturer warranty summary**, as you
    have it in writing. If both are blank, proposals are blocked. Nothing
    about warranty years appears anywhere until it's set here.
+   **Safety** (optional): the ladder limit to an outdoor bracket (2.5 m;
+   above it the survey wants a tower, podium steps, a scaffold or a MEWP),
+   and the hire price per job of each, if you know them (blank: the
+   proposal asks for the price when a job needs one).
 10. **Legal**: leave the two "a solicitor has reviewed" boxes unticked until
     one has. **Terms version** should read `pilot-draft-2` (the terms no
     longer cap our liability at the price paid, and say a change over £42 has
