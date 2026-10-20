@@ -16,6 +16,7 @@ const ALL: CommsEventId[] = [
   "payment-received",
   "install-booked",
   "kit-update",
+  "cancellation-period",
   "install-prep",
   "install-day-before",
   "installer-on-my-way",
