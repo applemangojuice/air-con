@@ -78,6 +78,23 @@ function syntheticId(line1, postcode) {
 const addressKey = (line1, postcode) =>
   `${normaliseAddress(line1)} ${postcode.toUpperCase().replace(/\s+/g, "")}`;
 
+// The EPC service's files (since May 2026) write dates as 22/02/2021, UPRNs as
+// "UPRN-000100023336956" and bands in lower case. Mirrors normaliseEpcDate,
+// normaliseUprn and normaliseRating in packages/domain/src/property-sources.ts.
+function isoDate(raw) {
+  const t = String(raw ?? "").trim();
+  const iso = t.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+  const uk = t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (uk) return `${uk[3]}-${uk[2].padStart(2, "0")}-${uk[1].padStart(2, "0")}`;
+  return "";
+}
+function cleanUprn(raw) {
+  const digits = String(raw ?? "").replace(/^UPRN-/i, "").replace(/\D/g, "").replace(/^0+/, "");
+  return digits.length >= 3 && digits.length <= 14 ? digits : "";
+}
+const band = (raw) => (/^[A-G]$/i.test(String(raw ?? "").trim()) ? String(raw).trim().toUpperCase() : undefined);
+
 /* ---------------- args + client -------------------------------------- */
 
 const [, , kind, filePath, ...rest] = process.argv;
@@ -197,12 +214,13 @@ if (kind === "epc") {
       skipped++;
       continue;
     }
-    const lodged = first(row, "LODGEMENT_DATE", "INSPECTION_DATE");
+    const lodged = isoDate(first(row, "LODGEMENT_DATE", "INSPECTION_DATE"));
     const k = addressKey(line1, postcode);
     const prev = byKey.get(k);
     if (prev && prev.lodged >= lodged) continue; // keep the newest certificate
 
-    const uprn = first(row, "UPRN");
+    const uprn = cleanUprn(first(row, "UPRN"));
+    const certificateNumber = first(row, "CERTIFICATE_NUMBER", "LMK_KEY");
     byKey.set(k, {
       lodged,
       intel: {
@@ -220,10 +238,14 @@ if (kind === "epc") {
           glazingDescription: first(row, "WINDOWS_DESCRIPTION", "GLAZED_TYPE"),
           mainHeatDescription: first(row, "MAINHEAT_DESCRIPTION"),
           hotWaterDescription: first(row, "HOTWATER_DESCRIPTION"),
-          currentRating: first(row, "CURRENT_ENERGY_RATING"),
-          potentialRating: first(row, "POTENTIAL_ENERGY_RATING"),
+          currentRating: band(first(row, "CURRENT_ENERGY_RATING")),
+          potentialRating: band(first(row, "POTENTIAL_ENERGY_RATING")),
           lodgedAt: lodged || undefined,
+          certificateNumber: certificateNumber || undefined,
         },
+        ...(first(row, "PROPERTY_TYPE", "BUILT_FORM")
+          ? { sources: { epc: { via: "import", detail: "full", fetchedAt: new Date().toISOString() } } }
+          : {}),
         planning: { loftConversion: false, rearExtension: false, sideExtension: false, garageConversion: false },
         constraints: { conservationArea: false, listedBuilding: false, article4: false },
         marketing: { leadStatus: "untouched" },
@@ -242,6 +264,10 @@ if (kind === "epc") {
       fresh.constraints = prior.constraints ?? fresh.constraints;
       fresh.audit = prior.audit;
       fresh.marketing = prior.marketing ?? fresh.marketing;
+      // Postcode centre and constraint checks from live lookups stay.
+      if (prior.sources?.geo || prior.sources?.constraints) {
+        fresh.sources = { ...fresh.sources, geo: prior.sources.geo, constraints: prior.sources.constraints };
+      }
       fresh.id = existing.get(k).id; // never re-key an existing property
     }
     return baseColumns(fresh);

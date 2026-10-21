@@ -26,6 +26,7 @@ import {
   vatCopy,
 } from "@/components/site/claims";
 import { withUploadedPhotosOnly } from "@/lib/quote-draft";
+import { markPropertyQuoted } from "@/lib/intel-server";
 
 const attributionSchema = z
   .object({
@@ -55,6 +56,8 @@ const bodySchema = z.object({
   draftId: z.string().regex(UUID_RE).optional(),
   /** First-touch acquisition, so a booking traces back to its campaign. */
   attribution: attributionSchema,
+  /** The property record the customer picked at the address step, when they picked one. */
+  intelId: z.string().regex(/^[a-z0-9-]{4,80}$/i).optional(),
   contact: z.object({
     // Printed in the email we send to the address typed: a name, nothing else (lib/person-name.ts).
     name: z.string().trim().max(120).refine((n) => personNameProblem(n) === null, "Invalid name"),
@@ -142,7 +145,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid survey" }, { status: 400 });
   }
 
-  const { contact, source, draftId, attribution, consents } = parsed.data;
+  const { contact, source, draftId, attribution, consents, intelId } = parsed.data;
   const survey = trustedPhotos(parsed.data.survey as Survey);
   if (survey.rooms.length === 0) {
     return NextResponse.json({ error: "No rooms selected" }, { status: 400 });
@@ -243,6 +246,9 @@ export async function POST(request: Request) {
     }
     id = data.id as string;
   }
+
+  // The property book learns this home asked for a price (its lead status, for mailings).
+  if (intelId) await markPropertyQuoted(supabase, intelId, survey);
 
   const email = quoteEmail({
     name: contact.name,

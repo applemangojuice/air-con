@@ -101,20 +101,26 @@ function usePostcodeCheck(postcode: string, onGeo: (geo: SurveyGeo | undefined) 
 /** Postcode → known properties from the Property Intelligence Engine. */
 function useIntelAddresses(postcode: string, enabled: boolean) {
   const [matches, setMatches] = useState<{ id: string; line1: string }[]>([]);
+  // A postcode we haven't seen is looked up live (a second or two): say so.
+  const [loading, setLoading] = useState(false);
   useEffect(() => {
     if (!enabled || !isValidUkPostcode(postcode)) {
       setMatches([]);
+      setLoading(false);
       return;
     }
     let cancelled = false;
+    setLoading(true);
     const timer = setTimeout(async () => {
       try {
         const res = await fetch(`/api/intel/addresses?postcode=${encodeURIComponent(postcode)}`);
-        if (!res.ok || cancelled) return;
-        const data = (await res.json()) as { matches: { id: string; line1: string }[] };
+        if (cancelled) return;
+        const data = res.ok ? ((await res.json()) as { matches: { id: string; line1: string }[] }) : { matches: [] };
         if (!cancelled) setMatches(data.matches);
       } catch {
         if (!cancelled) setMatches([]);
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     }, 400);
     return () => {
@@ -122,7 +128,7 @@ function useIntelAddresses(postcode: string, enabled: boolean) {
       clearTimeout(timer);
     };
   }, [postcode, enabled]);
-  return matches;
+  return { matches, loading };
 }
 
 /** Postcode → selectable address list (getAddress.io behind /api/addresses). */
@@ -171,7 +177,7 @@ export function AddressStep({
   const formatOk = isValidUkPostcode(postcode);
   const { covered, outcode } = coverageFor(settings.serviceArea, postcode);
   const { inArea, outOfArea, unverified, unknown } = postcodeOutcome(formatOk, check.state, covered);
-  const intelMatches = useIntelAddresses(postcode, inArea);
+  const { matches: intelMatches, loading: findingHomes } = useIntelAddresses(postcode, inArea);
   const addresses = useAddressList(postcode, inArea);
   const [manual, setManual] = useState(false);
   const district = check.state === "found" ? check.geo.district : undefined;
@@ -260,6 +266,11 @@ export function AddressStep({
 
       {inArea && (
         <>
+          {findingHomes && !showIntelPicker && !manual && (
+            <p className="text-sm text-ink-500" aria-live="polite">
+              Finding the homes at {normalisePostcode(postcode)}…
+            </p>
+          )}
           {showIntelPicker ? (
             <TextField label="Your address" hint="Picking yours pre-fills the next step from public records.">
               {(c) => (

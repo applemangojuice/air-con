@@ -102,6 +102,33 @@ export async function loadIntel(id: string): Promise<PropertyIntel | null> {
   return (data?.intel as PropertyIntel) ?? null;
 }
 
+/**
+ * A home asked for a price: its lead status moves to "quoted" (never back
+ * from "customer" or "excluded"). Only when the record matches the
+ * quote's (postcode and address), so a stale id can't touch another home's record. Best effort.
+ */
+export async function markPropertyQuoted(
+  supabase: SupabaseClient,
+  id: string,
+  where: { postcode: string; addressLine: string },
+): Promise<boolean> {
+  try {
+    const { data } = await supabase.from("properties").select("intel").eq("id", id).maybeSingle();
+    const intel = data?.intel as PropertyIntel | undefined;
+    if (!intel) return false;
+    const same = (a: string) => a.toUpperCase().replace(/\s+/g, "");
+    if (same(intel.address.postcode) !== same(where.postcode)) return false;
+    // They may have picked their home, then typed a different address: then it isn't this record.
+    if (normaliseAddress(intel.address.line1) !== normaliseAddress(where.addressLine)) return false;
+    if (["quoted", "customer", "excluded"].includes(intel.marketing.leadStatus)) return true;
+    intel.marketing = { ...intel.marketing, leadStatus: "quoted", lastContactAt: new Date().toISOString() };
+    return await saveIntel(supabase, intel);
+  } catch (err) {
+    console.warn("property quoted mark failed:", (err as Error).message);
+    return false;
+  }
+}
+
 /** Known addresses for a postcode, for the funnel's address picker. */
 export async function addressesForPostcode(
   postcode: string,

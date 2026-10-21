@@ -4,6 +4,7 @@ export { estimateRoomLoadWatts, selectCapacityKw } from "./heatload.ts";
 export { generateQuote, customerChecks, ENGINE_VERSION } from "./pricing.ts";
 export { scoreConfidence } from "./confidence.ts";
 export * from "./intelligence.ts";
+export * from "./property-sources.ts";
 export * from "./operations.ts";
 export * from "./design.ts";
 export * from "./install.ts";

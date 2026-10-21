@@ -36,6 +36,7 @@ export async function submitQuote(
         survey,
         contact: draft.contact,
         draftId: draft.draftId,
+        ...(draft.intelId ? { intelId: draft.intelId } : {}),
         attribution: getAttribution(),
         consents: { operational: true, marketing: consents.marketing, version: CONSENT_VERSION },
       }),

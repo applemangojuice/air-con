@@ -54,6 +54,21 @@ export interface PropertyIntel {
     currentRating?: string; // A-G
     potentialRating?: string;
     lodgedAt?: string; // certificate date, ISO
+    /** The certificate these details came from, so a later lookup can fetch the full record. */
+    certificateNumber?: string;
+  };
+  /**
+   * Where each layer came from and when, so a lookup knows what's still
+   * missing and the office can see how fresh it is. Absent on records
+   * written before live lookups existed.
+   */
+  sources?: {
+    /** EPC: "summary" has the address and rating only; "full" has the whole certificate. */
+    epc?: { via: "live" | "import"; detail: "summary" | "full"; fetchedAt: string };
+    /** Postcode centre from postcodes.io. */
+    geo?: { latitude: number; longitude: number; district?: string; fetchedAt: string };
+    /** Constraint areas found at the postcode centre (planning.data.gov.uk). */
+    constraints?: { via: "planning-data" | "import"; names: string[]; checkedAt: string };
   };
   /** Structural changes spotted in planning applications. */
   planning: {

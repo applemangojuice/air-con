@@ -228,6 +228,15 @@ function envReport(): EnvCheck[] {
       note: "Where new-lead and lost-lead alerts go. Defaults to the EMAIL_FROM address.",
     },
     {
+      key: "EPC_BEARER_TOKEN",
+      label: "Property data (EPC register)",
+      set: has("EPC_BEARER_TOKEN"),
+      required: false,
+      note: placeholder("EPC_BEARER_TOKEN")
+        ? stillTemplate
+        : "Strongly recommended. A postcode the property database doesn't know is looked up live: the homes there, then each picked home's type, age, size and rooms from its energy certificate. Without it only homes already loaded prefill the quote.",
+    },
+    {
       key: "GETADDRESS_API_KEY",
       label: "Address autofill",
       set: has("GETADDRESS_API_KEY"),

@@ -2,7 +2,8 @@ name: Load property data
 
 # Loads the Property Intelligence book into your Supabase database without you
 # running anything locally. Two sources:
-#   - epc-api: fetch REAL certificates from the EPC Open Data API (default).
+#   - epc-api: fetch REAL certificates from the EPC register's data service
+#              (get-energy-performance-data.communities.gov.uk; default).
 #   - sample:  the built-in SW16/SW17 sample CSVs (no EPC key needed).
 # It imports the data, then recomputes archetypes + priority scores (the
 # /ops/intel "Recompute scores" button, headless).
@@ -13,9 +14,14 @@ name: Load property data
 #        SUPABASE_URL                = https://YOUR-PROJECT.supabase.co
 #        SUPABASE_SERVICE_ROLE_KEY   = Supabase → Settings → API → service_role
 #      For the EPC API source, also add (free registration at
-#      https://epc.opendatacommunities.org/):
-#        EPC_API_EMAIL               = the email you registered with
-#        EPC_API_KEY                 = your EPC API key
+#      https://get-energy-performance-data.communities.gov.uk/, which replaced
+#      epc.opendatacommunities.org on 30 May 2026):
+#        EPC_BEARER_TOKEN            = the API token from your account there
+#      (the old EPC_API_EMAIL / EPC_API_KEY secrets no longer work: delete them)
+#
+# Postcodes the database doesn't hold are also looked up live on the quote
+# form when EPC_BEARER_TOKEN is set in Vercel, so this load is for mailings
+# and the /ops/intel book, not for the quote form to work.
 #
 # The weekly schedule below pulls just the newly-issued certificates (a new EPC
 # usually means a sale or renovation — a live marketing signal). Run it once
@@ -33,14 +39,18 @@ on:
           - epc-api
           - sample
         default: epc-api
-      since:
-        description: "EPC only: certificates lodged since YYYY-MM (empty = all history)"
+      postcodes:
+        description: "EPC only: just these postcodes, comma separated (e.g. the pilot homes'). Leave empty to load whole councils"
         type: string
         default: ""
-      local_authority:
-        description: "EPC only: ONS codes (default = Lambeth, Wandsworth, Merton, Croydon)"
+      since:
+        description: "EPC only, councils: certificates lodged since YYYY-MM (empty = all history)"
         type: string
-        default: "E09000022,E09000032,E09000024,E09000008"
+        default: ""
+      councils:
+        description: "EPC only: council names as the register spells them"
+        type: string
+        default: "Lambeth,Wandsworth,Merton,Croydon"
       outcodes:
         description: "Outcodes to keep on import"
         type: string
@@ -68,11 +78,11 @@ jobs:
     env:
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-      EPC_API_EMAIL: ${{ secrets.EPC_API_EMAIL }}
-      EPC_API_KEY: ${{ secrets.EPC_API_KEY }}
+      EPC_BEARER_TOKEN: ${{ secrets.EPC_BEARER_TOKEN }}
       SOURCE: ${{ inputs.source || 'epc-api' }}
       OUTCODES: ${{ inputs.outcodes || 'SW16,SW17' }}
-      LOCAL_AUTHORITY: ${{ inputs.local_authority || 'E09000022,E09000032,E09000024,E09000008' }}
+      COUNCILS: ${{ inputs.councils || 'Lambeth,Wandsworth,Merton,Croydon' }}
+      POSTCODES: ${{ inputs.postcodes || '' }}
     steps:
       - name: Check required secrets
         run: |
@@ -81,9 +91,9 @@ jobs:
             echo "Add them under Settings → Secrets and variables → Actions (values: Supabase → Settings → API)."
             exit 1
           fi
-          if [ "$SOURCE" = "epc-api" ] && { [ -z "$EPC_API_EMAIL" ] || [ -z "$EPC_API_KEY" ]; }; then
-            echo "::error::Source is epc-api but EPC_API_EMAIL / EPC_API_KEY secrets are missing."
-            echo "Register free at https://epc.opendatacommunities.org/ and add them, or run with source=sample."
+          if [ "$SOURCE" = "epc-api" ] && [ -z "$EPC_BEARER_TOKEN" ]; then
+            echo "::error::Source is epc-api but the EPC_BEARER_TOKEN secret is missing."
+            echo "Register free at https://get-energy-performance-data.communities.gov.uk/ and add your API token, or run with source=sample."
             exit 1
           fi
           echo "Secrets OK for source=$SOURCE."
@@ -100,12 +110,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # Scheduled runs get "last month onward" so each week picks up new certs;
+      # Scheduled runs get the last 8 days (a day's overlap) so each week picks up new certs;
       # manual runs use the "since" input (empty = full history).
       - name: Resolve "since"
         run: |
           if [ "${{ github.event_name }}" = "schedule" ]; then
-            echo "SINCE=$(date -u -d "$(date -u +%Y-%m-01) -1 month" +%Y-%m)" >> "$GITHUB_ENV"
+            echo "SINCE=$(date -u -d "8 days ago" +%Y-%m-%d)" >> "$GITHUB_ENV"
           else
             echo "SINCE=${{ inputs.since }}" >> "$GITHUB_ENV"
           fi
@@ -115,15 +125,28 @@ jobs:
         if: ${{ (inputs.source || 'epc-api') == 'epc-api' }}
         working-directory: apps/web
         run: |
-          node scripts/fetch-epc.mjs \
-            --local-authority "$LOCAL_AUTHORITY" \
-            ${SINCE:+--since "$SINCE"} \
-            --out scripts/data/epc-certificates.csv
+          if [ -n "$POSTCODES" ]; then
+            node --experimental-strip-types scripts/fetch-epc.mjs \
+              --postcodes "$POSTCODES" \
+              --out scripts/data/epc-certificates.csv
+          else
+            node --experimental-strip-types scripts/fetch-epc.mjs \
+              --council "$COUNCILS" \
+              --outcodes "$OUTCODES" \
+              ${SINCE:+--since "$SINCE"} \
+              --out scripts/data/epc-certificates.csv
+          fi
 
       - name: Import EPC (real)
         if: ${{ (inputs.source || 'epc-api') == 'epc-api' }}
         working-directory: apps/web
-        run: node scripts/import-intel.mjs epc scripts/data/epc-certificates.csv --outcodes "$OUTCODES"
+        # Named postcodes are kept whatever their outcode; council loads keep OUTCODES only.
+        run: |
+          if [ -n "$POSTCODES" ]; then
+            node scripts/import-intel.mjs epc scripts/data/epc-certificates.csv
+          else
+            node scripts/import-intel.mjs epc scripts/data/epc-certificates.csv --outcodes "$OUTCODES"
+          fi
 
       # ---- source: sample (no EPC key) ----
       - name: Generate + import sample data
@@ -149,7 +172,8 @@ jobs:
             echo ""
             echo "- Source: \`$SOURCE\`"
             echo "- Outcodes kept: \`$OUTCODES\`"
-            [ "$SOURCE" = "epc-api" ] && echo "- Authorities: \`$LOCAL_AUTHORITY\`"
+            [ "$SOURCE" = "epc-api" ] && echo "- Councils: \`$COUNCILS\`"
+            [ -n "$POSTCODES" ] && echo "- Postcodes: \`$POSTCODES\`"
             [ "$SOURCE" = "epc-api" ] && echo "- Since: \`${SINCE:-all history}\`"
             echo ""
             echo "Open \`/ops/status\` to confirm the tables are healthy and \`/ops/intel\` to see the book."
