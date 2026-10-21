@@ -10,6 +10,7 @@ import {
 } from "@aircon/domain";
 import { BRAND, appHost } from "@/lib/brand";
 import { gbp } from "@/lib/format";
+import { requireStaff } from "@/lib/auth/server";
 
 export const metadata: Metadata = {
   title: "Investor one-pager · collateral · ops",
@@ -33,7 +34,8 @@ function gbpShort(amount: number): string {
  * computed by the same @aircon/domain models that power /ops/finance —
  * change an assumption there, reprint here, nothing drifts.
  */
-export default function OnePagerPage() {
+export default async function OnePagerPage() {
+  await requireStaff("projects.view-all");
   const plan = buildPlan(PLAN_BASE);
   const ltv = ltvModel(PLAN_BASE, INVESTOR_BASE);
   const market = marketModel(PLAN_BASE, INVESTOR_BASE, plan);
@@ -93,8 +95,8 @@ export default function OnePagerPage() {
             </h2>
             <ul className="mt-2 ml-4 list-disc space-y-1 text-ink-700">
               <li>
-                Two-minute self-survey → a <strong>guaranteed fixed price</strong>, priced by a
-                deterministic engine, not a salesperson.
+                Two-minute self-survey → an <strong>instant price</strong> from a deterministic
+                engine, not a salesperson, confirmed at one home survey.
               </li>
               <li>
                 A property-intelligence book (EPC + planning + audits) that designs the install

@@ -9,6 +9,7 @@ import {
 } from "@aircon/domain";
 import { gbp } from "@/lib/format";
 import { queryIntel } from "@/lib/intel-server";
+import { requireStaff } from "@/lib/auth/server";
 
 export const metadata: Metadata = {
   title: "Template library · admin",
@@ -32,6 +33,7 @@ const FLOOR_LABEL: Record<string, string> = {
  * many homes in the book currently match it.
  */
 export default async function TemplatesPage() {
+  await requireStaff("projects.view-all");
   const book = await queryIntel({});
   const countByArchetype = new Map<string, number>();
   for (const row of book) {

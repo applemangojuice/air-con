@@ -4,36 +4,39 @@ import { Suspense } from "react";
 import { BRAND } from "@/lib/brand";
 import { PrototypeNav } from "@/components/site/prototype-nav";
 import { Analytics } from "@/components/site/analytics";
+import { prototypeNavVisible } from "@/lib/public-settings";
 import "./globals.css";
 
 /**
  * All three faces are self-hosted (Caprasimo + Figtree were previously a
  * render-blocking Google Fonts stylesheet): no third-party request in the
  * critical path, fonts served same-origin with immutable caching, and the
- * build never depends on fonts.googleapis.com being reachable.
+ * build never depends on fonts.googleapis.com being reachable. The files
+ * live in public/fonts so the hand-written sign-in confirm page
+ * (/auth/verify, a route handler outside React) can load the same faces.
  */
 const brandFont = localFont({
-  src: "./fonts/permanent-marker.woff2",
+  src: "../public/fonts/permanent-marker.woff2",
   variable: "--font-marker",
   display: "swap",
 });
 
 const displayFont = localFont({
-  src: "./fonts/caprasimo.woff2",
+  src: "../public/fonts/caprasimo.woff2",
   variable: "--font-caprasimo",
   display: "swap",
   weight: "400",
 });
 
 const sansFont = localFont({
-  src: "./fonts/figtree-variable.woff2",
+  src: "../public/fonts/figtree-variable.woff2",
   variable: "--font-figtree",
   display: "swap",
   weight: "300 900",
 });
 
 const DESCRIPTION =
-  "Get a fixed price for home air conditioning in minutes. Complete a guided photo survey of your home and book your installation online.";
+  "Home air conditioning that also heats: your price online in about two minutes, confirmed at a home survey, with your proposal, dates and documents online.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "https://dang.ac"),
@@ -42,6 +45,8 @@ export const metadata: Metadata = {
     template: `%s · ${BRAND.name}`,
   },
   description: DESCRIPTION,
+  // A route, so the field layout can link its own (app/field.webmanifest).
+  manifest: "/manifest.webmanifest",
   // The share image comes from app/opengraph-image.tsx. Deliberately NO
   // og/twitter title or description here: Next only falls back to each
   // page's own <title>/description when the parent didn't set them, so
@@ -60,9 +65,11 @@ export const viewport: Viewport = {
   themeColor: "#201e1d",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  // Prototype nav: hidden in production unless settings switch it on.
+  const showPrototypeNav = await prototypeNavVisible();
   return (
     <html lang="en-GB">
       <body
@@ -79,7 +86,7 @@ export default function RootLayout({
         <div id="main-content" tabIndex={-1} className="contents">
           {children}
         </div>
-        <PrototypeNav />
+        {showPrototypeNav && <PrototypeNav />}
         <Suspense fallback={null}>
           <Analytics />
         </Suspense>

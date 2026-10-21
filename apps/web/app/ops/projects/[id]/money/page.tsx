@@ -1,0 +1,702 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import {
+  CANCELLATION_CHARGE_BASIS_MAX,
+  CREDIT_PURPOSE_LABEL,
+  INVOICE_KIND_LABEL,
+  cancellationChargeProblem,
+  cancellationSettlement,
+  creditPurposeOf,
+  invoiceOutstanding,
+  isInvoiceOverdue,
+  refundableCreditPence,
+  type CreditPurpose,
+  type Invoice,
+  type Payment,
+  type Project,
+} from "@aircon/domain";
+import { Badge, Card, EmptyState, Money, Section, Stat, StatusChip } from "@/components/kit";
+import { requireProjectAccess, requireStaff } from "@/lib/auth/server";
+import { fmtDate } from "@/lib/format";
+import { billingStopped, loadMoney, type InvoicePlan } from "@/lib/money-server";
+import { isUuid } from "@/lib/repo/base";
+import { ActionForm } from "../booking/_f5/action-form";
+import { JobHeader } from "../booking/_f5/job-header";
+import { cancellationChargeAction, creditAction, finishAction, finishPaymentAction, issueAction, paymentAction, refundAction } from "./actions";
+
+export const metadata: Metadata = { title: "Money · ops", robots: { index: false } };
+export const dynamic = "force-dynamic";
+
+const field = "min-h-12 w-full rounded-full border border-line bg-white px-4 text-base text-ink-900 outline-none focus:border-accent-500 focus:ring-2 focus:ring-accent-100";
+const label = "mb-1.5 block text-sm font-semibold text-ink-900";
+
+const METHOD_LABEL: Record<Payment["method"], string> = { "bank-transfer": "Bank transfer", card: "Card", cash: "Cash", other: "Other" };
+const PLAN_ORDER = ["deposit", "balance", "variation", "survey-fee", "change-fee"] as const;
+
+/**
+ * Money (payments.record): what's been invoiced and paid, new invoices
+ * (each issued from the figure shown here, then emailed), payments recorded
+ * by the person who saw the money, refunds and credit notes. Nothing is
+ * paid without a payment record.
+ */
+export default async function MoneyPage({ params }: { params: Promise<{ id: string }> }) {
+  const staff = await requireStaff("payments.record");
+  const { id } = await params;
+  if (!isUuid(id)) notFound();
+  const access = await requireProjectAccess(id, { perm: "payments.record" });
+  if (!access || access.kind !== "staff") notFound();
+  const view = await loadMoney(id);
+  if (!view) notFound();
+  const { project: p, summary: s, invoices, payments, settings } = view;
+  const docFor = (docId?: string) => (docId ? view.documents.find((d) => d.id === docId) : undefined);
+  const receiptFor = (paymentId: string) =>
+    view.documents.find((d) => d.kind === "receipt" && (d.snapshot as { payment?: { id?: string } } | null)?.payment?.id === paymentId);
+  const live = invoices.filter((i) => i.status !== "void" && i.status !== "draft");
+  const available = PLAN_ORDER.map((k) => view.plans[k]).filter((pl) => pl.available);
+  const unavailable = PLAN_ORDER.map((k) => view.plans[k]).filter((pl) => !pl.available);
+  // The balance, ready but not due under the contract until the install is finished: an admin may still bill it, with a reason.
+  const early = view.plans.balance.early ? view.plans.balance : null;
+  const isAdmin = staff.roles.includes("admin");
+  const card = view.card;
+
+  return (
+    <main className="mx-auto w-full min-w-0 max-w-5xl px-4 py-8 sm:px-6">
+      <JobHeader project={p} current="money" title="Money" subtitle="Invoices, payments and receipts. Nothing is marked paid until the money is seen." />
+
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Stat label="Contract" value={s.contractTotalPence !== null ? <Money pence={s.contractTotalPence} /> : "Not accepted"} hint={billingStopped(p) ? "Cancelled: nothing more is billed" : s.toInvoicePence ? <>Still to invoice: <Money pence={s.toInvoicePence} /></> : undefined} />
+        <Stat label="Invoiced" value={<Money pence={s.invoicedPence} />} hint={`${live.length} invoice${live.length === 1 ? "" : "s"}`} />
+        <Stat label="Received" value={<Money pence={s.receivedPence - s.refundedPence} />} tone={s.receivedPence > 0 ? "success" : "neutral"} hint={
+            payments.some((x) => x.provider === "demo")
+              ? "Includes DEMO payments: no money moved"
+              : s.refundedPence
+                ? <>After <Money pence={s.refundedPence} /> refunded</>
+                : "Verified payments only"
+          } />
+        <Stat
+          label={s.outstandingPence < 0 ? "In credit" : "Outstanding"}
+          value={<Money pence={Math.abs(s.outstandingPence)} />}
+          tone={s.outstandingPence > 0 ? "warn" : "success"}
+          hint={s.outstandingPence < 0 ? "Refund it from the credit note below, or it comes off their next invoice" : undefined}
+        />
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-ink-500">
+        <span>How customers can pay:</span>
+        {settings.company.bank ? <Badge tone="success">Bank transfer</Badge> : <Badge tone="warn">No bank details in settings</Badge>}
+        {card.available ? (
+          <Badge tone={card.mode === "test" ? "warn" : "success"}>{card.mode === "test" ? "Card (Stripe TEST MODE)" : "Card (Stripe)"}</Badge>
+        ) : card.simulate ? (
+          <Badge tone="warn">Card: DEMO simulator only</Badge>
+        ) : (
+          <Badge tone="neutral">Card not set up</Badge>
+        )}
+        <Link href={`/p/${p.id}/pay`} className="font-semibold text-accent-700 underline">
+          See the customer&apos;s payment page
+        </Link>
+      </div>
+      {!settings.company.bank && (
+        <p className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          Add the bank account in <Link className="font-semibold underline" href="/ops/settings">Settings</Link> so invoices and the payment page can show it. Until then customers are asked to call.
+        </p>
+      )}
+
+      {/* Invoices */}
+      <Section className="mt-8" title="Invoices">
+        {live.length === 0 ? (
+          <EmptyState title="No invoices yet" body={available.length ? "Raise one below: it's numbered, emailed and in the customer's documents." : "Invoices open up once the proposal is accepted."} />
+        ) : (
+          <ul className="space-y-3">
+            {live.map((inv) => (
+              <InvoiceRow key={inv.id} inv={inv} all={invoices} today={view.today} doc={docFor(inv.documentId)} projectId={p.id} />
+            ))}
+          </ul>
+        )}
+      </Section>
+
+      {payments.some((x) => x.status === "failed" && x.amountPence < 0) && (
+        <div role="alert" className="mt-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
+          <p className="font-semibold">A card refund didn&apos;t go through</p>
+          <ul className="mt-1 list-disc space-y-1 pl-5">
+            {payments
+              .filter((x) => x.status === "failed" && x.amountPence < 0)
+              .map((x) => (
+                <li key={x.id}>
+                  <Money pence={-x.amountPence} /> on {fmtDate(x.receivedAt)} ({x.reference ?? x.providerRef}): {x.note ?? "it failed at Stripe."}
+                </li>
+              ))}
+          </ul>
+          <p className="mt-1">
+            It&apos;s kept here as failed and counts for nothing. {s.outstandingPence < 0 ? <>They&apos;re <Money pence={-s.outstandingPence} /> in credit: refund it again, in Stripe or by bank transfer (Record a refund on the invoice they paid).</> : "Check with the family, then refund again if it's still owed."}
+          </p>
+        </div>
+      )}
+
+      {p.cancellation && <CancellationChargeSection project={p} invoices={invoices} />}
+
+      {/* New invoice */}
+      <Section className="mt-10" title="New invoice" description="Each one is issued at the figure shown, numbered from settings, emailed, and put in the customer's documents.">
+        {available.length === 0 ? (
+          <Card>
+            <p className="text-sm text-ink-500">
+              {early ? "Nothing to invoice yet. The balance follows once the installation is finished, as the contract says." : "Nothing to invoice right now."}
+            </p>
+          </Card>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2">
+            {available.map((plan) => (
+              <PlanCard key={plan.kind} plan={plan} projectId={p.id} />
+            ))}
+          </div>
+        )}
+        {early && isAdmin && <EarlyBalanceCard plan={early} projectId={p.id} />}
+        {unavailable.length > 0 && (
+          <details className="mt-3 rounded-2xl border border-line bg-white px-4">
+            <summary className="flex min-h-12 cursor-pointer items-center text-sm font-semibold text-ink-900">Why the others aren&apos;t available</summary>
+            <ul className="space-y-1.5 pb-4 text-sm text-ink-700">
+              {unavailable.map((pl) => (
+                <li key={pl.kind}>
+                  <span className="font-semibold text-ink-900">{INVOICE_KIND_LABEL[pl.kind]}:</span> {pl.reason}
+                </li>
+              ))}
+            </ul>
+          </details>
+        )}
+        <details className="mt-3 rounded-2xl border border-line bg-white px-4">
+          <summary className="flex min-h-12 cursor-pointer items-center text-sm font-semibold text-ink-900">A credit note not tied to one invoice</summary>
+          <div className="pb-4">
+            <p className="mb-1 text-sm text-ink-500">It sits on their account and comes off what they owe, oldest invoice first. Never more than the price, less earlier credits.</p>
+            <ActionForm flash action={creditAction.bind(null, p.id)} submitLabel="Issue credit note" variant="secondary" confirm="Issue this credit note? It goes in the customer's documents.">
+              <CreditFields purpose="reduction" name="account" />
+            </ActionForm>
+          </div>
+        </details>
+      </Section>
+
+      {/* Payments */}
+      <Section className="mt-10" title="Payments" description="Every one has a record: who saw it, when it arrived, and its reference.">
+        {payments.length === 0 ? (
+          <EmptyState title="No payments yet" body="Record a bank transfer from an invoice above once you've seen it in the account. Card payments appear here by themselves once Stripe confirms them." />
+        ) : (
+          <Card padded={false}>
+            <ul className="divide-y divide-line">
+              {[...payments].reverse().map((pay) => {
+                const inv = invoices.find((i) => i.id === pay.invoiceId);
+                const receipt = receiptFor(pay.id);
+                return (
+                  <li key={pay.id} className="flex flex-col gap-2 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-ink-900">
+                        <Money pence={pay.amountPence} /> {pay.status === "failed" ? (pay.amountPence < 0 ? "refund failed: not sent" : "failed") : pay.amountPence < 0 ? "refunded" : "received"}
+                        {inv ? ` · ${inv.number}` : ""}
+                      </p>
+                      <p className="text-sm text-ink-500">
+                        {fmtDate(pay.receivedAt)} · {METHOD_LABEL[pay.method]}
+                        {pay.reference ? ` · ref ${pay.reference}` : ""}
+                        {pay.recordedBy ? ` · recorded by ${pay.recordedBy}` : pay.provider === "stripe" ? " · confirmed by Stripe" : ""}
+                      </p>
+                      {pay.note && <p className="text-sm text-ink-700">{pay.note}</p>}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {pay.provider === "demo" && <Badge tone="warn">DEMO: no money moved</Badge>}
+                      {pay.provider === "stripe" && <Badge tone="info">Stripe</Badge>}
+                      <StatusChip status={pay.status} />
+                      {pay.pendingApply && (
+                        <ActionForm flash action={finishPaymentAction.bind(null, p.id)} submitLabel="Finish applying" variant="secondary" footer={<Badge tone="warn">Not yet on the invoice</Badge>}>
+                          <input type="hidden" name="paymentId" value={pay.id} />
+                        </ActionForm>
+                      )}
+                      {receipt && (
+                        <Link href={`/d/${receipt.id}`} className="text-sm font-semibold text-accent-700 underline">
+                          Receipt
+                        </Link>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </Card>
+        )}
+      </Section>
+    </main>
+  );
+}
+
+/**
+ * After a cancellation inside the period that followed the family's
+ * evidenced early start: the charge for the work done up to the time they
+ * told us (CCR reg 36(4)), and what it leaves to refund or to pay. Shown
+ * with the reason when it can't be charged, so nobody invoices it some other way.
+ */
+function CancellationChargeSection({ project: p, invoices }: { project: Project; invoices: Invoice[] }) {
+  const s = cancellationSettlement(p);
+  const chargeInvoice = invoices.find((i) => i.kind === "cancellation-charge" && i.status !== "void" && i.status !== "draft");
+  // Whether it can be charged at all, before any amount is typed (a placeholder amount and basis).
+  const blocked = s ? null : cancellationChargeProblem(p, { amountPence: 1, basis: "x".repeat(40) });
+  const supplied = p.proposal.contractType !== "install-only";
+  return (
+    <Section className="mt-10" title="The charge for the work done before they cancelled" description="Consumer Contracts Regulations 2013, regulation 36(4): only after their express early-start request, inside the period.">
+      <Card>
+        {s ? (
+          <>
+            <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
+              <div className="flex justify-between gap-3">
+                <dt className="text-ink-700">Charge for the work done</dt>
+                <dd className="font-semibold tabular-nums text-ink-900"><Money pence={s.chargePence} /></dd>
+              </div>
+              <div className="flex justify-between gap-3">
+                <dt className="text-ink-700">They&apos;ve paid (after refunds)</dt>
+                <dd className="tabular-nums text-ink-900"><Money pence={s.paidPence} /></dd>
+              </div>
+              <div className="flex justify-between gap-3">
+                <dt className="text-ink-700">{s.owedPence > 0 ? "Left for them to pay" : "Still to refund"}</dt>
+                <dd className="font-semibold tabular-nums text-ink-900"><Money pence={s.owedPence > 0 ? s.owedPence : s.refundDuePence} /></dd>
+              </div>
+              <div className="flex justify-between gap-3">
+                <dt className="text-ink-700">Refund due by</dt>
+                <dd className="text-ink-900">{fmtDate(s.refundDueBy)}</dd>
+              </div>
+            </dl>
+            <p className="mt-3 text-sm text-ink-700">
+              <span className="font-semibold text-ink-900">How it was worked out:</span> {s.basis}
+            </p>
+            <p className="mt-2 text-xs text-ink-500">
+              {chargeInvoice ? `Invoice ${chargeInvoice.number}. ` : ""}What they paid on the contract&apos;s invoices is credit against it; refund the rest the same way
+              they paid (on the invoice they paid, below). The family has the same numbers on their page and by email.
+            </p>
+            {chargeInvoice && (
+              <details className="mt-3 rounded-2xl border border-line bg-white px-4">
+                <summary className="flex min-h-12 cursor-pointer items-center text-sm font-semibold text-ink-900">Reduce the charge (a credit note against it)</summary>
+                <div className="pb-4">
+                  <p className="mb-2 text-sm text-ink-500">
+                    If the charge was too high, or you&apos;ve agreed less with them. The charge comes down, and so do the refund and what&apos;s left to pay, everywhere.
+                  </p>
+                  <ActionForm flash action={creditAction.bind(null, p.id)} submitLabel="Take it off the charge" variant="secondary" confirm={`Issue a credit note against ${chargeInvoice.number} and bring the charge down?`}>
+                    <input type="hidden" name="invoiceId" value={chargeInvoice.id} />
+                    <input type="hidden" name="purpose" value="reduction" />
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <label className={label}>
+                        Amount (£)
+                        <input name="amount" inputMode="decimal" required className={`${field} mt-1.5 font-normal`} />
+                      </label>
+                      <label className={label}>
+                        Why (printed on the credit note)
+                        <input name="reason" required maxLength={300} className={`${field} mt-1.5 font-normal`} />
+                      </label>
+                    </div>
+                  </ActionForm>
+                </div>
+              </details>
+            )}
+            {!chargeInvoice && (
+              <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                The charge is recorded but its invoice wasn&apos;t issued. Finishing never doubles anything.
+                <ActionForm flash action={cancellationChargeAction.bind(null, p.id)} submitLabel="Finish: credit and invoice it" variant="secondary">
+                  <input type="hidden" name="chargeRequestId" value={p.cancellation?.charge?.requestId ?? ""} />
+                  <input type="hidden" name="amount" value={(s.chargePence / 100).toFixed(2)} />
+                  <input type="hidden" name="basis" value={s.basis} />
+                </ActionForm>
+              </div>
+            )}
+          </>
+        ) : blocked ? (
+          <p className="text-sm text-ink-700">{blocked}</p>
+        ) : (
+          <>
+            <p className="text-sm text-ink-700">
+              They asked us to start early (it&apos;s on file) and cancelled inside the period after work began, so they pay for the work done up to the
+              time they told us: a fair share of the contract price for what was done, never more than the contract. Everything else they paid is refunded
+              by {fmtDate(p.cancellation!.refundDueBy)}, the same way they paid.
+              {supplied
+                ? " Charge for the work only: the equipment we supplied isn't part of it (we collect it, at our cost) and nothing is deducted for it here."
+                : ""}
+            </p>
+            <ActionForm
+              flash
+              action={cancellationChargeAction.bind(null, p.id)}
+              submitLabel="Record the charge, invoice it and email them"
+              busyLabel="Recording…"
+              confirm="Record this charge? Their payments become credit against it, the charge is invoiced, and they're emailed the charge, how it was worked out and the refund."
+            >
+              <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                <div>
+                  <label className={label}>
+                    Charge, VAT included (£)
+                    <input name="amount" inputMode="decimal" required className={`${field} mt-1.5 font-normal`} />
+                  </label>
+                </div>
+                <div className="sm:col-span-2">
+                  <label className={label}>
+                    How you worked it out (printed on the invoice and in their email)
+                    <textarea
+                      name="basis"
+                      required
+                      minLength={20}
+                      maxLength={CANCELLATION_CHARGE_BASIS_MAX}
+                      rows={3}
+                      placeholder="Day 1 of 3 done: holes drilled and sealed, brackets fixed. A third of the labour."
+                      className="mt-1.5 w-full rounded-2xl border border-line bg-white px-4 py-3 text-base font-normal text-ink-900 outline-none focus:border-accent-500 focus:ring-2 focus:ring-accent-100"
+                    />
+                  </label>
+                </div>
+              </div>
+            </ActionForm>
+          </>
+        )}
+      </Card>
+    </Section>
+  );
+}
+
+function PlanCard({ plan, projectId }: { plan: InvoicePlan; projectId: string }) {
+  if (plan.kind === "variation") {
+    return (
+      <Card>
+        <h3 className="font-semibold text-ink-900">Variation</h3>
+        <p className="mt-1 text-sm text-ink-500">
+          Bill an accepted variation on its own (otherwise the balance invoice includes it). One that takes money off becomes a credit note on their account.
+        </p>
+        <ActionForm
+          flash
+          action={issueAction.bind(null, projectId)}
+          submitLabel="Issue"
+          confirm="Issue it? A variation that adds to the price is invoiced and emailed; one that takes money off becomes a credit note that comes off what they pay."
+        >
+          <input type="hidden" name="kind" value="variation" />
+          <fieldset className="mt-3">
+            <legend className={label}>Which variation</legend>
+            {(plan.variations ?? []).map((v) => (
+              <label key={v.id} className="flex min-h-11 items-center gap-2 text-sm text-ink-900">
+                <input type="radio" name="issueId" value={v.id} required className="h-4 w-4 accent-accent-600" />
+                #{v.number} {v.title}: <Money pence={v.totalPence} signed />
+              </label>
+            ))}
+          </fieldset>
+        </ActionForm>
+      </Card>
+    );
+  }
+  return (
+    <Card>
+      <h3 className="font-semibold text-ink-900">{INVOICE_KIND_LABEL[plan.kind]}</h3>
+      <dl className="mt-3 space-y-1.5 text-sm">
+        {plan.lines.map((l, i) => (
+          <div key={`${l.label}-${i}`} className="flex justify-between gap-3">
+            <dt className="text-ink-700">{l.label}</dt>
+            <dd className="tabular-nums text-ink-900">
+              <Money pence={l.totalPence} />
+            </dd>
+          </div>
+        ))}
+        <div className="flex justify-between gap-3 border-t border-line pt-1.5 font-semibold">
+          <dt>Total</dt>
+          <dd>
+            <Money pence={plan.totalPence} />
+          </dd>
+        </div>
+      </dl>
+      <ActionForm flash action={issueAction.bind(null, projectId)} submitLabel="Issue and email" busyLabel="Issuing…" confirm={`Issue this ${INVOICE_KIND_LABEL[plan.kind].toLowerCase()} invoice and email it to the customer?`}>
+        <input type="hidden" name="kind" value={plan.kind} />
+        <input type="hidden" name="expectedTotal" value={(plan.totalPence / 100).toFixed(2)} />
+      </ActionForm>
+    </Card>
+  );
+}
+
+/**
+ * Admins only: the balance before the installation is finished. The
+ * customer's terms say "once the installation is finished", so this needs a
+ * reason (agreed with them, a stopped job…), which is audited.
+ */
+function EarlyBalanceCard({ plan, projectId }: { plan: InvoicePlan; projectId: string }) {
+  return (
+    <details className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4">
+      <summary className="flex min-h-12 cursor-pointer items-center text-sm font-semibold text-amber-900">
+        Bill the balance before the installation is finished (admin)
+      </summary>
+      <div className="pb-4 text-sm text-amber-900">
+        <p>
+          The customer&apos;s contract says the balance comes once the installation is finished. Only bill it now if they&apos;ve agreed, or the job has stopped. Total{" "}
+          <span className="font-semibold">
+            <Money pence={plan.totalPence} />
+          </span>
+          , due on the contract&apos;s terms from today.
+        </p>
+        <ActionForm
+          flash
+          action={issueAction.bind(null, projectId)}
+          submitLabel="Issue the balance early and email it"
+          variant="secondary"
+          busyLabel="Issuing…"
+          confirm="Issue the balance invoice before the installation is finished, and email it to the customer?"
+        >
+          <input type="hidden" name="kind" value="balance" />
+          <input type="hidden" name="expectedTotal" value={(plan.totalPence / 100).toFixed(2)} />
+          <label className={`${label} mt-3`}>
+            Why now (kept with the invoice and in the audit log)
+            <input name="earlyReason" required minLength={5} maxLength={300} className={`${field} mt-1.5 font-normal`} />
+          </label>
+        </ActionForm>
+      </div>
+    </details>
+  );
+}
+
+const PURPOSES: CreditPurpose[] = ["reduction", "correction"];
+
+function CreditFields({ max, purpose, name }: { max?: number; purpose: CreditPurpose; name: string }) {
+  return (
+    <div className="grid gap-3 sm:grid-cols-2">
+      <div>
+        <label className={label}>
+          Amount (£)
+          <input name="amount" inputMode="decimal" required defaultValue={max ? (max / 100).toFixed(2) : ""} className={`${field} mt-1.5 font-normal`} />
+        </label>
+      </div>
+      <div>
+        <label className={label}>
+          Reason (printed on it)
+          <input name="reason" required maxLength={300} className={`${field} mt-1.5 font-normal`} />
+        </label>
+      </div>
+      <fieldset className="sm:col-span-2">
+        <legend className={label}>What is it for?</legend>
+        {PURPOSES.map((v) => (
+          <label key={v} className="flex min-h-11 items-start gap-2 py-1 text-sm text-ink-900">
+            <input type="radio" name="purpose" value={v} defaultChecked={v === purpose} className="mt-0.5 h-4 w-4 shrink-0 accent-accent-600" id={`purpose-${name}-${v}`} />
+            {CREDIT_PURPOSE_LABEL[v]}
+          </label>
+        ))}
+      </fieldset>
+    </div>
+  );
+}
+
+/** The refund form's fields; `treatment` only where a refund could leave the invoice owed again. */
+function RefundFields({ id, todayIso, treatment, max }: { id: string; todayIso: string; treatment: boolean; max?: number }) {
+  return (
+    <div className="grid gap-3 sm:grid-cols-2">
+      <div>
+        <label className={label} htmlFor={`ra-${id}`}>Amount refunded (£)</label>
+        <input id={`ra-${id}`} name="amount" inputMode="decimal" required defaultValue={max ? (max / 100).toFixed(2) : undefined} className={field} />
+      </div>
+      <div>
+        <label className={label} htmlFor={`ro-${id}`}>Date sent</label>
+        <input id={`ro-${id}`} name="refundedOn" type="date" required max={todayIso} defaultValue={todayIso} className={field} />
+      </div>
+      <div>
+        <label className={label} htmlFor={`rm-${id}`}>How</label>
+        <select id={`rm-${id}`} name="method" defaultValue="bank-transfer" className={`${field} pr-10`}>
+          <option value="bank-transfer">Bank transfer</option>
+          <option value="card">Card refund</option>
+          <option value="cash">Cash</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+      <div>
+        <label className={label} htmlFor={`rr-${id}`}>Reason</label>
+        <input id={`rr-${id}`} name="reason" required maxLength={300} className={field} />
+      </div>
+      <p className="text-xs text-ink-500 sm:col-span-2">
+        Paid by card through Stripe? Refund it in Stripe instead: it&apos;s recorded here by itself within a minute, with a credit note so it isn&apos;t asked for again.
+      </p>
+      {treatment && (
+        <fieldset className="sm:col-span-2">
+          <legend className={label}>Do they still owe it?</legend>
+          {(
+            [
+              ["reduction", "No, they keep it (goodwill, a snag, a cancellation): a credit note goes with the refund"],
+              ["correction", "No, it was invoiced in error: a credit note cancels it, and the balance bills the right figure"],
+              ["owed", "Yes, ask for it again (a payment that came back, say)"],
+            ] as const
+          ).map(([v, text]) => (
+            <label key={v} className="flex min-h-11 items-start gap-2 py-1 text-sm text-ink-900">
+              <input type="radio" name="treatment" value={v} defaultChecked={v === "reduction"} className="mt-0.5 h-4 w-4 shrink-0 accent-accent-600" />
+              {text}
+            </label>
+          ))}
+          <p className="mt-1 text-xs text-ink-500">Money they overpaid, or credit already on their account, needs no credit note and gets none.</p>
+        </fieldset>
+      )}
+    </div>
+  );
+}
+
+function InvoiceRow({
+  inv,
+  all,
+  today,
+  doc,
+  projectId,
+}: {
+  inv: Invoice;
+  all: Invoice[];
+  today: string;
+  doc?: { id: string; ref: string };
+  projectId: string;
+}) {
+  const owed = invoiceOutstanding(inv, all);
+  const overdue = isInvoiceOverdue(inv, all, today);
+  const credit = inv.kind === "credit-note";
+  const credited = all.filter((c) => c.kind === "credit-note" && c.creditsInvoiceId === inv.id && c.status !== "void");
+  const unfinished = inv.issuing === true;
+  const todayIso = today;
+  // What account credit (credit notes on their own, overpayments) is covering on this one.
+  const ownOwed = Math.max(0, inv.totalPence - inv.paidPence + credited.filter((c) => c.status !== "draft").reduce((sum, c) => sum + c.totalPence - c.paidPence, 0));
+  const fromAccount = credit ? 0 : Math.max(0, ownOwed - owed);
+  const refundable = credit ? refundableCreditPence(inv, all) : 0;
+  const purpose = creditPurposeOf(inv);
+
+  return (
+    <Card as="li" padded={false}>
+      <div className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-start sm:justify-between sm:px-6">
+        <div className="min-w-0">
+          <p className="font-semibold text-ink-900">
+            {inv.number} · {INVOICE_KIND_LABEL[inv.kind]}
+          </p>
+          <p className="text-sm text-ink-500">
+            Issued {inv.issuedAt ? fmtDate(inv.issuedAt) : "—"}
+            {inv.dueOn && !credit ? ` · due ${fmtDate(inv.dueOn)}` : ""}
+            {inv.issuedBy ? ` · by ${inv.issuedBy}` : ""}
+          </p>
+          {inv.reason && <p className="text-sm text-ink-700">{inv.reason}</p>}
+          {purpose && (
+            <p className="text-xs text-ink-500">
+              {inv.issueId
+                ? "An accepted variation that takes money off: credit on their account, off what they pay"
+                : purpose === "reduction"
+                  ? "Money off the price: never billed again"
+                  : "A correction: the balance bills the right figure"}
+            </p>
+          )}
+          {credited.length > 0 && <p className="text-sm text-ink-700">Credited: {credited.map((c) => c.number).join(", ")}</p>}
+        </div>
+        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+          <span className="text-lg font-semibold tabular-nums text-ink-900">
+            <Money pence={inv.totalPence} />
+          </span>
+          {overdue && <Badge tone="danger">Overdue</Badge>}
+          <StatusChip status={credit ? "issued" : owed === 0 && inv.paidPence < inv.totalPence ? "closed" : inv.status} label={credit ? "Credit note" : owed === 0 && inv.paidPence < inv.totalPence ? "Credited" : undefined} />
+          {doc ? (
+            <Link href={`/d/${doc.id}`} className="text-sm font-semibold text-accent-700 underline">
+              Document
+            </Link>
+          ) : null}
+        </div>
+      </div>
+      {!credit && (inv.paidPence !== 0 || owed > 0 || fromAccount > 0) && (
+        <p className="px-5 pb-3 text-sm text-ink-700 sm:px-6">
+          Paid <Money pence={inv.paidPence} />
+          {fromAccount > 0 && (
+            <>
+              {" "}
+              · <Money pence={fromAccount} /> covered by credit on their account
+            </>
+          )}{" "}
+          · left to pay <Money pence={owed} className="font-semibold" />
+        </p>
+      )}
+      {credit && inv.paidPence < 0 && (
+        <p className="px-5 pb-3 text-sm text-ink-700 sm:px-6">
+          Refunded <Money pence={-inv.paidPence} />
+        </p>
+      )}
+      {credit && refundable > 0 && (
+        <div className="border-t border-line bg-surface/40 px-5 py-3 sm:px-6">
+          <details className="rounded-2xl border border-line bg-white px-4">
+            <summary className="flex min-h-12 cursor-pointer items-center text-sm font-semibold text-ink-900">
+              Refund this credit (<Money pence={refundable} /> can go back)
+            </summary>
+            <div className="pb-4">
+              <ActionForm flash action={refundAction.bind(null, projectId)} submitLabel="Record the refund" variant="secondary" confirm="Record this refund of their credit? It's shown to the customer on their timeline." resetOnSuccess>
+                <input type="hidden" name="invoiceId" value={inv.id} />
+                <RefundFields id={inv.id} todayIso={todayIso} treatment={false} max={refundable} />
+              </ActionForm>
+            </div>
+          </details>
+        </div>
+      )}
+      {unfinished && (
+        <div className="mx-5 mb-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 sm:mx-6">
+          Issuing didn&apos;t finish: {!inv.documentId ? "the printable invoice is missing" : !inv.recordedOnProjectAt ? "the project's totals weren't updated" : "the email may not have gone"}. Finishing never doubles anything.
+          <ActionForm flash action={finishAction.bind(null, projectId)} submitLabel="Finish issuing" variant="secondary">
+            <input type="hidden" name="invoiceId" value={inv.id} />
+          </ActionForm>
+        </div>
+      )}
+      {!credit && inv.status !== "void" && (owed > 0 || inv.paidPence > 0) && (
+        <div className="space-y-2 border-t border-line bg-surface/40 px-5 py-3 sm:px-6">
+          {/* Also once it's paid: a second transfer that arrives anyway is recorded (as credit), so the records match the bank. */}
+          <details className="rounded-2xl border border-line bg-white px-4" open={false}>
+              <summary className="flex min-h-12 cursor-pointer items-center text-sm font-semibold text-ink-900">
+                {owed > 0 ? "Record a payment you've seen" : "Record more money that arrived for this invoice"}
+              </summary>
+              <div className="pb-4">
+                <ActionForm flash action={paymentAction.bind(null, projectId)} submitLabel="Record the payment" busyLabel="Recording…" resetOnSuccess>
+                  <input type="hidden" name="invoiceId" value={inv.id} />
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <label className={label} htmlFor={`amt-${inv.id}`}>Amount (£)</label>
+                      <input id={`amt-${inv.id}`} name="amount" inputMode="decimal" required defaultValue={owed > 0 ? (owed / 100).toFixed(2) : ""} className={field} />
+                    </div>
+                    <div>
+                      <label className={label} htmlFor={`on-${inv.id}`}>Date it arrived</label>
+                      <input id={`on-${inv.id}`} name="receivedOn" type="date" required max={todayIso} defaultValue={todayIso} className={field} />
+                    </div>
+                    <div>
+                      <label className={label} htmlFor={`m-${inv.id}`}>How</label>
+                      <select id={`m-${inv.id}`} name="method" defaultValue="bank-transfer" className={`${field} pr-10`}>
+                        <option value="bank-transfer">Bank transfer</option>
+                        <option value="cash">Cash</option>
+                        <option value="card">Card (taken elsewhere)</option>
+                        <option value="other">Other</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className={label} htmlFor={`ref-${inv.id}`}>Reference on the statement</label>
+                      <input id={`ref-${inv.id}`} name="reference" maxLength={120} placeholder={inv.number} className={field} />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className={label} htmlFor={`pn-${inv.id}`}>Note (optional)</label>
+                      <input id={`pn-${inv.id}`} name="note" maxLength={500} className={field} />
+                    </div>
+                  </div>
+                  <label className="mt-3 flex min-h-11 items-start gap-2 text-sm text-ink-700">
+                    <input type="checkbox" name="overpaid" className="mt-1 size-4" />
+                    <span>
+                      More than is owed arrived ({owed > 0 ? <Money pence={owed} /> : "nothing"} is left on {inv.number}): record it all. The extra is credit on their account, to refund or take off their next invoice.
+                    </span>
+                  </label>
+                  <p className="mt-2 text-xs text-ink-500">Only record money you&apos;ve seen arrive. The customer gets a receipt by email.</p>
+                </ActionForm>
+              </div>
+            </details>
+          {owed > 0 && (
+            <details className="rounded-2xl border border-line bg-white px-4">
+              <summary className="flex min-h-12 cursor-pointer items-center text-sm font-semibold text-ink-900">Credit it (cancel what&apos;s unpaid)</summary>
+              <div className="pb-4">
+                <ActionForm flash action={creditAction.bind(null, projectId)} submitLabel="Issue credit note" variant="secondary" confirm={`Issue a credit note against ${inv.number}?`}>
+                  <input type="hidden" name="invoiceId" value={inv.id} />
+                  <CreditFields max={owed} purpose="correction" name={inv.id} />
+                </ActionForm>
+              </div>
+            </details>
+          )}
+          {inv.paidPence > 0 && (
+            <details className="rounded-2xl border border-line bg-white px-4">
+              <summary className="flex min-h-12 cursor-pointer items-center text-sm font-semibold text-ink-900">Record a refund</summary>
+              <div className="pb-4">
+                <ActionForm flash action={refundAction.bind(null, projectId)} submitLabel="Record the refund" variant="secondary" confirm="Record this refund? It's shown to the customer on their timeline." resetOnSuccess>
+                  <input type="hidden" name="invoiceId" value={inv.id} />
+                  <RefundFields id={inv.id} todayIso={todayIso} treatment />
+                </ActionForm>
+              </div>
+            </details>
+          )}
+        </div>
+      )}
+    </Card>
+  );
+}

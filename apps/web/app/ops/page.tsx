@@ -1,302 +1,313 @@
-import Link from "next/link";
 import type { Metadata } from "next";
-import { SiteFooter } from "@/components/site/footer";
-import { SiteHeader } from "@/components/site/header";
+import Link from "next/link";
+import { can } from "@aircon/domain";
+import { Badge } from "@/components/kit/badge";
+import { LinkButton } from "@/components/kit/button";
+import { PageHeader } from "@/components/kit/layout";
+import { requireStaff } from "@/lib/auth/server";
+import { fmtDay, fmtDayTime, londonDateOf, money } from "@/lib/format";
+import { DUE_LEADS_SHOWN, loadDueLeads } from "@/lib/lead-follow-ups";
+import { loadPulse, type Pulse } from "@/lib/ops-core-server";
 import { getServiceClient } from "@/lib/supabase-server";
 import { tabByKey } from "./quotes/tabs";
 
-export const metadata: Metadata = {
-  title: "Admin console",
-  robots: { index: false },
-};
-
+export const metadata: Metadata = { title: "Console · ops", robots: { index: false } };
 export const dynamic = "force-dynamic";
 
-/** The console's pulse: live numbers, or nulls in demo mode. */
-async function pulse() {
-  const supabase = getServiceClient();
-  if (!supabase) return null;
+/**
+ * New leads from the website: the funnel's side of the pulse, and the chase
+ * list of follow-ups scheduled on quotes (due today or overdue). Nulls when
+ * a count or the list can't be read.
+ */
+async function leads(today: string) {
+  const db = getServiceClient();
+  if (!db) return null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const count = async (table: string, filter?: (q: any) => any) => {
-    let q = supabase.from(table).select("*", { count: "exact", head: true });
-    if (filter) q = filter(q);
-    const { count: n, error } = await q;
+  const count = async (filter: (q: any) => any) => {
+    const { count: n, error } = await filter(db.from("quote_requests").select("*", { count: "exact", head: true }));
     return error ? null : (n ?? 0);
   };
-  const sevenDays = new Date(Date.now() - 7 * 86400_000).toISOString();
-  const endOfToday = new Date(new Date().toISOString().slice(0, 10) + "T23:59:59Z").toISOString();
-  const [inbox, drafts, booked, properties, views7d, dueRes, unworked] = await Promise.all([
-    count("quote_requests", (q) => q.in("status", tabByKey("inbox")!.statuses!)),
-    count("quote_requests", (q) => q.in("status", tabByKey("drafts")!.statuses!)),
-    count("quote_requests", (q) => q.in("status", tabByKey("booked")!.statuses!)),
-    count("properties"),
-    count("analytics_events", (q) => q.eq("type", "page_view").gte("created_at", sevenDays)),
-    supabase
-      .from("quote_requests")
-      .select("id, customer_name, email, postcode, next_action, next_action_at")
-      .not("next_action_at", "is", null)
-      .lte("next_action_at", endOfToday)
-      .neq("status", "declined")
-      .order("next_action_at", { ascending: true })
-      .limit(12),
-    // The exception list every field-service benchmark insists on:
-    // live leads with NO scheduled next move. Should always be empty.
-    count("quote_requests", (q) =>
-      q.in("status", tabByKey("inbox")!.statuses!).is("next_action_at", null),
-    ),
+  const [inbox, drafts, unworked, due] = await Promise.all([
+    count((q) => q.in("status", tabByKey("inbox")!.statuses!)),
+    count((q) => q.in("status", tabByKey("drafts")!.statuses!)),
+    count((q) => q.in("status", tabByKey("inbox")!.statuses!).is("next_action_at", null)),
+    loadDueLeads(db, today).catch(() => null),
   ]);
-  return { inbox, drafts, booked, properties, views7d, due: dueRes.data ?? [], unworked };
+  return { inbox, drafts, unworked, due };
 }
 
-/**
- * The admin console home. Live modules up top, honest status on the rest.
- * Subpages sit behind basic auth (OPS_PASSWORD): browser prompts, any
- * username, that password.
- */
+type Module = { title: string; href: string; body: string; status: "Live" | "Demo" | "Older view" };
 
-const live = [
+const MODULES: { group: string; items: Module[] }[] = [
   {
-    title: "Property intelligence",
-    href: "/ops/intel",
-    body: "The book: every property we understand, scored and filtered. Build target lists, export mailings with per-address pages, run the business case.",
+    group: "Running the pilots",
+    items: [
+      { title: "Board", href: "/ops/projects", body: "Every project by stage, with its next action, owner and what's blocking it.", status: "Live" },
+      { title: "New pilot", href: "/ops/projects/new", body: "Set up a household in thirty seconds: instant price, project page, optional link by email.", status: "Live" },
+      { title: "Calendar", href: "/ops/calendar", body: "Surveys, deliveries and install days, with crew and qualification checks.", status: "Live" },
+      { title: "Purchasing", href: "/ops/purchasing", body: "Purchase orders from the approved design, from required to checked on site.", status: "Live" },
+      { title: "Catalogue", href: "/ops/catalogue", body: "Equipment, materials and labour rates with costs, sources and compatibility.", status: "Live" },
+      { title: "Pilots", href: "/ops/pilots", body: "Pilot 1 against 2, 3 and 4: price, cost, hours, quality, and what we learned.", status: "Live" },
+      { title: "Messages", href: "/ops/messages", body: "Every email and text with its status, previews, resend, and the daily jobs.", status: "Live" },
+    ],
   },
   {
-    title: "Projects",
-    href: "/ops/projects",
-    body: "Every installation in flight on the quote → floor plan → final quote → site visit → delivery → installation timeline. Issue final quotes, record site visits, dispatch kit, assign installers.",
+    group: "Set-up",
+    items: [
+      { title: "Staff", href: "/ops/staff", body: "The team and subcontractors, roles, and certificates with expiry dates.", status: "Live" },
+      { title: "Settings", href: "/ops/settings", body: "Company and legal details, VAT, pricing, discounts, payments, scheduling.", status: "Live" },
+      { title: "Go-live checklist", href: "/ops/launch", body: "Everything the pilots depend on, green, amber or red, with the exact fix.", status: "Live" },
+      { title: "System status", href: "/ops/status", body: "Database, storage and keys, checked live.", status: "Live" },
+    ],
   },
   {
-    title: "Quote requests",
-    href: "/ops/quotes",
-    body: "Incoming self-surveys with answers, computed loads, photos and status.",
+    group: "Leads and the business",
+    items: [
+      { title: "Quote requests", href: "/ops/quotes", body: "Website quotes with answers, photos, notes and next actions.", status: "Live" },
+      { title: "Property intelligence", href: "/ops/intel", body: "The homes we understand, scored and filtered for mailings.", status: "Live" },
+      { title: "Usage analytics", href: "/ops/analytics", body: "Visitors, sources and the quote funnel, cookieless.", status: "Live" },
+      { title: "Business review", href: "/ops/review", body: "Plan against actual, month by month.", status: "Live" },
+      { title: "Collateral", href: "/ops/collateral", body: "Print-ready letters, cards and the one-pager.", status: "Live" },
+      { title: "Business case", href: "/ops/finance", body: "The planning model: P&L, scenarios and the raise. Assumptions, not results.", status: "Live" },
+      { title: "Template library", href: "/ops/templates", body: "House archetypes and install patterns with sample prices.", status: "Live" },
+    ],
   },
   {
-    title: "Collateral",
-    href: "/ops/collateral",
-    body: "Print-ready pieces generated from the live platform: the street mailing letter (with per-address proofs), the A5 door-drop card, and the investor one-pager whose numbers come from the operating model.",
-  },
-  {
-    title: "Business review",
-    href: "/ops/review",
-    body: "Plan vs actual, automated: quotes, bookings, conversion and booked value month by month against the operating model, with the week-on-week strip and the 15-minute weekly agenda.",
-  },
-  {
-    title: "Usage analytics",
-    href: "/ops/analytics",
-    body: "Who's on the site and where they came from: visitors, sources, campaigns, geography, and the quote funnel from landing to saved. Cookieless, first-party.",
-  },
-  {
-    title: "System status",
-    href: "/ops/status",
-    body: "Is the database actually working? Live check of every table, storage bucket and env var, with the exact fix when something's red.",
-  },
-  {
-    title: "Launch readiness",
-    href: "/ops/launch",
-    body: "Are we ready to go public? Eight live platform checks plus the launch-day walk: domain, email deliverability, the money path end-to-end, uptime alarm.",
-  },
-  {
-    title: "Template library",
-    href: "/ops/templates",
-    body: "Every house archetype and install pattern we fit: stock floor plans, pipe routes, price adders, pre-checks, and a sample price for each.",
-  },
-  {
-    title: "Design studio",
-    href: "/ops/design",
-    body: "The engineering assistant: eight design rules score every property green, amber or red, then one button selects the full system: units, pipes, cables, breaker, refrigerant, the lot.",
-  },
-  {
-    title: "Installation OS",
-    href: "/ops/install",
-    body: "Airline-checklist installs built on required evidence: photos, readings, scans and signatures at every step. Jobs score themselves; humans review exceptions only.",
-  },
-  {
-    title: "Schedule",
-    href: "/ops/schedule",
-    body: "The next six weeks on one board: installs, site visits and deliveries from live projects, double-bookings flagged, street-batching wins surfaced.",
-  },
-  {
-    title: "Procurement",
-    href: "/ops/procurement",
-    body: "Booked installs turned into an order book: weekly purchase totals, per-install pick lists, and order-by dates from supplier lead times.",
-  },
-  {
-    title: "Business case & P&L",
-    href: "/ops/finance",
-    body: "The seed case end to end: monthly P&L with cost dials and scenarios, bottom-up TAM/SAM/SOM, LTV:CAC, the round and dilution, sensitivity on the ask, and the milestone road to Series A, all from one live model.",
+    group: "Earlier prototypes",
+    items: [
+      { title: "Design studio", href: "/ops/design", body: "The original design-rules demo on sample data. Real designs are on each project.", status: "Demo" },
+      { title: "Installation OS", href: "/ops/install", body: "The original runsheet demo on sample data. Real installs run in the field app.", status: "Demo" },
+      { title: "Schedule", href: "/ops/schedule", body: "The six-week view from before the calendar.", status: "Older view" },
+      { title: "Procurement", href: "/ops/procurement", body: "The order book from before purchase orders.", status: "Older view" },
+    ],
   },
 ];
 
-const customerSide = [
-  { title: "Quote funnel", href: "/quote" },
-  { title: "Project timeline (demo)", href: "/p/demo" },
-  { title: "Per-address mailing page (demo)", href: "/a/demo" },
-  { title: "Customer portal (placeholder)", href: "/portal" },
-];
-
-const roadmap = [
-  {
-    id: "installer",
-    phase: "Later",
-    title: "Installer mobile app",
-    body: "The Installation OS runsheet is live in this console; the phone app wraps it with a camera, barcode scanner and offline capture. Same domain package, same evidence rules.",
-  },
-  {
-    id: "monitoring",
-    phase: "Later",
-    title: "Fleet monitoring & service",
-    body: "Every installed system reports power, temperatures and errors. Predictive maintenance replaces blanket annual servicing.",
-  },
-  {
-    id: "intelligence",
-    phase: "Continuous",
-    title: "Knowledge loop",
-    body: "Actual install times, issues and outcomes feed back into pricing rules, heat-load factors and templates. The property_assessments table is ready to receive install actuals.",
-  },
-];
-
-function Pulse({ label, value, href }: { label: string; value: number | null; href: string }) {
+function Tile({ label, value, href, tone = "neutral", hint }: { label: string; value: string; href: string; tone?: "neutral" | "danger" | "warn"; hint?: string }) {
+  const cls = { neutral: "text-ink-900", danger: "text-red-700", warn: "text-amber-800" }[tone];
   return (
     <Link href={href} className="rounded-2xl border border-line bg-white p-4 transition hover:border-accent-400">
-      <p className="text-xs font-semibold uppercase tracking-wide text-ink-300">{label}</p>
-      <p className="mt-1 text-2xl font-display">
-        {value === null ? "—" : value.toLocaleString("en-GB")}
-      </p>
+      <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">{label}</p>
+      <p className={`mt-1 text-2xl font-semibold tabular-nums ${cls}`}>{value}</p>
+      {hint && <p className="mt-0.5 text-xs text-ink-500">{hint}</p>}
     </Link>
   );
 }
 
-export default async function OpsPage() {
-  const stats = await pulse();
+export default async function ConsolePage() {
+  const staff = await requireStaff("projects.view-all");
+  let pulse: Pulse | null = null;
+  let pulseFailed = false;
+  if (getServiceClient()) {
+    try {
+      pulse = await loadPulse();
+    } catch (err) {
+      console.error("[console] pulse failed:", err);
+      pulseFailed = true;
+    }
+  }
+  const lead = await leads(pulse?.today ?? londonDateOf(new Date().toISOString())).catch(() => null);
+  const canCreate = can(staff, "projects.edit");
 
   return (
-    <>
-      <SiteHeader />
-      <main className="mx-auto max-w-5xl px-4 py-16 sm:px-6">
-        <span className="rounded-full bg-surface px-3 py-1 text-xs font-semibold text-ink-500">
-          Internal · admin console
-        </span>
-        <h1 className="mt-4 text-4xl font-display">Mission control</h1>
-        <p className="mt-3 max-w-2xl text-ink-500">
-          Everything the team runs the business from. The modules below are
-          live now; subpages are protected by the ops password
-          (<code>OPS_PASSWORD</code>): your browser asks once, any username,
-          that password.
+    <main className="mx-auto w-full min-w-0 max-w-6xl px-4 pb-16 pt-6 sm:px-6">
+      <PageHeader
+        title="Today"
+        subtitle={pulse ? `${fmtDay(pulse.today)}. ${pulse.live} project${pulse.live === 1 ? "" : "s"} in flight.` : "The team's home: today first, then everything else."}
+        actions={
+          <>
+            <LinkButton href="/ops/projects" variant="secondary">
+              Open the board
+            </LinkButton>
+            {canCreate && <LinkButton href="/ops/projects/new">New pilot</LinkButton>}
+          </>
+        }
+      />
+
+      {pulseFailed && (
+        <p role="alert" className="mb-6 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-900">
+          Today&apos;s numbers couldn&apos;t load. The board and everything else still work; reload in a moment.
         </p>
+      )}
+      {!getServiceClient() && (
+        <p className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-900">No database is connected, so there are no projects to show. Check System status.</p>
+      )}
 
-        {stats && (
-          <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-5">
-            <Pulse label="Quote inbox" value={stats.inbox} href="/ops/quotes" />
-            <Pulse label="Unfinished" value={stats.drafts} href="/ops/quotes?tab=drafts" />
-            <Pulse label="Booked" value={stats.booked} href="/ops/quotes?tab=booked" />
-            <Pulse label="Properties" value={stats.properties} href="/ops/intel" />
-            <Pulse label="Views (7d)" value={stats.views7d} href="/ops/analytics" />
+      {pulse && (
+        <section aria-labelledby="today">
+          <h2 id="today" className="sr-only">
+            Today
+          </h2>
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+            <Tile label="Installs today" value={String(pulse.installsToday.length)} href="/ops/calendar" />
+            <Tile label="Surveys today" value={String(pulse.surveysToday.length)} href="/ops/calendar" />
+            <Tile label="Blocked" value={String(pulse.blocked.length)} href="/ops/projects?blocked=1" tone={pulse.blocked.length ? "danger" : "neutral"} />
+            <Tile label="Owed to us" value={money(pulse.outstanding.pence)} hint={`${pulse.outstanding.count} invoice${pulse.outstanding.count === 1 ? "" : "s"}`} href="/ops/projects" tone={pulse.outstanding.count ? "warn" : "neutral"} />
+            <Tile label="Open issues" value={String(pulse.openIssues)} href="/ops/projects" tone={pulse.openIssues ? "warn" : "neutral"} />
           </div>
-        )}
 
-        {stats && (stats.unworked ?? 0) > 0 && (
-          <p className="mt-3 text-sm text-red-600">
-            <Link href="/ops/quotes" className="font-semibold underline">
-              {stats.unworked} live lead{stats.unworked === 1 ? "" : "s"} with no next action
-            </Link>{" "}
-            — every open lead deserves a scheduled next move.
-          </p>
-        )}
+          {pulse.surveysUnassigned.length > 0 && (
+            <div role="status" className="mt-4 rounded-2xl border border-amber-300 bg-amber-50 p-4">
+              <h3 className="text-sm font-semibold text-amber-950">
+                Surveys with no surveyor ({pulse.surveysUnassigned.length})
+              </h3>
+              <p className="mt-1 text-sm text-amber-950">Booked (often by the family, from their page) with nobody down to go. Open each and assign a surveyor.</p>
+              <ul className="mt-2 space-y-1.5 text-sm">
+                {pulse.surveysUnassigned.map((c) => (
+                  <li key={`u-${c.id}`}>
+                    <Link href={`/ops/projects/${c.id}`} className="font-semibold text-accent-700 hover:underline">
+                      {c.customer}
+                    </Link>{" "}
+                    <span className="text-amber-950">
+                      · survey {c.surveyAt ? fmtDayTime(c.surveyAt) : ""} · {c.outcode} · no surveyor
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
-        {/* Today's chase list: the CRM loop's daily rhythm. */}
-        {stats && stats.due.length > 0 && (
-          <section className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4">
-            <h2 className="text-sm font-bold text-amber-800">
-              Due today ({stats.due.length})
-            </h2>
-            <ul className="mt-2 space-y-1.5">
-              {stats.due.map((d) => (
-                <li key={d.id} className="flex flex-wrap items-baseline gap-x-2 text-sm">
-                  <Link
-                    href={`/ops/quotes/${d.id}`}
-                    className="font-semibold text-accent-700 hover:underline"
-                  >
-                    {d.customer_name ?? d.email}
-                  </Link>
+          <div className="mt-4 grid gap-4 lg:grid-cols-2">
+            <div className="rounded-2xl border border-line bg-white p-4">
+              <h3 className="text-sm font-semibold text-ink-900">On today</h3>
+              {pulse.installsToday.length + pulse.surveysToday.length === 0 ? (
+                <p className="mt-2 text-sm text-ink-500">No surveys or install days today.</p>
+              ) : (
+                <ul className="mt-2 space-y-1.5 text-sm">
+                  {pulse.surveysToday.map((c) => (
+                    <li key={`s-${c.id}`}>
+                      <Link href={`/ops/projects/${c.id}`} className="font-semibold text-accent-700 hover:underline">
+                        {c.customer}
+                      </Link>{" "}
+                      <span className="text-ink-500">· survey {c.surveyAt ? fmtDayTime(c.surveyAt).split(", ")[1] : ""} · {c.outcode}</span>
+                      {c.surveyUnassigned && <span className="ml-1 font-semibold text-amber-800">· no surveyor</span>}
+                    </li>
+                  ))}
+                  {pulse.installsToday.map((c) => (
+                    <li key={`i-${c.id}`}>
+                      <Link href={`/ops/projects/${c.id}`} className="font-semibold text-accent-700 hover:underline">
+                        {c.customer}
+                      </Link>{" "}
+                      <span className="text-ink-500">
+                        · install day {c.installDates.indexOf(pulse!.today) + 1} of {c.installDates.length} · {c.outcode}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <div className="rounded-2xl border border-line bg-white p-4">
+              <h3 className="text-sm font-semibold text-ink-900">Overdue next actions</h3>
+              {pulse.overdue.length === 0 ? (
+                <p className="mt-2 text-sm text-ink-500">Nothing overdue.</p>
+              ) : (
+                <ul className="mt-2 space-y-1.5 text-sm">
+                  {pulse.overdue.slice(0, 8).map((c) => (
+                    <li key={c.id}>
+                      <Link href={`/ops/projects/${c.id}`} className="font-semibold text-accent-700 hover:underline">
+                        {c.customer}
+                      </Link>{" "}
+                      <span className="text-ink-500">
+                        · {c.nextAction.text} · due {c.nextAction.dueOn ? fmtDay(c.nextAction.dueOn) : ""}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {lead && (
+        <section aria-labelledby="leads-due" className="mt-4 rounded-2xl border border-line bg-white p-4">
+          <h2 id="leads-due" className="text-sm font-semibold text-ink-900">
+            Website leads due today{lead.due ? ` (${lead.due.total})` : ""}
+          </h2>
+          {!lead.due ? (
+            <p role="alert" className="mt-2 text-sm text-red-700">
+              The leads&apos; follow-ups couldn&apos;t load. Check them under{" "}
+              <Link href="/ops/quotes?sort=next" className="font-semibold underline">
+                Quote requests
+              </Link>
+              .
+            </p>
+          ) : lead.due.leads.length === 0 ? (
+            <p className="mt-2 text-sm text-ink-500">No lead follow-ups due.</p>
+          ) : (
+            <ul className="mt-2 space-y-1.5 text-sm">
+              {lead.due.leads.map((d) => (
+                <li key={d.id}>
+                  <Link href={`/ops/quotes/${d.id}`} className="font-semibold text-accent-700 hover:underline">
+                    {d.name}
+                  </Link>{" "}
                   <span className="text-ink-500">
-                    {d.postcode} · {d.next_action}
-                  </span>
-                  {d.next_action_at && new Date(d.next_action_at) < new Date(new Date().toISOString().slice(0, 10)) && (
-                    <span className="text-xs font-semibold text-red-600">overdue</span>
-                  )}
+                    · {d.action} · {d.postcode}
+                  </span>{" "}
+                  {d.overdue && <span className="text-xs font-semibold text-red-700">overdue since {fmtDay(d.dueOn)}</span>}
                 </li>
               ))}
+              {lead.due.total > DUE_LEADS_SHOWN && (
+                <li>
+                  <Link href="/ops/quotes?tab=all&sort=next" className="text-accent-700 hover:underline">
+                    and {lead.due.total - DUE_LEADS_SHOWN} more
+                  </Link>
+                </li>
+              )}
             </ul>
-          </section>
-        )}
+          )}
+        </section>
+      )}
 
-        <h2 className="mt-10 text-xl font-display">Live now</h2>
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          {live.map((m) => (
-            <Link
-              key={m.href}
-              href={m.href}
-              className="group rounded-2xl border border-line bg-white p-6 transition hover:border-accent-400 hover:shadow-sm"
-            >
-              <div className="flex items-center justify-between gap-3">
-                <h3 className="font-semibold group-hover:text-accent-700">{m.title}</h3>
-                <span className="shrink-0 rounded-full bg-sage-100 px-2.5 py-0.5 text-xs font-semibold text-sage-700">
-                  Live
-                </span>
-              </div>
-              <p className="mt-2 text-sm leading-relaxed text-ink-500">{m.body}</p>
-              <span className="mt-3 inline-block text-sm font-semibold text-accent-700">
-                Open →
-              </span>
-            </Link>
-          ))}
-        </div>
+      {lead && (
+        <p className="mt-4 text-sm text-ink-700">
+          <span className="font-semibold">Website leads:</span>{" "}
+          <Link href="/ops/quotes" className="text-accent-700 hover:underline">
+            {lead.inbox ?? "–"} in the inbox
+          </Link>
+          {" · "}
+          <Link href="/ops/quotes?tab=drafts" className="text-accent-700 hover:underline">
+            {lead.drafts ?? "–"} unfinished
+          </Link>
+          {(lead.unworked ?? 0) > 0 && <span className="font-semibold text-red-700"> · {lead.unworked} with no next action</span>}
+        </p>
+      )}
 
-        <h2 className="mt-10 text-xl font-display">The customer side, for reference</h2>
-        <div className="mt-4 flex flex-wrap gap-2">
-          {customerSide.map((c) => (
-            <Link
-              key={c.href}
-              href={c.href}
-              className="rounded-full border border-line bg-white px-4 py-2 text-sm font-medium text-ink-700 transition hover:border-accent-400 hover:text-accent-700"
-            >
+      {MODULES.map((g) => (
+        <section key={g.group} className="mt-10" aria-labelledby={`g-${g.group}`}>
+          <h2 id={`g-${g.group}`} className="font-display text-xl text-ink-900">
+            {g.group}
+          </h2>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {g.items.map((m) => (
+              <Link key={m.href} href={m.href} className="group rounded-2xl border border-line bg-white p-4 transition hover:border-accent-400 hover:shadow-sm">
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="font-semibold text-ink-900 group-hover:text-accent-700">{m.title}</h3>
+                  <Badge tone={m.status === "Live" ? "success" : m.status === "Demo" ? "warn" : "neutral"}>{m.status}</Badge>
+                </div>
+                <p className="mt-1.5 text-sm leading-relaxed text-ink-500">{m.body}</p>
+              </Link>
+            ))}
+          </div>
+        </section>
+      ))}
+
+      <section className="mt-10" aria-labelledby="customer-side">
+        <h2 id="customer-side" className="font-display text-xl text-ink-900">
+          The customer side
+        </h2>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {[
+            { title: "Quote funnel", href: "/quote" },
+            { title: "Project page (demo)", href: "/p/demo" },
+            { title: "Customer portal", href: "/portal" },
+          ].map((c) => (
+            <Link key={c.href} href={c.href} className="inline-flex min-h-10 items-center rounded-full border border-line bg-white px-4 text-sm font-medium text-ink-700 hover:border-accent-400 hover:text-accent-700">
               {c.title} →
             </Link>
           ))}
         </div>
-
-        <h2 className="mt-10 text-xl font-display">Not built yet</h2>
-        <p className="mt-2 max-w-2xl text-sm text-ink-500">
-          Each of these exists to reduce skilled labour, standardise
-          installations, or learn from every job. The data they need is
-          already being collected.
-        </p>
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          {roadmap.map((m) => (
-            <div key={m.id} id={m.id} className="scroll-mt-24 rounded-2xl border border-dashed border-line p-6">
-              <div className="flex items-center justify-between gap-3">
-                <h3 className="font-semibold text-ink-700">{m.title}</h3>
-                <span className="shrink-0 rounded-full bg-surface px-2.5 py-0.5 text-xs font-medium text-ink-500">
-                  {m.phase}
-                </span>
-              </div>
-              <p className="mt-2 text-sm leading-relaxed text-ink-500">{m.body}</p>
-            </div>
-          ))}
-        </div>
-
-        <div className="mt-12 rounded-2xl border border-line bg-surface p-6 text-sm text-ink-500">
-          <p className="font-semibold text-ink-900">Where the data already flows</p>
-          <p className="mt-2">
-            Quotes store the full survey + engine version (<code>quote_requests</code>),
-            installations run as JSONB state machines (<code>projects</code>), and every
-            home we understand lives in <code>properties</code> with an append-only
-            assessment log. When the modules above arrive, their data is
-            already shaped and waiting.
-          </p>
-        </div>
-      </main>
-      <SiteFooter />
-    </>
+      </section>
+    </main>
   );
 }

@@ -1,142 +1,86 @@
-import Link from "next/link";
 import type { Metadata } from "next";
-import { STAGE_INFO, type ProjectStageId } from "@aircon/domain";
-import { fmtDay, fmtDayTime } from "@/lib/format";
+import type { ReactNode } from "react";
+import { can } from "@aircon/domain";
+import { LinkButton } from "@/components/kit/button";
+import { EmptyState, PageHeader } from "@/components/kit/layout";
+import { filtersFromParams } from "@/components/ops/board/board-model";
+import { BoardView } from "@/components/ops/board/board-view";
+import { requireStaff } from "@/lib/auth/server";
+import { loadBoard, type BoardData } from "@/lib/ops-core-server";
 import { getServiceClient } from "@/lib/supabase-server";
 
-export const metadata: Metadata = {
-  title: "Projects · ops",
-  robots: { index: false },
-};
-
+export const metadata: Metadata = { title: "Board · ops", robots: { index: false } };
 export const dynamic = "force-dynamic";
 
-const STAGE_CLS: Record<string, string> = {
-  "floor-plan": "bg-accent-100 text-accent-700",
-  "final-quote": "bg-accent-100 text-accent-700",
-  "site-visit": "bg-amber-50 text-amber-700",
-  delivery: "bg-sage-100 text-sage-700",
-  installation: "bg-sage-100 text-sage-700",
-};
+/**
+ * The board (plan §5): every project by stage, each card with its next
+ * action and what's blocking it, straight from the domain's gates.
+ */
+export default async function BoardPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const staff = await requireStaff("projects.view-all");
+  const raw = await searchParams;
+  const params = new URLSearchParams(Object.entries(raw).flatMap(([k, v]) => (typeof v === "string" ? [[k, v]] : [])));
+  const initial = filtersFromParams(params);
+  const canCreate = can(staff, "projects.edit");
 
-export default async function OpsProjectsPage() {
-  const supabase = getServiceClient();
-
-  if (!supabase) {
+  if (!getServiceClient()) {
     return (
-      <Shell>
-        <div className="rounded-2xl border border-line bg-surface p-6 text-sm text-ink-500">
-          <p className="font-semibold text-ink-900">Demo mode, no database connected</p>
-          <p className="mt-2">
-            Set <code>SUPABASE_URL</code> and <code>SUPABASE_SERVICE_ROLE_KEY</code> to see live
-            projects here. The customer-side demo timeline is at <code>/p/demo</code>.
-          </p>
-        </div>
+      <Shell canCreate={false}>
+        <EmptyState title="No database connected" body="Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (or DATA_BACKEND=file locally) to see projects here." />
       </Shell>
     );
   }
 
-  const { data: projects, error } = await supabase
-    .from("projects")
-    .select(
-      "id, created_at, customer_name, postcode, current_stage, completed, site_visit_at, delivery_expected_on, install_on",
-    )
-    .order("created_at", { ascending: false })
-    .limit(200);
-
-  if (error) {
+  let board: BoardData;
+  try {
+    board = await loadBoard();
+  } catch (err) {
+    console.error("[board] load failed:", err);
     return (
-      <Shell>
-        <p className="text-sm text-red-600">Failed to load projects: {error.message}</p>
+      <Shell canCreate={canCreate}>
+        <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-900">
+          <p className="font-semibold">The board couldn&apos;t load.</p>
+          <p className="mt-1">The database didn&apos;t answer. Reload in a moment; if it keeps happening, check System status.</p>
+        </div>
       </Shell>
     );
   }
 
   return (
-    <Shell count={projects.length}>
-      {projects.length === 0 ? (
-        <p className="text-sm text-ink-500">
-          No projects yet. They appear when a customer starts their installation plan from a
-          saved quote.
-        </p>
+    <Shell canCreate={canCreate} live={board.cards.filter((c) => c.column !== "closed").length} blocked={board.cards.filter((c) => c.blockers > 0 && c.column !== "closed").length}>
+      {board.cards.length === 0 ? (
+        <EmptyState
+          title="No projects yet"
+          body="Projects appear when a customer books from their quote, or when you set up a pilot household here."
+          action={
+            canCreate ? (
+              <LinkButton href="/ops/projects/new" variant="primary">
+                Set up the first pilot
+              </LinkButton>
+            ) : undefined
+          }
+        />
       ) : (
-        <div className="overflow-x-auto rounded-2xl border border-line">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-line bg-surface text-left text-xs font-semibold text-ink-500">
-                <th className="px-4 py-3">Started</th>
-                <th className="px-4 py-3">Customer</th>
-                <th className="px-4 py-3">Postcode</th>
-                <th className="px-4 py-3">Stage</th>
-                <th className="px-4 py-3">Site visit</th>
-                <th className="px-4 py-3">Delivery</th>
-                <th className="px-4 py-3">Install</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-line">
-              {projects.map((p) => (
-                <tr key={p.id} className="hover:bg-surface/50">
-                  <td className="whitespace-nowrap px-4 py-3 text-ink-500">
-                    {new Date(p.created_at).toLocaleDateString("en-GB", {
-                      day: "numeric",
-                      month: "short",
-                    })}
-                  </td>
-                  <td className="px-4 py-3">
-                    <Link
-                      href={`/ops/projects/${p.id}`}
-                      className="font-semibold text-accent-700 hover:underline"
-                    >
-                      {p.customer_name}
-                    </Link>
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3">{p.postcode}</td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={`whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                        p.completed
-                          ? "bg-sage-100 text-sage-700"
-                          : (STAGE_CLS[p.current_stage] ?? "bg-surface text-ink-500")
-                      }`}
-                    >
-                      {p.completed
-                        ? "complete"
-                        : (STAGE_INFO[p.current_stage as ProjectStageId]?.label ?? p.current_stage)}
-                    </span>
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-ink-500">
-                    {p.site_visit_at ? fmtDayTime(p.site_visit_at) : "-"}
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-ink-500">
-                    {p.delivery_expected_on ? fmtDay(p.delivery_expected_on) : "-"}
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-ink-500">
-                    {p.install_on ? fmtDay(p.install_on) : "-"}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <BoardView cards={board.cards} me={staff.id} today={board.today} initial={initial} />
       )}
     </Shell>
   );
 }
 
-function Shell({ children, count }: { children: React.ReactNode; count?: number }) {
+function Shell({ children, canCreate, live, blocked }: { children: ReactNode; canCreate: boolean; live?: number; blocked?: number }) {
   return (
-    <main className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-display">Projects</h1>
-          <p className="mt-1 text-sm text-ink-500">
-            {count !== undefined ? `${count} in flight` : "Quote → install pipelines"}
-          </p>
-        </div>
-        <Link href="/ops" className="text-sm font-medium text-accent-700 hover:underline">
-          ← All modules
-        </Link>
-      </div>
+    <main className="mx-auto w-full min-w-0 max-w-[100rem] px-4 pb-16 pt-6 sm:px-6">
+      <PageHeader
+        title="Board"
+        subtitle={live === undefined ? "Every project, by stage." : `${live} in flight${blocked ? `, ${blocked} blocked` : ""}.`}
+        actions={
+          canCreate ? (
+            <LinkButton href="/ops/projects/new" variant="primary">
+              New pilot
+            </LinkButton>
+          ) : undefined
+        }
+      />
       {children}
     </main>
   );

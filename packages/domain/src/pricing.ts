@@ -3,7 +3,6 @@ import { getPermutation } from "./archetypes.ts";
 import { scoreConfidence } from "./confidence.ts";
 import type {
   CapacityKw,
-  FinanceOption,
   QuoteLine,
   QuoteResult,
   RoomDesign,
@@ -107,25 +106,12 @@ function designSystems(survey: Survey): SystemDesign[] {
   });
 }
 
-function financeOptions(totalGbp: number): FinanceOption[] {
-  const APR = 11.9;
-  const deposit = Math.round(totalGbp * 0.1);
-  const principal = totalGbp - deposit;
-  const monthlyRate = APR / 100 / 12;
-  return [24, 48, 60].map((months) => {
-    const monthly =
-      (principal * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -months));
-    const monthlyRounded = Math.round(monthly * 100) / 100;
-    return {
-      months,
-      aprPercent: APR,
-      depositGbp: deposit,
-      monthlyGbp: monthlyRounded,
-      totalPayableGbp: Math.round(deposit + monthlyRounded * months),
-    };
-  });
-}
-
+/**
+ * The price for a survey. No finance figures: a credit promotion only ever
+ * prints the lender's own representative example from settings
+ * (settings.finance, financeOffered), never one worked out here. (Quotes
+ * saved by older engines may still carry a `finance` array; nothing reads it.)
+ */
 export function generateQuote(survey: Survey): QuoteResult {
   const systems = designSystems(survey);
   const lines: QuoteLine[] = [];
@@ -197,6 +183,7 @@ export function generateQuote(survey: Survey): QuoteResult {
       });
     }
     if (survey.rooms.length > permutation.servesUpTo) {
+      // Ops wording: customers see customerChecks() instead.
       reviewFlags.push(
         `"${permutation.label}" serves up to ${permutation.servesUpTo} rooms and you asked for ${survey.rooms.length}, so we'll confirm the second outdoor unit position.`,
       );
@@ -232,7 +219,45 @@ export function generateQuote(survey: Survey): QuoteResult {
     installDays,
     warrantyYears: WARRANTY_YEARS,
     confidence: scoreConfidence(survey),
-    finance: totalGbp > 0 ? financeOptions(totalGbp) : [],
     reviewFlags,
   };
+}
+
+/**
+ * What "Your surveyor will check" says to the customer, from a quote's
+ * review flags (which are written for the office: pattern names, "Pattern
+ * check:" items, narration notes). Pattern checks become one plain sentence
+ * about the outdoor unit; "serves up to N rooms" becomes the second outdoor
+ * unit's position (worded for how many the system shown has); notes from a video's
+ * narration stay in ops. Works on stored quotes, so it reads the strings.
+ */
+export function customerChecks(reviewFlags: readonly string[], opts: { outdoorUnits?: number } = {}): string[] {
+  const out: string[] = [];
+  const two = (opts.outdoorUnits ?? 1) >= 2;
+  let pattern = false;
+  let secondOutdoor = false;
+  for (const raw of reviewFlags) {
+    const flag = raw.trim();
+    if (!flag || /^From narration:/i.test(flag)) continue;
+    if (/^Pattern check:/i.test(flag)) {
+      pattern = true;
+      continue;
+    }
+    if (/serves up to \d+ rooms? and you asked for \d+/i.test(flag)) {
+      secondOutdoor = true;
+      continue;
+    }
+    out.push(flag.replace(/lets us lock this line in/i, "helps us firm up this line"));
+  }
+  if (secondOutdoor) {
+    out.unshift(two ? "Where your second outdoor unit goes." : "Whether your rooms need a second outdoor unit, and where it would go.");
+  }
+  if (pattern) {
+    out.unshift(
+      two || secondOutdoor
+        ? "The best spots for your outdoor units, and how the pipes and condensate run to them."
+        : "The best spot for your outdoor unit, and how the pipes and condensate run to it.",
+    );
+  }
+  return [...new Set(out)];
 }

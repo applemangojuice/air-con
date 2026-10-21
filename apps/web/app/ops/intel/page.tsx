@@ -10,6 +10,8 @@ import { gbp } from "@/lib/format";
 import { queryIntel, type IntelFilters, type IntelRow } from "@/lib/intel-server";
 import { getServiceClient } from "@/lib/supabase-server";
 import { recomputeAction, seedSampleBookAction, tagCampaignAction } from "./actions";
+import { requireStaff } from "@/lib/auth/server";
+import { demoModeAllowed } from "@/lib/auth/demo-guard";
 
 export const metadata: Metadata = {
   title: "Property intelligence · ops",
@@ -55,6 +57,7 @@ function filterQuery(f: IntelFilters): string {
 }
 
 export default async function OpsIntelPage({ searchParams }: { searchParams: Promise<Search> }) {
+  await requireStaff("projects.view-all");
   const sp = await searchParams;
   const filters = readFilters(sp);
   const demo = !getServiceClient();
@@ -81,6 +84,7 @@ export default async function OpsIntelPage({ searchParams }: { searchParams: Pro
   const bc = businessCase(rows.length);
   const qs = filterQuery(filters);
   const connectedButEmpty = !demo && everything.length === 0;
+  const canSeedSample = await demoModeAllowed();
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
@@ -117,11 +121,17 @@ export default async function OpsIntelPage({ searchParams }: { searchParams: Pro
             demo mode (no database). Seed the sample book to explore the tools now, or run the EPC
             importer (see <code>docs/property-intelligence.md</code>) for the real thing.
           </p>
-          <form action={seedSampleBookAction} className="mt-3">
-            <button className="rounded-full bg-amber-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-700">
-              Seed sample book (~240 homes)
-            </button>
-          </form>
+          {canSeedSample ? (
+            <form action={seedSampleBookAction} className="mt-3">
+              <button className="rounded-full bg-amber-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-700">
+                Seed sample book (~240 homes, DEMO)
+              </button>
+            </form>
+          ) : (
+            <p className="mt-2 text-sm text-amber-800">
+              The sample book is made-up homes on real street names, so it only loads on a demo deployment, never into a live book.
+            </p>
+          )}
         </div>
       )}
 
@@ -208,7 +218,7 @@ export default async function OpsIntelPage({ searchParams }: { searchParams: Pro
             />
             Audited only
           </label>
-          <button className="rounded-full bg-accent-600 px-4 py-2 font-semibold text-white transition hover:bg-accent-700">
+          <button className="rounded-full bg-accent-700 px-4 py-2 font-semibold text-white transition hover:bg-accent-800">
             Apply
           </button>
           <Link href="/ops/intel" className="pb-2 text-xs font-medium text-ink-500 hover:underline">
@@ -245,7 +255,7 @@ export default async function OpsIntelPage({ searchParams }: { searchParams: Pro
           <h2 className="font-bold">Run the mailing</h2>
           <a
             href={`/ops/intel/export${qs ? `?${qs}` : ""}`}
-            className="mt-3 inline-block rounded-full bg-accent-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-accent-700"
+            className="mt-3 inline-block rounded-full bg-accent-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-accent-800"
           >
             Download mailing CSV ({rows.length.toLocaleString("en-GB")} homes)
           </a>

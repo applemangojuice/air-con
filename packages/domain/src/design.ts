@@ -139,8 +139,9 @@ function neighbourDistanceM(survey: Survey): number {
  * behind the building line, MCS 020 style.
  */
 function soundPressureAt(soundPowerDb: number, distanceM: number, location: Survey["outdoor"]["location"]): number {
-  const screening = location === "ground-rear" || location === "ground-side" ? 6 : 0;
-  return Math.round(soundPowerDb - 8 - 20 * Math.log10(Math.max(1, distanceM)) - screening);
+  // Q4 on the ground (against a wall), Q2 on a bracket or roof: no screening credit is assumed.
+  const q = location === "ground-rear" || location === "ground-side" ? 4 : 2;
+  return Math.round((soundPowerDb + 10 * Math.log10(q / (4 * Math.PI * Math.max(1, distanceM) ** 2))) * 10) / 10;
 }
 
 /* ------------------------------------------------------------------ */
@@ -165,8 +166,17 @@ export function designVerdict(rules: RuleResult[]): DesignVerdict {
   return "auto-approved";
 }
 
-/** Noise limit at the nearest neighbouring window: permitted-development guidance. */
+/** Permitted development's noise limit at the neighbour's assessment position (Class G, MCS 020(a)), background included. */
 export const NOISE_LIMIT_DB = 42;
+
+/**
+ * What that leaves for the heat pump itself: MCS 020(a) checks the heat
+ * pump's own level at the assessment position against 37.0 dB(A), to 0.1 dB
+ * (the 42 dB(A) includes an assumed 40 dB(A) background). Read from
+ * extracts of MCS 020(a) Issue 1.1 and a gov.uk review: confirm against the
+ * current issue.
+ */
+export const MCS_HEAT_PUMP_LIMIT_DB = 37;
 
 interface RuleContext {
   input: DesignInput;
@@ -279,15 +289,16 @@ function evaluateRules(ctx: RuleContext): RuleResult[] {
   const distance = neighbourDistanceM(survey);
   const loudest = Math.max(...ctx.systems.map((s) => s.outdoor.soundPowerDb));
   const atWindow = soundPressureAt(loudest, distance, loc);
-  const margin = NOISE_LIMIT_DB - atWindow;
+  const margin = Math.round((MCS_HEAT_PUMP_LIMIT_DB - atWindow) * 10) / 10;
+  const limit = `the ${MCS_HEAT_PUMP_LIMIT_DB}.0 dB(A) MCS 020(a) allows the heat pump (the ${NOISE_LIMIT_DB} dB(A) limit includes a 40 dB(A) background)`;
   if (loc === "unsure") {
     add("noise", "Noise at nearest neighbour", "fail", "Cannot model noise without an outdoor position.");
-  } else if (margin >= 3) {
-    add("noise", "Noise at nearest neighbour", "pass", `Estimated ${atWindow} dB(A) at the nearest neighbouring window (${distance} m), inside the ${NOISE_LIMIT_DB} dB(A) guidance with ${margin} dB to spare.`);
+  } else if (margin >= 1) {
+    add("noise", "Noise at nearest neighbour", "pass", `Estimated ${atWindow} dB(A) from the heat pump at the nearest neighbouring window (${distance} m, assumed), under ${limit}. A sketch: the survey measures it.`);
   } else if (margin >= 0) {
-    add("noise", "Noise at nearest neighbour", "review", `Estimated ${atWindow} dB(A) at ${distance} m sits within ${NOISE_LIMIT_DB} dB(A) guidance but with under 3 dB margin. Night mode or an acoustic tweak keeps neighbours friendly.`);
+    add("noise", "Noise at nearest neighbour", "review", `Estimated ${atWindow} dB(A) at ${distance} m, within 1 dB of ${limit}. The survey measures it.`);
   } else {
-    add("noise", "Noise at nearest neighbour", "review", `Estimated ${atWindow} dB(A) at ${distance} m exceeds the ${NOISE_LIMIT_DB} dB(A) guidance. Relocation, a quieter unit or an acoustic enclosure; an engineer picks.`);
+    add("noise", "Noise at nearest neighbour", "review", `Estimated ${atWindow} dB(A) at ${distance} m, over ${limit}. Another position, a quieter unit or a barrier; an engineer works it out.`);
   }
 
   return rules;

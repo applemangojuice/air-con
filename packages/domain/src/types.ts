@@ -151,13 +151,6 @@ export interface Confidence {
   gaps: string[];
 }
 
-export interface FinanceOption {
-  months: number;
-  aprPercent: number;
-  depositGbp: number;
-  monthlyGbp: number;
-  totalPayableGbp: number;
-}
 
 export interface QuoteResult {
   engineVersion: string;
@@ -167,7 +160,6 @@ export interface QuoteResult {
   installDays: number;
   warrantyYears: number;
   confidence: Confidence;
-  finance: FinanceOption[];
   /** Non-price flags ops should review before confirming (e.g. "no external wall"). */
   reviewFlags: string[];
 }

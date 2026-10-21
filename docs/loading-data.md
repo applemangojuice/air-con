@@ -40,9 +40,8 @@ Then browse:
   step pre-answered from the record.
 - `/a/demo` — a per-address mailing landing page.
 - `/ops/intel` — the analytics console (coverage, priority bands, target-list
-  filters, mailing CSV export). Set `OPS_PASSWORD` in
-  `apps/web/.env.local` to unlock the `/ops/*` pages; the browser prompts for
-  any username + that password.
+  filters, mailing CSV export). The `/ops/*` pages need a staff sign-in: in
+  development, "Try as… Admin" on `/login` is enough.
 
 Demo postcodes: `SW16 1AD`, `SW16 2BE`, `SW16 1CF`, `SW16 2DG`, `SW16 1EH`,
 `SW17 2FJ`, `SW17 1GA`, `SW17 2HB`, `SW17 1JC`, `SW17 2AD`.
@@ -139,7 +138,8 @@ imported book looks familiar.
    two `0006_*` files; run both.)
 3. Copy `apps/web/.env.example` to `apps/web/.env.local` and fill in
    `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` (Supabase → Settings → API).
-   Add `OPS_PASSWORD` too, so you can open `/ops/intel`.
+   Add `SESSION_SECRET` (`openssl rand -hex 32`) and your address in
+   `ADMIN_EMAILS` too, then sign in at `/login` to open `/ops/intel`.
 
 ### 2b. Generate the sample files (optional — they're already committed)
 

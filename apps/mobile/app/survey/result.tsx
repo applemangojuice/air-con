@@ -34,8 +34,6 @@ export default function ResultScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const longest = quote.finance[quote.finance.length - 1];
-
   async function book() {
     if (submission?.status !== "saved") return;
     const ok = await requestBooking(submission.id, "2-4-weeks", "");
@@ -67,14 +65,7 @@ export default function ResultScreen() {
           {quote.installDays === 1 ? "1-day install" : `${quote.installDays}-day install`} ·{" "}
           {quote.warrantyYears}-year warranty · VAT included
         </Text>
-        {longest && (
-          <View style={styles.financeStrip}>
-            <Text style={styles.financeText}>
-              Or from <Text style={styles.bold}>{gbp(longest.monthlyGbp)}/month</Text> over{" "}
-              {longest.months} months with a {gbp(longest.depositGbp)} deposit.
-            </Text>
-          </View>
-        )}
+        {/* No finance figures: a credit promotion needs a lender's own example and FCA cover (web: settings.finance). */}
       </View>
 
       {/* System */}
@@ -176,13 +167,6 @@ const styles = StyleSheet.create({
   badgeText: { color: colors.sage700, fontSize: 11, fontWeight: "700" },
   heroPrice: { color: colors.white, fontSize: 44, fontWeight: "800", marginTop: space(2) },
   heroMeta: { color: "rgba(255,255,255,0.7)", fontSize: 13, marginTop: space(2), lineHeight: 19 },
-  financeStrip: {
-    backgroundColor: "rgba(255,255,255,0.1)",
-    borderRadius: radius.md,
-    padding: space(3.5),
-    marginTop: space(4),
-  },
-  financeText: { color: colors.white, fontSize: 13, lineHeight: 19 },
   bold: { fontWeight: "700" },
   h2: { fontSize: 18, fontWeight: "700", color: colors.ink900, marginTop: space(7), marginBottom: space(3) },
   card: {

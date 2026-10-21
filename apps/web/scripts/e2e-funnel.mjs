@@ -1,9 +1,11 @@
 /**
  * End-to-end smoke of the quote funnel in a real browser:
- * homepage postcode → address+email → house → rooms → contact → price.
+ * homepage postcode → postcode/address (coverage) → house → rooms (price)
+ * → firm up (optional, skipped) → details + consent → saved quote page
+ * → "Book my home survey" → project page. Plus the out-of-area path.
  *
- * Run against a production build:
- *   pnpm build && pnpm start -p 3000 &
+ * Run against a production build with a database (file backend is fine):
+ *   pnpm build && DATA_BACKEND=file pnpm start -p 3000 &
  *   BASE_URL=http://localhost:3000 node scripts/e2e-funnel.mjs
  *
  * Uses playwright-core (devDependency; no bundled browsers). Point
@@ -38,6 +40,11 @@ const check = (name, ok) => {
   console.log(`${ok ? "✓" : "✗"} ${name}`);
   if (!ok) fails.push(name);
 };
+const focusIsTextInput = () =>
+  page.evaluate(() => {
+    const el = document.activeElement;
+    return el instanceof HTMLInputElement && ["text", "email", "tel", "number", ""].includes(el.type);
+  });
 
 try {
   // 1. Homepage → postcode → funnel (client-side navigation)
@@ -46,15 +53,22 @@ try {
     "homepage renders hero",
     await page.locator("h1").first().textContent().then((t) => t.toLowerCase().includes("hot")),
   );
-  await page.fill('input[name="postcode"]', "SW16 1AA");
+  const home = (await page.locator("main").textContent()) ?? "";
+  check("homepage makes no 'single day' or 'guaranteed' promise", !/single day|guaranteed|price locked/i.test(home));
+  check("homepage frames heating and cooling", /warm it in winter/i.test(home));
+  await page.fill('input[name="postcode"]', "SW16 2BE");
   await page.click('button:has-text("Start")');
   await page.waitForURL("**/quote**");
   check("postcode form navigates to /quote", page.url().includes("/quote"));
 
-  // 2. Address step: postcode carried over, address + email in
-  await page.waitForSelector("text=Step 1 of 4");
-  const pcVal = await page.locator("input").first().inputValue();
-  check("postcode carried into funnel", pcVal.replace(/\s/g, "") === "SW161AA");
+  // 2. Postcode step: carried over, coverage confirmed from settings, terms + privacy linked
+  await page.waitForSelector("text=Step 1 of 5");
+  const pcVal = await page.locator('input[autocomplete="postal-code"]').inputValue();
+  check("postcode carried into funnel", pcVal.replace(/\s/g, "") === "SW162BE");
+  await page.waitForSelector("text=/we cover SW16/i", { timeout: 15000 });
+  check("coverage confirmed for a configured outcode", true);
+  check("terms and privacy linked on the step", (await page.locator('a[href="/terms"]').count()) > 0 && (await page.locator('a[href="/privacy"]').count()) > 0);
+  check("progressbar is exposed", (await page.locator('[role="progressbar"][aria-valuenow="1"]').count()) === 1);
   const addressInput = page.locator('input[autocomplete="address-line1"]');
   if (await addressInput.count()) {
     await addressInput.fill("12 Example Road");
@@ -63,36 +77,64 @@ try {
     await page.locator("select").first().selectOption({ index: 1 });
   }
   await page.fill('input[type="email"]', "e2e@example.com");
+  // Told at collection, free to refuse: one reminder, ticked unless they untick it.
+  const reminder = page.getByLabel(/Email me one reminder if I don't finish/);
+  const offered = (await reminder.count()) === 1 && (await reminder.isChecked());
+  if (offered) await reminder.uncheck();
+  const unticks = offered && !(await reminder.isChecked());
+  if (offered) await reminder.check();
+  check("a reminder email is offered under the email, ticked, and can be unticked", unticks && /Untick and we won't/.test((await page.locator("main").textContent()) ?? ""));
   await page.click('button[type="submit"]');
 
-  // 3–4. House and rooms steps advance on the generated defaults.
-  await page.waitForSelector("text=Step 2 of 4");
-  check("house step reached", true);
+  // 3–5. House, rooms (price), firm-up (skipped).
+  await page.waitForSelector("text=Step 2 of 5");
+  check("house step reached, option groups are fieldsets", (await page.locator("fieldset legend").count()) >= 4);
+  check("no autofocus keyboard pop on step change", !(await focusIsTextInput()));
   await page.click('button[type="submit"]');
-  await page.waitForSelector("text=Step 3 of 4");
-  check("rooms step reached", true);
+  await page.waitForSelector("text=Step 3 of 5");
+  await page.waitForSelector("text=/£[0-9,]+/");
+  check("rooms step shows a price", true);
+  check("no finance example without a lender", !/\/mo\b|\bAPR\b/.test((await page.locator("main").textContent()) ?? ""));
   await page.click('button[type="submit"]');
-
-  // 5. Contact step: autofocus lands in the name field.
-  await page.waitForSelector("text=Step 4 of 4");
-  const nameInput = page.locator('input[autocomplete="name"]');
-  check(
-    "contact step autofocuses name",
-    await nameInput.evaluate((el) => el === document.activeElement),
-  );
-  await nameInput.fill("E2E Tester");
+  await page.waitForSelector("text=Step 4 of 5");
+  check("optional firm-up step offered", (await page.locator('button:has-text("Skip for now")').count()) === 1);
   await page.click('button[type="submit"]');
 
-  // 6. Result: a real price renders (demo mode: computed client-side).
-  await page.waitForSelector("text=/£[0-9,]+/", { timeout: 15000 });
-  check("price renders on result", true);
+  // 6. Details: consent is required, marketing is optional and unticked.
+  await page.waitForSelector("text=Step 5 of 5");
+  const boxes = page.locator('input[type="checkbox"]');
+  check("two separate consent boxes, both unticked", (await boxes.count()) === 2 && !(await boxes.nth(0).isChecked()) && !(await boxes.nth(1).isChecked()));
+  await page.fill('input[autocomplete="name"]', "DEMO Funnel Tester");
+  await page.click('button[type="submit"]');
+  await page.waitForSelector("text=/Tick the first box/");
+  check("saving without operational consent is refused with a reason", true);
+  await page.locator('label:has-text("Save my quote and keep me posted")').click();
+  await page.click('button[type="submit"]');
 
-  // 7. The journey continues: start the installation plan → the timeline.
-  await page.click('button:has-text("installation plan"), button:has-text("timeline")');
+  // 7. Saved quote page (or the demo result when there's no database).
+  await page.waitForSelector("text=Book my home survey", { timeout: 20000 });
+  const result = (await page.locator("main").textContent()) ?? "";
+  check("price renders on the result", /£[0-9,]+/.test(result));
+  check("result says confirmed at survey, not locked", /confirmed at your home survey/i.test(result) && !/price locked|guaranteed/i.test(result));
+  check("result states validity", /Valid (until|for)/.test(result));
+
+  // 8. The journey continues: Book my home survey → the project page.
+  await page.click('button:has-text("Book my home survey")');
   await page.waitForURL("**/p/**", { timeout: 15000 });
-  check("start-plan lands on the project timeline", page.url().includes("/p/"));
-  await page.waitForSelector("text=/site visit/i", { timeout: 15000 });
-  check("timeline renders the journey stages", true);
+  check("Book my home survey lands on the project page", page.url().includes("/p/"));
+  await page.waitForLoadState("networkidle");
+  const hub = (await page.locator("main").textContent()) ?? "";
+  check("the browser that saved the quote opens its project (no sign-in wall)", !/Sign in to see your project/.test(hub));
+  check("no placeholder phone number on the project page", !/0800 000 0000/.test(hub));
+
+  // 9. Out of area: honest, with an optional heads-up.
+  await page.goto(`${BASE}/quote?postcode=${encodeURIComponent("E8 1AA")}`, { waitUntil: "networkidle" });
+  await page.waitForSelector("text=/not in .*E8/i", { timeout: 15000 });
+  check("out-of-area postcode is told the truth", (await page.locator("text=/we cover/i").count()) === 0);
+  await page.fill('input[type="email"]', "later@example.com");
+  await page.click('button:has-text("Tell me when")');
+  await page.waitForSelector("text=/We'll email/", { timeout: 15000 });
+  check("out-of-area heads-up is stored", true);
 } catch (err) {
   console.error("E2E failure:", err.message);
   fails.push(err.message);

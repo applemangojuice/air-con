@@ -8,7 +8,9 @@ import {
   syntheticId,
   type PropertyIntel,
 } from "@aircon/domain";
+import { selectAllPages } from "./repo/base";
 import { getServiceClient } from "./supabase-server";
+import { demoModeAllowed } from "./auth/demo-guard";
 
 /**
  * Server-side access to the Property Intelligence Engine. The JSONB `intel`
@@ -88,13 +90,14 @@ export async function seedSampleBook(): Promise<{ inserted: number; error?: stri
 }
 
 export async function loadIntel(id: string): Promise<PropertyIntel | null> {
-  // "/a/demo" and friends: a rich sample property that always exists.
+  // "/a/demo" and friends: a rich sample property, only where demo mode is allowed (never on a live site).
   if (id === "demo") {
+    if (!(await demoModeAllowed())) return null;
     const sample = demoDataset();
     return sample.find((p) => p.audit && p.planning.loftConversion) ?? sample[0] ?? null;
   }
   const supabase = getServiceClient();
-  if (!supabase) return demoDataset().find((p) => p.id === id) ?? null;
+  if (!supabase) return (await demoModeAllowed()) ? (demoDataset().find((p) => p.id === id) ?? null) : null;
   const { data } = await supabase.from("properties").select("intel").eq("id", id).single();
   return (data?.intel as PropertyIntel) ?? null;
 }
@@ -204,21 +207,31 @@ export async function queryIntel(f: IntelFilters, limit = 5000): Promise<IntelRo
       .sort((a, b) => b.priority_score - a.priority_score)
       .slice(0, limit);
   }
-  const { data, error } = await applyFilters(
-    supabase
-      .from("properties")
-      .select(
-        "id, address_line, postcode, outcode, archetype_id, archetype_confidence, planning_risk, has_loft_conversion, epc_rating, floor_area_m2, audited, priority_score, priority_band, lead_status, campaign",
-      ),
-    f,
-  )
-    .order("priority_score", { ascending: false })
-    .limit(limit);
-  if (error) {
-    console.error("intel query failed:", error.message);
+  // Page by page: Supabase returns at most Max Rows (1000) per select, so a
+  // plain .limit(5000) gave the mailing export its first 1000 homes and no
+  // word about the rest. The id breaks priority ties, so pages never overlap.
+  try {
+    return await selectAllPages<IntelRow>(
+      (from, to, count) =>
+        applyFilters(
+          supabase
+            .from("properties")
+            .select(
+              "id, address_line, postcode, outcode, archetype_id, archetype_confidence, planning_risk, has_loft_conversion, epc_rating, floor_area_m2, audited, priority_score, priority_band, lead_status, campaign",
+              count ? { count: "exact" } : undefined,
+            ),
+          f,
+        )
+          .order("priority_score", { ascending: false })
+          .order("id")
+          .range(from, to),
+      "intel query",
+      { limit },
+    );
+  } catch (err) {
+    console.error("intel query failed:", (err as Error).message);
     return [];
   }
-  return (data ?? []) as IntelRow[];
 }
 
 /** Mark a filtered set as part of a campaign (mailing sent). */
@@ -276,6 +289,11 @@ const DEMO_STREETS: { name: string; outcode: "SW16" | "SW17"; kind: "victorian" 
 let demoCache: PropertyIntel[] | null = null;
 
 /** ~240 believable SW16/SW17 properties. Deterministic: same every time. */
+/** One of the made-up sample homes (the demo dataset, also what "Seed sample book" loads): shown labelled DEMO. */
+export function isSampleIntel(intel: Pick<PropertyIntel, "id">): boolean {
+  return demoDataset().some((p) => p.id === intel.id);
+}
+
 export function demoDataset(): PropertyIntel[] {
   if (demoCache) return demoCache;
   const rand = mulberry32(161717);

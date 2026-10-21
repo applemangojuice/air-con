@@ -18,7 +18,7 @@
   --color-ink-950: #14171e;
   --color-ink-900: #1d212b;
   --color-ink-700: #454b58;
-  --color-ink-500: #6e7482;
+  --color-ink-500: #5d6371; /* secondary text: 5.5:1 on cream, 5.0:1 on surface (AA at any size) */
   --color-ink-300: #a3a8b4;
 
   /* hot orange accent ramp ("It's Hot", #f2711b) */
@@ -26,8 +26,9 @@
   --color-accent-100: #fcdfc5;
   --color-accent-400: #f78e45;
   --color-accent-500: #f2711b;
-  --color-accent-600: #d55a0a;
-  --color-accent-700: #a84508;
+  --color-accent-600: #d55a0a; /* decoration and large marks only: white text on it is under 4:1 */
+  --color-accent-700: #a84508; /* every primary button: white text 6:1 */
+  --color-accent-800: #8f3a06; /* its hover */
 
   /* splash blue second accent ramp (the watercolour splash, #47698a) */
   --color-sage-50: #eef3f8;
@@ -63,9 +64,10 @@ body {
   letter-spacing: 0.005em;
 }
 
-/* Themed interaction states — never the browser defaults. */
+/* Themed interaction states — never the browser defaults. The ring is
+   accent-700: over 5:1 on cream and white (the 3:1 non-text minimum). */
 :focus-visible {
-  outline: 2px solid var(--color-accent-500);
+  outline: 2px solid var(--color-accent-700);
   outline-offset: 2px;
 }
 

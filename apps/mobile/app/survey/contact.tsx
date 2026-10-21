@@ -1,13 +1,15 @@
 import { router } from "expo-router";
 import { Field, Input, OptionCards, Screen } from "@/components/ui";
+import { MARKETING_CONSENT, OPERATIONAL_CONSENT } from "@/lib/consent";
 import { useDraft, type Timeframe } from "@/lib/store";
 
 export default function ContactScreen() {
-  const { draft, setContact, setSurvey } = useDraft();
+  const { draft, setContact, setSurvey, setConsents } = useDraft();
   const c = draft.contact;
   const property = draft.survey.property;
   const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c.email);
-  const ready = c.name.trim().length >= 2 && emailOk;
+  // The API won't save a quote without the operational consent, in the words the web funnel uses.
+  const ready = c.name.trim().length >= 2 && emailOk && draft.consents.operational;
 
   return (
     <Screen
@@ -60,6 +62,20 @@ export default function ContactScreen() {
             { value: "1-3-months", label: "1–3 months" },
             { value: "researching", label: "Researching" },
           ]}
+        />
+      </Field>
+      <Field label="Saving your quote" hint="Tap to tick. Needed to save your quote.">
+        <OptionCards<boolean>
+          value={draft.consents.operational}
+          onChange={() => setConsents({ operational: !draft.consents.operational })}
+          options={[{ value: true, label: `${draft.consents.operational ? "✓ " : ""}${OPERATIONAL_CONSENT.label}`, hint: OPERATIONAL_CONSENT.hint }]}
+        />
+      </Field>
+      <Field label="News and offers (optional)" hint="Never assumed: leave it unticked and you get no marketing.">
+        <OptionCards<boolean>
+          value={draft.consents.marketing}
+          onChange={() => setConsents({ marketing: !draft.consents.marketing })}
+          options={[{ value: true, label: `${draft.consents.marketing ? "✓ " : ""}${MARKETING_CONSENT.label}`, hint: MARKETING_CONSENT.hint }]}
         />
       </Field>
     </Screen>

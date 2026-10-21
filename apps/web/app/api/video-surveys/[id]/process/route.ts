@@ -4,6 +4,8 @@ import { VIDEO_BUCKET, getServiceClient } from "@/lib/supabase-server";
 import { assembleSurvey } from "@/lib/pipeline/assemble";
 import { extractFromTranscript, isExtractionConfigured } from "@/lib/pipeline/extract";
 import { isTranscriptionConfigured, transcribeVideo } from "@/lib/pipeline/transcribe";
+import { enforceRateLimit } from "@/lib/rate-limit";
+import { CLAIMABLE_VIDEO_STATUSES, processDecision, videoSurveysEnabled } from "@/lib/video-surveys";
 
 // Transcription + extraction of a walkthrough can take a couple of minutes.
 export const maxDuration = 300;
@@ -15,11 +17,19 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
  *   video → transcript (Whisper) → structured extraction (Claude)
  *   → assembled Survey (archetype defaults) → fixed-price quote.
  * Any unavailable stage parks the record at 'needs_review' instead of failing.
+ *
+ * Public (the capture app has no sign-in), so it runs once per record
+ * (lib/video-surveys.ts): a record already extracted, quoted or parked gets
+ * its stored answer, and a run claims the record before calling any paid
+ * provider, so repeated or parallel calls never pay twice.
  */
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  if (!videoSurveysEnabled()) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const limited = enforceRateLimit(request, "video-process", 6, 600_000);
+  if (limited) return limited;
   const { id } = await params;
   if (!UUID_RE.test(id)) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -40,6 +50,26 @@ export async function POST(
   if (!archetype || !permutation) {
     return NextResponse.json({ error: "Unknown archetype" }, { status: 409 });
   }
+
+  const decision = processDecision(row.status);
+  if (decision === "stored") {
+    return NextResponse.json({
+      ok: true,
+      status: row.status,
+      ...(row.status === "quoted" ? { survey: row.draft_survey, quote: row.quote } : {}),
+      ...(row.error ? { reason: row.error } : {}),
+    });
+  }
+  if (decision === "busy") return NextResponse.json({ ok: true, status: row.status ?? "processing" }, { status: 202 });
+  // Claim it: only the request that moves it to "processing" runs the pipeline.
+  const { data: claimed } = await supabase
+    .from("video_surveys")
+    .update({ status: "processing" })
+    .eq("id", id)
+    .in("status", [...CLAIMABLE_VIDEO_STATUSES])
+    .select("id")
+    .maybeSingle();
+  if (!claimed) return NextResponse.json({ ok: true, status: "processing" }, { status: 202 });
 
   async function park(reason: string) {
     await supabase!
@@ -62,10 +92,8 @@ export async function POST(
       if (dlError || !video) return park(`Could not read video: ${dlError?.message}`);
       transcript = await transcribeVideo(video, row.video_path.split("/").pop() ?? "video.mp4");
       if (transcript === null) return park("Transcription not configured.");
-      await supabase
-        .from("video_surveys")
-        .update({ transcript, status: "transcribed" })
-        .eq("id", id);
+      // Kept, so a parked record never pays for transcription again; still ours ("processing").
+      await supabase.from("video_surveys").update({ transcript }).eq("id", id);
     }
 
     // 2. Extract structured rooms/wishes with Claude

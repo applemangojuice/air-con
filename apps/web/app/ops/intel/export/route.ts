@@ -1,11 +1,14 @@
 import { queryIntel, type IntelFilters } from "@/lib/intel-server";
+import { requireStaffApi } from "@/lib/auth/server";
 
 /**
  * Mailing-list export for the current filter: one row per property with its
  * personalised landing URL (/a/<id>), ready for a mail-merge house. Sits
- * behind the same /ops basic-auth wall as the page (middleware matcher).
+ * behind the same staff sign-in as the page.
  */
 export async function GET(request: Request) {
+  const staff = await requireStaffApi(request, "projects.view-all");
+  if (staff instanceof Response) return staff;
   const url = new URL(request.url);
   const q = url.searchParams;
   const filters: IntelFilters = {

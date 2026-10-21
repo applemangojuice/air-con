@@ -1,0 +1,80 @@
+diff --git a/dist/compiled/react-dom/cjs/react-dom-client.development.js b/dist/compiled/react-dom/cjs/react-dom-client.development.js
+index 4376913076151ad78dcc4059ad4152fad25478da..56e0ff0f597d936093ef77ea39baac69e588ebb2 100644
+--- a/dist/compiled/react-dom/cjs/react-dom-client.development.js
++++ b/dist/compiled/react-dom/cjs/react-dom-client.development.js
+@@ -15776,6 +15776,15 @@
+           break;
+         case 5:
+           resetHooksOnUnwind(unitOfWork);
++          // Patched (patches/next@15.5.28.patch): a host component that suspended
++          // while reconciling its children during hydration (a lazy child: an RSC row
++          // or a client chunk not loaded yet) has already claimed its DOM node and
++          // moved the hydration cursor into it. Put the cursor back on that node so
++          // the replay claims it again instead of failing on its first child (#418).
++          null === current &&
++            isHydrating &&
++            null !== unitOfWork.stateNode &&
++            (nextHydratableInstance = unitOfWork.stateNode);
+         default:
+           unwindInterruptedWork(current, unitOfWork),
+             (unitOfWork = workInProgress =
+diff --git a/dist/compiled/react-dom/cjs/react-dom-client.production.js b/dist/compiled/react-dom/cjs/react-dom-client.production.js
+index 755076a5cf15273f024c18fdc6a8805f1e36860b..2ebf627009bff214f23c3fa75e63d0ade6b66368 100644
+--- a/dist/compiled/react-dom/cjs/react-dom-client.production.js
++++ b/dist/compiled/react-dom/cjs/react-dom-client.production.js
+@@ -11210,6 +11210,15 @@ function replaySuspendedUnitOfWork(unitOfWork) {
+       break;
+     case 5:
+       resetHooksOnUnwind(next);
++      // Patched (patches/next@15.5.28.patch): a host component that suspended
++      // while reconciling its children during hydration (a lazy child: an RSC row
++      // or a client chunk not loaded yet) has already claimed its DOM node and
++      // moved the hydration cursor into it. Put the cursor back on that node so
++      // the replay claims it again instead of failing on its first child (#418).
++      null === current &&
++        isHydrating &&
++        null !== next.stateNode &&
++        (nextHydratableInstance = next.stateNode);
+     default:
+       unwindInterruptedWork(current, next),
+         (next = workInProgress =
+diff --git a/dist/compiled/react-dom/cjs/react-dom-profiling.development.js b/dist/compiled/react-dom/cjs/react-dom-profiling.development.js
+index 43d0363849598f796873fffaf33117d54b76de19..627ef52476090f3593b66e860a9d3b3d5e487712 100644
+--- a/dist/compiled/react-dom/cjs/react-dom-profiling.development.js
++++ b/dist/compiled/react-dom/cjs/react-dom-profiling.development.js
+@@ -15784,6 +15784,15 @@
+           break;
+         case 5:
+           resetHooksOnUnwind(unitOfWork);
++          // Patched (patches/next@15.5.28.patch): a host component that suspended
++          // while reconciling its children during hydration (a lazy child: an RSC row
++          // or a client chunk not loaded yet) has already claimed its DOM node and
++          // moved the hydration cursor into it. Put the cursor back on that node so
++          // the replay claims it again instead of failing on its first child (#418).
++          null === current &&
++            isHydrating &&
++            null !== unitOfWork.stateNode &&
++            (nextHydratableInstance = unitOfWork.stateNode);
+         default:
+           unwindInterruptedWork(current, unitOfWork),
+             (unitOfWork = workInProgress =
+diff --git a/dist/compiled/react-dom/cjs/react-dom-profiling.profiling.js b/dist/compiled/react-dom/cjs/react-dom-profiling.profiling.js
+index 85185b07d38d122ada8ed308523b181da102ccad..7e9019e43205619ee3a1de18ba923abeb9211ac5 100644
+--- a/dist/compiled/react-dom/cjs/react-dom-profiling.profiling.js
++++ b/dist/compiled/react-dom/cjs/react-dom-profiling.profiling.js
+@@ -11814,6 +11814,15 @@ function replaySuspendedUnitOfWork(unitOfWork) {
+       break;
+     case 5:
+       resetHooksOnUnwind(next);
++      // Patched (patches/next@15.5.28.patch): a host component that suspended
++      // while reconciling its children during hydration (a lazy child: an RSC row
++      // or a client chunk not loaded yet) has already claimed its DOM node and
++      // moved the hydration cursor into it. Put the cursor back on that node so
++      // the replay claims it again instead of failing on its first child (#418).
++      null === current &&
++        isHydrating &&
++        null !== next.stateNode &&
++        (nextHydratableInstance = next.stateNode);
+     default:
+       unwindInterruptedWork(current, next),
+         (next = workInProgress =

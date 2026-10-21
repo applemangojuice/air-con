@@ -2,64 +2,57 @@
 
 import { useMemo } from "react";
 import { generateQuote } from "@aircon/domain";
-import { BRAND } from "@/lib/brand";
 import type { QuoteDraft } from "@/lib/quote-draft";
-import { StartProjectPanel } from "@/components/project/start-project";
-import { TimelineStrip } from "@/components/project/timeline";
+import { surveyDurationCopy, surveyPriceCopy, type PublicSettings } from "@/components/site/claims";
+import { BookSurveyButton } from "./book-survey";
+import { JourneyStrip } from "./journey-strip";
+import { LegalLinks } from "./legal-links";
 import { QuoteView } from "./quote-view";
-import { ShareQuoteButton } from "./share-button";
 
-export type SubmissionState =
-  | { status: "saved"; id: string; emailed: boolean }
-  | { status: "demo" }
-  | { status: "error" };
-
-export function QuoteResult({
+/**
+ * The in-funnel result, used only when nothing could be saved because this
+ * deployment has no database (demo mode). A saved quote goes straight to its
+ * permanent /q/[id] page instead, which survives a refresh.
+ */
+export function DemoResult({
   draft,
-  submission,
+  settings,
   onStartOver,
 }: {
   draft: QuoteDraft;
-  submission: SubmissionState | null;
+  settings: PublicSettings;
   onStartOver: () => void;
 }) {
   const quote = useMemo(() => generateQuote(draft.survey), [draft.survey]);
-  const saved = submission?.status === "saved" ? submission : null;
 
   return (
-    <div className="mx-auto w-full max-w-xl px-4 pb-24 pt-8 sm:px-0">
+    <div className="mx-auto w-full max-w-xl px-4 pb-16 pt-8 sm:px-0">
       <div className="mb-6">
-        <TimelineStrip current="quote" />
+        <JourneyStrip current="price" />
       </div>
-      <QuoteView quote={quote} roomCount={draft.survey.rooms.length} />
-
-      {saved && (
-        <p className="mt-4 text-sm text-sage-700">
-          ✓ Saved{saved.emailed ? `, and a copy is on its way to ${draft.contact.email}` : ""}. Your
-          quote lives at{" "}
-          <a href={`/q/${saved.id}`} className="font-semibold underline">
-            this permanent link
-          </a>
-          . Bookmark it to come back any time.
-        </p>
-      )}
-      {submission?.status === "error" && (
-        <p className="mt-4 text-sm text-red-600">
-          We couldn&apos;t save your survey just now, but your quote is still valid.
-          Screenshot this page or email us at {BRAND.supportEmail}.
-        </p>
-      )}
-
-      <StartProjectPanel quoteId={saved?.id ?? null} />
-      {saved && <ShareQuoteButton quoteId={saved.id} />}
-
+      <p role="status" className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+        This is a demo site, so your quote wasn&apos;t saved and nothing was emailed.
+      </p>
+      <QuoteView
+        quote={quote}
+        roomCount={draft.survey.rooms.length}
+        settings={settings}
+        afterHero={
+          <BookSurveyButton
+            quoteId={null}
+            surveyPrice={surveyPriceCopy(settings)}
+            surveyDuration={surveyDurationCopy(settings)}
+          />
+        }
+      />
       <button
         type="button"
         onClick={onStartOver}
-        className="mt-8 text-sm font-medium text-ink-300 hover:text-ink-700 hover:underline"
+        className="mt-8 min-h-10 text-sm font-semibold text-ink-700 underline-offset-2 hover:underline"
       >
         Start a new quote
       </button>
+      <LegalLinks className="mt-6" />
     </div>
   );
 }

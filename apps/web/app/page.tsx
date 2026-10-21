@@ -1,240 +1,307 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { SiteHeader } from "@/components/site/header";
 import { SiteFooter } from "@/components/site/footer";
 import { PostcodeForm } from "@/components/site/postcode-form";
 import { ResumeBanner } from "@/components/site/resume-banner";
-import { BRAND } from "@/lib/brand";
-import { examplePrices, fromPrice } from "@/lib/example-prices";
+import { BrandArt } from "@/components/site/brand-art";
+import {
+  cancellationSummary,
+  fgasClaim,
+  installDurationCopy,
+  numberWord,
+  slaCommitments,
+  surveyDurationCopy,
+  surveyPriceCopy,
+  vatCopy,
+  warrantyCopy,
+  GUARANTEE_FALLBACK,
+} from "@/components/site/claims";
+import { onDarkBtn, primaryBtn, textLink } from "@/components/site/styles";
+import { AREA_PAGES } from "@/app/areas/area-data";
+import { appUrl } from "@/lib/brand";
+import { fromPrice } from "@/lib/example-prices";
+import { homeAnchor } from "@/components/site/examples";
 import { gbp } from "@/lib/format";
+import { getPublicSettings } from "@/lib/public-settings";
 
-const steps = [
-  {
-    n: "01",
-    title: "Tell us about your home",
-    body: "A few taps about your house. If we already know your address, most of it is filled in for you. Under two minutes to your price. No ladder, no loft, no small talk.",
-  },
-  {
-    n: "02",
-    title: "Get a fixed price instantly",
-    body: "Our pricing engine sizes the right units for every room and returns a guaranteed installation price with finance options. Not an estimate, the actual price.",
-  },
-  {
-    n: "03",
-    title: "Book your installation online",
-    body: "Pick a date, pay a deposit, and track everything in your portal. Most homes are installed in a single day. Kettle on, job done.",
-  },
-];
+export const revalidate = 60;
 
-const promises = [
-  { title: "Fixed price, guaranteed", body: "The price you see is the price you pay. No surveyor upsell, no on-the-day extras, no sharp intake of breath." },
-  { title: "5-year warranty", body: "Parts and labour included on every installation as standard." },
-  { title: "Certified engineers", body: "Every install by F-Gas certified engineers, photographed and quality-checked at each step. Boots wiped, mess binned." },
-  { title: "Cooling and heating", body: "Modern systems heat efficiently in winter too. One unit, comfy all year." },
-];
-
-const platform = [
-  { title: "Your project timeline", body: "Quote to install day on one timeline: dates, deliveries, your installer, all live.", href: "/p/demo", status: "Live" },
-  { title: "Customer portal", body: "Quotes, contracts, installation progress and documents in one place.", href: "/portal", status: "In progress" },
-  { title: "Installer app", body: "Job packs, step-by-step workflows and photo-verified quality assurance.", href: "/ops#installer", status: "Planned" },
-  { title: "Smart monitoring", body: "Energy use, running costs and predictive maintenance for every system.", href: "/ops#monitoring", status: "Planned" },
-];
-
-/** LocalBusiness structured data: name, area, offer. Keeps search results rich. */
-const businessJsonLd = {
-  "@context": "https://schema.org",
-  "@type": "HVACBusiness",
-  name: BRAND.name,
-  legalName: BRAND.legalName,
+export const metadata: Metadata = {
   description:
-    "Fixed-price residential air conditioning: guided self-survey, instant guaranteed quote, certified installation.",
-  email: BRAND.supportEmail,
-  areaServed: { "@type": "City", name: "London" },
-  url: process.env.NEXT_PUBLIC_APP_URL ?? "https://dang.ac",
-  priceRange: "££",
-  makesOffer: {
-    "@type": "Offer",
-    itemOffered: {
-      "@type": "Service",
-      name: "Home air conditioning installation",
-      description: "Fixed-price installation with 5-year parts and labour warranty",
-    },
-  },
+    "Heat pumps that cool your home in summer and warm it in winter. Your price online in about two minutes, confirmed at a home survey. Now installing in our first London postcodes.",
 };
 
-export default function HomePage() {
-  // Price anchoring, computed by the real engine at build time — the #1
-  // unknown for AC buyers is "what will this cost?", so answer it in the hero.
+export default async function HomePage() {
+  const settings = await getPublicSettings();
+  // Price anchors from the real engine, never hand-typed.
   const from = fromPrice();
-  const prices = examplePrices();
+  const anchor = homeAnchor();
+  const vat = vatCopy(settings);
+  const warranty = warrantyCopy(settings);
+  const fgas = fgasClaim(settings);
+  const sla = slaCommitments(settings);
+  const surveyFacts = [surveyPriceCopy(settings), surveyDurationCopy(settings)].filter(Boolean).join(", ");
+  const outcodes = settings.serviceArea.slice().sort((a, b) => a.localeCompare(b, "en", { numeric: true }));
+
+  const steps = [
+    {
+      n: "01",
+      title: "Get your price online",
+      body: "A few taps about your home and your price appears, in about two minutes. If we already know your address, most of it's filled in. No email needed to see it.",
+    },
+    {
+      n: "02",
+      title: "A home survey",
+      body: `${surveyFacts ? `${surveyFacts}. ` : ""}A surveyor measures each room, checks where the units and pipes can go, and looks at your fuse board. No sales pitch.`,
+    },
+    {
+      n: "03",
+      title: "Your proposal, in writing",
+      body: "Designed on photos of your own rooms and signed off by a qualified engineer. If the price differs from your online price, it says exactly why. Then you decide.",
+    },
+    {
+      n: "04",
+      title: "Installed and handed over",
+      body: `${installDurationCopy(settings)}, with an update at the end of each day. We commission it in heating and cooling, show you how it all works, and hand over your paperwork.`,
+    },
+  ];
+
+  const promises = [
+    {
+      title: "Your price, in writing",
+      body: "Your online price is confirmed at your survey. If anything changes, your proposal says what and why, before you agree to anything.",
+    },
+    {
+      title: "No sales patter",
+      body: "No salesperson, no \"today only\" prices, no one ringing to follow up. Take your time.",
+    },
+    {
+      title: "People you can check",
+      body: `Before your install you'll see who's coming and the qualifications they actually hold.${fgas ? ` ${fgas}` : ""}`,
+    },
+    warranty
+      ? { title: warranty.headline, body: `${warranty.body} All on top of your statutory rights.` }
+      : {
+          title: "Guarantees, spelled out",
+          body: GUARANTEE_FALLBACK,
+        },
+    {
+      title: "Updates without chasing",
+      body: "A short update with photos at the end of each install day, and one page that shows where everything's up to.",
+    },
+    { title: "Room to change your mind", body: cancellationSummary(settings).replace(/^If you accept, you/, "Once you accept, you") },
+  ];
+
+  /** LocalBusiness structured data: only facts we hold. */
+  const businessJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "HVACBusiness",
+    name: settings.company.tradingName,
+    legalName: settings.company.legalName,
+    description: "Air-to-air heat pumps for heating and cooling homes, surveyed and installed in London.",
+    email: settings.company.email,
+    ...(settings.company.phone ? { telephone: settings.company.phone } : {}),
+    url: appUrl(),
+    areaServed: outcodes.map((o) => ({ "@type": "Place", name: `${o}, London` })),
+  };
 
   return (
     <>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(businessJsonLd) }}
-      />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(businessJsonLd) }} />
       <SiteHeader />
       <ResumeBanner />
       <main>
-        {/* Hero: the collateral IS the header */}
+        {/* Hero */}
         <section className="warm-gradient">
-          <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 pb-20 pt-14 sm:px-6 sm:pt-20 lg:grid-cols-[1fr_460px]">
+          <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 pb-16 pt-12 sm:px-6 sm:pt-20 lg:grid-cols-[1fr_460px]">
             <div className="max-w-2xl">
               <p className="inline-flex items-center gap-2 rounded-full border border-accent-100 bg-white px-3 py-1 text-xs font-semibold text-accent-700">
-                <span className="h-1.5 w-1.5 rounded-full bg-accent-500" />
-                Now taking bookings in our launch areas
+                <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-accent-500" />
+                Now booking home surveys in London
               </p>
               <h1 className="mt-5 text-4xl font-display text-ink-900 sm:text-6xl">
-                Dang, it&apos;s hot.{" "}
-                <span className="text-accent-600">Let&apos;s fix that.</span>
+                Dang, it&apos;s hot. <span className="text-accent-700">Let&apos;s fix that.</span>
               </h1>
-              <p className="mt-5 max-w-xl text-lg text-ink-500">
-                Proper air conditioning for your home, with a guaranteed fixed
-                price in under two minutes. No salesperson, no waiting a week
-                for a surveyor, no more sleeping on top of the duvet with a wet
-                flannel. Keeping London cool, street by street.
+              <p className="mt-5 max-w-xl text-lg text-ink-700">
+                Heat pumps that cool your home in summer and warm it in winter. Get your price in about two
+                minutes, then we visit to confirm it. No salesperson, no clipboard, no more sleeping on top of the
+                duvet with a wet flannel.
               </p>
 
               <PostcodeForm />
-              <p className="mt-3 text-sm text-ink-300">
-                Free, under two minutes, and the price is the price. No email
-                needed to see it, no salesperson, no man with a clipboard.
+              <p className="mt-3 text-sm text-ink-500">
+                Free and no obligation. No email needed to see your price.
               </p>
               <p className="mt-4 text-sm font-semibold text-ink-700">
-                Single room from {gbp(from)} installed · whole 3-bed home from{" "}
-                {gbp(Math.min(prices.threeBedTerrace, prices.threeBedSemi))} · VAT included ·{" "}
-                <Link href="/guides/air-conditioning-cost-uk" className="text-accent-700 hover:underline">
-                  full cost guide →
+                One room from {gbp(from)} installed · {numberWord(anchor.rooms)} rooms in a 3-bed home from{" "}
+                {gbp(anchor.price)}
+                {vat.short ? ` · ${vat.short}` : ""} ·{" "}
+                <Link href="/guides/air-conditioning-cost-uk" className={`whitespace-nowrap ${textLink}`}>
+                  cost guide
                 </Link>
               </p>
             </div>
-            <div className="overflow-hidden rounded-3xl border border-line bg-white shadow-lg">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/brand/dang-its-hot.webp"
-                alt="Dang, It's Hot: cooling technologies for the UK. Keeping London cool."
-                className="h-auto w-full"
-                width={1400}
-                height={933}
-                fetchPriority="high"
-                decoding="async"
-              />
-            </div>
+            <BrandArt priority />
           </div>
         </section>
 
-        {/* Steps */}
-        <section className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
-          <h2 className="text-3xl font-display sm:text-4xl">
-            From “maybe” to installed, in three steps
-          </h2>
-          <div className="mt-10 grid gap-6 md:grid-cols-3">
+        {/* How it works */}
+        <section id="how-it-works" className="mx-auto max-w-6xl scroll-mt-20 px-4 py-20 sm:px-6">
+          <h2 className="text-3xl font-display sm:text-4xl">From &ldquo;maybe&rdquo; to installed</h2>
+          <p className="mt-3 max-w-2xl text-ink-700">
+            Four steps, one at a time, and you can see what&apos;s next at every point.
+          </p>
+          <ol className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {steps.map((s) => (
-              <div key={s.n} className="rounded-2xl border border-line bg-surface p-6">
-                <span className="text-sm font-bold text-accent-600">{s.n}</span>
+              <li key={s.n} className="rounded-2xl border border-line bg-surface p-6">
+                <span className="text-sm font-bold text-accent-700">{s.n}</span>
                 <h3 className="mt-2 text-lg font-semibold">{s.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-ink-500">{s.body}</p>
-              </div>
+                <p className="mt-2 text-sm leading-relaxed text-ink-700">{s.body}</p>
+              </li>
             ))}
-          </div>
+          </ol>
           <div className="mt-8">
-            <Link
-              href="/quote"
-              className="inline-block rounded-full bg-accent-600 px-6 py-3 font-semibold text-white shadow-sm transition hover:bg-accent-700"
-            >
-              Get my fixed price
+            <Link href="/quote" className={primaryBtn}>
+              Get my price
             </Link>
           </div>
         </section>
 
+        {/* Heating and cooling */}
+        <section className="border-y border-line bg-white">
+          <div className="mx-auto grid max-w-6xl gap-10 px-4 py-16 sm:px-6 lg:grid-cols-2">
+            <div>
+              <h2 className="text-3xl font-display sm:text-4xl">It heats, too. Properly.</h2>
+              <p className="mt-4 text-ink-700">
+                What most people call air conditioning is an air-to-air heat pump. The unit that cools a bedroom in
+                July heats it in January, moving heat rather than making it, so it uses far less electricity than a
+                plug-in heater. Every system we fit is set up, tested and handed over for both.
+              </p>
+            </div>
+            <ul className="space-y-4">
+              {[
+                ["Cool in summer", "Quiet indoor units for bedrooms, lofts and living rooms, the rooms that cook first."],
+                ["Warm in winter", "Efficient heating room by room, alongside your radiators or instead of plug-in heaters."],
+                [
+                  "Planning, checked",
+                  "Heat pumps on houses can often go in without planning permission when they meet the size, siting and noise rules and aren't used for cooling alone. We check yours at the survey; we never assume.",
+                ],
+              ].map(([title, body]) => (
+                <li key={title} className="flex gap-3">
+                  <span aria-hidden className="mt-2 h-2 w-2 shrink-0 rounded-full bg-accent-500" />
+                  <span>
+                    <span className="font-semibold">{title}.</span> <span className="text-ink-700">{body}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+
         {/* Promises */}
-        <section className="border-y border-line bg-surface">
+        <section className="bg-surface">
           <div className="mx-auto max-w-6xl px-4 pt-16 sm:px-6">
             <h2 className="text-3xl font-display sm:text-4xl">Not your usual tradespeople</h2>
-            <p className="mt-2 max-w-2xl text-ink-500">
-              Professional to a fault, and all of it in writing. If we miss a
-              commitment, money comes off your bill automatically.
-            </p>
+            <p className="mt-2 max-w-2xl text-ink-700">Professional to a fault, and all of it in writing.</p>
           </div>
-          <div className="mx-auto grid max-w-6xl gap-6 px-4 py-12 sm:grid-cols-2 sm:px-6 lg:grid-cols-4">
+          <div className="mx-auto grid max-w-6xl gap-x-8 gap-y-6 px-4 py-12 sm:grid-cols-2 sm:px-6 lg:grid-cols-3">
             {promises.map((p) => (
               <div key={p.title}>
                 <h3 className="font-semibold">{p.title}</h3>
-                <p className="mt-1.5 text-sm leading-relaxed text-ink-500">{p.body}</p>
+                <p className="mt-1.5 text-sm leading-relaxed text-ink-700">{p.body}</p>
               </div>
             ))}
           </div>
+          {sla.length > 0 && (
+            <div className="mx-auto max-w-6xl px-4 pb-14 sm:px-6">
+              <div className="rounded-2xl border border-line bg-white p-6">
+                <h3 className="font-semibold">Our service commitments</h3>
+                <p className="mt-1 text-sm text-ink-700">If we miss one, the remedy comes off your bill. You don&apos;t have to ask.</p>
+                <ul className="mt-4 divide-y divide-line text-sm">
+                  {sla.map((c) => (
+                    <li key={c.promise} className="flex flex-wrap justify-between gap-x-4 gap-y-1 py-2.5">
+                      <span className="text-ink-900">{c.promise}</span>
+                      <span className="font-semibold text-ink-900">{c.remedy}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          )}
         </section>
 
-        {/* Platform teaser */}
-        <section className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
-          <h2 className="text-3xl font-display sm:text-4xl">
-            One platform, from first quote to year fifteen
-          </h2>
-          <p className="mt-3 max-w-2xl text-ink-500">
-            {BRAND.name} looks after the whole life of your system: quoting, design,
-            installation, monitoring and servicing. Every step is faster,
-            more predictable and better documented.
-          </p>
-          <div className="mt-10 grid gap-6 sm:grid-cols-2">
-            {platform.map((p) => (
-              <Link
-                key={p.title}
-                href={p.href}
-                className="group rounded-2xl border border-line p-6 transition hover:border-accent-400 hover:shadow-sm"
-              >
-                <div className="flex items-center justify-between">
-                  <h3 className="font-semibold group-hover:text-accent-700">{p.title}</h3>
-                  <span className="rounded-full bg-surface px-2.5 py-0.5 text-xs font-medium text-ink-500">
-                    {p.status}
-                  </span>
-                </div>
-                <p className="mt-2 text-sm leading-relaxed text-ink-500">{p.body}</p>
-              </Link>
-            ))}
+        {/* Honest about being new */}
+        <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
+          <div className="rounded-3xl border border-accent-100 bg-accent-50 p-6 sm:p-10">
+            <h2 className="text-2xl font-display sm:text-3xl">We&apos;re new, and we&apos;ll say so</h2>
+            <p className="mt-3 max-w-3xl text-ink-700">
+              We&apos;re surveying and installing our first homes now. So you won&apos;t find made-up reviews,
+              borrowed badges or a &ldquo;thousands of happy customers&rdquo; banner here: just the work, done
+              properly, photographed at every step and explained in plain English.
+            </p>
+            <Link href="/about" className={`mt-4 inline-block text-sm ${textLink}`}>
+              Who we are
+            </Link>
           </div>
         </section>
 
-        {/* Areas + FAQ: internal links that also answer "do you cover me?" */}
+        {/* Areas + FAQ */}
         <section className="border-t border-line bg-surface">
-          <div className="mx-auto grid max-w-6xl gap-8 px-4 py-14 sm:px-6 md:grid-cols-2">
+          <div className="mx-auto grid max-w-6xl gap-10 px-4 py-14 sm:px-6 md:grid-cols-2">
             <div>
               <h2 className="text-2xl font-display">Where we install</h2>
-              <p className="mt-2 text-sm text-ink-500">
-                Street by street across South London, starting where the terraces repeat and the
-                summers cook.
-              </p>
-              <div className="mt-4 flex flex-wrap gap-2">
-                <Link
-                  href="/areas/sw16"
-                  className="rounded-full border border-line bg-white px-4 py-2 text-sm font-medium text-ink-700 transition hover:border-accent-400 hover:text-accent-700"
-                >
-                  Streatham (SW16) →
-                </Link>
-                <Link
-                  href="/areas/sw17"
-                  className="rounded-full border border-line bg-white px-4 py-2 text-sm font-medium text-ink-700 transition hover:border-accent-400 hover:text-accent-700"
-                >
-                  Tooting (SW17) →
-                </Link>
-              </div>
-              <p className="mt-3 text-xs text-ink-300">
-                Elsewhere? Your quote is still real — start it and we&apos;ll tell you when we
-                reach your street.
+              {outcodes.length > 0 ? (
+                <>
+                  <p className="mt-2 text-sm text-ink-700">We&apos;re starting in these postcodes:</p>
+                  <ul className="mt-4 flex flex-wrap gap-2" aria-label="Postcode areas we cover">
+                    {outcodes.map((o) => {
+                      const page = AREA_PAGES[o.toLowerCase()];
+                      return (
+                        <li key={o}>
+                          {page ? (
+                            <Link
+                              href={`/areas/${o.toLowerCase()}`}
+                              className="inline-block rounded-full border border-line bg-white px-3.5 py-1.5 text-sm font-semibold text-accent-700 transition hover:border-accent-500"
+                            >
+                              {o} · {page.name}
+                            </Link>
+                          ) : (
+                            <span className="inline-block rounded-full border border-line bg-white px-3.5 py-1.5 text-sm font-medium text-ink-700">
+                              {o}
+                            </span>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </>
+              ) : (
+                <p className="mt-2 text-sm text-ink-700">We&apos;re finalising our first areas. Check back soon.</p>
+              )}
+              <p className="mt-4 text-sm text-ink-700">
+                Not on the list? Pop your postcode in anyway: if we&apos;re not there yet, you can ask us to email
+                you once when we are.
               </p>
             </div>
             <div>
               <h2 className="text-2xl font-display">The questions everyone asks</h2>
-              <ul className="mt-3 space-y-2 text-sm text-ink-700">
-                <li>Do I need planning permission? <span className="text-ink-300">Usually not.</span></li>
-                <li>Is it noisy? <span className="text-ink-300">Quieter than a library.</span></li>
-                <li>What about winter? <span className="text-ink-300">It heats too, efficiently.</span></li>
-              </ul>
-              <Link
-                href="/faq"
-                className="mt-4 inline-block text-sm font-semibold text-accent-700 hover:underline"
-              >
-                All ten answers, straight →
+              <dl className="mt-3 space-y-3 text-sm">
+                <div>
+                  <dt className="font-semibold">Does it heat as well as cool?</dt>
+                  <dd className="text-ink-700">Yes. It&apos;s a heat pump: warm in winter, cool in summer.</dd>
+                </div>
+                <div>
+                  <dt className="font-semibold">Do I need planning permission?</dt>
+                  <dd className="text-ink-700">Often not for a house, but it depends. We check at your survey.</dd>
+                </div>
+                <div>
+                  <dt className="font-semibold">How long does installing take?</dt>
+                  <dd className="text-ink-700">{installDurationCopy(settings)} for most homes.</dd>
+                </div>
+              </dl>
+              <Link href="/faq" className={`mt-4 inline-block text-sm ${textLink}`}>
+                All the answers, straight
               </Link>
             </div>
           </div>
@@ -243,20 +310,16 @@ export default function HomePage() {
         {/* Final CTA */}
         <section className="ink-gradient">
           <div className="mx-auto max-w-6xl px-4 py-20 text-center sm:px-6">
-            <h2 className="text-3xl font-display text-white sm:text-4xl">
-              Ready to see your price?
-            </h2>
-            <p className="mx-auto mt-3 max-w-md text-white/60">
-              Two minutes on your phone. A guaranteed price at the end. No
-              obligation, no pushy calls. Worst case, you go back to your fan
+            <h2 className="text-3xl font-display text-white sm:text-4xl">Ready to see your price?</h2>
+            <p className="mx-auto mt-3 max-w-md text-white/80">
+              About two minutes on your phone. No obligation, no pushy calls. Worst case, you go back to your fan
               knowing exactly what freedom costs.
             </p>
-            <Link
-              href="/quote"
-              className="mt-8 inline-block rounded-full bg-accent-500 px-8 py-3.5 font-semibold text-white shadow-lg transition hover:bg-accent-400"
-            >
-              Start my survey
-            </Link>
+            <div className="mt-8">
+              <Link href="/quote" className={onDarkBtn}>
+                Get my price
+              </Link>
+            </div>
           </div>
         </section>
       </main>

@@ -459,6 +459,17 @@ export function getPermutation(
 }
 
 /**
+ * The archetype's install pattern for an outdoor position: the one built for
+ * that spot, else none (the surveyor works it out). Used when the customer
+ * moves the outdoor unit, so the quote's pattern, its price and its checks
+ * never describe a spot they didn't pick.
+ */
+export function permutationForLocation(archetypeId: string | undefined, location: OutdoorLocation): InstallPermutation | undefined {
+  if (!archetypeId) return undefined;
+  return getArchetype(archetypeId)?.permutations.find((p) => p.outdoorLocation === location);
+}
+
+/**
  * Materialise a stock-floor-plan room as a survey room (deterministic ids,
  * the same preset always produces the same room). Glazing/orientation start
  * at safe defaults the customer can tweak.

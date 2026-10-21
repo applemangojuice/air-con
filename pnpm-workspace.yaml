@@ -1,3 +1,11 @@
 packages:
   - "apps/*"
   - "packages/*"
+
+patchedDependencies:
+  # React (as vendored by Next 15.5) loses its hydration cursor when it replays
+  # a host element that suspended on a lazy child (an RSC row still streaming,
+  # a client chunk still loading): the page fails to hydrate (#418) and is
+  # rendered again on the client. Slower data makes it likelier; the patch
+  # puts the cursor back. See docs/pilot-architecture.md §K.
+  next@15.5.28: patches/next@15.5.28.patch

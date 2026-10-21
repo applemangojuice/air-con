@@ -1,5 +1,9 @@
+import { MIN_BREAK_GLASS_PASSWORD, breakGlassEnabled } from "./auth/access";
+import { MIN_SESSION_SECRET_LENGTH, sessionSecretUsable } from "./auth/session";
+import { isPlaceholderValue, realEnv } from "./env-placeholders";
+import { PILOT_COLUMNS, PILOT_MIGRATION, PILOT_TABLES, probeTable } from "./schema-check";
 import { getServiceClient } from "./supabase-server";
-import { PHOTO_BUCKET, VIDEO_BUCKET } from "./supabase-server";
+import { MEDIA_BUCKET, PHOTO_BUCKET, VIDEO_BUCKET } from "./supabase-server";
 
 /**
  * Database self-check. Every symptom of "the site isn't saving anything"
@@ -17,6 +21,8 @@ export interface TableCheck {
   error: string | null;
   /** What breaks for the customer when this table is missing. */
   impact: string;
+  /** The database says the table (or a column the pilot needs) isn't there: a migration hasn't run. */
+  missing: boolean;
 }
 
 export interface BucketCheck {
@@ -76,23 +82,67 @@ const TABLES: { table: string; label: string; impact: string }[] = [
     label: "Analytics events",
     impact: "Usage analytics aren't recorded — no visitor, source or funnel data.",
   },
+  // Pilot platform (migration 0010): without these nobody can sign in.
+  {
+    table: "staff",
+    label: "Staff",
+    impact: "Nobody can sign in to /ops or /field: there's nowhere to keep the team.",
+  },
+  {
+    table: "login_tokens",
+    label: "Sign-in links",
+    impact: "Magic sign-in links can't be issued or checked.",
+  },
+  {
+    table: "messages",
+    label: "Message outbox",
+    impact: "Customer and team messages aren't recorded or sent.",
+  },
+  {
+    table: "audit_log",
+    label: "Audit log",
+    impact: "Sign-ins and changes aren't recorded against who made them.",
+  },
+  // The rest of the pilot platform (0010), so a half-run migration can't hide.
+  ...PILOT_TABLES.filter((t) => !["staff", "login_tokens", "messages", "audit_log"].includes(t)).map((t) => ({
+    table: t,
+    label: t.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase()),
+    impact: `Pilot projects can't save their ${t.replace(/_/g, " ")} (migration 0010).`,
+  })),
 ];
 
+/**
+ * One table, with a GET (schema-check's probeTable), never a HEAD: a HEAD
+ * turns PostgREST's "no such table" 404 into an empty 204 with no error, so
+ * a missing table looked present and empty. Tables 0010 adds columns to
+ * are checked for those columns too.
+ */
 async function checkTable(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: any,
   t: { table: string; label: string; impact: string },
 ): Promise<TableCheck> {
-  const { count, error } = await supabase
-    .from(t.table)
-    .select("*", { count: "exact", head: true });
+  const probe = await probeTable(supabase, t.table, { count: true });
+  let error = probe.error;
+  let ok = probe.ok;
+  let missing = probe.missing;
+  const columns = PILOT_COLUMNS.find((c) => c.table === t.table);
+  if (ok && columns) {
+    const cols = await probeTable(supabase, t.table, { columns: columns.columns });
+    if (!cols.ok) {
+      ok = false;
+      missing = cols.missing;
+      error = cols.missing ? `Missing the pilot columns from ${PILOT_MIGRATION}: ${cols.error}` : cols.error;
+    }
+  }
   return {
     table: t.table,
     label: t.label,
-    ok: !error,
-    count: error ? null : (count ?? 0),
-    error: error?.message ?? null,
+    ok,
+    count: ok ? probe.count : null,
+    error,
     impact: t.impact,
+    missing,
   };
 }
 
@@ -102,12 +152,20 @@ async function checkBucket(
   bucket: string,
   label: string,
 ): Promise<BucketCheck> {
-  const { error } = await supabase.storage.getBucket(bucket);
-  return { bucket, label, ok: !error, error: error?.message ?? null };
+  const { data, error } = await supabase.storage.getBucket(bucket);
+  if (error) return { bucket, label, ok: false, error: error.message ?? "Bucket not found" };
+  // A bucket with no size or type limit takes anything anyone uploads (migration 0011).
+  const limited = Number(data?.file_size_limit) > 0 && Array.isArray(data?.allowed_mime_types) && data.allowed_mime_types.length > 0;
+  return limited
+    ? { bucket, label, ok: true, error: null }
+    : { bucket, label, ok: false, error: "No file size or type limits on this bucket: run migration 0011_storage_limits.sql" };
 }
 
 function envReport(): EnvCheck[] {
-  const has = (k: string) => Boolean(process.env[k]);
+  // Set means really set: an .env.example placeholder counts as missing.
+  const has = (k: string) => Boolean(realEnv(process.env, k));
+  const placeholder = (k: string) => isPlaceholderValue(process.env[k]);
+  const stillTemplate = "Still the .env.example placeholder, so it counts as not set.";
   const emailReady = has("RESEND_API_KEY") && has("EMAIL_FROM");
   return [
     {
@@ -115,7 +173,7 @@ function envReport(): EnvCheck[] {
       label: "Supabase URL",
       set: has("SUPABASE_URL"),
       required: true,
-      note: "Persistence. Without it the whole site runs in demo mode.",
+      note: placeholder("SUPABASE_URL") ? stillTemplate : "Persistence. Without it the whole site runs in demo mode.",
     },
     {
       key: "SUPABASE_SERVICE_ROLE_KEY",
@@ -125,18 +183,42 @@ function envReport(): EnvCheck[] {
       note: "Server-side writes. Pair with SUPABASE_URL.",
     },
     {
-      key: "OPS_PASSWORD",
-      label: "Ops password",
-      set: has("OPS_PASSWORD"),
+      key: "SESSION_SECRET",
+      label: "Session secret",
+      set: sessionSecretUsable(process.env),
+      required: true,
+      note: placeholder("SESSION_SECRET")
+        ? `${stillTemplate} It's published in the repo, so it can't sign anything: generate one with \`openssl rand -hex 32\`.`
+        : has("SESSION_SECRET") && !sessionSecretUsable(process.env)
+        ? `Set but too short: production ignores a secret under ${MIN_SESSION_SECRET_LENGTH} characters, so nobody can sign in. Generate one with \`openssl rand -hex 32\`.`
+        : "Signs staff and customer sessions. Without it production signs nobody in. Generate with `openssl rand -hex 32`.",
+    },
+    {
+      key: "ADMIN_EMAILS",
+      label: "Admin emails",
+      set: has("ADMIN_EMAILS"),
       required: false,
-      note: "Locks these admin pages. Unset = anyone with the link can view.",
+      note: "Comma list. The first sign-in from one of these creates its admin account.",
+    },
+    {
+      key: "OPS_PASSWORD",
+      label: "Break-glass password",
+      set: breakGlassEnabled(process.env),
+      required: false,
+      note: placeholder("OPS_PASSWORD")
+        ? `${stillTemplate} Break-glass stays off: set a random one (\`openssl rand -base64 24\`) or remove it.`
+        : has("OPS_PASSWORD") && !breakGlassEnabled(process.env)
+        ? `Set but too short: break-glass is off until it's at least ${MIN_BREAK_GLASS_PASSWORD} characters.`
+        : `Optional: lets an admin email sign in with this password when email is down. At least ${MIN_BREAK_GLASS_PASSWORD} characters.`,
     },
     {
       key: "RESEND_API_KEY",
       label: "Email (Resend)",
       set: emailReady,
       required: false,
-      note: "Quote emails to customers + new-lead / lost-lead alerts to the team. Needs RESEND_API_KEY + EMAIL_FROM.",
+      note: placeholder("RESEND_API_KEY")
+        ? stillTemplate
+        : "Sign-in links, proposals, contracts and every customer email, plus the team's lead alerts. Needs RESEND_API_KEY + EMAIL_FROM.",
     },
     {
       key: "LEADS_NOTIFY_EMAIL",
@@ -154,10 +236,12 @@ function envReport(): EnvCheck[] {
     },
     {
       key: "CRON_SECRET",
-      label: "Follow-up cron",
+      label: "Scheduled jobs (cron)",
       set: has("CRON_SECRET"),
-      required: false,
-      note: "Enables the daily abandoned-quote follow-up email (needs Resend too).",
+      required: true,
+      note: placeholder("CRON_SECRET")
+        ? `${stillTemplate} Every scheduled job refuses to run until it's a real secret.`
+        : "Vercel sends it to the scheduled jobs: daily ops (survey and day-before reminders, proposal expiry, outbox retries, aftercare), the morning digest and the abandoned-quote follow-up. Without it they all refuse to run.",
     },
     {
       key: "NEXT_PUBLIC_APP_URL",
@@ -188,11 +272,12 @@ export async function healthReport(): Promise<HealthReport> {
   const buckets = await Promise.all([
     checkBucket(supabase, PHOTO_BUCKET, "Survey photos"),
     checkBucket(supabase, VIDEO_BUCKET, "Survey videos"),
+    checkBucket(supabase, MEDIA_BUCKET, "Project media"),
   ]);
 
-  // If every table errors identically, the project itself is unreachable
-  // (bad URL/key) rather than just un-migrated.
-  const allFailed = tables.every((t) => !t.ok);
+  // If every table fails for a reason other than "it isn't there", the
+  // project itself is unreachable (bad URL/key) rather than un-migrated.
+  const allFailed = tables.every((t) => !t.ok && !t.missing);
   const connectionError = allFailed ? (tables[0]?.error ?? "unreachable") : null;
 
   const healthy = tables.every((t) => t.ok) && buckets.every((b) => b.ok);

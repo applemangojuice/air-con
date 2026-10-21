@@ -16,6 +16,8 @@ const PREFERRED_START_LABEL: Record<BookingRequest["preferredStart"], string> = 
   flexible: "Flexible",
 };
 import { PHOTO_BUCKET, getServiceClient } from "@/lib/supabase-server";
+import { requireStaff } from "@/lib/auth/server";
+import { isUuid } from "@/lib/repo/base";
 
 export const metadata: Metadata = {
   title: "Quote detail · ops",
@@ -29,9 +31,11 @@ export default async function OpsQuoteDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  await requireStaff("projects.view-all");
   const { id } = await params;
   const supabase = getServiceClient();
-  if (!supabase) notFound();
+  // A link that isn't a quote id is a 404, not a query Postgres refuses (22P02).
+  if (!supabase || !isUuid(id)) notFound();
 
   const { data: q } = await supabase.from("quote_requests").select("*").eq("id", id).single();
   if (!q) notFound();
@@ -62,6 +66,7 @@ export default async function OpsQuoteDetailPage({
 
   async function setStatus(formData: FormData) {
     "use server";
+    await requireStaff(["projects.edit", "projects.view-all"]);
     const status = formData.get("status");
     if (typeof status !== "string" || !["new", "reviewed", "booked", "declined"].includes(status))
       return;
@@ -79,6 +84,7 @@ export default async function OpsQuoteDetailPage({
 
   async function addNote(formData: FormData) {
     "use server";
+    await requireStaff(["projects.edit", "projects.view-all"]);
     const note = String(formData.get("note") ?? "").trim();
     if (!note || note.length > 4000) return;
     const sb = getServiceClient();
@@ -89,6 +95,7 @@ export default async function OpsQuoteDetailPage({
 
   async function setNextAction(formData: FormData) {
     "use server";
+    await requireStaff(["projects.edit", "projects.view-all"]);
     const action = String(formData.get("action") ?? "").trim();
     const dueRaw = String(formData.get("due") ?? "").trim();
     const sb = getServiceClient();
@@ -228,7 +235,7 @@ export default async function OpsQuoteDetailPage({
               name="due"
               className="rounded-full border border-line bg-white px-3 py-1.5 text-sm outline-none focus:border-accent-500"
             />
-            <button className="rounded-full bg-accent-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-accent-700">
+            <button className="rounded-full bg-accent-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-accent-800">
               Set
             </button>
           </form>

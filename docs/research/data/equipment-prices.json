@@ -1,0 +1,630 @@
+{
+  "researchedAt": "2026-10-18",
+  "observations": [
+    {
+      "manufacturer": "Daikin",
+      "model": "FTXM25R / RXM25R9",
+      "description": "Perfera 2.5 kW (9,000 btu) R32 heat pump wall-mounted system (indoor + outdoor)",
+      "isPairKit": true,
+      "priceGbp": 1069.0,
+      "vatIncluded": true,
+      "supplier": "Air Conditioning World",
+      "url": "https://www.airconditioningworld.co.uk/daikin-ftxm25r-rxm25r9-2-5kw-",
+      "observedAt": "2026-10-18",
+      "notes": "Source type: secondary (UK retailer listing), read from a search-engine extract of the page; WebFetch/curl could not reach the page in this sandbox (DNS fail / proxy 403), so price, stock and VAT wording are not live-verified. Extract says prices include VAT; listed with 5-year manufacturer parts warranty. Page also carries a GBP 751-1000 price-filter band, which fits the ex-VAT figure (1069/1.2 = 890.83), not the VAT-inclusive one. F-gas: the extract did not say whether the site restricts sales to F-gas certified buyers (not determinable without opening the page). fact-check (2026-10-18, adversarial pass): the '5-year manufacturer parts warranty' is CONTRADICTED as an unconditional product warranty. docs/research/data/daikin.json, citing Daikin UK's installer warranty page (https://www.daikin.co.uk/en_gb/installers/support/warranty.html), records the standard warranty as 'typically 1 or 3 years depending on product type', 'up to 5 years on AC equipment' only via Daikin Certified Installers, and UK retailers listing Daikin splits with '3 years manufacturer's parts warranty'. Treat 5 years as conditional on installer status and registration, not as a property of this kit. Price itself not re-verified: this pass had no web access (shared WebSearch budget already exhausted, WebFetch DNS failure and curl proxy 403 on every domain tried).",
+      "confidence": "provisional"
+    },
+    {
+      "manufacturer": "Daikin",
+      "model": "FTXM25R",
+      "description": "Perfera 2.5 kW R32 multi-split-capable wall indoor unit only",
+      "isPairKit": false,
+      "priceGbp": 269.0,
+      "vatIncluded": true,
+      "supplier": "Air Conditioning World",
+      "url": "https://www.airconditioningworld.co.uk/daikin-ftxm25r-2-5kw-",
+      "observedAt": "2026-10-18",
+      "notes": "Source type: secondary (UK retailer listing), read from a search-engine extract of the page; WebFetch/curl could not reach the page in this sandbox (DNS fail / proxy 403), so price, stock and VAT wording are not live-verified. Indoor unit only (for single or multi split). Price includes VAT per extract. F-gas: the extract did not say whether the site restricts sales to F-gas certified buyers (not determinable without opening the page)."
+    },
+    {
+      "manufacturer": "Daikin",
+      "model": "FTXM35R / RXM35R9",
+      "description": "Perfera 3.5 kW (12,000 btu) R32 heat pump wall-mounted system",
+      "isPairKit": true,
+      "priceGbp": 1235.0,
+      "vatIncluded": true,
+      "supplier": "Air Conditioning World",
+      "url": "https://www.airconditioningworld.co.uk/daikin-ftxm35r-rxm35r9-3-5kw-",
+      "observedAt": "2026-10-18",
+      "notes": "Source type: secondary (UK retailer listing), read from a search-engine extract of the page; WebFetch/curl could not reach the page in this sandbox (DNS fail / proxy 403), so price, stock and VAT wording are not live-verified. Extract says all prices include VAT. F-gas: the extract did not say whether the site restricts sales to F-gas certified buyers (not determinable without opening the page)."
+    },
+    {
+      "manufacturer": "Daikin",
+      "model": "FTXM35R / RXM35R",
+      "description": "Perfera 3.5 kW wall-mounted system",
+      "isPairKit": true,
+      "priceGbp": 1123.2,
+      "vatIncluded": true,
+      "supplier": "Avon Air",
+      "url": "https://avonair.co.uk/product/daikin-air-conditioning-rxm35r-wall-mounted-3-5kw/",
+      "observedAt": "2026-10-18",
+      "notes": "Source type: secondary (UK retailer listing), read from a search-engine extract of the page; WebFetch/curl could not reach the page in this sandbox (DNS fail / proxy 403), so price, stock and VAT wording are not live-verified. Extract shows 'GBP 1,123.20 (Including VAT)'. Title names FTXM35R; URL names RXM35R, so read as an indoor+outdoor pair. F-gas: the extract did not say whether the site restricts sales to F-gas certified buyers (not determinable without opening the page)."
+    },
+    {
+      "manufacturer": "Daikin",
+      "model": "FTXM35R + RXM35R9",
+      "description": "Perfera 3.5 kW / 12,000 btu inverter heat pump R32 A++ Wi-Fi wall-mounted system",
+      "isPairKit": true,
+      "priceGbp": 1095.46,
+      "vatIncluded": true,
+      "supplier": "Orion Air Sales",
+      "url": "https://www.orionairsales.co.uk/daikin-air-conditioning-ftxm35rrxm35r9-wall-mounted-35kw12000btu-inverter-heat-pump-r32-a-wi-fi-15083-p.asp",
+      "observedAt": "2026-10-18",
+      "notes": "Source type: secondary (UK retailer listing), read from a search-engine extract of the page; WebFetch/curl could not reach the page in this sandbox (DNS fail / proxy 403), so price, stock and VAT wording are not live-verified. Site shows GBP 1,095.46 inc VAT and GBP 912.88 ex VAT. The page's structured data marked it OUT OF STOCK. F-gas: the extract did not say whether the site restricts sales to F-gas certified buyers (not determinable without opening the page)."
+    },
+    {
+      "manufacturer": "Daikin",
+      "model": "FTXM35R + RXM35R9 (install kit)",
+      "description": "Perfera 3.5 kW wall-mounted inverter heat pump with 'Install Kit'",
+      "isPairKit": true,
+      "priceGbp": 1536.34,
+      "vatIncluded": null,
+      "supplier": "Tiedex",
+      "url": "https://tiedex.co.uk/products/daikin-air-conditioning-ftxm35r-rxm35r9-wall-mounted-3-5kw-12000btu-inverter-heat-pump-install-kit-16256",
+      "observedAt": "2026-10-18",
+      "notes": "Source type: secondary (UK retailer listing), read from a search-engine extract of the page; WebFetch/curl could not reach the page in this sandbox (DNS fail / proxy 403), so price, stock and VAT wording are not live-verified. VAT treatment not stated in extract. 'Install Kit' is not defined in the extract: probably the system plus an install pack (pipe, brackets), not labour, but this is unconfirmed. Product naming and IDs match Orion Air Sales listings, so it may be the same catalogue. F-gas: the extract did not say whether the site restricts sales to F-gas certified buyers (not determinable without opening the page)."
+    },
+    {
+      "manufacturer": "Daikin",
+      "model": "FTXM35R / RXM35R",
+      "description": "Perfera 3.4 kW system (London installer's web shop)",
+      "isPairKit": true,
+      "priceGbp": 1200.0,
+      "vatIncluded": null,
+      "supplier": "Micro-Climate",
+      "url": "https://micro-climate.co.uk/daikin-ftxm35r-rxm35r-perfera-3-4kw",
+      "observedAt": "2026-10-18",
+      "notes": "Source type: secondary (UK retailer listing), read from a search-engine extract of the page; WebFetch/curl could not reach the page in this sandbox (DNS fail / proxy 403), so price, stock and VAT wording are not live-verified. VAT treatment and whether installation is included are not stated in the extract; seller shown as in stock. London installer, so possibly a supply price with fitting quoted on top. F-gas: the extract did not say whether the site restricts sales to F-gas certified buyers (not determinable without opening the page)."
+    },
+    {
+      "manufacturer": "Daikin",
+      "model": "FTXM35R",
+      "description": "Perfera 3.5 kW R32 multi-split-capable wall indoor unit only",
+      "isPairKit": false,
+      "priceGbp": 305.0,
+      "vatIncluded": true,
+      "supplier": "Air Conditioning World",
+      "url": "https://www.airconditioningworld.co.uk/daikin-ftxm35r-3-5kw-",
+      "observedAt": "2026-10-18",
+      "notes": "Source type: secondary (UK retailer listing), read from a search-engine extract of the page; WebFetch/curl could not reach the page in this sandbox (DNS fail / proxy 403), so price, stock and VAT wording are not live-verified. Indoor unit only. Price includes VAT per extract. F-gas: the extract did not say whether the site restricts sales to F-gas certified buyers (not determinable without opening the page)."
+    },
+    {
+      "manufacturer": "Daikin",
+      "model": "FTXM35R",
+      "description": "Daikin R32 wall-mount indoor 3.5 kW (indoor unit only)",
+      "isPairKit": false,
+      "priceGbp": 305.8,
+      "vatIncluded": false,
+      "supplier": "HVAC-Sanitary",
+      "url": "https://www.hvac-sanitary.co.uk/product/ftxm35r-daikin-r32-wall-mount-i-d-3-5-kw-ftxm35r-daikin/",
+      "observedAt": "2026-10-18",
+      "notes": "Source type: secondary (UK retailer listing), read from a search-engine extract of the page; WebFetch/curl could not reach the page in this sandbox (DNS fail / proxy 403), so price, stock and VAT wording are not live-verified. Price given ex VAT. F-gas: the extract did not say whether the site restricts sales to F-gas certified buyers (not determinable without opening the page)."
+    },
+    {
+      "manufacturer": "Daikin",
+      "model": "FTXM50R / RXM50R",
+      "description": "Perfera 5.0 kW R32 heat pump wall-mounted system (retailer title says '18,000 btu', a size-class label; 5.0 kW is about 17,060 btu/h)",
+      "isPairKit": true,
+      "priceGbp": 1645.0,
+      "vatIncluded": true,
+      "supplier": "Air Conditioning World",
+      "url": "https://www.airconditioningworld.co.uk/daikin-ftxm50r-rxm50r-5-0kw-",
+      "observedAt": "2026-10-18",
+      "notes": "Source type: secondary (UK retailer listing), read from a search-engine extract of the page; WebFetch/curl could not reach the page in this sandbox (DNS fail / proxy 403), so price, stock and VAT wording are not live-verified. Price includes VAT per extract. F-gas: the extract did not say whether the site restricts sales to F-gas certified buyers (not determinable without opening the page). fact-check (2026-10-18, adversarial pass): the '5.0 kW (18,000 btu)' wording is REFUTED as a unit conversion: 1 Btu(IT)/h = 0.29307 W (NIST SP 811 conversion factors, https://www.nist.gov/pml/special-publication-811, not fetched this session), so 5.0 kW = 5000 / 0.29307 = about 17,060 btu/h. Orion lists the same FTXM50R/RXM50R pair as '17,000 btu'. '18,000 btu' is the trade size class (as 9,000 for 2.5 kW and 12,000 for 3.5 kW); use kW for sizing. Description corrected. Price itself not re-verified: this pass had no web access (shared WebSearch budget already exhausted, WebFetch DNS failure and curl proxy 403 on every domain tried).",
+      "confidence": "provisional"
+    },
+    {
+      "manufacturer": "Daikin",
+      "model": "FTXM50R + RXM50R",
+      "description": "Perfera 5 kW / 17,000 btu inverter heat pump R32 A++ Wi-Fi wall-mounted system",
+      "isPairKit": true,
+      "priceGbp": 1414.98,
+      "vatIncluded": true,
+      "supplier": "Orion Air Sales",
+      "url": "https://www.orionairsales.co.uk/daikin-air-conditioning-ftxm50rrxm50r-wall-mounted-inverter-heat-pump-5kw17000btu-r32-a-wi-fi-16260-p.asp",
+      "observedAt": "2026-10-18",
+      "notes": "Source type: secondary (UK retailer listing), read from a search-engine extract of the page; WebFetch/curl could not reach the page in this sandbox (DNS fail / proxy 403), so price, stock and VAT wording are not live-verified. Site shows GBP 1,414.98 inc VAT and GBP 1,179.15 ex VAT. F-gas: the extract did not say whether the site restricts sales to F-gas certified buyers (not determinable without opening the page)."
+    },
+    {
+      "manufacturer": "Daikin",
+      "model": "FTXM50R (system)",
+      "description": "Daikin FTXM50R air conditioning system",
+      "isPairKit": true,
+      "priceGbp": 1283.0,
+      "vatIncluded": false,
+      "supplier": "Carlton Services",
+      "url": "https://www.carltonservices.co.uk/product/daikin-ftxm50r-air-conditioning-system/",
+      "observedAt": "2026-10-18",
+      "notes": "Source type: secondary (UK retailer listing), read from a search-engine extract of the page; WebFetch/curl could not reach the page in this sandbox (DNS fail / proxy 403), so price, stock and VAT wording are not live-verified. GBP 1,283.00 ex VAT (about GBP 1,540 inc VAT). The extract said the listing was about 262 days old, so the price may be stale. Outdoor code not stated in extract; 'system' taken from the title. F-gas: the extract did not say whether the site restricts sales to F-gas certified buyers (not determinable without opening the page)."
+    },
+    {
+      "manufacturer": "Daikin",
+      "model": "FTXM50R + RXM50R9",
+      "description": "Perfera 5.0 kW wall-mounted heat pump complete system",
+      "isPairKit": true,
+      "priceGbp": 1332.99,
+      "vatIncluded": null,
+      "supplier": "Rimy",
+      "url": "https://rimy.co.uk/products/daikin-prefera-series-ftxm50r-5-0-kw-wall-mounted-heat-pump-system-for-home-or-office",
+      "observedAt": "2026-10-18",
+      "notes": "Source type: secondary (UK retailer listing), read from a search-engine extract of the page; WebFetch/curl could not reach the page in this sandbox (DNS fail / proxy 403), so price, stock and VAT wording are not live-verified. Sale price; regular price GBP 1,399.99. VAT treatment not stated for this supply listing (Rimy's separate supply-and-install listings say 'VAT-free for domestic customers'). F-gas: the extract did not say whether the site restricts sales to F-gas certified buyers (not determinable without opening the page). fact-check (2026-10-18, adversarial pass): outdoor code UNVERIFIED and inconsistent: every other 5.0 kW Perfera R listing in this file (Air Conditioning World, Orion, Micro-Climate, Tiedex) names RXM50R without a '9', and the Rimy URL slug names no outdoor code. The '9' may have been carried over from Rimy's FTXM35R + RXM35R9 listing. Could not be checked this pass (no web access); see caveats."
+    },
+    {
+      "manufacturer": "Daikin",
+      "model": "FTXM50R / RXM50R",
+      "description": "Perfera 5.0 kW system (London installer's web shop)",
+      "isPairKit": true,
+      "priceGbp": 1500.0,
+      "vatIncluded": null,
+      "supplier": "Micro-Climate",
+      "url": "https://micro-climate.co.uk/daikin-ftxm50r-rxm50r-perfera-5kw",
+      "observedAt": "2026-10-18",
+      "notes": "Source type: secondary (UK retailer listing), read from a search-engine extract of the page; WebFetch/curl could not reach the page in this sandbox (DNS fail / proxy 403), so price, stock and VAT wording are not live-verified. VAT treatment and whether installation is included are not stated in the extract. F-gas: the extract did not say whether the site restricts sales to F-gas certified buyers (not determinable without opening the page)."
+    },
+    {
+      "manufacturer": "Daikin",
+      "model": "FTXM50R + RXM50R (install kit)",
+      "description": "Perfera 5 kW / 17,000 btu wall-mounted inverter heat pump with 'Install Kit'",
+      "isPairKit": true,
+      "priceGbp": 1798.13,
+      "vatIncluded": null,
+      "supplier": "Tiedex",
+      "url": "https://tiedex.co.uk/products/daikin-air-conditioning-ftxm50r-rxm50r-wall-mounted-inverter-heat-pump-5kw-17000btu-install-kit-16261",
+      "observedAt": "2026-10-18",
+      "notes": "Source type: secondary (UK retailer listing), read from a search-engine extract of the page; WebFetch/curl could not reach the page in this sandbox (DNS fail / proxy 403), so price, stock and VAT wording are not live-verified. VAT treatment not stated. 'Install Kit' meaning unconfirmed (likely an install pack, not labour). F-gas: the extract did not say whether the site restricts sales to F-gas certified buyers (not determinable without opening the page)."
+    },
+    {
+      "manufacturer": "Daikin",
+      "model": "FTXF35F / RXF35F",
+      "description": "Sensira 3.5 kW / 12,000 btu wall-mounted system (Wi-Fi optional)",
+      "isPairKit": true,
+      "priceGbp": 636.0,
+      "vatIncluded": true,
+      "supplier": "Basildon ACR",
+      "url": "https://www.basildonacr.co.uk/product/daikin-sensira-air-conditioning-ftxf35d-rxf35d-3-5kw-12000btu-wall-mounted-wifi-optional/",
+      "observedAt": "2026-10-18",
+      "notes": "Source type: secondary (UK retailer listing), read from a search-engine extract of the page; WebFetch/curl could not reach the page in this sandbox (DNS fail / proxy 403), so price, stock and VAT wording are not live-verified. GBP 636.00 inc VAT, shown OUT OF STOCK. The URL slug says FTXF35D/RXF35D (older generation), the title says FTXF35F/RXF35F. The same page quotes installation labour from GBP 385. F-gas: the extract did not say whether the site restricts sales to F-gas certified buyers (not determinable without opening the page)."
+    },
+    {
+      "manufacturer": "Daikin",
+      "model": "FTXF35F / RXF35/1",
+      "description": "Sensira 3.5 kW wall-mounted complete system",
+      "isPairKit": true,
+      "priceGbp": 587.0,
+      "vatIncluded": false,
+      "supplier": "Cooling Company (London)",
+      "url": "https://www.coolingcompany.co.uk/product/daikin-sensira-air-conditioning-ftxf35f-rxf35-1-wall-mounted-complete-system/",
+      "observedAt": "2026-10-18",
+      "notes": "Source type: secondary (UK retailer listing), read from a search-engine extract of the page; WebFetch/curl could not reach the page in this sandbox (DNS fail / proxy 403), so price, stock and VAT wording are not live-verified. GBP 587.00 ex VAT; shown OUT OF STOCK. Outdoor code as written in the title (RXF35/1). F-gas: the extract did not say whether the site restricts sales to F-gas certified buyers (not determinable without opening the page)."
+    },
+    {
+      "manufacturer": "Daikin",
+      "model": "FTXF35E + RXF35E",
+      "description": "Sensira 3.5 kW wall-mounted heat pump complete system (3-year warranty)",
+      "isPairKit": true,
+      "priceGbp": 739.99,
+      "vatIncluded": null,
+      "supplier": "Rimy",
+      "url": "https://rimy.co.uk/products/daikin-sensira-series-ftxf35e-rxf35e-3-5-kw-wall-mounted-heat-pump-complete-system-for-home-or-office",
+      "observedAt": "2026-10-18",
+      "notes": "Source type: secondary (UK retailer listing), read from a search-engine extract of the page; WebFetch/curl could not reach the page in this sandbox (DNS fail / proxy 403), so price, stock and VAT wording are not live-verified. Sale price; regular price GBP 899.99; shown in stock. VAT treatment not stated. E-suffix is an earlier generation than the F-suffix. F-gas: the extract did not say whether the site restricts sales to F-gas certified buyers (not determinable without opening the page)."
+    },
+    {
+      "manufacturer": "Daikin",
+      "model": "FTXF35F / RXF35F",
+      "description": "Sensira 3.5 kW system (London installer's web shop)",
+      "isPairKit": true,
+      "priceGbp": 850.0,
+      "vatIncluded": null,
+      "supplier": "Micro-Climate",
+      "url": "https://micro-climate.co.uk/daikin-sensira-ftxf35f-rxf35f-3-5kw",
+      "observedAt": "2026-10-18",
+      "notes": "Source type: secondary (UK retailer listing), read from a search-engine extract of the page; WebFetch/curl could not reach the page in this sandbox (DNS fail / proxy 403), so price, stock and VAT wording are not live-verified. VAT not stated. The extract also says supply and installation in London 'from GBP 910', which does not reconcile with GBP 850 for equipment alone. Treat as unclear. F-gas: the extract did not say whether the site restricts sales to F-gas certified buyers (not determinable without opening the page)."
+    },
+    {
+      "manufacturer": "Daikin",
+      "model": "FTXF35F",
+      "description": "Sensira 3.5 kW single-split indoor unit only",
+      "isPairKit": false,
+      "priceGbp": 163.2,
+      "vatIncluded": null,
+      "supplier": "City Plumbing",
+      "url": "https://www.cityplumbing.co.uk/p/daikin-sensira-3-5kw-single-split-indoor-unit-ftxf35f/p/296116",
+      "observedAt": "2026-10-18",
+      "notes": "Source type: secondary (UK retailer listing), read from a search-engine extract of the page; WebFetch/curl could not reach the page in this sandbox (DNS fail / proxy 403), so price, stock and VAT wording are not live-verified. Indoor unit only; VAT treatment not stated in extract. A national plumbing merchant with a trade counter. F-gas: the extract did not say whether the site restricts sales to F-gas certified buyers (not determinable without opening the page)."
+    },
+    {
+      "manufacturer": "Mitsubishi Electric",
+      "model": "MSZ-AP35VGK / MUZ-AP35VG",
+      "description": "MSZ-AP 3.5 kW / 12,000 btu R32 wall-mounted system with built-in Wi-Fi",
+      "isPairKit": true,
+      "priceGbp": 875.0,
+      "vatIncluded": true,
+      "supplier": "Air Conditioning World",
+      "url": "https://www.airconditioningworld.co.uk/mitsubishi-electric-msz-ap35vgk-muz-ap35vg-3-5kw-",
+      "observedAt": "2026-10-18",
+      "notes": "Source type: secondary (UK retailer listing), read from a search-engine extract of the page; WebFetch/curl could not reach the page in this sandbox (DNS fail / proxy 403), so price, stock and VAT wording are not live-verified. Price includes VAT. Wi-Fi interface standard (the 'K' suffix). F-gas: the extract did not say whether the site restricts sales to F-gas certified buyers (not determinable without opening the page)."
+    },
+    {
+      "manufacturer": "Mitsubishi Electric",
+      "model": "MSZ-AP35VG / MUZ-AP35VG",
+      "description": "MSZ-AP 3.5 kW / 12,000 btu inverter heat pump wall-mounted system (no built-in Wi-Fi)",
+      "isPairKit": true,
+      "priceGbp": 829.0,
+      "vatIncluded": true,
+      "supplier": "Air Conditioning World",
+      "url": "https://www.airconditioningworld.co.uk/mitsubishi-electric-msz-ap35vg-muz-ap35vg-3-5kw-",
+      "observedAt": "2026-10-18",
+      "notes": "Source type: secondary (UK retailer listing), read from a search-engine extract of the page; WebFetch/curl could not reach the page in this sandbox (DNS fail / proxy 403), so price, stock and VAT wording are not live-verified. Price includes VAT. F-gas: the extract did not say whether the site restricts sales to F-gas certified buyers (not determinable without opening the page)."
+    },
+    {
+      "manufacturer": "Mitsubishi Electric",
+      "model": "MSZ-AP35VGK",
+      "description": "Elegance Wall AP series 3.5 kW",
+      "isPairKit": true,
+      "priceGbp": 976.5,
+      "vatIncluded": true,
+      "supplier": "Avon Air",
+      "url": "https://avonair.co.uk/product/mitsubishi-electric-elegance-wall-ap-series-air-conditioning-msz-ap35vgk-3-5kw/",
+      "observedAt": "2026-10-18",
+      "notes": "Source type: secondary (UK retailer listing), read from a search-engine extract of the page; WebFetch/curl could not reach the page in this sandbox (DNS fail / proxy 403), so price, stock and VAT wording are not live-verified. GBP 976.50 inc VAT. The title gives only the indoor code; isPairKit=true is inferred from the price level and is NOT confirmed. F-gas: the extract did not say whether the site restricts sales to F-gas certified buyers (not determinable without opening the page). fact-check (2026-10-18, adversarial pass): the original '(about 3x a single indoor unit)' basis was REMOVED as unsourced: no MSZ-AP35VGK indoor-only price exists in this file or in docs/research/data/mitsubishi.json. The only sourced support for reading this as a pair is that GBP 976.50 is GBP 101.50 above Air Conditioning World's explicit MSZ-AP35VGK/MUZ-AP35VG pair (GBP 875 inc VAT) and far above any indoor-only price in this file. Confirm on the page whether the MUZ-AP35VG outdoor is included. Price itself not re-verified: this pass had no web access (shared WebSearch budget already exhausted, WebFetch DNS failure and curl proxy 403 on every domain tried).",
+      "confidence": "provisional"
+    },
+    {
+      "manufacturer": "Mitsubishi Electric",
+      "model": "MSZ-AP35VGK (system)",
+      "description": "MSZ-AP35VGK wall 3.5 kW / 12,000 btu heat pump R32 A+++",
+      "isPairKit": true,
+      "priceGbp": 1109.87,
+      "vatIncluded": true,
+      "supplier": "Orion Air Sales",
+      "url": "https://www.orionairsales.co.uk/mitsubishi-electric-air-conditioning-msz-ap35vgk-wall-35kw12000btu-heat-pump-r32-a-240v50hz-9559-p.asp",
+      "observedAt": "2026-10-18",
+      "notes": "Source type: secondary (UK retailer listing), read from a search-engine extract of the page; WebFetch/curl could not reach the page in this sandbox (DNS fail / proxy 403), so price, stock and VAT wording are not live-verified. GBP 1,109.87 inc VAT / GBP 924.89 ex VAT. The page says this model has been replaced by MSZ-AY35VGK. isPairKit inferred from title/price. F-gas: the extract did not say whether the site restricts sales to F-gas certified buyers (not determinable without opening the page)."
+    },
+    {
+      "manufacturer": "Mitsubishi Electric",
+      "model": "MSZ-AP35VGK (install kit)",
+      "description": "MSZ-AP35VGK wall-mounted 3.5 kW / 12,000 btu R32 with 'Install Kit'",
+      "isPairKit": true,
+      "priceGbp": 1353.72,
+      "vatIncluded": true,
+      "supplier": "Orion Air Sales",
+      "url": "https://www.orionairsales.co.uk/mitsubishi-electric-air-conditioning-msz-ap35vgk-wall-mounted-35kw12000btu-r32-install-kit-11327-p.asp",
+      "observedAt": "2026-10-18",
+      "notes": "Source type: secondary (UK retailer listing), read from a search-engine extract of the page; WebFetch/curl could not reach the page in this sandbox (DNS fail / proxy 403), so price, stock and VAT wording are not live-verified. GBP 1,353.72 inc VAT / GBP 1,128.10 ex VAT. 'Install Kit' meaning unconfirmed (likely the system plus an install pack). About GBP 203 ex VAT more than Orion's plain listing. F-gas: the extract did not say whether the site restricts sales to F-gas certified buyers (not determinable without opening the page)."
+    },
+    {
+      "manufacturer": "Mitsubishi Electric",
+      "model": "MSZ-AP35VGK",
+      "description": "M Series MSZ-AP35VGK R32 air conditioner",
+      "isPairKit": true,
+      "priceGbp": 890.55,
+      "vatIncluded": false,
+      "supplier": "SWAT Engineering",
+      "url": "https://www.swatengineering.co.uk/shop/mitsubishi-m-series-air-conditioner-msz-ap35vgk-r32",
+      "observedAt": "2026-10-18",
+      "notes": "Source type: secondary (UK retailer listing), read from a search-engine extract of the page; WebFetch/curl could not reach the page in this sandbox (DNS fail / proxy 403), so price, stock and VAT wording are not live-verified. Listed as a price range, GBP 890.55-937.55 ex VAT (options not identified in extract); the lower bound is recorded. isPairKit inferred from the price level, NOT confirmed. F-gas: the extract did not say whether the site restricts sales to F-gas certified buyers (not determinable without opening the page). fact-check (2026-10-18, adversarial pass): listing reliability in doubt: docs/research/data/mitsubishi.json found this same SWAT page gives SEER 7.2 / SCOP 4.4 and 195 mm depth for MSZ-AP35VGK, which conflict with the other sources there (Orion: SEER 8.60 / SCOP 4.70; 219 mm depth); mitsubishi.json reads the 7.2/4.4 as the AP50 rating. The unidentified price options may therefore span sizes or variants. Not checkable this pass (no web access); see caveats."
+    }
+  ],
+  "summary": [
+    {
+      "manufacturer": "Daikin",
+      "series": "Perfera FTXM-R",
+      "sizeKw": 2.5,
+      "configuration": "pair (indoor+outdoor)",
+      "minExVatGbp": 890.83,
+      "maxExVatGbp": 890.83,
+      "n": 1,
+      "suppliers": [
+        "Air Conditioning World"
+      ],
+      "notes": "Ex-VAT figures use the supplier's own ex-VAT price where shown; otherwise VAT-inclusive prices are divided by 1.2 (20% UK standard rate). Only one observation, so this is not a range."
+    },
+    {
+      "manufacturer": "Daikin",
+      "series": "Perfera FTXM-R",
+      "sizeKw": 2.5,
+      "configuration": "indoor unit only",
+      "minExVatGbp": 224.17,
+      "maxExVatGbp": 224.17,
+      "n": 1,
+      "suppliers": [
+        "Air Conditioning World"
+      ],
+      "notes": "Ex-VAT figures use the supplier's own ex-VAT price where shown; otherwise VAT-inclusive prices are divided by 1.2 (20% UK standard rate). Only one observation, so this is not a range."
+    },
+    {
+      "manufacturer": "Daikin",
+      "series": "Perfera FTXM-R",
+      "sizeKw": 3.5,
+      "configuration": "pair (indoor+outdoor)",
+      "minExVatGbp": 912.88,
+      "maxExVatGbp": 1029.17,
+      "n": 3,
+      "suppliers": [
+        "Air Conditioning World",
+        "Avon Air",
+        "Orion Air Sales"
+      ],
+      "notes": "Ex-VAT figures use the supplier's own ex-VAT price where shown; otherwise VAT-inclusive prices are divided by 1.2 (20% UK standard rate). Excluded (VAT treatment unknown): Micro-Climate GBP 1200.00."
+    },
+    {
+      "manufacturer": "Daikin",
+      "series": "Perfera FTXM-R",
+      "sizeKw": 3.5,
+      "configuration": "indoor unit only",
+      "minExVatGbp": 254.17,
+      "maxExVatGbp": 305.8,
+      "n": 2,
+      "suppliers": [
+        "Air Conditioning World",
+        "HVAC-Sanitary"
+      ],
+      "notes": "Ex-VAT figures use the supplier's own ex-VAT price where shown; otherwise VAT-inclusive prices are divided by 1.2 (20% UK standard rate)."
+    },
+    {
+      "manufacturer": "Daikin",
+      "series": "Perfera FTXM-R",
+      "sizeKw": 5.0,
+      "configuration": "pair (indoor+outdoor)",
+      "minExVatGbp": 1179.15,
+      "maxExVatGbp": 1370.83,
+      "n": 3,
+      "suppliers": [
+        "Air Conditioning World",
+        "Carlton Services",
+        "Orion Air Sales"
+      ],
+      "notes": "Ex-VAT figures use the supplier's own ex-VAT price where shown; otherwise VAT-inclusive prices are divided by 1.2 (20% UK standard rate). Excluded (VAT treatment unknown): Rimy GBP 1332.99; Micro-Climate GBP 1500.00."
+    },
+    {
+      "manufacturer": "Daikin",
+      "series": "Sensira FTXF",
+      "sizeKw": 3.5,
+      "configuration": "pair (indoor+outdoor)",
+      "minExVatGbp": 530.0,
+      "maxExVatGbp": 587.0,
+      "n": 2,
+      "suppliers": [
+        "Basildon ACR",
+        "Cooling Company (London)"
+      ],
+      "notes": "Ex-VAT figures use the supplier's own ex-VAT price where shown; otherwise VAT-inclusive prices are divided by 1.2 (20% UK standard rate). Excluded (VAT treatment unknown): Rimy GBP 739.99; Micro-Climate GBP 850.00."
+    },
+    {
+      "manufacturer": "Daikin",
+      "series": "Sensira FTXF",
+      "sizeKw": 3.5,
+      "configuration": "indoor unit only",
+      "minExVatGbp": null,
+      "maxExVatGbp": null,
+      "n": 0,
+      "suppliers": [],
+      "notes": "Ex-VAT figures use the supplier's own ex-VAT price where shown; otherwise VAT-inclusive prices are divided by 1.2 (20% UK standard rate). Excluded (VAT treatment unknown): City Plumbing GBP 163.20. No VAT-known observation."
+    },
+    {
+      "manufacturer": "Mitsubishi Electric",
+      "series": "MSZ-AP",
+      "sizeKw": 3.5,
+      "configuration": "pair (indoor+outdoor)",
+      "minExVatGbp": 690.83,
+      "maxExVatGbp": 924.89,
+      "n": 5,
+      "suppliers": [
+        "Air Conditioning World",
+        "Avon Air",
+        "Orion Air Sales",
+        "SWAT Engineering"
+      ],
+      "notes": "Ex-VAT figures use the supplier's own ex-VAT price where shown; otherwise VAT-inclusive prices are divided by 1.2 (20% UK standard rate)."
+    },
+    {
+      "manufacturer": "Mitsubishi Electric",
+      "series": "MSZ-AP",
+      "sizeKw": 3.5,
+      "configuration": "pair + 'install kit'",
+      "minExVatGbp": 1128.1,
+      "maxExVatGbp": 1128.1,
+      "n": 1,
+      "suppliers": [
+        "Orion Air Sales"
+      ],
+      "notes": "Ex-VAT figures use the supplier's own ex-VAT price where shown; otherwise VAT-inclusive prices are divided by 1.2 (20% UK standard rate). Only one observation, so this is not a range."
+    },
+    {
+      "manufacturer": "Panasonic",
+      "series": "TZ / Etherea (CS-TZ/CS-Z)",
+      "sizeKw": 2.5,
+      "configuration": "any",
+      "minExVatGbp": null,
+      "maxExVatGbp": null,
+      "n": 0,
+      "suppliers": [],
+      "notes": "NO DATA: not covered before the shared web-search budget ran out (and no page could be fetched directly). Needs a follow-up pass."
+    },
+    {
+      "manufacturer": "Panasonic",
+      "series": "TZ / Etherea (CS-TZ/CS-Z)",
+      "sizeKw": 3.5,
+      "configuration": "any",
+      "minExVatGbp": null,
+      "maxExVatGbp": null,
+      "n": 0,
+      "suppliers": [],
+      "notes": "NO DATA: not covered before the shared web-search budget ran out (and no page could be fetched directly). Needs a follow-up pass."
+    },
+    {
+      "manufacturer": "Panasonic",
+      "series": "TZ / Etherea (CS-TZ/CS-Z)",
+      "sizeKw": 5.0,
+      "configuration": "any",
+      "minExVatGbp": null,
+      "maxExVatGbp": null,
+      "n": 0,
+      "suppliers": [],
+      "notes": "NO DATA: not covered before the shared web-search budget ran out (and no page could be fetched directly). Needs a follow-up pass."
+    },
+    {
+      "manufacturer": "Daikin",
+      "series": "Stylish FTXA",
+      "sizeKw": 2.5,
+      "configuration": "any",
+      "minExVatGbp": null,
+      "maxExVatGbp": null,
+      "n": 0,
+      "suppliers": [],
+      "notes": "NO DATA: not covered before the shared web-search budget ran out (and no page could be fetched directly). Needs a follow-up pass."
+    },
+    {
+      "manufacturer": "Daikin",
+      "series": "Stylish FTXA",
+      "sizeKw": 3.5,
+      "configuration": "any",
+      "minExVatGbp": null,
+      "maxExVatGbp": null,
+      "n": 0,
+      "suppliers": [],
+      "notes": "NO DATA: not covered before the shared web-search budget ran out (and no page could be fetched directly). Needs a follow-up pass."
+    },
+    {
+      "manufacturer": "Daikin",
+      "series": "Stylish FTXA",
+      "sizeKw": 5.0,
+      "configuration": "any",
+      "minExVatGbp": null,
+      "maxExVatGbp": null,
+      "n": 0,
+      "suppliers": [],
+      "notes": "NO DATA: not covered before the shared web-search budget ran out (and no page could be fetched directly). Needs a follow-up pass."
+    },
+    {
+      "manufacturer": "Daikin",
+      "series": "Multi 2MXM/3MXM/4MXM outdoor",
+      "sizeKw": null,
+      "configuration": "any",
+      "minExVatGbp": null,
+      "maxExVatGbp": null,
+      "n": 0,
+      "suppliers": [],
+      "notes": "NO DATA: not covered before the shared web-search budget ran out (and no page could be fetched directly). Needs a follow-up pass."
+    },
+    {
+      "manufacturer": "Daikin",
+      "series": "Sensira FTXF",
+      "sizeKw": 2.5,
+      "configuration": "any",
+      "minExVatGbp": null,
+      "maxExVatGbp": null,
+      "n": 0,
+      "suppliers": [],
+      "notes": "NO DATA: not covered before the shared web-search budget ran out (and no page could be fetched directly). Needs a follow-up pass."
+    },
+    {
+      "manufacturer": "Daikin",
+      "series": "Sensira FTXF",
+      "sizeKw": 5.0,
+      "configuration": "any",
+      "minExVatGbp": null,
+      "maxExVatGbp": null,
+      "n": 0,
+      "suppliers": [],
+      "notes": "NO DATA: not covered before the shared web-search budget ran out (and no page could be fetched directly). Needs a follow-up pass."
+    },
+    {
+      "manufacturer": "Mitsubishi Electric",
+      "series": "MSZ-AP",
+      "sizeKw": 2.5,
+      "configuration": "any",
+      "minExVatGbp": null,
+      "maxExVatGbp": null,
+      "n": 0,
+      "suppliers": [],
+      "notes": "NO DATA: not covered before the shared web-search budget ran out (and no page could be fetched directly). Needs a follow-up pass."
+    },
+    {
+      "manufacturer": "Mitsubishi Electric",
+      "series": "MSZ-AP",
+      "sizeKw": 5.0,
+      "configuration": "any",
+      "minExVatGbp": null,
+      "maxExVatGbp": null,
+      "n": 0,
+      "suppliers": [],
+      "notes": "NO DATA: not covered before the shared web-search budget ran out (and no page could be fetched directly). Needs a follow-up pass."
+    },
+    {
+      "manufacturer": "Mitsubishi Electric",
+      "series": "MSZ-HR / MSZ-LN",
+      "sizeKw": 2.5,
+      "configuration": "any",
+      "minExVatGbp": null,
+      "maxExVatGbp": null,
+      "n": 0,
+      "suppliers": [],
+      "notes": "NO DATA: not covered before the shared web-search budget ran out (and no page could be fetched directly). Needs a follow-up pass."
+    },
+    {
+      "manufacturer": "Mitsubishi Electric",
+      "series": "MSZ-HR / MSZ-LN",
+      "sizeKw": 3.5,
+      "configuration": "any",
+      "minExVatGbp": null,
+      "maxExVatGbp": null,
+      "n": 0,
+      "suppliers": [],
+      "notes": "NO DATA: not covered before the shared web-search budget ran out (and no page could be fetched directly). Needs a follow-up pass."
+    },
+    {
+      "manufacturer": "Mitsubishi Electric",
+      "series": "MSZ-HR / MSZ-LN",
+      "sizeKw": 5.0,
+      "configuration": "any",
+      "minExVatGbp": null,
+      "maxExVatGbp": null,
+      "n": 0,
+      "suppliers": [],
+      "notes": "NO DATA: not covered before the shared web-search budget ran out (and no page could be fetched directly). Needs a follow-up pass."
+    },
+    {
+      "manufacturer": "Mitsubishi Electric",
+      "series": "MXZ multi outdoor",
+      "sizeKw": null,
+      "configuration": "any",
+      "minExVatGbp": null,
+      "maxExVatGbp": null,
+      "n": 0,
+      "suppliers": [],
+      "notes": "NO DATA: not covered before the shared web-search budget ran out (and no page could be fetched directly). Needs a follow-up pass."
+    }
+  ],
+  "caveats": [
+    "Research method limit: WebFetch failed with DNS errors on every domain (including en.wikipedia.org), and curl got proxy 403. Every price here comes from search-engine extracts of UK retailer pages, not from a live page load. The extracts are machine summaries, so a figure may be mis-transcribed or stale. Open each URL to confirm before relying on it.",
+    "'observedAt' is the research date (2026-10-18). The date the search engine indexed each page is unknown and may be months earlier. One listing (Carlton Services) was flagged as about 262 days old.",
+    "The shared web-search budget (200 calls across all agents in this run) ran out after 7 searches by this agent. Panasonic (TZ, Etherea), Daikin Stylish, Daikin 2MXM/3MXM/4MXM, Mitsubishi MSZ-HR, MSZ-LN, MXZ, and the 2.5/5.0 kW sizes for Sensira and MSZ-AP were NOT researched. They have no observations, and their summary rows are null.",
+    "Panasonic: the only UK distributor seen (Oceanair UK, e.g. https://www.oceanairuk.com/products/panasonic-etherea-cu-z35zke-single-split-outdoor-unit-r32-3-5kw) hides prices behind a trade login; its listing says the outdoor unit must be installed by an F-gas certified installer. All other Panasonic prices found were EU (EUR) retailers, which are not recorded here.",
+    "Generations: several observed models may be superseded or end-of-line. Daikin Perfera FTXM-R has an FTXM-A successor (see docs/research/data/daikin.json). Orion says MSZ-AP35VGK is replaced by MSZ-AY35VGK. Sensira listings mix D/E/F suffixes. Prices for current-generation units may differ. Confirm the shippable model code with the distributor.",
+    "F-gas: no extract said whether a site limits sales to F-gas certified buyers, so every observation records it as not determinable. Background (not verified in this session): GB F-gas rules restrict selling non-hermetically-sealed split equipment to end users unless certified installation is evidenced, so expect online sellers to ask for an F-gas / REFCOM certificate number or installer details at checkout. Fact-check 2026-10-18: still UNVERIFIED (legislation.gov.uk unreachable, search budget exhausted). The provision this is believed to rest on is Article 11(5) of Regulation (EU) No 517/2014 as retained in GB law (non-hermetically sealed equipment charged with F-gases sold to an end user only with evidence that a certified undertaking will install it). docs/research/commissioning-standards.md also grades this unverified. Confirm the current GB text at https://www.legislation.gov.uk/eur/2014/517/contents and check for any 2025-2026 GB F-gas amendment before building a checkout or purchasing rule on it.",
+    "'isPairKit' is inferred from titles and price levels for Avon Air (MSZ-AP35VGK), Orion (MSZ-AP35VGK), SWAT Engineering and Carlton Services; their titles name only the indoor model. 'Install Kit' listings (Orion, Tiedex) are not defined in the extracts and are kept out of the plain-pair ranges.",
+    "VAT: vatIncluded=null means the extract did not show the VAT treatment; those rows are left out of the summary ranges. Where an inc-VAT price was the only figure, ex-VAT = price/1.2 (20% UK standard rate). Supply-only equipment bought by a VAT-registered installer carries 20% VAT; the 0% domestic rate for energy-saving materials applies to installed supply, not to equipment the trade buys. Fact-check 2026-10-18: CONFIRMED in substance against VATA 1994 Sch 8 Group 23 Item 2 ('Relevant supplies of energy-saving materials by a person who installs those materials', https://www.legislation.gov.uk/ukpga/1994/23/schedule/8/part/II/group/23, as quoted in docs/research/uk-consumer-legal.md). Three qualifications: (1) the 0% rate covers supplies made before 1 April 2027, and 5% applies from 1 April 2027 (Sch 7A Group 2, https://www.legislation.gov.uk/ukpga/1994/23/schedule/7A/part/2/group/2), so Rimy's 'VAT-free for domestic customers' is time-limited; (2) whether an air-to-air unit counts as an 'air source heat pump' rests on HMRC's VENSAV3080 view as quoted by secondary sources; (3) supply-only equipment carries 20% VAT whoever buys it, and VAT registration only decides whether the installer can recover it.",
+    "These are public retail/e-commerce prices. Trade account prices from distributors (e.g. Climate Center, Oceanair, Wolseley, City Plumbing trade) are usually lower and were not captured. Do not treat these figures as the installer's cost price.",
+    "Installed-price context, not included as observations: Rimy lists supply and installation of the Daikin FTXM35R + RXM35R9 at GBP 2,549.99, regular GBP 2,699.99, 'VAT-free for domestic customers' (https://rimy.co.uk/products/supply-installation-of-daikin-prefera-series-ftxm35r-rxm35r9-3-5-kw-wall-mounted-for-home-or-office-upto-25m-br-br-vat-free-for-domestic-customers). Air Con Adviser (secondary) reports Costco UK installed packages at GBP 1,849.99 (2.5 kW) and GBP 1,899.99 (3.5 kW) for members (https://airconadviser.co.uk/products/wall-mounted-split-systems/daikin-sensira-ftxf). Basildon ACR quotes install labour from GBP 385 (https://www.basildonacr.co.uk/product/daikin-sensira-air-conditioning-ftxf35d-rxf35d-3-5kw-12000btu-wall-mounted-wifi-optional/).",
+    "Aggregator prices left out as unreliable: Skinflint lists 'Daikin Perfera FTXM-R (FTXM50R) from GBP 746.59 (2024)', with indoor vs set unclear (https://skinflint.co.uk/daikin-perfera-ftxm-r-ftxm50r-a2723457.html). e-catalog lists the Sensira FTXF35F/RXF35F 'from GBP 330.99', out of stock (https://e-catalog.co.uk/DAIKIN-SENSIRA-FTXF35F-RXF35F.htm).",
+    "Incidental Daikin prices in docs/research/data/daikin.json (corrected by fact-check 2026-10-18: the earlier version of this caveat said they had no source URL, which is wrong, since daikin.json cites a URL for each). City Plumbing RXF50F Sensira 5.0 kW outdoor unit only, about GBP 820, VAT basis not stated (https://www.cityplumbing.co.uk/p/daikin-sensira-5-0kw-outdoor-unit-rxf50f/p/296079). Basildon ACR FTXF50F/RXF50F pair, about GBP 830 inc VAT; the URL slug says FTXF50D/RXF50D (https://www.basildonacr.co.uk/product/daikin-sensira-wall-mounted-air-conditioning-ftxf50d-rxf50d-5-0kw-18000btu-a-inverter-wifi-optional/). Aircon Spares FTXM25A/RXM25A9 Perfera (current A generation) 2.5 kW pair, about GBP 996 inc VAT (https://www.airconspares.com/products/daikin-perfera-2-5kw-9000-btu-wall-mounted-air-conditioning-system). They are still not added as observations because daikin.json records only rounded ('~') figures; open the URLs and add exact prices. They would fill the empty Sensira 5.0 kW and Perfera-A 2.5 kW rows.",
+    "Fact-check pass 2026-10-18 (adversarial): NO PRICE could be independently re-verified. The run's shared WebSearch budget (200 calls) was already exhausted before the first fact-check search, and WebFetch (DNS) and curl (proxy 403) failed for every domain tried: airconditioningworld.co.uk, orionairsales.co.uk, daikin.co.uk, les.mitsubishielectric.co.uk, legislation.gov.uk, gov.uk. The installed-price anchors repeated in docs/research/commissioning-standards.md and docs/research/data/commissioning-defaults.json cite the same URLs from the same run, so they are not independent confirmation. Every observed price remains secondary and unverified.",
+    "Fact-check 2026-10-18, claims CONFIRMED by cross-checking other repo research (secondary, not live): Perfera FTXM-R has an FTXM-A successor (daikin.json cites Daikin UK FTXM-A pages and 2025 Lot 10 labels); FTXM35R is multi-split capable (Daikin Lot 10 fiche FTXM20R5V1B / FTXM35R5V1B / 2MXM40A2V1B9 in daikin.json); Sensira FTXF-E/D are older than FTXF-F (daikin.json); MSZ-AP 'VGK' units have built-in Wi-Fi and MSZ-AY replaces MSZ-AP at 2.5-5.0 kW in the UK (mitsubishi.json); Panasonic has no GBP price anywhere in the repo, so its rows stay null (panasonic.json). All ex-VAT figures, inc/ex pairs and summary min/max/n were recomputed and match.",
+    "Capacity and btu labels: the kW and btu figures in 'description' are retailer size-class labels, not rated capacities. Examples: Daikin's FTXF35F nominal cooling is 3.3 kW against a 3.5 kW label design capacity (daikin.json); Micro-Climate titles FTXM35R as '3.4 kW'; '18,000 btu' for 5.0 kW is about 5.5% above the converted 17,060 btu/h. Take capacities from daikin.json or mitsubishi.json, not from this file.",
+    "Open question (fact-check): Rimy's FTXM50R pairing is recorded as RXM50R9, while every other 5.0 kW Perfera R listing names RXM50R. Confirm on https://rimy.co.uk/products/daikin-prefera-series-ftxm50r-5-0-kw-wall-mounted-heat-pump-system-for-home-or-office whether an RXM50R9 exists, and whether Avon Air's RXM35R (no '9') is a different outdoor from the RXM35R9 sold by Air Conditioning World and Orion. The Perfera 3.5 kW pair summary currently mixes both.",
+    "Open question (fact-check): SWAT Engineering's MSZ-AP35VGK listing has conflicting spec data (see mitsubishi.json) and an unidentified GBP 890.55-937.55 option range. Confirm that the GBP 890.55 lower bound is the 3.5 kW pair before keeping it in the MSZ-AP 3.5 kW summary range."
+  ]
+}

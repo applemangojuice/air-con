@@ -33,7 +33,7 @@ export default function ErrorPage({
         <button
           type="button"
           onClick={reset}
-          className="rounded-full bg-accent-600 px-6 py-3 font-semibold text-white shadow-sm transition hover:bg-accent-700"
+          className="rounded-full bg-accent-700 px-6 py-3 font-semibold text-white shadow-sm transition hover:bg-accent-800"
         >
           Try again
         </button>

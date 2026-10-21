@@ -3,6 +3,8 @@ import type { Metadata } from "next";
 import { healthReport } from "@/lib/health";
 import { appUrl } from "@/lib/brand";
 import { getServiceClient } from "@/lib/supabase-server";
+import { requireStaff } from "@/lib/auth/server";
+import { goLiveChecks, type GoLiveCheck } from "@/lib/ops-core-server";
 
 export const metadata: Metadata = {
   title: "Launch readiness · ops",
@@ -23,6 +25,8 @@ interface Check {
   ok: boolean;
   detail: string;
   fix?: string;
+  /** Nice to have, never a reason to hold the pilots back: shown, not counted. */
+  optional?: boolean;
 }
 
 async function liveChecks(): Promise<{ checks: Check[]; score: number; total: number }> {
@@ -39,26 +43,28 @@ async function liveChecks(): Promise<{ checks: Check[]; score: number; total: nu
         ? "All tables present."
         : `Missing: ${report.tables.filter((t) => !t.ok).map((t) => t.table).join(", ")}`
       : "SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY not set — demo mode, nothing saves.",
-    fix: "Run supabase/migrations 0001→0008 in the SQL editor; check /ops/status.",
+    fix: "In the Supabase SQL editor, run supabase/pilot-upgrade.sql (a brand-new database: 0001 to 0009 from supabase/migrations first); check /ops/status.",
   });
 
   checks.push({
-    label: "Photo & video storage buckets",
+    label: "Photo, video & project media buckets",
     ok: report.buckets.every((b) => b.ok),
     detail: report.buckets.every((b) => b.ok)
-      ? "Both buckets present."
-      : "Missing bucket — photo uploads will fail with 'invalid path'.",
-    fix: "Migration 0001 creates survey-photos; 0004 creates survey-videos.",
+      ? "All buckets present."
+      : `Missing: ${report.buckets.filter((b) => !b.ok).map((b) => b.bucket).join(", ")}. Uploads there fail with 'invalid path'.`,
+    fix: "Migration 0001 creates survey-photos, 0004 survey-videos, 0010 project-media.",
   });
 
   const env = (k: string) => report.env.find((e) => e.key === k)?.set ?? false;
   checks.push({
-    label: "Ops console password",
-    ok: env("OPS_PASSWORD"),
-    detail: env("OPS_PASSWORD")
-      ? "Set — /ops is gated."
-      : "NOT SET: anyone with the URL can read leads, bookings and traffic.",
-    fix: "Set OPS_PASSWORD in Vercel env vars and redeploy.",
+    label: "Staff sign-in",
+    ok: env("SESSION_SECRET") && env("ADMIN_EMAILS"),
+    detail: !env("SESSION_SECRET")
+      ? "SESSION_SECRET NOT SET (or under 32 characters): nobody can sign in to /ops or /field in production."
+      : env("ADMIN_EMAILS")
+        ? "Sessions are signed; the first sign-in from an ADMIN_EMAILS address becomes admin."
+        : "Sessions are signed, but ADMIN_EMAILS is empty, so there's no way to create the first admin.",
+    fix: "Set SESSION_SECRET (`openssl rand -hex 32`) and ADMIN_EMAILS in Vercel env vars and redeploy.",
   });
 
   checks.push({
@@ -71,12 +77,12 @@ async function liveChecks(): Promise<{ checks: Check[]; score: number; total: nu
   });
 
   checks.push({
-    label: "Automations (follow-up nudge + daily digest)",
+    label: "Scheduled jobs (daily ops, morning digest, follow-up nudge)",
     ok: env("CRON_SECRET"),
     detail: env("CRON_SECRET")
-      ? "CRON_SECRET set — Vercel crons will authenticate."
-      : "Not set: abandoned-quote follow-ups and the daily digest won't run.",
-    fix: "Set CRON_SECRET (any long random string) in Vercel.",
+      ? "CRON_SECRET set: Vercel's scheduled jobs will authenticate."
+      : "Not set: no survey or day-before reminders, no proposal expiry, no outbox retries, no aftercare, no digest, no follow-up nudge.",
+    fix: "Set CRON_SECRET (`openssl rand -hex 32`) in Vercel and redeploy.",
   });
 
   checks.push({
@@ -91,22 +97,25 @@ async function liveChecks(): Promise<{ checks: Check[]; score: number; total: nu
   if (supabase) {
     const { count: propertyCount } = await supabase
       .from("properties")
-      .select("*", { count: "exact", head: true });
+      .select("*", { count: "exact" })
+      .limit(0);
     checks.push({
       label: "Property intelligence has data",
       ok: (propertyCount ?? 0) > 0,
       detail:
         (propertyCount ?? 0) > 0
-          ? `${(propertyCount ?? 0).toLocaleString("en-GB")} properties in the book.`
+          ? `${String(propertyCount ?? 0).replace(/\B(?=(\d{3})+(?!\d))/g, ",")} properties in the book.`
           : "Empty — address prefill and per-address pages have nothing to serve.",
       fix: "Seed the sample book on /ops/intel, or run the EPC importer (docs/loading-data.md).",
+      optional: true,
     });
 
     const dayAgo = new Date(Date.now() - 24 * 3600_000).toISOString();
     const { count: eventCount } = await supabase
       .from("analytics_events")
-      .select("*", { count: "exact", head: true })
-      .gte("created_at", dayAgo);
+      .select("*", { count: "exact" })
+      .gte("created_at", dayAgo)
+      .limit(0);
     checks.push({
       label: "Analytics receiving events",
       ok: (eventCount ?? 0) > 0,
@@ -115,11 +124,12 @@ async function liveChecks(): Promise<{ checks: Check[]; score: number; total: nu
           ? `${eventCount} events in the last 24h.`
           : "No events in 24h — either no traffic yet, or the beacon isn't reaching the database.",
       fix: "Visit the site once and refresh; if still zero, check /ops/status for the analytics_events table.",
+      optional: true,
     });
   }
 
-  const score = checks.filter((c) => c.ok).length;
-  return { checks, score, total: checks.length };
+  const counted = checks.filter((c) => !c.optional);
+  return { checks, score: counted.filter((c) => c.ok).length, total: counted.length };
 }
 
 /** The launch-day items only a human can do, with the exact verification. */
@@ -138,7 +148,7 @@ const MANUAL: { label: string; how: string }[] = [
   },
   {
     label: "Run the automated funnel test against production",
-    how: "BASE_URL=https://your-domain pnpm --filter @aircon/web test:e2e — all seven checks green.",
+    how: "BASE_URL=https://your-domain pnpm --filter @aircon/web test:e2e — it ends with every check passed.",
   },
   {
     label: "Share preview looks right",
@@ -155,11 +165,22 @@ const MANUAL: { label: string; how: string }[] = [
 ];
 
 export default async function LaunchPage() {
-  const { checks, score, total } = await liveChecks();
-  const ready = score === total;
+  await requireStaff("settings.edit");
+  const [{ checks, score, total }, pilot] = await Promise.all([
+    liveChecks(),
+    goLiveChecks().catch((err) => {
+      console.error("[launch] go-live checks failed:", err);
+      return null;
+    }),
+  ]);
+  // The headline is the pilot checklist (what the founders' guide says to make green), not the
+  // older live score, which also counts marketing extras the pilots don't need.
+  const red = pilot ? pilot.filter((c) => c.level === "red").length : total - score;
+  const amber = pilot ? pilot.filter((c) => c.level === "amber").length : 0;
+  const ready = red === 0 && score === total;
 
   return (
-    <main className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
+    <main className="mx-auto w-full min-w-0 max-w-4xl px-4 py-10 sm:px-6">
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-display">Launch readiness</h1>
@@ -178,26 +199,42 @@ export default async function LaunchPage() {
         }`}
       >
         <p className={`text-3xl font-display ${ready ? "text-sage-800" : "text-amber-800"}`}>
-          {score}/{total} automated checks green
+          {red > 0
+            ? `${red} to fix before real customers`
+            : score < total
+              ? `${total - score} live check${total - score === 1 ? "" : "s"} to fix`
+              : amber > 0
+                ? `Ready, with ${amber} to check`
+                : "Ready for real customers"}
         </p>
         <p className={`mt-1 text-sm ${ready ? "text-sage-700" : "text-amber-700"}`}>
           {ready
-            ? "The platform side is ready. Walk the manual list below and go."
-            : "Fix the red rows below first — each one is customer-visible."}
+            ? `The platform side is ready${amber > 0 ? ": the amber rows can go live knowingly" : ""}. Walk the human checks at the bottom and go.`
+            : "Work down the red rows below first: each one is customer-visible. Amber rows can go live knowingly."}
         </p>
       </div>
 
+      <PilotChecklist checks={pilot} />
+
       <section className="mt-8">
-        <h2 className="mb-3 text-lg font-display">Checked live, right now</h2>
+        <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="text-lg font-display">Checked live, right now</h2>
+          <p className="text-sm text-ink-500">
+            {score} of {total} green
+          </p>
+        </div>
         <div className="divide-y divide-line rounded-2xl border border-line">
           {checks.map((c) => (
             <div key={c.label} className="flex items-start gap-3 px-4 py-3">
               <span
                 aria-hidden
-                className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${c.ok ? "bg-sage-500" : "bg-red-500"}`}
+                className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${c.ok ? "bg-sage-500" : c.optional ? "bg-ink-300" : "bg-red-500"}`}
               />
               <div className="min-w-0 flex-1">
-                <p className="font-semibold">{c.label}</p>
+                <p className="font-semibold">
+                  {c.label}
+                  {c.optional && <span className="ml-2 text-xs font-normal text-ink-500">Optional: the pilots don&apos;t need it</span>}
+                </p>
                 <p className="text-sm text-ink-500">{c.detail}</p>
                 {!c.ok && c.fix && <p className="mt-0.5 text-xs text-accent-700">{c.fix}</p>}
               </div>
@@ -223,7 +260,7 @@ export default async function LaunchPage() {
         </div>
       </section>
 
-      <p className="mt-8 text-xs text-ink-300">
+      <p className="mt-8 text-xs text-ink-500">
         After launch, this page stays useful: it&apos;s the first stop when anything smells off,
         alongside{" "}
         <Link href="/ops/status" className="text-accent-700 hover:underline">
@@ -232,5 +269,74 @@ export default async function LaunchPage() {
         .
       </p>
     </main>
+  );
+}
+
+const LEVEL: Record<GoLiveCheck["level"], { dot: string; label: string; text: string }> = {
+  green: { dot: "bg-emerald-600", label: "Ready", text: "text-emerald-800" },
+  amber: { dot: "bg-amber-500", label: "Check", text: "text-amber-800" },
+  red: { dot: "bg-red-600", label: "Fix before go-live", text: "text-red-700" },
+};
+
+/**
+ * The pilot go-live checklist (feature F7): every setting, secret and
+ * record the four pilots depend on, with the exact fix for anything that
+ * isn't green. Amber items can go live knowingly; red ones can't.
+ */
+function PilotChecklist({ checks }: { checks: GoLiveCheck[] | null }) {
+  if (!checks) {
+    return (
+      <section className="mt-8">
+        <h2 className="mb-3 text-lg font-display">Pilot go-live checklist</h2>
+        <p role="alert" className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
+          The checklist couldn&apos;t run. Reload in a moment; if it keeps failing, check System status.
+        </p>
+      </section>
+    );
+  }
+  const red = checks.filter((c) => c.level === "red").length;
+  const amber = checks.filter((c) => c.level === "amber").length;
+  const order = { red: 0, amber: 1, green: 2 } as const;
+  const sorted = [...checks].sort((a, b) => order[a.level] - order[b.level]);
+  return (
+    <section className="mt-8" aria-labelledby="pilot-checks">
+      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+        <h2 id="pilot-checks" className="text-lg font-display">
+          Pilot go-live checklist
+        </h2>
+        <p className={`text-sm font-semibold ${red ? "text-red-700" : amber ? "text-amber-800" : "text-emerald-800"}`}>
+          {red ? `${red} to fix before real customers` : amber ? `Ready, with ${amber} to check` : "Ready for real customers"}
+        </p>
+      </div>
+      <ul className="divide-y divide-line rounded-2xl border border-line bg-white">
+        {sorted.map((c) => {
+          const l = LEVEL[c.level];
+          return (
+            <li key={c.id} className="flex items-start gap-3 px-4 py-3">
+              <span aria-hidden className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${l.dot}`} />
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold text-ink-900">
+                  {c.label} <span className={`ml-1 text-xs font-semibold ${l.text}`}>{l.label}</span>
+                </p>
+                <p className="text-sm text-ink-700">{c.detail}</p>
+                {c.level !== "green" && c.fix && (
+                  <p className="mt-0.5 text-sm text-accent-700">
+                    Fix: {c.fix}
+                    {c.href && (
+                      <>
+                        {" "}
+                        <Link href={c.href} className="font-semibold underline">
+                          Go there
+                        </Link>
+                      </>
+                    )}
+                  </p>
+                )}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }

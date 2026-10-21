@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types --test tests/*.test.ts",
     "test:e2e": "node scripts/e2e-funnel.mjs",
+    "test:e2e:pilot": "node scripts/e2e-pilot.mjs",
     "data:sample": "node scripts/make-sample-data.mjs",
     "data:fetch-epc": "node scripts/fetch-epc.mjs",
     "data:import": "node scripts/import-intel.mjs",
@@ -19,7 +20,7 @@
     "@aircon/domain": "workspace:*",
     "@anthropic-ai/sdk": "^0.111.0",
     "@supabase/supabase-js": "^2.45.0",
-    "next": "^15.3.0",
+    "next": "15.5.28",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "zod": "^4.4.3"

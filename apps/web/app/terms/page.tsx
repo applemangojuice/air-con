@@ -1,166 +1,184 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { SiteFooter } from "@/components/site/footer";
 import { SiteHeader } from "@/components/site/header";
-import { BRAND } from "@/lib/brand";
+import type { TermsSection } from "@aircon/domain";
+import { textLink } from "@/components/site/styles";
+import { cancellationForm, cancellationInstructions, type TraderDetails } from "@/lib/comms/legal-text";
+import { termsSections } from "@/lib/legal/terms";
+import { getPublicSettings } from "@/lib/public-settings";
+
+export const revalidate = 60;
 
 export const metadata: Metadata = {
-  title: "Terms of service",
-  description: "The terms that govern quotes, bookings and installations.",
+  title: "Terms",
+  description:
+    "How prices, home surveys, proposals, installation, payment, guarantees and your right to cancel work, with the model cancellation instructions and form.",
 };
 
+const LAST_UPDATED = "19 Oct 2026";
+
 /**
- * Plain-English terms matching how the product actually works: instant fixed
- * quote → confidence score → deposit → install → 5-year warranty. Consumer
- * rights (14-day cooling off, Consumer Rights Act) stated, not buried.
+ * The pilot terms, in plain English, from lib/legal/terms.ts: the same text
+ * frozen onto every proposal at issue, shown before acceptance, emailed and
+ * copied into the contract. Built from settings, so every fact (who we are,
+ * VAT, payment, install length, guarantees, complaints) is the one the
+ * business has actually decided. The model cancellation instructions and
+ * form come from lib/comms/legal-text.ts (the same text the contract emails
+ * carry). Marked as a draft under solicitor review until
+ * settings.legal.termsReviewed.
  */
-export default function TermsPage() {
+export default async function TermsPage() {
+  const s = await getPublicSettings();
+  const c = s.company;
+  const days = s.scheduling.cancellationDays;
+  const sections = termsSections(s);
+  const trader: TraderDetails = {
+    legalName: c.legalName,
+    tradingName: c.tradingName,
+    ...(c.geographicAddress ? { geographicAddress: c.geographicAddress } : {}),
+    ...(c.registeredAddress ? { registeredAddress: c.registeredAddress } : {}),
+    ...(c.phone ? { phone: c.phone } : {}),
+    email: c.email,
+  };
+  const supplyInstructions = cancellationInstructions(trader, { contractType: "supply-and-install", days });
+  const installOnlyInstructions = cancellationInstructions(trader, { contractType: "install-only", days });
+  const form = cancellationForm(trader);
+
   return (
     <>
       <SiteHeader />
       <main className="mx-auto w-full max-w-3xl px-4 py-14 sm:px-6">
-        <h1 className="text-4xl font-display">Terms of service</h1>
-        <p className="mt-3 text-sm text-ink-300">Last updated: 19 July 2026</p>
-        <p className="mt-5 text-ink-500">
-          The deal in one paragraph: your quote is a genuine fixed price for
-          the system it describes, based on the survey you gave us. If your
-          home matches your survey, the price is the price. You get a 14-day
-          cooling-off period, a 5-year warranty on the installation, and your
-          statutory consumer rights on top of everything here.
+        {!s.legal.termsReviewed && (
+          <div role="note" className="mb-8 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-amber-950">
+            <p className="font-semibold">Draft: under solicitor review</p>
+            <p className="mt-1 text-sm">
+              These are the terms we intend to use for our first installations. A solicitor is reviewing them and
+              they may change before you&apos;re asked to agree to anything. Every proposal carries the full text of
+              the terms that apply to it, fixed on the day it&apos;s issued, and only that text forms part of your
+              contract.
+            </p>
+          </div>
+        )}
+
+        <h1 className="text-4xl font-display">Terms</h1>
+        <p className="mt-3 text-sm text-ink-500">
+          Version {s.legal.termsVersion} · last updated {LAST_UPDATED}
         </p>
 
-        <Section title="1. Who you're dealing with">
-          <p>
-            These terms are between you and {BRAND.legalName}
-            (&ldquo;we&rdquo;, &ldquo;us&rdquo;). Contact:{" "}
-            <a className="text-accent-700 hover:underline" href={`mailto:${BRAND.supportEmail}`}>
-              {BRAND.supportEmail}
-            </a>
-            .
-          </p>
-        </Section>
-
-        <Section title="2. Your quote">
-          <ul className="list-disc space-y-2 pl-5">
+        <div className="mt-6 rounded-2xl border border-line bg-white p-5">
+          <h2 className="font-semibold">In short</h2>
+          <ul className="mt-2 list-disc space-y-1.5 pl-5 text-ink-700">
+            <li>Your online price is a real price, confirmed at a home survey. It only changes for a reason we put in writing.</li>
+            <li>Nothing is agreed until you accept a written proposal. Getting a price or a survey commits you to nothing.</li>
             <li>
-              The quote is calculated from the survey you complete. It is a
-              fixed, VAT-inclusive price for the system described in it.
+              {s.scheduling.surveyFeeGbp > 0 ? "Moving your home survey" : "Your home survey is free, and moving it"} costs nothing, however short the notice.
             </li>
             <li>
-              Every quote carries an Installation Confidence Score. A
-              high-confidence quote (complete survey with photos) is guaranteed
-              as-is. A lower-confidence quote may be revised after we review
-              your details or visit, and you can always add the missing
-              information to lock it in.
+              You can cancel without giving a reason: when we supply the equipment, until {days} days after the last
+              of it is delivered to you.
             </li>
-            <li>
-              If, on the day, your home materially differs from your survey
-              (for example, a room or electrical setup isn&apos;t as
-              described), we&apos;ll explain the difference and agree any
-              change with you before doing any work. You can cancel at no cost
-              if you don&apos;t accept the revised price.
-            </li>
-            <li>Quotes are valid for 60 days from the date they&apos;re generated.</li>
+            <li>Nothing extra is added without your written approval.</li>
+            <li>Your statutory rights apply on top of everything here.</li>
           </ul>
-        </Section>
+        </div>
 
-        <Section title="3. Booking and payment">
-          <ul className="list-disc space-y-2 pl-5">
-            <li>A booking is confirmed when you pay the deposit shown at booking.</li>
-            <li>The balance is due on completion of the installation, once you&apos;re satisfied it works as described.</li>
-            <li>
-              Moving your installation date is free with reasonable notice;
-              short-notice changes may carry the change fee shown when you
-              rebook. We apply the same standard to ourselves: if we miss a
-              commitment we&apos;ve put in writing, the stated credit comes off
-              your bill automatically.
-            </li>
-          </ul>
-        </Section>
+        <nav aria-label="On this page" className="mt-6">
+          <ol className="grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
+            {sections.map((section, i) => (
+              <li key={section.id}>
+                <a href={`#${section.id}`} className="text-ink-700 underline-offset-2 hover:text-ink-900 hover:underline">
+                  {i + 1}. {section.title}
+                </a>
+              </li>
+            ))}
+          </ol>
+        </nav>
 
-        <Section title="4. Cooling off and cancellation">
-          <ul className="list-disc space-y-2 pl-5">
-            <li>
-              You have 14 days from booking to cancel for any reason with a
-              full refund of your deposit (Consumer Contracts Regulations
-              2013).
-            </li>
-            <li>
-              If you ask us to install within the 14-day period, you&apos;re
-              agreeing that the work may start before the cooling-off period
-              ends; if you then cancel mid-way, we may charge for work already
-              done.
-            </li>
-            <li>After 14 days, cancellation terms are shown at booking before you commit.</li>
-          </ul>
-        </Section>
+        {sections.map((section, i) => (
+          <Section key={section.id} section={section} n={i + 1}>
+            {section.id === "data" && (
+              <p>
+                <Link href="/privacy" className={textLink}>
+                  Read our privacy notice
+                </Link>
+              </p>
+            )}
+            {section.id === "cancel" && (
+              <>
+                {!s.legal.cancellationReviewed && (
+                  <p className="text-sm text-ink-500">
+                    The wording below follows the model in Schedule 3 to the Consumer Contracts Regulations 2013 and is
+                    being reviewed by our solicitor.
+                  </p>
+                )}
 
-        <Section title="5. The installation">
-          <ul className="list-disc space-y-2 pl-5">
-            <li>All work is carried out by F-Gas certified engineers.</li>
-            <li>
-              We&apos;re responsible for obtaining nothing on your behalf:
-              where planning permission or freeholder/landlord consent is
-              needed (we flag this in your quote when public records suggest
-              it), obtaining it is your responsibility, and we&apos;ll help you
-              understand what&apos;s required.
-            </li>
-            <li>
-              We make good any damage we cause, document the installation
-              (photos, pressure tests, commissioning data), and hand over the
-              certificates.
-            </li>
-          </ul>
-        </Section>
+                <div className="rounded-2xl border border-line bg-white p-5">
+                  <h3 className="font-semibold">Model cancellation instructions</h3>
+                  <p className="mt-1 text-sm text-ink-500">For contracts where we supply the equipment.</p>
+                  <div className="mt-3 space-y-2 text-sm">
+                    {supplyInstructions.map((p, k) => (
+                      <div key={k}>
+                        {p.heading && <p className="mt-3 font-semibold text-ink-900">{p.heading}</p>}
+                        <p>{p.text}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <details className="mt-4 rounded-xl border border-line p-3 text-sm">
+                    <summary className="cursor-pointer font-semibold text-ink-900">If we only install equipment you supply</summary>
+                    <div className="mt-2 space-y-2">
+                      {installOnlyInstructions.map((p, k) => (
+                        <div key={k}>
+                          {p.heading && <p className="mt-3 font-semibold text-ink-900">{p.heading}</p>}
+                          <p>{p.text}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                </div>
 
-        <Section title="6. Warranty">
-          <ul className="list-disc space-y-2 pl-5">
-            <li>
-              Every installation includes a 5-year parts and labour warranty,
-              in addition to (not instead of) your rights under the Consumer
-              Rights Act 2015.
-            </li>
-            <li>
-              The warranty covers the system and our workmanship; it
-              doesn&apos;t cover damage caused by tampering, or by servicing
-              carried out by third parties without our agreement.
-            </li>
-          </ul>
-        </Section>
-
-        <Section title="7. Liability">
-          <p>
-            Nothing in these terms limits our liability for death or personal
-            injury caused by negligence, for fraud, or for anything else that
-            can&apos;t be limited by law. Otherwise, our liability under these
-            terms is limited to the price you paid us. We&apos;re not liable
-            for losses that aren&apos;t a foreseeable result of our breaking
-            these terms.
-          </p>
-        </Section>
-
-        <Section title="8. General">
-          <p>
-            These terms are governed by the law of England and Wales, and
-            disputes go to the courts of England and Wales. If any part of
-            these terms is found unenforceable, the rest still applies. Our{" "}
-            <Link href="/privacy" className="text-accent-700 hover:underline">
-              privacy policy
-            </Link>{" "}
-            explains how we handle your data.
-          </p>
-        </Section>
+                <div className="rounded-2xl border border-line bg-white p-5">
+                  <h3 className="font-semibold">Model cancellation form</h3>
+                  <div className="mt-3 space-y-2 text-sm">
+                    {form.map((line, k) => (
+                      <p key={k}>{line}</p>
+                    ))}
+                  </div>
+                  <p className="mt-3 text-sm text-ink-500">
+                    Your contract confirmation email includes this form with your details.
+                  </p>
+                </div>
+              </>
+            )}
+          </Section>
+        ))}
       </main>
       <SiteFooter />
     </>
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ section, n, children }: { section: TermsSection; n: number; children?: ReactNode }) {
   return (
-    <section className="mt-8">
-      <h2 className="text-xl font-display">{title}</h2>
-      <div className="mt-3 space-y-3 text-ink-700 leading-relaxed">{children}</div>
+    <section id={section.id} className="mt-10 scroll-mt-24" aria-labelledby={`${section.id}-title`}>
+      <h2 id={`${section.id}-title`} className="text-xl font-display">
+        {n}. {section.title}
+      </h2>
+      <div className="mt-3 space-y-3 leading-relaxed text-ink-700">
+        {section.items.length === 1 ? (
+          <p className="whitespace-pre-line">{section.items[0]}</p>
+        ) : (
+          <ul className="list-disc space-y-2 pl-5">
+            {section.items.map((item) => (
+              <li key={item} className="whitespace-pre-line">
+                {item}
+              </li>
+            ))}
+          </ul>
+        )}
+        {children}
+      </div>
     </section>
   );
 }

@@ -1,0 +1,1995 @@
+{
+  "manufacturer": "Mitsubishi Electric",
+  "researchedAt": "2026-10-18",
+  "models": [
+    {
+      "kind": "indoor",
+      "manufacturer": "Mitsubishi Electric",
+      "series": "Classic HR (MSZ-HR..VF / MUZ-HR..VF, R32)",
+      "model": "MSZ-HR25VF",
+      "label": "Mitsubishi Electric Classic HR 2.5 kW",
+      "tier": "standard",
+      "multiSplitCapable": true,
+      "ports": null,
+      "pairedWith": "MUZ-HR25VF",
+      "specs": {
+        "coolingKw": 2.5,
+        "heatingKw": 3.15,
+        "seer": 6.2,
+        "scop": 4.3,
+        "energyClassCooling": "A++",
+        "energyClassHeating": "A+",
+        "soundPressureLowDb": 21,
+        "soundPressureHighDb": 43,
+        "soundPowerDb": null,
+        "dimensionsMm": {
+          "w": 838,
+          "h": 280,
+          "d": 228
+        },
+        "weightKg": 8.5,
+        "refrigerant": "R32",
+        "liquidPipeMm": 6.35,
+        "gasPipeMm": 9.52,
+        "maxPipeM": null,
+        "maxHeightDiffM": null,
+        "prechargedPipeM": null,
+        "additionalChargeGPerM": null,
+        "powerSupply": "220-240 V, 50 Hz, single phase (Mitsubishi RAC splits: indoor unit fed via the outdoor unit interconnect - confirm in installation manual)",
+        "recommendedBreakerA": null,
+        "wifi": "Not built in on MSZ-HR..VF; optional MELCloud Wi-Fi interface (MELCloud lists MAC-587IF-E as the current module) - HR..VF compatibility not confirmed. EU 'VFK' / 'VFK2' variants are marketed with integrated Wi-Fi, but some EU listings still call the interface optional - confirm for the UK suffix.",
+        "operatingRangeCoolingC": "-10 to +46",
+        "operatingRangeHeatingC": "-10 to +24"
+      },
+      "warranty": "Mitsubishi Electric UK: 3 years standard on air conditioning equipment; up to 5 years parts when installed by a Mitsubishi Electric Accredited Installer (Partner Programme). Source: UK installer announcements and pages (MODBS / Weatherite, Carlton Services, HF Group) - SECONDARY, official A2A warranty T&Cs not retrieved. One installer (ACE Services) claims 7-year parts cover via 'Business Solutions Partner' status - unverified. Registration rules for air-to-air splits not confirmed (Lossnay requires registration within 3 months of commissioning; Ecodan uses a guarantee form).",
+      "sources": [
+        {
+          "url": "https://www.carltonservices.co.uk/product/mitsubishi-electric-msz-hr25vf-wall-mounted-air-conditioning-system/",
+          "title": "Carlton Services UK - MSZ-HR25VF (2.5 / 3.15 kW, SEER 6.2 / SCOP 4.3)"
+        },
+        {
+          "url": "https://www.coolingcompany.co.uk/product/mitsubishi-electric-air-conditioning-msz-hr25vf-classic-wall-mounted/",
+          "title": "Cooling Company UK - MSZ-HR25VF spec table (SPL 21-30-37-43, pipes, 20 m / 7 m pre-charge)"
+        },
+        {
+          "url": "https://www.orionairsales.co.uk/mitsubishi-electric-air-conditioning-msz-hr25vf-classic-wall-mounted-25kw9000btu-r32-a-240v50hz-10696-p.asp",
+          "title": "Orion Air Sales UK - MSZ-HR25VF (reproduces UK PI table)"
+        },
+        {
+          "url": "https://eprel.ec.europa.eu/fiches/airconditioners/Fiche_2378946_SV.pdf",
+          "title": "EU EPREL product fiche MSZ-HR25VF(2)/MUZ-HR25VF (SEER 6.2 A++, SCOP 4.3 A+, LwA 57/63 dB) - via search snippet"
+        },
+        {
+          "url": "https://acvent.co.uk/wp-content/uploads/2024/09/MSZ-HR_R32_PI_Sheet_AW-1.pdf",
+          "title": "MSZ-HR R32 PI sheet (copy of Mitsubishi UK sheet hosted by installer; read via search snippet)"
+        },
+        {
+          "url": "https://library.mitsubishielectric.co.uk/pdf/download_full/4097",
+          "title": "Mitsubishi Electric UK library - MSZ-HR R32 Classic Wall Mounted System PI sheet (located via search; not opened - DNS blocked)"
+        },
+        {
+          "url": "https://planetaklimata.com.ua/instr/Mitsubishi_Electric/Mitsubishi_Electric_MUZ-HR_VF_Service_Manual_Eng.pdf",
+          "title": "Mitsubishi Electric MUZ-HR25/35/42/50/60/71VF service manual OBH823 (third-party host)"
+        },
+        {
+          "url": "https://www.logicool-ac.com/products/mitsubishi-electric-air-conditioning-classic-hr-r32-wall-mounted-system-2/",
+          "title": "Logicool - MSZ-HR Multi Classic wall mount (states for use with MXZ-HA multi outdoor only)"
+        },
+        {
+          "url": "https://melcloud.com/gb/en/products/melcloud-legacy-wi-fi-devices",
+          "title": "MELCloud GB - legacy Wi-Fi devices (MAC-587IF-E current, MAC-567IF-E/577IF-E previous)"
+        },
+        {
+          "url": "https://modbs.co.uk/news/fullstory.php/aid/2748/Air_conditioning_enjoys__5-year_guarantee_.html",
+          "title": "MODBS - Air conditioning enjoys 5-year guarantee (Mitsubishi accredited installer; secondary)"
+        }
+      ],
+      "confidence": "provisional",
+      "notes": "fact-check (2026-10-18): the earlier note labelled the indoor sound as 'SLo-Lo-Mid-Hi-SHi 21-30-37-43', which is five step names for four values, so the mapping was wrong. Corrected: the source (Cooling Company) gives four values, lowest to highest; the fan-step names are not confirmed. The dB figures are unchanged and were not re-verified (no web access this pass). Capacities/efficiency are for the single-split pair. Sound = indoor cooling 21-30-37-43 dB(A), four steps lowest to highest (heating identical); indoor sound power 57 dB(A). Mitsubishi France FTI gives heating 3.2 kW (0.5-3.5) and SCOP 4.2 - UK listings and EPREL give 3.15 kW / SCOP 4.3. Operating range from the OBH823 service manual (VF models; heating limit -10 C). MULTI: HR multi indoor units are for the budget MXZ-HA outdoor family (e.g. MXZ-2HA40VF2) per Logicool and the 2024 Mitsubishi multisplit catalogue; a UK combination-chart snippet showed no MXZ-3F54VF4 marks for MSZ-HR25VF. An older Orion listing bundles MXZ-2F42VF + 2x MSZ-HR25VF, so treat MXZ-F compatibility as NOT confirmed. Model suffix: UK library also lists MSZ-HR25VFK (Wi-Fi variant); EU sells VF2/VFK2 - confirm the UK 2026 suffix with distributor."
+    },
+    {
+      "kind": "outdoor",
+      "manufacturer": "Mitsubishi Electric",
+      "series": "Classic HR (MSZ-HR..VF / MUZ-HR..VF, R32)",
+      "model": "MUZ-HR25VF",
+      "label": "Mitsubishi Electric Classic HR 2.5 kW outdoor",
+      "tier": "standard",
+      "multiSplitCapable": false,
+      "ports": 1,
+      "pairedWith": "MSZ-HR25VF",
+      "specs": {
+        "coolingKw": 2.5,
+        "heatingKw": 3.15,
+        "seer": 6.2,
+        "scop": 4.3,
+        "energyClassCooling": "A++",
+        "energyClassHeating": "A+",
+        "soundPressureLowDb": null,
+        "soundPressureHighDb": null,
+        "soundPowerDb": 63,
+        "dimensionsMm": {
+          "w": 699,
+          "h": 538,
+          "d": 249
+        },
+        "weightKg": 23,
+        "refrigerant": "R32",
+        "liquidPipeMm": 6.35,
+        "gasPipeMm": 9.52,
+        "maxPipeM": 20,
+        "maxHeightDiffM": 12,
+        "prechargedPipeM": 7,
+        "additionalChargeGPerM": 20,
+        "powerSupply": "230 V, 50 Hz, single phase (service manual)",
+        "recommendedBreakerA": 10,
+        "wifi": null,
+        "operatingRangeCoolingC": "-10 to +46",
+        "operatingRangeHeatingC": "-10 to +24"
+      },
+      "warranty": "Mitsubishi Electric UK: 3 years standard on air conditioning equipment; up to 5 years parts when installed by a Mitsubishi Electric Accredited Installer (Partner Programme). Source: UK installer announcements and pages (MODBS / Weatherite, Carlton Services, HF Group) - SECONDARY, official A2A warranty T&Cs not retrieved. One installer (ACE Services) claims 7-year parts cover via 'Business Solutions Partner' status - unverified. Registration rules for air-to-air splits not confirmed (Lossnay requires registration within 3 months of commissioning; Ecodan uses a guarantee form).",
+      "sources": [
+        {
+          "url": "https://www.orionairsales.co.uk/mitsubishi-electric-air-conditioning-msz-hr25vf-classic-wall-mounted-25kw9000btu-r32-a-240v50hz-10696-p.asp",
+          "title": "Orion Air Sales UK - MUZ-HR25VF (20 m, 12 m, LwA 63 dB, SPL 50/50)"
+        },
+        {
+          "url": "https://www.carltonservices.co.uk/product/mitsubishi-electric-msz-hr25vf-wall-mounted-air-conditioning-system/",
+          "title": "Carlton Services UK - MSZ-HR25VF / MUZ-HR25VF"
+        },
+        {
+          "url": "https://eprel.ec.europa.eu/fiches/airconditioners/Fiche_2378946_SV.pdf",
+          "title": "EU EPREL product fiche (outdoor LwA 63 dB) - via search snippet"
+        },
+        {
+          "url": "https://www.manualslib.com/manual/2662642/Mitsubishi-Electric-Muz-Hr25vf.html",
+          "title": "ManualsLib - Mitsubishi Electric MUZ-HR25VF service manual (breaker, 20 g/m formula)"
+        },
+        {
+          "url": "https://planetaklimata.com.ua/instr/Mitsubishi_Electric/Mitsubishi_Electric_MUZ-HR_VF_Service_Manual_Eng.pdf",
+          "title": "Mitsubishi Electric MUZ-HR25/35/42/50/60/71VF service manual OBH823 (third-party host)"
+        },
+        {
+          "url": "https://www.logicool-ac.com/products/mitsubishi-electric-air-conditioning-classic-hr-r32-wall-mounted-system/",
+          "title": "Logicool - MSZ-HR R32 Classic wall mount spec table (UK distributor)"
+        },
+        {
+          "url": "https://acvent.co.uk/wp-content/uploads/2024/09/MSZ-HR_R32_PI_Sheet_AW-1.pdf",
+          "title": "MSZ-HR R32 PI sheet (copy of Mitsubishi UK sheet hosted by installer; read via search snippet)"
+        },
+        {
+          "url": "https://modbs.co.uk/news/fullstory.php/aid/2748/Air_conditioning_enjoys__5-year_guarantee_.html",
+          "title": "MODBS - Air conditioning enjoys 5-year guarantee (Mitsubishi accredited installer; secondary)"
+        }
+      ],
+      "confidence": "provisional",
+      "notes": "Outdoor sound pressure 50/50 dB(A) heating/cooling. Breaker 10 A = 'breaker capacity' in service manual table; Logicool lists 10 A fuse. Additional charge X g = 20 g/m x (one-way pipe length - 7 m) per service manual; Logicool also lists 20 g/m. Max height difference: Orion and service manual 12 m, Logicool table shows 10 m - confirm in installation manual. Dimensions W x H x D. Factory charge ~0.40 kg (Mitsubishi France FTI, via snippet); installation manual max charge 660 g. R32 GWP 675."
+    },
+    {
+      "kind": "indoor",
+      "manufacturer": "Mitsubishi Electric",
+      "series": "Classic HR (MSZ-HR..VF / MUZ-HR..VF, R32)",
+      "model": "MSZ-HR35VF",
+      "label": "Mitsubishi Electric Classic HR 3.5 kW",
+      "tier": "standard",
+      "multiSplitCapable": true,
+      "ports": null,
+      "pairedWith": "MUZ-HR35VF",
+      "specs": {
+        "coolingKw": 3.4,
+        "heatingKw": 3.6,
+        "seer": 6.2,
+        "scop": 4.3,
+        "energyClassCooling": "A++",
+        "energyClassHeating": "A+",
+        "soundPressureLowDb": 22,
+        "soundPressureHighDb": 46,
+        "soundPowerDb": null,
+        "dimensionsMm": {
+          "w": 838,
+          "h": 280,
+          "d": 228
+        },
+        "weightKg": 8.5,
+        "refrigerant": "R32",
+        "liquidPipeMm": 6.35,
+        "gasPipeMm": 9.52,
+        "maxPipeM": null,
+        "maxHeightDiffM": null,
+        "prechargedPipeM": null,
+        "additionalChargeGPerM": null,
+        "powerSupply": "220-240 V, 50 Hz, single phase (Mitsubishi RAC splits: indoor unit fed via the outdoor unit interconnect - confirm in installation manual)",
+        "recommendedBreakerA": null,
+        "wifi": "Not built in on MSZ-HR..VF; optional MELCloud Wi-Fi interface (MELCloud lists MAC-587IF-E as the current module) - HR..VF compatibility not confirmed. EU 'VFK' / 'VFK2' variants are marketed with integrated Wi-Fi, but some EU listings still call the interface optional - confirm for the UK suffix.",
+        "operatingRangeCoolingC": "-10 to +46",
+        "operatingRangeHeatingC": "-10 to +24"
+      },
+      "warranty": "Mitsubishi Electric UK: 3 years standard on air conditioning equipment; up to 5 years parts when installed by a Mitsubishi Electric Accredited Installer (Partner Programme). Source: UK installer announcements and pages (MODBS / Weatherite, Carlton Services, HF Group) - SECONDARY, official A2A warranty T&Cs not retrieved. One installer (ACE Services) claims 7-year parts cover via 'Business Solutions Partner' status - unverified. Registration rules for air-to-air splits not confirmed (Lossnay requires registration within 3 months of commissioning; Ecodan uses a guarantee form).",
+      "sources": [
+        {
+          "url": "https://www.carltonservices.co.uk/product/mitsubishi-electric-msz-hr35vf-wall-mounted-air-conditioning-system/",
+          "title": "Carlton Services UK - MSZ-HR35VF spec table"
+        },
+        {
+          "url": "https://www.orionairsales.co.uk/mitsubishi-electric-air-conditioning-msz-hr35vf-classic-wall-mounted-35kw12000btu-r32-a-240v50hz-10699-p.asp",
+          "title": "Orion Air Sales UK - MSZ-HR35VF (SCOP/SEER 4.30/6.20, pipe sizes)"
+        },
+        {
+          "url": "https://www.eurovent-certification.com/en/catalog/program/certificate/participant/model/show/196524623",
+          "title": "Eurovent certificate - MUZ-HR35VF/MSZ-HR35VF (SEER 6.2, EER 2.81, COP 3.69, LwA indoor 60 / outdoor 64)"
+        },
+        {
+          "url": "https://www.logicool-ac.com/products/mitsubishi-electric-air-conditioning-classic-hr-r32-wall-mounted-system/",
+          "title": "Logicool - MSZ-HR R32 Classic wall mount spec table (UK distributor)"
+        },
+        {
+          "url": "https://www.logicool-ac.com/products/mitsubishi-electric-air-conditioning-classic-hr-r32-wall-mounted-system-2/",
+          "title": "Logicool - MSZ-HR Multi Classic wall mount (states for use with MXZ-HA multi outdoor only)"
+        },
+        {
+          "url": "https://acvent.co.uk/wp-content/uploads/2024/09/MSZ-HR_R32_PI_Sheet_AW-1.pdf",
+          "title": "MSZ-HR R32 PI sheet (copy of Mitsubishi UK sheet hosted by installer; read via search snippet)"
+        },
+        {
+          "url": "https://modbs.co.uk/news/fullstory.php/aid/2748/Air_conditioning_enjoys__5-year_guarantee_.html",
+          "title": "MODBS - Air conditioning enjoys 5-year guarantee (Mitsubishi accredited installer; secondary)"
+        }
+      ],
+      "confidence": "provisional",
+      "notes": "Sold as '3.5 kW' but nominal cooling is 3.4 kW (0.9-3.4) and heating 3.6 kW (0.9-3.7) per Logicool UK table and EU listings. Sound = cooling 22-31-38-46 dB(A); heating 21-30-37-44 (four steps, lowest to highest; fact-check 2026-10-18: the earlier 'SLo..SHi' label implied five steps but only four values are given, and the step names are not confirmed). Indoor sound power 57-60 dB(A) (sources differ). Multi-split: see MSZ-HR25VF note (MXZ-HA only; MXZ-F not confirmed)."
+    },
+    {
+      "kind": "outdoor",
+      "manufacturer": "Mitsubishi Electric",
+      "series": "Classic HR (MSZ-HR..VF / MUZ-HR..VF, R32)",
+      "model": "MUZ-HR35VF",
+      "label": "Mitsubishi Electric Classic HR 3.5 kW outdoor",
+      "tier": "standard",
+      "multiSplitCapable": false,
+      "ports": 1,
+      "pairedWith": "MSZ-HR35VF",
+      "specs": {
+        "coolingKw": 3.4,
+        "heatingKw": 3.6,
+        "seer": 6.2,
+        "scop": 4.3,
+        "energyClassCooling": "A++",
+        "energyClassHeating": "A+",
+        "soundPressureLowDb": null,
+        "soundPressureHighDb": null,
+        "soundPowerDb": 64,
+        "dimensionsMm": {
+          "w": 699,
+          "h": 538,
+          "d": 249
+        },
+        "weightKg": 24,
+        "refrigerant": "R32",
+        "liquidPipeMm": 6.35,
+        "gasPipeMm": 9.52,
+        "maxPipeM": 20,
+        "maxHeightDiffM": 12,
+        "prechargedPipeM": 7,
+        "additionalChargeGPerM": 20,
+        "powerSupply": "230 V, 50 Hz, single phase (service manual)",
+        "recommendedBreakerA": 10,
+        "wifi": null,
+        "operatingRangeCoolingC": "-10 to +46",
+        "operatingRangeHeatingC": "-10 to +24"
+      },
+      "warranty": "Mitsubishi Electric UK: 3 years standard on air conditioning equipment; up to 5 years parts when installed by a Mitsubishi Electric Accredited Installer (Partner Programme). Source: UK installer announcements and pages (MODBS / Weatherite, Carlton Services, HF Group) - SECONDARY, official A2A warranty T&Cs not retrieved. One installer (ACE Services) claims 7-year parts cover via 'Business Solutions Partner' status - unverified. Registration rules for air-to-air splits not confirmed (Lossnay requires registration within 3 months of commissioning; Ecodan uses a guarantee form).",
+      "sources": [
+        {
+          "url": "https://www.eurovent-certification.com/en/catalog/program/certificate/participant/model/show/196524623",
+          "title": "Eurovent certificate - MUZ-HR35VF/MSZ-HR35VF (outdoor LwA 64 dB)"
+        },
+        {
+          "url": "https://www.carltonservices.co.uk/product/mitsubishi-electric-msz-hr35vf-wall-mounted-air-conditioning-system/",
+          "title": "Carlton Services UK - MUZ-HR35VF 699x249x538, 24 kg, SPL 51/51, 20 m"
+        },
+        {
+          "url": "https://www.orionairsales.co.uk/mitsubishi-electric-air-conditioning-msz-hr35vf-classic-wall-mounted-35kw12000btu-r32-a-240v50hz-10699-p.asp",
+          "title": "Orion Air Sales UK - MUZ-HR35VF (20 m / 12 m, pre-charged 7 m)"
+        },
+        {
+          "url": "https://www.manualslib.com/manual/2662642/Mitsubishi-Electric-Muz-Hr25vf.html",
+          "title": "ManualsLib - Mitsubishi Electric MUZ-HR25VF service manual (breaker, 20 g/m formula)"
+        },
+        {
+          "url": "https://planetaklimata.com.ua/instr/Mitsubishi_Electric/Mitsubishi_Electric_MUZ-HR_VF_Service_Manual_Eng.pdf",
+          "title": "Mitsubishi Electric MUZ-HR25/35/42/50/60/71VF service manual OBH823 (third-party host)"
+        },
+        {
+          "url": "https://modbs.co.uk/news/fullstory.php/aid/2748/Air_conditioning_enjoys__5-year_guarantee_.html",
+          "title": "MODBS - Air conditioning enjoys 5-year guarantee (Mitsubishi accredited installer; secondary)"
+        }
+      ],
+      "confidence": "provisional",
+      "notes": "Outdoor SPL 51/51 dB(A). Weight 24 kg (Carlton); one EU source 25 kg. A garbled service-manual extract suggested 800x550x285 for HR35 - UK retailers consistently give 699x538x249; treat as provisional. Breaker 10 A from service-manual breaker-capacity row (25/35/42 = 10 A)."
+    },
+    {
+      "kind": "indoor",
+      "manufacturer": "Mitsubishi Electric",
+      "series": "Classic HR (MSZ-HR..VF / MUZ-HR..VF, R32)",
+      "model": "MSZ-HR50VF",
+      "label": "Mitsubishi Electric Classic HR 5.0 kW",
+      "tier": "standard",
+      "multiSplitCapable": true,
+      "ports": null,
+      "pairedWith": "MUZ-HR50VF",
+      "specs": {
+        "coolingKw": 5.0,
+        "heatingKw": 5.4,
+        "seer": 6.5,
+        "scop": 4.3,
+        "energyClassCooling": "A++",
+        "energyClassHeating": "A+",
+        "soundPressureLowDb": 28,
+        "soundPressureHighDb": 45,
+        "soundPowerDb": null,
+        "dimensionsMm": {
+          "w": 838,
+          "h": 280,
+          "d": 228
+        },
+        "weightKg": 9,
+        "refrigerant": "R32",
+        "liquidPipeMm": 6.35,
+        "gasPipeMm": 9.52,
+        "maxPipeM": null,
+        "maxHeightDiffM": null,
+        "prechargedPipeM": null,
+        "additionalChargeGPerM": null,
+        "powerSupply": "220-240 V, 50 Hz, single phase (Mitsubishi RAC splits: indoor unit fed via the outdoor unit interconnect - confirm in installation manual)",
+        "recommendedBreakerA": null,
+        "wifi": "Not built in on MSZ-HR..VF; optional MELCloud Wi-Fi interface (MELCloud lists MAC-587IF-E as the current module) - HR..VF compatibility not confirmed. EU 'VFK' / 'VFK2' variants are marketed with integrated Wi-Fi, but some EU listings still call the interface optional - confirm for the UK suffix.",
+        "operatingRangeCoolingC": "-10 to +46",
+        "operatingRangeHeatingC": "-10 to +24"
+      },
+      "warranty": "Mitsubishi Electric UK: 3 years standard on air conditioning equipment; up to 5 years parts when installed by a Mitsubishi Electric Accredited Installer (Partner Programme). Source: UK installer announcements and pages (MODBS / Weatherite, Carlton Services, HF Group) - SECONDARY, official A2A warranty T&Cs not retrieved. One installer (ACE Services) claims 7-year parts cover via 'Business Solutions Partner' status - unverified. Registration rules for air-to-air splits not confirmed (Lossnay requires registration within 3 months of commissioning; Ecodan uses a guarantee form).",
+      "sources": [
+        {
+          "url": "https://www.orionairsales.co.uk/mitsubishi-electric-air-conditioning-msz-hr50vf-classic-wall-mounted-5kw18000btu-r32-a-240v50hz-10702-p.asp",
+          "title": "Orion Air Sales UK - MSZ-HR50VF (SCOP/SEER 4.30/6.50, COP/EER 3.48/2.44)"
+        },
+        {
+          "url": "https://www.carltonservices.co.uk/product/mitsubishi-electric-msz-hr50vf-wall-mounted-air-conditioning-system/",
+          "title": "Carlton Services UK - MSZ-HR50VF"
+        },
+        {
+          "url": "https://air24.be/en/product/mitsubishi-electric-msz-muz-hr50vf/",
+          "title": "Air24.be - MSZ/MUZ-HR50VF (indoor weight 9 kg; secondary, BE)"
+        },
+        {
+          "url": "https://www.eurovent-certification.com/it/catalog/program/certificate/participant/model/show/196524625",
+          "title": "Eurovent certificate - MUZ-HR50VF/MSZ-HR50VF (indoor LwA 60, outdoor LwA 64)"
+        },
+        {
+          "url": "https://www.logicool-ac.com/products/mitsubishi-electric-air-conditioning-classic-hr-r32-wall-mounted-system-2/",
+          "title": "Logicool - MSZ-HR Multi Classic wall mount (states for use with MXZ-HA multi outdoor only)"
+        },
+        {
+          "url": "https://planetaklimata.com.ua/instr/Mitsubishi_Electric/Mitsubishi_Electric_MUZ-HR_VF_Service_Manual_Eng.pdf",
+          "title": "Mitsubishi Electric MUZ-HR25/35/42/50/60/71VF service manual OBH823 (third-party host)"
+        },
+        {
+          "url": "https://modbs.co.uk/news/fullstory.php/aid/2748/Air_conditioning_enjoys__5-year_guarantee_.html",
+          "title": "MODBS - Air conditioning enjoys 5-year guarantee (Mitsubishi accredited installer; secondary)"
+        }
+      ],
+      "confidence": "provisional",
+      "notes": "Heating 5.4 kW nominal (1.4-6.5). Sound = cooling 28-36-40-45 dB(A); heating 27-34-41-47 (four steps, lowest to highest; fact-check 2026-10-18: the earlier 'SLo..SHi' label implied five steps but only four values are given, and the step names are not confirmed); indoor sound power 60 dB(A). Pipe sizes 1/4\" / 3/8\" per Logicool HR table. Multi-split: see MSZ-HR25VF note."
+    },
+    {
+      "kind": "outdoor",
+      "manufacturer": "Mitsubishi Electric",
+      "series": "Classic HR (MSZ-HR..VF / MUZ-HR..VF, R32)",
+      "model": "MUZ-HR50VF",
+      "label": "Mitsubishi Electric Classic HR 5.0 kW outdoor",
+      "tier": "standard",
+      "multiSplitCapable": false,
+      "ports": 1,
+      "pairedWith": "MSZ-HR50VF",
+      "specs": {
+        "coolingKw": 5.0,
+        "heatingKw": 5.4,
+        "seer": 6.5,
+        "scop": 4.3,
+        "energyClassCooling": "A++",
+        "energyClassHeating": "A+",
+        "soundPressureLowDb": null,
+        "soundPressureHighDb": null,
+        "soundPowerDb": 64,
+        "dimensionsMm": {
+          "w": 800,
+          "h": 550,
+          "d": 285
+        },
+        "weightKg": 35,
+        "refrigerant": "R32",
+        "liquidPipeMm": 6.35,
+        "gasPipeMm": 9.52,
+        "maxPipeM": 20,
+        "maxHeightDiffM": 12,
+        "prechargedPipeM": null,
+        "additionalChargeGPerM": null,
+        "powerSupply": "230 V, 50 Hz, single phase (service manual)",
+        "recommendedBreakerA": null,
+        "wifi": null,
+        "operatingRangeCoolingC": "-10 to +46",
+        "operatingRangeHeatingC": "-10 to +24"
+      },
+      "warranty": "Mitsubishi Electric UK: 3 years standard on air conditioning equipment; up to 5 years parts when installed by a Mitsubishi Electric Accredited Installer (Partner Programme). Source: UK installer announcements and pages (MODBS / Weatherite, Carlton Services, HF Group) - SECONDARY, official A2A warranty T&Cs not retrieved. One installer (ACE Services) claims 7-year parts cover via 'Business Solutions Partner' status - unverified. Registration rules for air-to-air splits not confirmed (Lossnay requires registration within 3 months of commissioning; Ecodan uses a guarantee form).",
+      "sources": [
+        {
+          "url": "https://www.orionairsales.co.uk/mitsubishi-electric-air-conditioning-msz-hr50vf-classic-wall-mounted-5kw18000btu-r32-a-240v50hz-10702-p.asp",
+          "title": "Orion Air Sales UK - MUZ-HR50VF 800x285x550, 35 kg, SPL 51/50"
+        },
+        {
+          "url": "https://www.eurovent-certification.com/it/catalog/program/certificate/participant/model/show/196524625",
+          "title": "Eurovent certificate - MUZ-HR50VF (outdoor LwA 64 dB)"
+        },
+        {
+          "url": "https://eprel.ec.europa.eu/fiches/airconditioners/Fiche_75442_ES.pdf",
+          "title": "EU EPREL fiche - MSZ-HR50VF/MUZ-HR50VF (outdoor LwA cooling 64 dB) - via search snippet"
+        },
+        {
+          "url": "https://planetaklimata.com.ua/instr/Mitsubishi_Electric/Mitsubishi_Electric_MUZ-HR_VF_Service_Manual_Eng.pdf",
+          "title": "Mitsubishi Electric MUZ-HR25/35/42/50/60/71VF service manual OBH823 (third-party host)"
+        },
+        {
+          "url": "https://modbs.co.uk/news/fullstory.php/aid/2748/Air_conditioning_enjoys__5-year_guarantee_.html",
+          "title": "MODBS - Air conditioning enjoys 5-year guarantee (Mitsubishi accredited installer; secondary)"
+        }
+      ],
+      "confidence": "provisional",
+      "notes": "Outdoor SPL 51/50 dB(A) heating/cooling. 20 m / 12 m from the OBH823 service-manual piping table (covers 25/35/42/50VF; extract was garbled). Pre-charge length and additional charge rate not confirmed for HR50 (left null). The service-manual breaker row reads 10/10/10/12/16/16 A for 25..71 - would imply 12 A for HR50 but the column mapping is unconfirmed, so left null."
+    },
+    {
+      "kind": "indoor",
+      "manufacturer": "Mitsubishi Electric",
+      "series": "Elegance AP (MSZ-AP..VGK / MUZ-AP..VG, R32)",
+      "model": "MSZ-AP25VGK",
+      "label": "Mitsubishi Electric Elegance AP 2.5 kW",
+      "tier": "standard",
+      "multiSplitCapable": true,
+      "ports": null,
+      "pairedWith": "MUZ-AP25VG",
+      "specs": {
+        "coolingKw": 2.5,
+        "heatingKw": 3.2,
+        "seer": 8.6,
+        "scop": 4.8,
+        "energyClassCooling": "A+++",
+        "energyClassHeating": "A++",
+        "soundPressureLowDb": 19,
+        "soundPressureHighDb": null,
+        "soundPowerDb": null,
+        "dimensionsMm": {
+          "w": 798,
+          "h": 299,
+          "d": 219
+        },
+        "weightKg": 10.5,
+        "refrigerant": "R32",
+        "liquidPipeMm": 6.35,
+        "gasPipeMm": 9.52,
+        "maxPipeM": null,
+        "maxHeightDiffM": null,
+        "prechargedPipeM": null,
+        "additionalChargeGPerM": null,
+        "powerSupply": "220-240 V, 50 Hz, single phase (Mitsubishi RAC splits: indoor unit fed via the outdoor unit interconnect - confirm in installation manual)",
+        "recommendedBreakerA": null,
+        "wifi": "Built-in Wi-Fi (MELCloud) on 'VGK' indoor units per Mitsubishi UK MSZ-AP literature and Orion listings",
+        "operatingRangeCoolingC": null,
+        "operatingRangeHeatingC": null
+      },
+      "warranty": "Mitsubishi Electric UK: 3 years standard on air conditioning equipment; up to 5 years parts when installed by a Mitsubishi Electric Accredited Installer (Partner Programme). Source: UK installer announcements and pages (MODBS / Weatherite, Carlton Services, HF Group) - SECONDARY, official A2A warranty T&Cs not retrieved. One installer (ACE Services) claims 7-year parts cover via 'Business Solutions Partner' status - unverified. Registration rules for air-to-air splits not confirmed (Lossnay requires registration within 3 months of commissioning; Ecodan uses a guarantee form).",
+      "sources": [
+        {
+          "url": "https://www.orionairsales.co.uk/mitsubishi-electric-air-conditioning-msz-ap25vgk-wall-25kw9000btu-r32-heat-pump-a-240v50hz-9557-p.asp",
+          "title": "Orion Air Sales UK - MSZ-AP25VGK (3.2 kW heat 1.0-4.1, 19-45 dB(A), 798x219x299, 10.5 kg)"
+        },
+        {
+          "url": "https://www.schiessl-kaelte.com/en_IT/Shop/Air-conditioners-ventilation-systems/Air-conditioners/Air-conditioners/Set/Mitsubishi-air-condition-set-M-Series-MSZ-AP25VGK-MUZ-AP25VG-2-5kW-R32-Wifi~p1530883",
+          "title": "Schiessl - MSZ-AP25VGK/MUZ-AP25VG set (SEER 8.6, SCOP 4.8, 20 m / 12 m, 7 m + 20 g/m)"
+        },
+        {
+          "url": "https://avonair.co.uk/product/mitsubishi-electric-elegance-wall-ap-series-air-conditioning-msz-ap25vgk-2-5kw/",
+          "title": "Avon Air UK - MSZ-AP25VGK"
+        },
+        {
+          "url": "https://www.orionairsales.co.uk/mitsubishi-electric-air-conditioning-mxz-2f42vf3-multi-2-x-msz-ap25vgk-25kw-wall-a-240v50hz-14598-p.asp",
+          "title": "Orion Air Sales UK - MXZ-2F42VF3 + 2x MSZ-AP25VGK multi bundle"
+        },
+        {
+          "url": "https://koolit.co.uk/app/uploads/2021/02/MSZ-AP_Product_Information_Sheet_2019.pdf",
+          "title": "Mitsubishi Electric UK MSZ-AP R32 Product Information Sheet 2019 (installer-hosted copy; via search snippet)"
+        },
+        {
+          "url": "https://library.mitsubishielectric.co.uk/pdf/download_full/4788",
+          "title": "Mitsubishi Electric UK library - MSZ-AY / MSZ-AP R32 Elegance Wall Mounted System PI sheet (located via search; not opened)"
+        },
+        {
+          "url": "https://airconadviser.co.uk/products/wall-mounted-split-systems/mitsubishi-msz-ay",
+          "title": "AirConAdviser UK - Mitsubishi MSZ-AY review (AY replaces AP for 2.5-5.0 kW; secondary)"
+        },
+        {
+          "url": "https://modbs.co.uk/news/fullstory.php/aid/2748/Air_conditioning_enjoys__5-year_guarantee_.html",
+          "title": "MODBS - Air conditioning enjoys 5-year guarantee (Mitsubishi accredited installer; secondary)"
+        }
+      ],
+      "confidence": "provisional",
+      "notes": "Sound low = quietest indoor setting 19 dB(A); highest heating 45 dB(A); cooling SHi not captured. Indoor sound power 57 dB(A); 6 A BS88 HRC fuse on indoor feed (Orion). A SWAT Engineering UK listing shows SEER 7.2 / SCOP 4.4 which appears to be the AP50 rating - ignored. Pipe sizes from MUZ-AP25-50VG service manual (9.52 / 6.35). UK STATUS: from 2023 the MSZ-AY (Elegance) replaces MSZ-AP in the 2.5-5.0 kW sizes (AirConAdviser, ClimaMarket - secondary); the UK PI sheet is now titled 'MSZ-AY / MSZ-AP' and Logicool lists 'MSZ-AP Elegance (6.0-7.1kW)', suggesting AP continues only at 6.0/7.1 kW. AP25/35/50VGK are still listed by UK retailers - confirm availability before quoting."
+    },
+    {
+      "kind": "outdoor",
+      "manufacturer": "Mitsubishi Electric",
+      "series": "Elegance AP (MSZ-AP..VGK / MUZ-AP..VG, R32)",
+      "model": "MUZ-AP25VG",
+      "label": "Mitsubishi Electric Elegance AP 2.5 kW outdoor",
+      "tier": "standard",
+      "multiSplitCapable": false,
+      "ports": 1,
+      "pairedWith": "MSZ-AP25VGK",
+      "specs": {
+        "coolingKw": 2.5,
+        "heatingKw": 3.2,
+        "seer": 8.6,
+        "scop": 4.8,
+        "energyClassCooling": "A+++",
+        "energyClassHeating": "A++",
+        "soundPressureLowDb": null,
+        "soundPressureHighDb": null,
+        "soundPowerDb": 59,
+        "dimensionsMm": {
+          "w": 800,
+          "h": 550,
+          "d": 285
+        },
+        "weightKg": 31,
+        "refrigerant": "R32",
+        "liquidPipeMm": 6.35,
+        "gasPipeMm": 9.52,
+        "maxPipeM": 20,
+        "maxHeightDiffM": 12,
+        "prechargedPipeM": 7,
+        "additionalChargeGPerM": 20,
+        "powerSupply": "220-240 V, 50 Hz, single phase",
+        "recommendedBreakerA": 10,
+        "wifi": null,
+        "operatingRangeCoolingC": "-10 to +46",
+        "operatingRangeHeatingC": "-15 to +24"
+      },
+      "warranty": "Mitsubishi Electric UK: 3 years standard on air conditioning equipment; up to 5 years parts when installed by a Mitsubishi Electric Accredited Installer (Partner Programme). Source: UK installer announcements and pages (MODBS / Weatherite, Carlton Services, HF Group) - SECONDARY, official A2A warranty T&Cs not retrieved. One installer (ACE Services) claims 7-year parts cover via 'Business Solutions Partner' status - unverified. Registration rules for air-to-air splits not confirmed (Lossnay requires registration within 3 months of commissioning; Ecodan uses a guarantee form).",
+      "sources": [
+        {
+          "url": "https://www.orionairsales.co.uk/mitsubishi-electric-air-conditioning-msz-ap25vgk-wall-25kw9000btu-r32-heat-pump-a-240v50hz-9557-p.asp",
+          "title": "Orion Air Sales UK - MUZ-AP25VG 800x285x550, 31 kg, LwA 59, SPL 48/47"
+        },
+        {
+          "url": "https://www.schiessl-kaelte.com/en_IT/Shop/Air-conditioners-ventilation-systems/Air-conditioners/Air-conditioners/Set/Mitsubishi-air-condition-set-M-Series-MSZ-AP25VGK-MUZ-AP25VG-2-5kW-R32-Wifi~p1530883",
+          "title": "Schiessl - 20 m line, 12 m height, 7 m pre-charge, 20 g/m"
+        },
+        {
+          "url": "https://www.manualslib.com/manual/1403912/Mitsubishi-Electric-Muz-Ap25vg-E1.html?page=14",
+          "title": "ManualsLib - MUZ-AP25VG-E1 service manual p.14: max piping length, height difference, additional charge"
+        },
+        {
+          "url": "http://www.mitsubishitech.co.uk/Data/M-Series/MSZ/2019/MUZ-AP-VG/MUZ-AP25-50VG_SM_OBH789.pdf",
+          "title": "Mitsubishi Electric MUZ-AP25/35/42/50VG service manual OBH789 (via search snippet)"
+        },
+        {
+          "url": "https://hewitttradeservices.com.au/products/mitsubishi-electric-ap-series-msz-ap25vgd/",
+          "title": "Hewitt Trade Services AU - MSZ-AP25VG(D) (breaker 10 A; AU market, secondary)"
+        },
+        {
+          "url": "https://koolit.co.uk/app/uploads/2021/02/MSZ-AP_Product_Information_Sheet_2019.pdf",
+          "title": "Mitsubishi Electric UK MSZ-AP R32 Product Information Sheet 2019 (installer-hosted copy; via search snippet)"
+        },
+        {
+          "url": "https://modbs.co.uk/news/fullstory.php/aid/2748/Air_conditioning_enjoys__5-year_guarantee_.html",
+          "title": "MODBS - Air conditioning enjoys 5-year guarantee (Mitsubishi accredited installer; secondary)"
+        }
+      ],
+      "confidence": "provisional",
+      "notes": "Outdoor SPL 48/47 dB(A) heating/cooling. Breaker 10 A: AU listing + UK 2019 PI sheet pattern (10 A smaller / 16 A larger models); Mitsubishi UK says fuse ratings are guidance only - electrician to size. Operating range -10..+46 C cooling / -15..+24 C heating is from a single secondary source for the AP series - confirm in databook. UK STATUS: from 2023 the MSZ-AY (Elegance) replaces MSZ-AP in the 2.5-5.0 kW sizes (AirConAdviser, ClimaMarket - secondary); the UK PI sheet is now titled 'MSZ-AY / MSZ-AP' and Logicool lists 'MSZ-AP Elegance (6.0-7.1kW)', suggesting AP continues only at 6.0/7.1 kW. AP25/35/50VGK are still listed by UK retailers - confirm availability before quoting."
+    },
+    {
+      "kind": "indoor",
+      "manufacturer": "Mitsubishi Electric",
+      "series": "Elegance AP (MSZ-AP..VGK / MUZ-AP..VG, R32)",
+      "model": "MSZ-AP35VGK",
+      "label": "Mitsubishi Electric Elegance AP 3.5 kW",
+      "tier": "standard",
+      "multiSplitCapable": true,
+      "ports": null,
+      "pairedWith": "MUZ-AP35VG",
+      "specs": {
+        "coolingKw": 3.5,
+        "heatingKw": 4.0,
+        "seer": 8.6,
+        "scop": 4.7,
+        "energyClassCooling": "A+++",
+        "energyClassHeating": "A++",
+        "soundPressureLowDb": 19,
+        "soundPressureHighDb": 42,
+        "soundPowerDb": null,
+        "dimensionsMm": {
+          "w": 798,
+          "h": 299,
+          "d": 219
+        },
+        "weightKg": 10.5,
+        "refrigerant": "R32",
+        "liquidPipeMm": 6.35,
+        "gasPipeMm": 9.52,
+        "maxPipeM": null,
+        "maxHeightDiffM": null,
+        "prechargedPipeM": null,
+        "additionalChargeGPerM": null,
+        "powerSupply": "220-240 V, 50 Hz, single phase (Mitsubishi RAC splits: indoor unit fed via the outdoor unit interconnect - confirm in installation manual)",
+        "recommendedBreakerA": null,
+        "wifi": "Built-in Wi-Fi (MELCloud) on 'VGK' indoor units per Mitsubishi UK MSZ-AP literature and Orion listings",
+        "operatingRangeCoolingC": "-10 to +46",
+        "operatingRangeHeatingC": "-15 to +24"
+      },
+      "warranty": "Mitsubishi Electric UK: 3 years standard on air conditioning equipment; up to 5 years parts when installed by a Mitsubishi Electric Accredited Installer (Partner Programme). Source: UK installer announcements and pages (MODBS / Weatherite, Carlton Services, HF Group) - SECONDARY, official A2A warranty T&Cs not retrieved. One installer (ACE Services) claims 7-year parts cover via 'Business Solutions Partner' status - unverified. Registration rules for air-to-air splits not confirmed (Lossnay requires registration within 3 months of commissioning; Ecodan uses a guarantee form).",
+      "sources": [
+        {
+          "url": "https://www.orionairsales.co.uk/mitsubishi-electric-air-conditioning-msz-ap35vgk-wall-35kw12000btu-heat-pump-r32-a-240v50hz-9559-p.asp",
+          "title": "Orion Air Sales UK - MSZ-AP35VGK (SCOP/SEER 4.70/8.60, 4.0 kW heat 1.3-4.6, SPL)"
+        },
+        {
+          "url": "https://www.swatengineering.co.uk/shop/mitsubishi-m-series-air-conditioner-msz-ap35vgk-r32",
+          "title": "SWAT Engineering UK - MSZ-AP35VGK (conflicting SEER/SCOP 7.2/4.4)"
+        },
+        {
+          "url": "http://www.mitsubishitech.co.uk/Data/M-Series/MSZ/2019/MUZ-AP-VG/MUZ-AP25-50VG_SM_OBH789.pdf",
+          "title": "Mitsubishi Electric MUZ-AP25/35/42/50VG service manual OBH789 (via search snippet)"
+        },
+        {
+          "url": "https://library.mitsubishielectric.co.uk/pdf/download_full/4788",
+          "title": "Mitsubishi Electric UK library - MSZ-AY / MSZ-AP R32 Elegance Wall Mounted System PI sheet (located via search; not opened)"
+        },
+        {
+          "url": "https://airconadviser.co.uk/products/wall-mounted-split-systems/mitsubishi-msz-ay",
+          "title": "AirConAdviser UK - Mitsubishi MSZ-AY review (AY replaces AP for 2.5-5.0 kW; secondary)"
+        },
+        {
+          "url": "https://modbs.co.uk/news/fullstory.php/aid/2748/Air_conditioning_enjoys__5-year_guarantee_.html",
+          "title": "MODBS - Air conditioning enjoys 5-year guarantee (Mitsubishi accredited installer; secondary)"
+        }
+      ],
+      "confidence": "provisional",
+      "notes": "Sound = cooling SLo..SHi 19-24-30-36-42 dB(A); heating 19-24-31-38-45. Orion quotes UK-condition cooling 3.26 kW, SWAT 3.47 kW; nominal 3.5 kW. EER 3.54 / COP 3.88 (manual aggregators). SWAT's SEER 7.2 / SCOP 4.4 and 195 mm depth conflict with other sources. UK STATUS: from 2023 the MSZ-AY (Elegance) replaces MSZ-AP in the 2.5-5.0 kW sizes (AirConAdviser, ClimaMarket - secondary); the UK PI sheet is now titled 'MSZ-AY / MSZ-AP' and Logicool lists 'MSZ-AP Elegance (6.0-7.1kW)', suggesting AP continues only at 6.0/7.1 kW. AP25/35/50VGK are still listed by UK retailers - confirm availability before quoting."
+    },
+    {
+      "kind": "outdoor",
+      "manufacturer": "Mitsubishi Electric",
+      "series": "Elegance AP (MSZ-AP..VGK / MUZ-AP..VG, R32)",
+      "model": "MUZ-AP35VG",
+      "label": "Mitsubishi Electric Elegance AP 3.5 kW outdoor",
+      "tier": "standard",
+      "multiSplitCapable": false,
+      "ports": 1,
+      "pairedWith": "MSZ-AP35VGK",
+      "specs": {
+        "coolingKw": 3.5,
+        "heatingKw": 4.0,
+        "seer": 8.6,
+        "scop": 4.7,
+        "energyClassCooling": "A+++",
+        "energyClassHeating": "A++",
+        "soundPressureLowDb": null,
+        "soundPressureHighDb": null,
+        "soundPowerDb": 61,
+        "dimensionsMm": {
+          "w": 800,
+          "h": 550,
+          "d": 285
+        },
+        "weightKg": 31,
+        "refrigerant": "R32",
+        "liquidPipeMm": 6.35,
+        "gasPipeMm": 9.52,
+        "maxPipeM": 20,
+        "maxHeightDiffM": 12,
+        "prechargedPipeM": 7,
+        "additionalChargeGPerM": 20,
+        "powerSupply": "220-240 V, 50 Hz, single phase",
+        "recommendedBreakerA": 10,
+        "wifi": null,
+        "operatingRangeCoolingC": "-10 to +46",
+        "operatingRangeHeatingC": "-15 to +24"
+      },
+      "warranty": "Mitsubishi Electric UK: 3 years standard on air conditioning equipment; up to 5 years parts when installed by a Mitsubishi Electric Accredited Installer (Partner Programme). Source: UK installer announcements and pages (MODBS / Weatherite, Carlton Services, HF Group) - SECONDARY, official A2A warranty T&Cs not retrieved. One installer (ACE Services) claims 7-year parts cover via 'Business Solutions Partner' status - unverified. Registration rules for air-to-air splits not confirmed (Lossnay requires registration within 3 months of commissioning; Ecodan uses a guarantee form).",
+      "sources": [
+        {
+          "url": "https://www.orionairsales.co.uk/mitsubishi-electric-air-conditioning-msz-ap35vgk-wall-35kw12000btu-heat-pump-r32-a-240v50hz-9559-p.asp",
+          "title": "Orion Air Sales UK - MUZ-AP35VG 800x285x550, 31 kg, SPL 50/49, LwA 61"
+        },
+        {
+          "url": "http://www.mitsubishitech.co.uk/Data/M-Series/MSZ/2019/MUZ-AP-VG/MUZ-AP25-50VG_SM_OBH789.pdf",
+          "title": "Mitsubishi Electric MUZ-AP25/35/42/50VG service manual OBH789 (via search snippet)"
+        },
+        {
+          "url": "https://www.manualslib.com/manual/1403912/Mitsubishi-Electric-Muz-Ap25vg-E1.html?page=14",
+          "title": "ManualsLib - MUZ-AP25VG-E1 service manual p.14: max piping length, height difference, additional charge"
+        },
+        {
+          "url": "https://koolit.co.uk/app/uploads/2021/02/MSZ-AP_Product_Information_Sheet_2019.pdf",
+          "title": "Mitsubishi Electric UK MSZ-AP R32 Product Information Sheet 2019 (installer-hosted copy; via search snippet)"
+        },
+        {
+          "url": "https://modbs.co.uk/news/fullstory.php/aid/2748/Air_conditioning_enjoys__5-year_guarantee_.html",
+          "title": "MODBS - Air conditioning enjoys 5-year guarantee (Mitsubishi accredited installer; secondary)"
+        }
+      ],
+      "confidence": "provisional",
+      "notes": "Pipe limits / pre-charge / 20 g/m taken from the MUZ-AP25-50VG series service manual (covers AP35). Breaker 10 A from UK 2019 PI sheet pattern - provisional."
+    },
+    {
+      "kind": "indoor",
+      "manufacturer": "Mitsubishi Electric",
+      "series": "Elegance AP (MSZ-AP..VGK / MUZ-AP..VG, R32)",
+      "model": "MSZ-AP50VGK",
+      "label": "Mitsubishi Electric Elegance AP 5.0 kW",
+      "tier": "standard",
+      "multiSplitCapable": true,
+      "ports": null,
+      "pairedWith": "MUZ-AP50VG",
+      "specs": {
+        "coolingKw": 5.0,
+        "heatingKw": 5.8,
+        "seer": 7.4,
+        "scop": 4.7,
+        "energyClassCooling": "A++",
+        "energyClassHeating": "A++",
+        "soundPressureLowDb": null,
+        "soundPressureHighDb": null,
+        "soundPowerDb": null,
+        "dimensionsMm": {
+          "w": 798,
+          "h": 299,
+          "d": 219
+        },
+        "weightKg": 10.5,
+        "refrigerant": "R32",
+        "liquidPipeMm": 6.35,
+        "gasPipeMm": null,
+        "maxPipeM": null,
+        "maxHeightDiffM": null,
+        "prechargedPipeM": null,
+        "additionalChargeGPerM": null,
+        "powerSupply": "220-240 V, 50 Hz, single phase (Mitsubishi RAC splits: indoor unit fed via the outdoor unit interconnect - confirm in installation manual)",
+        "recommendedBreakerA": null,
+        "wifi": "Built-in Wi-Fi (MELCloud) on 'VGK' indoor units per Mitsubishi UK MSZ-AP literature and Orion listings",
+        "operatingRangeCoolingC": null,
+        "operatingRangeHeatingC": null
+      },
+      "warranty": "Mitsubishi Electric UK: 3 years standard on air conditioning equipment; up to 5 years parts when installed by a Mitsubishi Electric Accredited Installer (Partner Programme). Source: UK installer announcements and pages (MODBS / Weatherite, Carlton Services, HF Group) - SECONDARY, official A2A warranty T&Cs not retrieved. One installer (ACE Services) claims 7-year parts cover via 'Business Solutions Partner' status - unverified. Registration rules for air-to-air splits not confirmed (Lossnay requires registration within 3 months of commissioning; Ecodan uses a guarantee form).",
+      "sources": [
+        {
+          "url": "https://www.orionairsales.co.uk/mitsubishi-electric-air-conditioning-msz-ap50vgk-wall-5kw17000btu-heat-pump-r32-a-240v50hz-9561-p.asp",
+          "title": "Orion Air Sales UK - MSZ-AP50VGK (5.0/5.8 kW, SCOP/SEER 4.70/7.40, built-in Wi-Fi)"
+        },
+        {
+          "url": "https://www.climamania.com/en/air-conditioning-mitsubishi-electric-msz-ap50vgk.html",
+          "title": "Climamania - MSZ-AP50VGK (SEER 7.4, SCOP 4.7)"
+        },
+        {
+          "url": "https://www.orionairsales.co.uk/mitsubishi-electric-air-conditioning-mxz-4f72vf3-multi-2-x-msz-ap50vgk-25kw-wall-a-240v50hz-14608-p.asp",
+          "title": "Orion Air Sales UK - MXZ-4F72VF3 + 2x MSZ-AP50VGK multi bundle"
+        },
+        {
+          "url": "https://www.mitsubishi-electric.co.nz/heatpump/i/69357B/classic-ap-50-high-wall-heat-pump",
+          "title": "Mitsubishi Electric NZ - AP50 (gas 12.7 mm; NZ variant)"
+        },
+        {
+          "url": "http://www.mitsubishitech.co.uk/Data/M-Series/MSZ/2019/MUZ-AP-VG/MUZ-AP25-50VG_SM_OBH789.pdf",
+          "title": "Mitsubishi Electric MUZ-AP25/35/42/50VG service manual OBH789 (via search snippet)"
+        },
+        {
+          "url": "https://airconadviser.co.uk/products/wall-mounted-split-systems/mitsubishi-msz-ay",
+          "title": "AirConAdviser UK - Mitsubishi MSZ-AY review (AY replaces AP for 2.5-5.0 kW; secondary)"
+        },
+        {
+          "url": "https://modbs.co.uk/news/fullstory.php/aid/2748/Air_conditioning_enjoys__5-year_guarantee_.html",
+          "title": "MODBS - Air conditioning enjoys 5-year guarantee (Mitsubishi accredited installer; secondary)"
+        }
+      ],
+      "confidence": "provisional",
+      "notes": "Indoor sound levels not captured reliably. GAS PIPE CONFLICT: Mitsubishi NZ and a UK retailer give 12.7 mm (1/2\") gas; the EU MUZ-AP25-50VG service manual and indoor parts catalogue give 9.52 mm for AP42/50 - left null, check installation manual before ordering pipe. SWAT UK lists SEER 7.2 / SCOP 4.4 (conflict). UK STATUS: from 2023 the MSZ-AY (Elegance) replaces MSZ-AP in the 2.5-5.0 kW sizes (AirConAdviser, ClimaMarket - secondary); the UK PI sheet is now titled 'MSZ-AY / MSZ-AP' and Logicool lists 'MSZ-AP Elegance (6.0-7.1kW)', suggesting AP continues only at 6.0/7.1 kW. AP25/35/50VGK are still listed by UK retailers - confirm availability before quoting."
+    },
+    {
+      "kind": "outdoor",
+      "manufacturer": "Mitsubishi Electric",
+      "series": "Elegance AP (MSZ-AP..VGK / MUZ-AP..VG, R32)",
+      "model": "MUZ-AP50VG",
+      "label": "Mitsubishi Electric Elegance AP 5.0 kW outdoor",
+      "tier": "standard",
+      "multiSplitCapable": false,
+      "ports": 1,
+      "pairedWith": "MSZ-AP50VGK",
+      "specs": {
+        "coolingKw": 5.0,
+        "heatingKw": 5.8,
+        "seer": 7.4,
+        "scop": 4.7,
+        "energyClassCooling": "A++",
+        "energyClassHeating": "A++",
+        "soundPressureLowDb": null,
+        "soundPressureHighDb": null,
+        "soundPowerDb": null,
+        "dimensionsMm": {
+          "w": 800,
+          "h": 714,
+          "d": 285
+        },
+        "weightKg": 40,
+        "refrigerant": "R32",
+        "liquidPipeMm": 6.35,
+        "gasPipeMm": null,
+        "maxPipeM": 20,
+        "maxHeightDiffM": 12,
+        "prechargedPipeM": 7,
+        "additionalChargeGPerM": 20,
+        "powerSupply": "230 V, 50 Hz, single phase",
+        "recommendedBreakerA": 16,
+        "wifi": null,
+        "operatingRangeCoolingC": null,
+        "operatingRangeHeatingC": null
+      },
+      "warranty": "Mitsubishi Electric UK: 3 years standard on air conditioning equipment; up to 5 years parts when installed by a Mitsubishi Electric Accredited Installer (Partner Programme). Source: UK installer announcements and pages (MODBS / Weatherite, Carlton Services, HF Group) - SECONDARY, official A2A warranty T&Cs not retrieved. One installer (ACE Services) claims 7-year parts cover via 'Business Solutions Partner' status - unverified. Registration rules for air-to-air splits not confirmed (Lossnay requires registration within 3 months of commissioning; Ecodan uses a guarantee form).",
+      "sources": [
+        {
+          "url": "https://hewitttradeservices.com.au/products/mitsubishi-electric-ap-series-msz-ap50vgd/",
+          "title": "Hewitt Trade Services AU - MUZ-AP50VG 714x800x285, 40 kg, breaker 16 A (AU market)"
+        },
+        {
+          "url": "https://www.schiessl-kaelte.com/en_IT/Shop/Air-conditioners-ventilation-systems/Air-conditioners/Air-conditioners/Multi-split-outdoor-units/Mitsubishi-air-conditioner-M-Series-5kW-Outdoor-unit-Single-Split-MUZ-AP50-VG-R32~p403013",
+          "title": "Schiessl - MUZ-AP50VG (net 40.0 kg, 16 A overcurrent protection)"
+        },
+        {
+          "url": "https://www.manualslib.com/manual/1403912/Mitsubishi-Electric-Muz-Ap25vg-E1.html?page=14",
+          "title": "ManualsLib - MUZ-AP25VG-E1 service manual p.14: max piping length, height difference, additional charge"
+        },
+        {
+          "url": "http://www.mitsubishitech.co.uk/Data/M-Series/MSZ/2019/MUZ-AP-VG/MUZ-AP25-50VG_SM_OBH789.pdf",
+          "title": "Mitsubishi Electric MUZ-AP25/35/42/50VG service manual OBH789 (via search snippet)"
+        },
+        {
+          "url": "https://www.orionairsales.co.uk/mitsubishi-electric-air-conditioning-msz-ap50vgk-wall-mounted-5kw17000btu-r32-a-install-kit-11338-p.asp",
+          "title": "Orion Air Sales UK - MSZ-AP50VGK install kit (R32 charge 1.00 kg, 0.68 tCO2e)"
+        },
+        {
+          "url": "https://modbs.co.uk/news/fullstory.php/aid/2748/Air_conditioning_enjoys__5-year_guarantee_.html",
+          "title": "MODBS - Air conditioning enjoys 5-year guarantee (Mitsubishi accredited installer; secondary)"
+        }
+      ],
+      "confidence": "provisional",
+      "notes": "Weight: 40 kg (Hewitt AU, Schiessl), 41 kg (Patton NZ), 35 kg (manuals.ca) - 40 kg used. Outdoor sound power CONFLICT (56 / 64 / 69 dB(A) across sources) - left null. Service manual: max 20 m, 12 m height, factory charge 1,000 g, 20 g/m beyond 7 m; one retailer says 15 m chargeless (conflict). Gas pipe size conflict - see indoor record."
+    },
+    {
+      "kind": "indoor",
+      "manufacturer": "Mitsubishi Electric",
+      "series": "Elegance AY (MSZ-AY..VGK / MUZ-AY..VG, R32) - current UK Elegance 2.5-5.0 kW",
+      "model": "MSZ-AY25VGK",
+      "label": "Mitsubishi Electric Elegance AY 2.5 kW",
+      "tier": "standard",
+      "multiSplitCapable": true,
+      "ports": null,
+      "pairedWith": "MUZ-AY25VG",
+      "specs": {
+        "coolingKw": 2.5,
+        "heatingKw": 3.2,
+        "seer": 8.7,
+        "scop": 4.8,
+        "energyClassCooling": "A+++",
+        "energyClassHeating": null,
+        "soundPressureLowDb": 18,
+        "soundPressureHighDb": 42,
+        "soundPowerDb": null,
+        "dimensionsMm": {
+          "w": 798,
+          "h": 299,
+          "d": 245
+        },
+        "weightKg": 10.5,
+        "refrigerant": "R32",
+        "liquidPipeMm": 6.35,
+        "gasPipeMm": 9.52,
+        "maxPipeM": null,
+        "maxHeightDiffM": null,
+        "prechargedPipeM": null,
+        "additionalChargeGPerM": null,
+        "powerSupply": "220-240 V, 50 Hz, single phase (Mitsubishi RAC splits: indoor unit fed via the outdoor unit interconnect - confirm in installation manual)",
+        "recommendedBreakerA": null,
+        "wifi": "Built-in Wi-Fi (MELCloud / MELCloud Home) per Mitsubishi UK MSZ-AY/AP PI sheet",
+        "operatingRangeCoolingC": null,
+        "operatingRangeHeatingC": null
+      },
+      "warranty": "Mitsubishi Electric UK: 3 years standard on air conditioning equipment; up to 5 years parts when installed by a Mitsubishi Electric Accredited Installer (Partner Programme). Source: UK installer announcements and pages (MODBS / Weatherite, Carlton Services, HF Group) - SECONDARY, official A2A warranty T&Cs not retrieved. One installer (ACE Services) claims 7-year parts cover via 'Business Solutions Partner' status - unverified. Registration rules for air-to-air splits not confirmed (Lossnay requires registration within 3 months of commissioning; Ecodan uses a guarantee form).",
+      "sources": [
+        {
+          "url": "https://www.orionairsales.co.uk/mitsubishi-electric-air-conditioning-msz-ay25vgk-wall-25kw9000btu-r32-heat-pump-a-elegance-17148-p.asp",
+          "title": "Orion Air Sales UK - MSZ-AY25VGK (3.2 kW heat 1.0-4.1, SCOP/SEER 4.80/8.70, 10.5 kg)"
+        },
+        {
+          "url": "https://climacom.com/en/product/mitsubishi-electric-air-conditioner-msz-ay25vgk-muz-ay25vg-9000btu/",
+          "title": "Climacom - MSZ-AY25VGK/MUZ-AY25VG (cooling SPL 18-24-30-36-42)"
+        },
+        {
+          "url": "https://library.mitsubishielectric.co.uk/pdf/download_full/4788",
+          "title": "Mitsubishi Electric UK library - MSZ-AY / MSZ-AP R32 Elegance Wall Mounted System PI sheet (located via search; not opened)"
+        },
+        {
+          "url": "https://airconadviser.co.uk/products/wall-mounted-split-systems/mitsubishi-msz-ay",
+          "title": "AirConAdviser UK - Mitsubishi MSZ-AY review (AY replaces AP for 2.5-5.0 kW; secondary)"
+        },
+        {
+          "url": "https://www.logicool-ac.com/products/mitsubishi-electric-msz-ay-r32-wall-mounted-mxz-multi/",
+          "title": "Logicool - MSZ-AY R32 Wall Mount (Multi) 2.5-5.0 kW"
+        },
+        {
+          "url": "https://modbs.co.uk/news/fullstory.php/aid/2748/Air_conditioning_enjoys__5-year_guarantee_.html",
+          "title": "MODBS - Air conditioning enjoys 5-year guarantee (Mitsubishi accredited installer; secondary)"
+        }
+      ],
+      "confidence": "provisional",
+      "notes": "Sound = cooling SLo..SHi 18-24-30-36-42 dB(A); heating 18-24-34-39-45; indoor sound power 57 dB(A). Heating energy class not captured from a source (SCOP 4.8). Depth 245 mm (Orion/Climacom) vs 219 mm (Carlton - likely AP carry-over). Carlton shows SEER 8.6; one listing SCOP 4.7. AY adds self-clean mode and dual-barrier coating vs AP (UK PI sheet)."
+    },
+    {
+      "kind": "outdoor",
+      "manufacturer": "Mitsubishi Electric",
+      "series": "Elegance AY (MSZ-AY..VGK / MUZ-AY..VG, R32) - current UK Elegance 2.5-5.0 kW",
+      "model": "MUZ-AY25VG",
+      "label": "Mitsubishi Electric Elegance AY 2.5 kW outdoor",
+      "tier": "standard",
+      "multiSplitCapable": false,
+      "ports": 1,
+      "pairedWith": "MSZ-AY25VGK",
+      "specs": {
+        "coolingKw": 2.5,
+        "heatingKw": 3.2,
+        "seer": 8.7,
+        "scop": 4.8,
+        "energyClassCooling": "A+++",
+        "energyClassHeating": null,
+        "soundPressureLowDb": null,
+        "soundPressureHighDb": null,
+        "soundPowerDb": 59,
+        "dimensionsMm": {
+          "w": 800,
+          "h": 550,
+          "d": 285
+        },
+        "weightKg": null,
+        "refrigerant": "R32",
+        "liquidPipeMm": 6.35,
+        "gasPipeMm": 9.52,
+        "maxPipeM": 20,
+        "maxHeightDiffM": 12,
+        "prechargedPipeM": null,
+        "additionalChargeGPerM": null,
+        "powerSupply": "220-240 V, 50 Hz, single phase (max running current 7.06 A)",
+        "recommendedBreakerA": 10,
+        "wifi": null,
+        "operatingRangeCoolingC": null,
+        "operatingRangeHeatingC": null
+      },
+      "warranty": "Mitsubishi Electric UK: 3 years standard on air conditioning equipment; up to 5 years parts when installed by a Mitsubishi Electric Accredited Installer (Partner Programme). Source: UK installer announcements and pages (MODBS / Weatherite, Carlton Services, HF Group) - SECONDARY, official A2A warranty T&Cs not retrieved. One installer (ACE Services) claims 7-year parts cover via 'Business Solutions Partner' status - unverified. Registration rules for air-to-air splits not confirmed (Lossnay requires registration within 3 months of commissioning; Ecodan uses a guarantee form).",
+      "sources": [
+        {
+          "url": "https://www.orionairsales.co.uk/mitsubishi-electric-air-conditioning-msz-ay25vgk-wall-25kw9000btu-r32-heat-pump-a-elegance-17148-p.asp",
+          "title": "Orion Air Sales UK - MUZ-AY25VG (SPL 48/47, LwA 59)"
+        },
+        {
+          "url": "https://e-catalog.com/MITSUBISHI-ELECTRIC-STANDARD-MSZ-AY25VGK-MUZ-AY25VG.htm",
+          "title": "e-catalog - MSZ-AY25VGK/MUZ-AY25VG (20 m pipe, 12 m height; secondary)"
+        },
+        {
+          "url": "https://www.orionairsales.co.uk/blogs/the-perfect-blend-of-style-and-comfort-the-new-mszapay-r32-elegance-wall-mounted-system",
+          "title": "Orion Air Sales blog - MSZ-AP/AY R32 Elegance (mains fuse 10/10/16 A for AY25/35/50; reproduces UK PI table)"
+        },
+        {
+          "url": "https://klimatime.com/products/mitsubishi-electric-msz-ay25vgk-muz-ay25vg-wall-split-air-conditioner",
+          "title": "KlimaTime - AY25 (recommended 10 A)"
+        },
+        {
+          "url": "https://modbs.co.uk/news/fullstory.php/aid/2748/Air_conditioning_enjoys__5-year_guarantee_.html",
+          "title": "MODBS - Air conditioning enjoys 5-year guarantee (Mitsubishi accredited installer; secondary)"
+        }
+      ],
+      "confidence": "provisional",
+      "notes": "Outdoor weight CONFLICT: 31 kg (Orion), 27 kg, 26.5 kg (Climacom) - left null. Pre-charge length and g/m not found for AY (AP was 7 m + 20 g/m; do not assume). Operating range not found."
+    },
+    {
+      "kind": "indoor",
+      "manufacturer": "Mitsubishi Electric",
+      "series": "Elegance AY (MSZ-AY..VGK / MUZ-AY..VG, R32) - current UK Elegance 2.5-5.0 kW",
+      "model": "MSZ-AY35VGK",
+      "label": "Mitsubishi Electric Elegance AY 3.5 kW",
+      "tier": "standard",
+      "multiSplitCapable": true,
+      "ports": null,
+      "pairedWith": "MUZ-AY35VG",
+      "specs": {
+        "coolingKw": 3.5,
+        "heatingKw": 4.0,
+        "seer": 8.7,
+        "scop": 4.7,
+        "energyClassCooling": "A+++",
+        "energyClassHeating": "A++",
+        "soundPressureLowDb": 18,
+        "soundPressureHighDb": 42,
+        "soundPowerDb": null,
+        "dimensionsMm": {
+          "w": 798,
+          "h": 299,
+          "d": 245
+        },
+        "weightKg": 10.5,
+        "refrigerant": "R32",
+        "liquidPipeMm": null,
+        "gasPipeMm": null,
+        "maxPipeM": null,
+        "maxHeightDiffM": null,
+        "prechargedPipeM": null,
+        "additionalChargeGPerM": null,
+        "powerSupply": "220-240 V, 50 Hz, single phase (Mitsubishi RAC splits: indoor unit fed via the outdoor unit interconnect - confirm in installation manual)",
+        "recommendedBreakerA": null,
+        "wifi": "Built-in Wi-Fi (MELCloud / MELCloud Home) per Mitsubishi UK MSZ-AY/AP PI sheet",
+        "operatingRangeCoolingC": null,
+        "operatingRangeHeatingC": null
+      },
+      "warranty": "Mitsubishi Electric UK: 3 years standard on air conditioning equipment; up to 5 years parts when installed by a Mitsubishi Electric Accredited Installer (Partner Programme). Source: UK installer announcements and pages (MODBS / Weatherite, Carlton Services, HF Group) - SECONDARY, official A2A warranty T&Cs not retrieved. One installer (ACE Services) claims 7-year parts cover via 'Business Solutions Partner' status - unverified. Registration rules for air-to-air splits not confirmed (Lossnay requires registration within 3 months of commissioning; Ecodan uses a guarantee form).",
+      "sources": [
+        {
+          "url": "https://www.eurovent-certification.com/en/catalog/program/certificate/participant/model/show/201929577",
+          "title": "Eurovent certificate - MUZ-AY35VG/MSZ-AY35VGK(P) (SEER 8.7, SCOP 4.7, Pdesignh 2.9 kW)"
+        },
+        {
+          "url": "https://climacom.com/en/product/mitsubishi-electric-air-conditioner-msz-ay35vgk-muz-ay35vg-12000btu/",
+          "title": "Climacom - MSZ-AY35VGK (3.5 (1.1-3.8) / 4.0 (1.3-4.6) kW, SPL, 10.5 kg)"
+        },
+        {
+          "url": "https://www.carltonservices.co.uk/product/mitsubishi-electric-msz-ay35vgk-wall-mounted-air-conditioning-system/",
+          "title": "Carlton Services UK - MSZ-AY35VGK (conflicting UK-rated figures)"
+        },
+        {
+          "url": "https://library.mitsubishielectric.co.uk/pdf/download_full/4788",
+          "title": "Mitsubishi Electric UK library - MSZ-AY / MSZ-AP R32 Elegance Wall Mounted System PI sheet (located via search; not opened)"
+        },
+        {
+          "url": "https://modbs.co.uk/news/fullstory.php/aid/2748/Air_conditioning_enjoys__5-year_guarantee_.html",
+          "title": "MODBS - Air conditioning enjoys 5-year guarantee (Mitsubishi accredited installer; secondary)"
+        }
+      ],
+      "confidence": "provisional",
+      "notes": "Sound = cooling 18-24-30-36-42 dB(A); heating 18-24-31-38-45. Carlton lists UK-rated heating 3.3 (1.1-3.8) and SCOP/SEER 4.70/8.60 - conflicts with EU nominal 4.0 kW / SEER 8.7. Pipe sizes not explicitly confirmed for AY35 (AY25 is 6.35/9.52) - left null."
+    },
+    {
+      "kind": "outdoor",
+      "manufacturer": "Mitsubishi Electric",
+      "series": "Elegance AY (MSZ-AY..VGK / MUZ-AY..VG, R32) - current UK Elegance 2.5-5.0 kW",
+      "model": "MUZ-AY35VG",
+      "label": "Mitsubishi Electric Elegance AY 3.5 kW outdoor",
+      "tier": "standard",
+      "multiSplitCapable": false,
+      "ports": 1,
+      "pairedWith": "MSZ-AY35VGK",
+      "specs": {
+        "coolingKw": 3.5,
+        "heatingKw": 4.0,
+        "seer": 8.7,
+        "scop": 4.7,
+        "energyClassCooling": "A+++",
+        "energyClassHeating": "A++",
+        "soundPressureLowDb": null,
+        "soundPressureHighDb": null,
+        "soundPowerDb": null,
+        "dimensionsMm": {
+          "w": 800,
+          "h": 550,
+          "d": 285
+        },
+        "weightKg": 27,
+        "refrigerant": "R32",
+        "liquidPipeMm": null,
+        "gasPipeMm": null,
+        "maxPipeM": null,
+        "maxHeightDiffM": null,
+        "prechargedPipeM": null,
+        "additionalChargeGPerM": null,
+        "powerSupply": "220-240 V, 50 Hz, single phase",
+        "recommendedBreakerA": 10,
+        "wifi": null,
+        "operatingRangeCoolingC": null,
+        "operatingRangeHeatingC": null
+      },
+      "warranty": "Mitsubishi Electric UK: 3 years standard on air conditioning equipment; up to 5 years parts when installed by a Mitsubishi Electric Accredited Installer (Partner Programme). Source: UK installer announcements and pages (MODBS / Weatherite, Carlton Services, HF Group) - SECONDARY, official A2A warranty T&Cs not retrieved. One installer (ACE Services) claims 7-year parts cover via 'Business Solutions Partner' status - unverified. Registration rules for air-to-air splits not confirmed (Lossnay requires registration within 3 months of commissioning; Ecodan uses a guarantee form).",
+      "sources": [
+        {
+          "url": "https://climacom.com/en/product/mitsubishi-electric-air-conditioner-msz-ay35vgk-muz-ay35vg-12000btu/",
+          "title": "Climacom - MUZ-AY35VG 550x800x285, 27 kg"
+        },
+        {
+          "url": "https://www.orionairsales.co.uk/blogs/the-perfect-blend-of-style-and-comfort-the-new-mszapay-r32-elegance-wall-mounted-system",
+          "title": "Orion Air Sales blog - MSZ-AP/AY R32 Elegance (mains fuse 10/10/16 A for AY25/35/50; reproduces UK PI table)"
+        },
+        {
+          "url": "https://www.eurovent-certification.com/en/catalog/program/certificate/participant/model/show/201929577",
+          "title": "Eurovent certificate - MUZ-AY35VG/MSZ-AY35VGK(P)"
+        },
+        {
+          "url": "https://modbs.co.uk/news/fullstory.php/aid/2748/Air_conditioning_enjoys__5-year_guarantee_.html",
+          "title": "MODBS - Air conditioning enjoys 5-year guarantee (Mitsubishi accredited installer; secondary)"
+        }
+      ],
+      "confidence": "provisional",
+      "notes": "Outdoor sound power NOT found (SPL 47-49 dB(A) quoted). Pipe limits, pre-charge and operating range not found - check databook."
+    },
+    {
+      "kind": "indoor",
+      "manufacturer": "Mitsubishi Electric",
+      "series": "Elegance AY (MSZ-AY..VGK / MUZ-AY..VG, R32) - current UK Elegance 2.5-5.0 kW",
+      "model": "MSZ-AY50VGK",
+      "label": "Mitsubishi Electric Elegance AY 5.0 kW",
+      "tier": "standard",
+      "multiSplitCapable": true,
+      "ports": null,
+      "pairedWith": "MUZ-AY50VG",
+      "specs": {
+        "coolingKw": 5.0,
+        "heatingKw": 5.8,
+        "seer": 7.5,
+        "scop": 4.7,
+        "energyClassCooling": "A++",
+        "energyClassHeating": "A++",
+        "soundPressureLowDb": null,
+        "soundPressureHighDb": null,
+        "soundPowerDb": null,
+        "dimensionsMm": {
+          "w": 798,
+          "h": 299,
+          "d": 245
+        },
+        "weightKg": 10.5,
+        "refrigerant": "R32",
+        "liquidPipeMm": null,
+        "gasPipeMm": null,
+        "maxPipeM": null,
+        "maxHeightDiffM": null,
+        "prechargedPipeM": null,
+        "additionalChargeGPerM": null,
+        "powerSupply": "220-240 V, 50 Hz, single phase (Mitsubishi RAC splits: indoor unit fed via the outdoor unit interconnect - confirm in installation manual)",
+        "recommendedBreakerA": null,
+        "wifi": "Built-in Wi-Fi (MELCloud / MELCloud Home) per Mitsubishi UK MSZ-AY/AP PI sheet",
+        "operatingRangeCoolingC": null,
+        "operatingRangeHeatingC": null
+      },
+      "warranty": "Mitsubishi Electric UK: 3 years standard on air conditioning equipment; up to 5 years parts when installed by a Mitsubishi Electric Accredited Installer (Partner Programme). Source: UK installer announcements and pages (MODBS / Weatherite, Carlton Services, HF Group) - SECONDARY, official A2A warranty T&Cs not retrieved. One installer (ACE Services) claims 7-year parts cover via 'Business Solutions Partner' status - unverified. Registration rules for air-to-air splits not confirmed (Lossnay requires registration within 3 months of commissioning; Ecodan uses a guarantee form).",
+      "sources": [
+        {
+          "url": "https://climacom.com/en/product/mitsubishi-electric-air-conditioner-msz-ay50vgk-muz-ay50vg-18000btu/",
+          "title": "Climacom - MSZ-AY50VGK/MUZ-AY50VG (SEER 7.5, SCOP 4.7, A++/A++)"
+        },
+        {
+          "url": "https://groupsumi.pt/aquecimento/ar-condicionado/ar-condicionado-fixo-split/ar-condicionado-com-wi-fi-mitsubishi-5-0-kw-18000-btu-msz-ay50vgk",
+          "title": "GroupSumi PT - MSZ-AY50VGK (5.8 kW heat; outdoor 40 kg)"
+        },
+        {
+          "url": "https://airconadviser.co.uk/products/wall-mounted-split-systems/mitsubishi-msz-ay",
+          "title": "AirConAdviser UK - Mitsubishi MSZ-AY review (AY replaces AP for 2.5-5.0 kW; secondary)"
+        },
+        {
+          "url": "https://library.mitsubishielectric.co.uk/pdf/download_full/4788",
+          "title": "Mitsubishi Electric UK library - MSZ-AY / MSZ-AP R32 Elegance Wall Mounted System PI sheet (located via search; not opened)"
+        },
+        {
+          "url": "https://modbs.co.uk/news/fullstory.php/aid/2748/Air_conditioning_enjoys__5-year_guarantee_.html",
+          "title": "MODBS - Air conditioning enjoys 5-year guarantee (Mitsubishi accredited installer; secondary)"
+        }
+      ],
+      "confidence": "provisional",
+      "notes": "Heating CONFLICT: 5.8 kW nominal (two sources) vs 5.5 kW (1.4-7.3) on another; 5.8 used. One FR listing gives SEER 7.9. AirConAdviser notes the 4.2/5.0 kW AY sizes drop to A++ cooling. Indoor SPL quoted only as '28 / 40' (ambiguous) - left null. Pipe sizes not captured."
+    },
+    {
+      "kind": "outdoor",
+      "manufacturer": "Mitsubishi Electric",
+      "series": "Elegance AY (MSZ-AY..VGK / MUZ-AY..VG, R32) - current UK Elegance 2.5-5.0 kW",
+      "model": "MUZ-AY50VG",
+      "label": "Mitsubishi Electric Elegance AY 5.0 kW outdoor",
+      "tier": "standard",
+      "multiSplitCapable": false,
+      "ports": 1,
+      "pairedWith": "MSZ-AY50VGK",
+      "specs": {
+        "coolingKw": 5.0,
+        "heatingKw": 5.8,
+        "seer": 7.5,
+        "scop": 4.7,
+        "energyClassCooling": "A++",
+        "energyClassHeating": "A++",
+        "soundPressureLowDb": null,
+        "soundPressureHighDb": null,
+        "soundPowerDb": null,
+        "dimensionsMm": {
+          "w": 800,
+          "h": 714,
+          "d": 285
+        },
+        "weightKg": 40,
+        "refrigerant": "R32",
+        "liquidPipeMm": null,
+        "gasPipeMm": null,
+        "maxPipeM": null,
+        "maxHeightDiffM": null,
+        "prechargedPipeM": null,
+        "additionalChargeGPerM": null,
+        "powerSupply": "220-240 V, 50 Hz, single phase",
+        "recommendedBreakerA": 16,
+        "wifi": null,
+        "operatingRangeCoolingC": null,
+        "operatingRangeHeatingC": null
+      },
+      "warranty": "Mitsubishi Electric UK: 3 years standard on air conditioning equipment; up to 5 years parts when installed by a Mitsubishi Electric Accredited Installer (Partner Programme). Source: UK installer announcements and pages (MODBS / Weatherite, Carlton Services, HF Group) - SECONDARY, official A2A warranty T&Cs not retrieved. One installer (ACE Services) claims 7-year parts cover via 'Business Solutions Partner' status - unverified. Registration rules for air-to-air splits not confirmed (Lossnay requires registration within 3 months of commissioning; Ecodan uses a guarantee form).",
+      "sources": [
+        {
+          "url": "https://climacom.com/en/product/mitsubishi-electric-air-conditioner-msz-ay50vgk-muz-ay50vg-18000btu/",
+          "title": "Climacom - MUZ-AY50VG (714x800x285; SPL 52/52)"
+        },
+        {
+          "url": "https://groupsumi.pt/aquecimento/ar-condicionado/ar-condicionado-fixo-split/ar-condicionado-com-wi-fi-mitsubishi-5-0-kw-18000-btu-msz-ay50vgk",
+          "title": "GroupSumi PT - outdoor 40 kg (single source)"
+        },
+        {
+          "url": "https://www.orionairsales.co.uk/blogs/the-perfect-blend-of-style-and-comfort-the-new-mszapay-r32-elegance-wall-mounted-system",
+          "title": "Orion Air Sales blog - MSZ-AP/AY R32 Elegance (mains fuse 10/10/16 A for AY25/35/50; reproduces UK PI table)"
+        },
+        {
+          "url": "https://modbs.co.uk/news/fullstory.php/aid/2748/Air_conditioning_enjoys__5-year_guarantee_.html",
+          "title": "MODBS - Air conditioning enjoys 5-year guarantee (Mitsubishi accredited installer; secondary)"
+        }
+      ],
+      "confidence": "provisional",
+      "notes": "Weight 40 kg from a single secondary source. Outdoor sound power not found (SPL 52/52 dB(A)). A UK retailer quoted a 30 m max pipe run but the listing could not be pinned down - left null."
+    },
+    {
+      "kind": "indoor",
+      "manufacturer": "Mitsubishi Electric",
+      "series": "LN premium wall (MSZ-LN..VG2 / MUZ-LN..VG2, R32; 'Zen' in some UK installer copy, 'Diamond' in EU)",
+      "model": "MSZ-LN25VG2W",
+      "label": "Mitsubishi Electric LN Premium 2.5 kW",
+      "tier": "premium",
+      "multiSplitCapable": true,
+      "ports": null,
+      "pairedWith": "MUZ-LN25VG2",
+      "specs": {
+        "coolingKw": 2.5,
+        "heatingKw": 3.2,
+        "seer": 10.5,
+        "scop": 5.2,
+        "energyClassCooling": "A+++",
+        "energyClassHeating": "A+++",
+        "soundPressureLowDb": 19,
+        "soundPressureHighDb": 42,
+        "soundPowerDb": null,
+        "dimensionsMm": {
+          "w": 890,
+          "h": 307,
+          "d": 233
+        },
+        "weightKg": 15.5,
+        "refrigerant": "R32",
+        "liquidPipeMm": 6.35,
+        "gasPipeMm": 9.52,
+        "maxPipeM": null,
+        "maxHeightDiffM": null,
+        "prechargedPipeM": null,
+        "additionalChargeGPerM": null,
+        "powerSupply": "220-240 V, 50 Hz, single phase (Mitsubishi RAC splits: indoor unit fed via the outdoor unit interconnect - confirm in installation manual)",
+        "recommendedBreakerA": null,
+        "wifi": "Built-in Wi-Fi as standard (MELCloud / MELCloud Home; Alexa & Google Assistant voice control) per Mitsubishi MSZ-LN literature",
+        "operatingRangeCoolingC": "-10 to +46",
+        "operatingRangeHeatingC": "-15 to +24"
+      },
+      "warranty": "Mitsubishi Electric UK: 3 years standard on air conditioning equipment; up to 5 years parts when installed by a Mitsubishi Electric Accredited Installer (Partner Programme). Source: UK installer announcements and pages (MODBS / Weatherite, Carlton Services, HF Group) - SECONDARY, official A2A warranty T&Cs not retrieved. One installer (ACE Services) claims 7-year parts cover via 'Business Solutions Partner' status - unverified. Registration rules for air-to-air splits not confirmed (Lossnay requires registration within 3 months of commissioning; Ecodan uses a guarantee form).",
+      "sources": [
+        {
+          "url": "https://confort.mitsubishielectric.fr/sites/default/files/imported/RAC-SET-MSZ-LN25VG2B_MUZ-LN25VG2-FTI.pdf",
+          "title": "Mitsubishi Electric France - MSZ-LN25VG2B / MUZ-LN25VG2 technical sheet (FTI) (manufacturer; read via search snippet)"
+        },
+        {
+          "url": "https://www.eurovent-certification.com/de/catalog/program/certificate/participant/model/show/199572686",
+          "title": "Eurovent certificate - MUZ-LN25VG2/MSZ-LN25VG2 (SEER 10.5, EER 5.15)"
+        },
+        {
+          "url": "https://www.orionairsales.co.uk/mitsubishi-electric-air-conditioning-msz-ln25vg2-25kw9000btu-r32-heat-pump-wall-mounted-a-14554-p.asp",
+          "title": "Orion Air Sales UK - MSZ-LN25VG2 (SPL heating 19-24-29-36-45, cooling 19-23-29-36-42, LwA 58)"
+        },
+        {
+          "url": "https://avonair.co.uk/product/mitsubishi-electric-msz-ln25vg-wall-mounted-2-5kw/",
+          "title": "Avon Air UK - MSZ-LN25VG (previous VG gen: 15.5 kg, 20 m / 12 m, fuses)"
+        },
+        {
+          "url": "https://www.logicool-ac.com/products/mitsubishi-electric-air-conditioning-m-series-ln-wall/",
+          "title": "Logicool - MSZ-LN Wall (Multi) compatible indoor units"
+        },
+        {
+          "url": "https://www.costco.co.uk/Appliances/Cooling-Air-Treatment-Heating/Air-Conditioners/Installed-Mitsubishi-Residential-Air-Conditioning-Unit-South-East-Area/p/487844",
+          "title": "Costco UK - Installed Mitsubishi residential AC (LN colours Natural White, Pearl White, Black, Red)"
+        },
+        {
+          "url": "https://modbs.co.uk/news/fullstory.php/aid/2748/Air_conditioning_enjoys__5-year_guarantee_.html",
+          "title": "MODBS - Air conditioning enjoys 5-year guarantee (Mitsubishi accredited installer; secondary)"
+        }
+      ],
+      "confidence": "provisional",
+      "notes": "Capacity/SEER/SCOP/op range from Mitsubishi France FTI + Eurovent (manufacturer/certification, but read via search snippets, hence provisional). COP 5.33 (FR) / 5.52 (Orion); EER 5.15 (FR, Eurovent) vs 5.10 (NZ). Indoor sound power 58 dB(A). FR sheet gives indoor weight 16 kg vs 15.5 kg UK. Indoor colour suffix: W natural white (catalogued), V pearl white, R ruby red, B onyx black - V/R/B codes seen on Mitsubishi FR datasheets and EU retailers; UK Costco names Natural White, Pearl White, Black, Red. Same outdoor for all colours; VG2 vs VG mainly aesthetic per a retailer."
+    },
+    {
+      "kind": "outdoor",
+      "manufacturer": "Mitsubishi Electric",
+      "series": "LN premium wall (MSZ-LN..VG2 / MUZ-LN..VG2, R32; 'Zen' in some UK installer copy, 'Diamond' in EU)",
+      "model": "MUZ-LN25VG2",
+      "label": "Mitsubishi Electric LN Premium 2.5 kW outdoor",
+      "tier": "premium",
+      "multiSplitCapable": false,
+      "ports": 1,
+      "pairedWith": "MSZ-LN25VG2W",
+      "specs": {
+        "coolingKw": 2.5,
+        "heatingKw": 3.2,
+        "seer": 10.5,
+        "scop": 5.2,
+        "energyClassCooling": "A+++",
+        "energyClassHeating": "A+++",
+        "soundPressureLowDb": null,
+        "soundPressureHighDb": null,
+        "soundPowerDb": 60,
+        "dimensionsMm": {
+          "w": 800,
+          "h": 550,
+          "d": 285
+        },
+        "weightKg": null,
+        "refrigerant": "R32",
+        "liquidPipeMm": 6.35,
+        "gasPipeMm": 9.52,
+        "maxPipeM": 20,
+        "maxHeightDiffM": 12,
+        "prechargedPipeM": 7,
+        "additionalChargeGPerM": 20,
+        "powerSupply": "220-240 V, 50 Hz, single phase",
+        "recommendedBreakerA": 10,
+        "wifi": null,
+        "operatingRangeCoolingC": "-10 to +46",
+        "operatingRangeHeatingC": "-15 to +24"
+      },
+      "warranty": "Mitsubishi Electric UK: 3 years standard on air conditioning equipment; up to 5 years parts when installed by a Mitsubishi Electric Accredited Installer (Partner Programme). Source: UK installer announcements and pages (MODBS / Weatherite, Carlton Services, HF Group) - SECONDARY, official A2A warranty T&Cs not retrieved. One installer (ACE Services) claims 7-year parts cover via 'Business Solutions Partner' status - unverified. Registration rules for air-to-air splits not confirmed (Lossnay requires registration within 3 months of commissioning; Ecodan uses a guarantee form).",
+      "sources": [
+        {
+          "url": "https://mitsubishi-electric.co.nz/materials/PRODUCT/Aircon/MSZ-LN25-60VG(HZ)2/01_Specifications/SPC_MSZ-LN25-60VG(HZ)2_Specifications.pdf",
+          "title": "Mitsubishi Electric NZ - MSZ-LN25-60VG(HZ)2 specifications (manufacturer, NZ market)"
+        },
+        {
+          "url": "https://confort.mitsubishielectric.fr/sites/default/files/imported/RAC-SET-MSZ-LN25VG2B_MUZ-LN25VG2-FTI.pdf",
+          "title": "Mitsubishi Electric France - MSZ-LN25VG2B / MUZ-LN25VG2 technical sheet (FTI) (manufacturer; read via search snippet)"
+        },
+        {
+          "url": "https://avonair.co.uk/product/mitsubishi-electric-msz-ln25vg-wall-mounted-2-5kw/",
+          "title": "Avon Air UK - MUZ-LN25VG (SPL 49/46, LwA 60, 35 kg, 20 m/12 m, outdoor fuse 10 A)"
+        },
+        {
+          "url": "https://www.manualslib.com/manual/3355376/Mitsubishi-Electric-Muz-Ln50vg2-Evr2.html",
+          "title": "ManualsLib - MUZ-LN50VG2 service manual (20 g/m beyond 7 m for LN25/35/50; LN50 pipe table)"
+        },
+        {
+          "url": "https://library.mitsubishielectric.co.uk/pdf/download_full/3405",
+          "title": "Mitsubishi Electric UK library - MUZ-LN25VG service manual (located via search; not opened)"
+        },
+        {
+          "url": "https://modbs.co.uk/news/fullstory.php/aid/2748/Air_conditioning_enjoys__5-year_guarantee_.html",
+          "title": "MODBS - Air conditioning enjoys 5-year guarantee (Mitsubishi accredited installer; secondary)"
+        }
+      ],
+      "confidence": "provisional",
+      "notes": "Outdoor SPL 49/46 dB(A) heating/cooling. Weight CONFLICT 33 vs 35 kg - left null. Breaker 10 A from Avon Air (previous VG generation; table layout ambiguous) - provisional. Factory charge 0.80 kg (FR FTI). Additional charge X g = 20 g/m x (L - 7) per LN service manual (covers LN25/35/50)."
+    },
+    {
+      "kind": "indoor",
+      "manufacturer": "Mitsubishi Electric",
+      "series": "LN premium wall (MSZ-LN..VG2 / MUZ-LN..VG2, R32; 'Zen' in some UK installer copy, 'Diamond' in EU)",
+      "model": "MSZ-LN35VG2W",
+      "label": "Mitsubishi Electric LN Premium 3.5 kW",
+      "tier": "premium",
+      "multiSplitCapable": true,
+      "ports": null,
+      "pairedWith": "MUZ-LN35VG2",
+      "specs": {
+        "coolingKw": 3.5,
+        "heatingKw": 4.0,
+        "seer": 9.5,
+        "scop": 5.1,
+        "energyClassCooling": "A+++",
+        "energyClassHeating": null,
+        "soundPressureLowDb": 19,
+        "soundPressureHighDb": null,
+        "soundPowerDb": null,
+        "dimensionsMm": {
+          "w": 890,
+          "h": 307,
+          "d": 233
+        },
+        "weightKg": 15.5,
+        "refrigerant": "R32",
+        "liquidPipeMm": null,
+        "gasPipeMm": null,
+        "maxPipeM": null,
+        "maxHeightDiffM": null,
+        "prechargedPipeM": null,
+        "additionalChargeGPerM": null,
+        "powerSupply": "220-240 V, 50 Hz, single phase (Mitsubishi RAC splits: indoor unit fed via the outdoor unit interconnect - confirm in installation manual)",
+        "recommendedBreakerA": null,
+        "wifi": "Built-in Wi-Fi as standard (MELCloud / MELCloud Home; Alexa & Google Assistant voice control) per Mitsubishi MSZ-LN literature",
+        "operatingRangeCoolingC": null,
+        "operatingRangeHeatingC": null
+      },
+      "warranty": "Mitsubishi Electric UK: 3 years standard on air conditioning equipment; up to 5 years parts when installed by a Mitsubishi Electric Accredited Installer (Partner Programme). Source: UK installer announcements and pages (MODBS / Weatherite, Carlton Services, HF Group) - SECONDARY, official A2A warranty T&Cs not retrieved. One installer (ACE Services) claims 7-year parts cover via 'Business Solutions Partner' status - unverified. Registration rules for air-to-air splits not confirmed (Lossnay requires registration within 3 months of commissioning; Ecodan uses a guarantee form).",
+      "sources": [
+        {
+          "url": "https://www.eurovent-certification.com/en/catalog/program/certificate/participant/model/show/199572687",
+          "title": "Eurovent certificate - MUZ-LN35VG2/MSZ-LN35VG2 (SEER 9.5 A+++, SCOP 5.10, Pdesignh 3.6 kW)"
+        },
+        {
+          "url": "https://www.orionairsales.co.uk/mitsubishi-electric-air-conditioning-msz-ln35vg2-35kw12000btu-r32-heat-pump-wall-a-240v50hz-14558-p.asp",
+          "title": "Orion Air Sales UK - MSZ-LN35VG2 (4.0 kW heat, 19-45 dB(A), LwA 58)"
+        },
+        {
+          "url": "https://avonair.co.uk/product/mitsubishi-electric-premium-wall-ln-series3-5kw-pearl-white-msz-ln35vg2-v/",
+          "title": "Avon Air UK - MSZ-LN35VG2-V (dimensions)"
+        },
+        {
+          "url": "https://www.carltonservices.co.uk/product/mitsubishi-electric-zen-msz-ln35vg-air-conditioning-system-onyx-black/",
+          "title": "Carlton Services UK - MSZ-LN35VG 'Zen' onyx black (15.5 kg)"
+        },
+        {
+          "url": "https://www.logicool-ac.com/products/mitsubishi-electric-air-conditioning-m-series-ln-wall/",
+          "title": "Logicool - MSZ-LN Wall (Multi) compatible indoor units"
+        },
+        {
+          "url": "https://modbs.co.uk/news/fullstory.php/aid/2748/Air_conditioning_enjoys__5-year_guarantee_.html",
+          "title": "MODBS - Air conditioning enjoys 5-year guarantee (Mitsubishi accredited installer; secondary)"
+        }
+      ],
+      "confidence": "provisional",
+      "notes": "Quietest 19 dB(A); highest heating 45 dB(A); cooling SHi not captured. Heating energy class not captured (SCOP 5.10). Pipe sizes not explicitly captured for LN35 - left null (LN25/LN50 are 6.35/9.52). One EU retailer's SCOP 6.7 ignored (conflicts with Eurovent). Indoor colour suffix: W natural white (catalogued), V pearl white, R ruby red, B onyx black - V/R/B codes seen on Mitsubishi FR datasheets and EU retailers; UK Costco names Natural White, Pearl White, Black, Red. Same outdoor for all colours; VG2 vs VG mainly aesthetic per a retailer."
+    },
+    {
+      "kind": "outdoor",
+      "manufacturer": "Mitsubishi Electric",
+      "series": "LN premium wall (MSZ-LN..VG2 / MUZ-LN..VG2, R32; 'Zen' in some UK installer copy, 'Diamond' in EU)",
+      "model": "MUZ-LN35VG2",
+      "label": "Mitsubishi Electric LN Premium 3.5 kW outdoor",
+      "tier": "premium",
+      "multiSplitCapable": false,
+      "ports": 1,
+      "pairedWith": "MSZ-LN35VG2W",
+      "specs": {
+        "coolingKw": 3.5,
+        "heatingKw": 4.0,
+        "seer": 9.5,
+        "scop": 5.1,
+        "energyClassCooling": "A+++",
+        "energyClassHeating": null,
+        "soundPressureLowDb": null,
+        "soundPressureHighDb": null,
+        "soundPowerDb": 61,
+        "dimensionsMm": {
+          "w": 800,
+          "h": 550,
+          "d": 285
+        },
+        "weightKg": 35,
+        "refrigerant": "R32",
+        "liquidPipeMm": null,
+        "gasPipeMm": null,
+        "maxPipeM": null,
+        "maxHeightDiffM": null,
+        "prechargedPipeM": 7,
+        "additionalChargeGPerM": 20,
+        "powerSupply": "220-240 V, 50 Hz, single phase",
+        "recommendedBreakerA": null,
+        "wifi": null,
+        "operatingRangeCoolingC": null,
+        "operatingRangeHeatingC": null
+      },
+      "warranty": "Mitsubishi Electric UK: 3 years standard on air conditioning equipment; up to 5 years parts when installed by a Mitsubishi Electric Accredited Installer (Partner Programme). Source: UK installer announcements and pages (MODBS / Weatherite, Carlton Services, HF Group) - SECONDARY, official A2A warranty T&Cs not retrieved. One installer (ACE Services) claims 7-year parts cover via 'Business Solutions Partner' status - unverified. Registration rules for air-to-air splits not confirmed (Lossnay requires registration within 3 months of commissioning; Ecodan uses a guarantee form).",
+      "sources": [
+        {
+          "url": "https://avonair.co.uk/product/mitsubishi-electric-premium-wall-ln-series3-5kw-pearl-white-msz-ln35vg2-v/",
+          "title": "Avon Air UK - MUZ-LN35VG2 (SPL 50/49, LwA 61, 800x285x550)"
+        },
+        {
+          "url": "https://www.carltonservices.co.uk/product/mitsubishi-electric-zen-msz-ln35vg-air-conditioning-system-onyx-black/",
+          "title": "Carlton Services UK - outdoor 35 kg"
+        },
+        {
+          "url": "https://www.manualslib.com/manual/3355376/Mitsubishi-Electric-Muz-Ln50vg2-Evr2.html",
+          "title": "ManualsLib - MUZ-LN50VG2 service manual (20 g/m beyond 7 m for LN25/35/50; LN50 pipe table)"
+        },
+        {
+          "url": "https://modbs.co.uk/news/fullstory.php/aid/2748/Air_conditioning_enjoys__5-year_guarantee_.html",
+          "title": "MODBS - Air conditioning enjoys 5-year guarantee (Mitsubishi accredited installer; secondary)"
+        }
+      ],
+      "confidence": "provisional",
+      "notes": "Max pipe length / height for LN35VG2 not captured (LN25 is 20 m / 12 m) - left null. Breaker and operating range not captured."
+    },
+    {
+      "kind": "indoor",
+      "manufacturer": "Mitsubishi Electric",
+      "series": "LN premium wall (MSZ-LN..VG2 / MUZ-LN..VG2, R32; 'Zen' in some UK installer copy, 'Diamond' in EU)",
+      "model": "MSZ-LN50VG2W",
+      "label": "Mitsubishi Electric LN Premium 5.0 kW",
+      "tier": "premium",
+      "multiSplitCapable": true,
+      "ports": null,
+      "pairedWith": "MUZ-LN50VG2",
+      "specs": {
+        "coolingKw": 5.0,
+        "heatingKw": 6.0,
+        "seer": 8.5,
+        "scop": 4.6,
+        "energyClassCooling": "A+++",
+        "energyClassHeating": "A++",
+        "soundPressureLowDb": 25,
+        "soundPressureHighDb": 47,
+        "soundPowerDb": null,
+        "dimensionsMm": {
+          "w": 890,
+          "h": 307,
+          "d": 233
+        },
+        "weightKg": 15.5,
+        "refrigerant": "R32",
+        "liquidPipeMm": 6.35,
+        "gasPipeMm": 9.52,
+        "maxPipeM": null,
+        "maxHeightDiffM": null,
+        "prechargedPipeM": null,
+        "additionalChargeGPerM": null,
+        "powerSupply": "220-240 V, 50 Hz, single phase (Mitsubishi RAC splits: indoor unit fed via the outdoor unit interconnect - confirm in installation manual)",
+        "recommendedBreakerA": null,
+        "wifi": "Built-in Wi-Fi as standard (MELCloud / MELCloud Home; Alexa & Google Assistant voice control) per Mitsubishi MSZ-LN literature",
+        "operatingRangeCoolingC": null,
+        "operatingRangeHeatingC": null
+      },
+      "warranty": "Mitsubishi Electric UK: 3 years standard on air conditioning equipment; up to 5 years parts when installed by a Mitsubishi Electric Accredited Installer (Partner Programme). Source: UK installer announcements and pages (MODBS / Weatherite, Carlton Services, HF Group) - SECONDARY, official A2A warranty T&Cs not retrieved. One installer (ACE Services) claims 7-year parts cover via 'Business Solutions Partner' status - unverified. Registration rules for air-to-air splits not confirmed (Lossnay requires registration within 3 months of commissioning; Ecodan uses a guarantee form).",
+      "sources": [
+        {
+          "url": "https://www.eurovent-certification.com/en/catalog/program/certificate/participant/model/show/199572688",
+          "title": "Eurovent certificate - MUZ-LN50VG2/MSZ-LN50VG2 (SEER 8.50 A+++, SCOP 4.60 A++, LwA 60/64, charge 1.25 kg)"
+        },
+        {
+          "url": "https://www.orionairsales.co.uk/mitsubishi-electric-air-conditioning-msz-ln50vg2-5kw17000btu-r32-heat-pump-wall-a-240v50hz-14564-p.asp",
+          "title": "Orion Air Sales UK - MSZ-LN50VG2 (pipes 1/4\" / 3/8\", 30 m / 12 m)"
+        },
+        {
+          "url": "https://avonair.co.uk/product/mitsubishi-electric-premium-wall-ln-seriesnatural-white5-0kw-msz-ln50vg2-w/",
+          "title": "Avon Air UK - MSZ-LN50VG2-W (15.5 kg, LwA 60)"
+        },
+        {
+          "url": "https://www.topten.eu/private/product/view/Mitsubishi-MSZ-LN50VG2W-MUZ-LN50VG2",
+          "title": "Topten EU - MSZ-LN50VG2W/MUZ-LN50VG2"
+        },
+        {
+          "url": "https://www.logicool-ac.com/products/mitsubishi-electric-air-conditioning-m-series-ln-wall/",
+          "title": "Logicool - MSZ-LN Wall (Multi) compatible indoor units"
+        },
+        {
+          "url": "https://modbs.co.uk/news/fullstory.php/aid/2748/Air_conditioning_enjoys__5-year_guarantee_.html",
+          "title": "MODBS - Air conditioning enjoys 5-year guarantee (Mitsubishi accredited installer; secondary)"
+        }
+      ],
+      "confidence": "provisional",
+      "notes": "Heating 6.0 kW nominal (1.0-8.2). Sound 25-47 dB(A) is an indoor range quoted by a distributor without mode - provisional. Indoor sound power 60 dB(A). Pipe sizes 6.35/9.52 from UK retailers and Mitsubishi NZ; a garbled LN service-manual extract suggested 12.7 mm gas for LN50/60 - check installation manual. Indoor colour suffix: W natural white (catalogued), V pearl white, R ruby red, B onyx black - V/R/B codes seen on Mitsubishi FR datasheets and EU retailers; UK Costco names Natural White, Pearl White, Black, Red. Same outdoor for all colours; VG2 vs VG mainly aesthetic per a retailer."
+    },
+    {
+      "kind": "outdoor",
+      "manufacturer": "Mitsubishi Electric",
+      "series": "LN premium wall (MSZ-LN..VG2 / MUZ-LN..VG2, R32; 'Zen' in some UK installer copy, 'Diamond' in EU)",
+      "model": "MUZ-LN50VG2",
+      "label": "Mitsubishi Electric LN Premium 5.0 kW outdoor",
+      "tier": "premium",
+      "multiSplitCapable": false,
+      "ports": 1,
+      "pairedWith": "MSZ-LN50VG2W",
+      "specs": {
+        "coolingKw": 5.0,
+        "heatingKw": 6.0,
+        "seer": 8.5,
+        "scop": 4.6,
+        "energyClassCooling": "A+++",
+        "energyClassHeating": "A++",
+        "soundPressureLowDb": null,
+        "soundPressureHighDb": null,
+        "soundPowerDb": 64,
+        "dimensionsMm": {
+          "w": 800,
+          "h": 714,
+          "d": 285
+        },
+        "weightKg": 40,
+        "refrigerant": "R32",
+        "liquidPipeMm": 6.35,
+        "gasPipeMm": 9.52,
+        "maxPipeM": 30,
+        "maxHeightDiffM": 12,
+        "prechargedPipeM": 7,
+        "additionalChargeGPerM": 20,
+        "powerSupply": "220-240 V, 50 Hz, single phase",
+        "recommendedBreakerA": null,
+        "wifi": null,
+        "operatingRangeCoolingC": null,
+        "operatingRangeHeatingC": null
+      },
+      "warranty": "Mitsubishi Electric UK: 3 years standard on air conditioning equipment; up to 5 years parts when installed by a Mitsubishi Electric Accredited Installer (Partner Programme). Source: UK installer announcements and pages (MODBS / Weatherite, Carlton Services, HF Group) - SECONDARY, official A2A warranty T&Cs not retrieved. One installer (ACE Services) claims 7-year parts cover via 'Business Solutions Partner' status - unverified. Registration rules for air-to-air splits not confirmed (Lossnay requires registration within 3 months of commissioning; Ecodan uses a guarantee form).",
+      "sources": [
+        {
+          "url": "https://www.eurovent-certification.com/en/catalog/program/certificate/participant/model/show/199572688",
+          "title": "Eurovent certificate - MUZ-LN50VG2 (outdoor LwA 64 dB, factory charge 1.25 kg)"
+        },
+        {
+          "url": "https://www.orionairsales.co.uk/mitsubishi-electric-air-conditioning-msz-ln50vg2-5kw17000btu-r32-heat-pump-wall-a-240v50hz-14564-p.asp",
+          "title": "Orion Air Sales UK - MUZ-LN50VG2 (30 m / 12 m)"
+        },
+        {
+          "url": "https://agoraklima.com/en/spd/MSZ-LN50VG2W-E3-MUZ-LN50VG2-E3/Mitsubishi-Diamond-MSZ-LN50VG2W-E3-MUZ-LN50VG2-E3",
+          "title": "Agora Klima - LN50VG2-E3 (30 m / 15 m)"
+        },
+        {
+          "url": "https://www.manualslib.com/manual/3355376/Mitsubishi-Electric-Muz-Ln50vg2-Evr2.html",
+          "title": "ManualsLib - MUZ-LN50VG2 service manual (20 g/m beyond 7 m for LN25/35/50; LN50 pipe table)"
+        },
+        {
+          "url": "https://modbs.co.uk/news/fullstory.php/aid/2748/Air_conditioning_enjoys__5-year_guarantee_.html",
+          "title": "MODBS - Air conditioning enjoys 5-year guarantee (Mitsubishi accredited installer; secondary)"
+        }
+      ],
+      "confidence": "provisional",
+      "notes": "Outdoor SPL 51-54 dB(A). Height difference CONFLICT: UK listings 12 m vs service manual / Agora 15 m - 12 m used (conservative). Max length includes height differential. Breaker and operating range not captured (rated to -15 C outdoor heating per distributor)."
+    },
+    {
+      "kind": "outdoor",
+      "manufacturer": "Mitsubishi Electric",
+      "series": "MXZ-F multi-split outdoor (R32)",
+      "model": "MXZ-2F42VF4",
+      "label": "Mitsubishi Electric MXZ 2-room multi 4.2 kW",
+      "tier": "standard",
+      "multiSplitCapable": true,
+      "ports": 2,
+      "pairedWith": null,
+      "specs": {
+        "coolingKw": 4.2,
+        "heatingKw": 4.5,
+        "seer": 8.69,
+        "scop": 4.6,
+        "energyClassCooling": "A+++",
+        "energyClassHeating": "A++",
+        "soundPressureLowDb": null,
+        "soundPressureHighDb": null,
+        "soundPowerDb": 59,
+        "dimensionsMm": {
+          "w": 800,
+          "h": 550,
+          "d": 285
+        },
+        "weightKg": 37,
+        "refrigerant": "R32",
+        "liquidPipeMm": 6.35,
+        "gasPipeMm": 9.52,
+        "maxPipeM": 30,
+        "maxHeightDiffM": 15,
+        "prechargedPipeM": 30,
+        "additionalChargeGPerM": null,
+        "powerSupply": "220-240 V, 50 Hz, single phase",
+        "recommendedBreakerA": 16,
+        "wifi": null,
+        "operatingRangeCoolingC": "-10 to +46",
+        "operatingRangeHeatingC": "-15 to +24"
+      },
+      "warranty": "Mitsubishi Electric UK: 3 years standard on air conditioning equipment; up to 5 years parts when installed by a Mitsubishi Electric Accredited Installer (Partner Programme). Source: UK installer announcements and pages (MODBS / Weatherite, Carlton Services, HF Group) - SECONDARY, official A2A warranty T&Cs not retrieved. One installer (ACE Services) claims 7-year parts cover via 'Business Solutions Partner' status - unverified. Registration rules for air-to-air splits not confirmed (Lossnay requires registration within 3 months of commissioning; Ecodan uses a guarantee form).",
+      "sources": [
+        {
+          "url": "https://prosatech.de/mediafiles/Bilder/Technische%20Daten/Mitsubishi%20Electric/Technisches-Datenblatt-Mitsubishi-Electric-MXZ-VF4-Multisplit-Aussengeraete.pdf",
+          "title": "Technisches Datenblatt Mitsubishi Electric MXZ-VF4 Multisplit-Aussengeraete (manufacturer data table, German distributor-hosted)"
+        },
+        {
+          "url": "https://www.sonepar.fr/catalog/fr-fr/products/mitsubishi-electric-mxz-2f42vf4-e1-00064235912",
+          "title": "Sonepar FR - MXZ-2F42VF4-E1 (20 m per circuit, 30 m total; SEER 8.69 / SCOP 4.6)"
+        },
+        {
+          "url": "https://www.orionairsales.co.uk/mitsubishi-electric-air-conditioning-mxz-2f42vf3-multi-2-x-msz-ap25vgk-25kw-wall-a-240v50hz-14598-p.asp",
+          "title": "Orion Air Sales UK - MXZ-2F42VF3 (2 indoor; 4.2 (1.1-4.4) / 4.5 (1.0-4.8) kW; 30 m total, 20 m each)"
+        },
+        {
+          "url": "https://www.eurovent-certification.com/en/catalog/program/certificate/participant/model/show/202108769",
+          "title": "Eurovent - MXZ-2F42VF4 + 2x MSZ-AY20VGK combination"
+        },
+        {
+          "url": "https://www.climaconvenienza.it/en/products/unita-esterna-mitsubishi-electric-motore-multisplit-2f42vf-dual-split-r-32",
+          "title": "Climaconvenienza IT - MXZ-2F42VF (2x 6.35 liquid / 2x 9.52 gas, 30 m, 15/10 m height)"
+        },
+        {
+          "url": "https://www.logicool-ac.com/products/mitsubishi-electric-air-conditioning-mxz-multi-split-2/",
+          "title": "Logicool - MXZ Multi-Split (R32) table: connectable units, total / per-room pipe, fuse (columns partly ambiguous)"
+        },
+        {
+          "url": "https://koolit.co.uk/app/uploads/2023/11/Mitsubishi-Electrc-MXZ-F-Multi-Split-Air-Conditioning-System-web.pdf",
+          "title": "Mitsubishi Electric UK - The MXZ-F Multi-Split outdoor unit range brochure (installer-hosted copy; max height 15 m, 10 m if OU higher)"
+        },
+        {
+          "url": "https://www.mitsubishielectric.com.au/wp-content/uploads/2022/03/Multi_Split_Guide-2021-01-web.pdf",
+          "title": "Mitsubishi Electric Australia - Multi Split Guide 2021 (50-130% connectable rule; MXZ-F charged to max pipe length) - non-UK"
+        },
+        {
+          "url": "https://www.klimaworld.com/products/mitsubishi-klimaanlage-multisplit-aussengerat-mxz-2f42vf5-4-2-kw",
+          "title": "Klimaworld DE - MXZ-2F42VF5 (newer VF5 suffix in EU market)"
+        },
+        {
+          "url": "https://modbs.co.uk/news/fullstory.php/aid/2748/Air_conditioning_enjoys__5-year_guarantee_.html",
+          "title": "MODBS - Air conditioning enjoys 5-year guarantee (Mitsubishi accredited installer; secondary)"
+        }
+      ],
+      "confidence": "provisional",
+      "notes": "maxPipeM = total (30 m); 20 m per room. Height 15 m, reduced to 10 m if outdoor unit is HIGHER than indoor (UK MXZ-F brochure). Port connections 2x 6.35 liquid / 2x 9.52 gas (Italian/IT retailer data) - 5.0 kW indoor units may need reducer/expander joints. Pre-charge 30 m from a French product sheet and AU guide ('MXZ-F charged to max field piping') - provisional; no per-metre top-up found. Breaker 16 A from Logicool table (column labels ambiguous; one FR listing says 10 A). Op range from retailer data sheet. Multi SEER/SCOP are the outdoor's rated values; real seasonal efficiency depends on the connected indoor combination (Eurovent: MXZ-2F42VF4 + 2x MSZ-AY20VGK = SEER 7.64 / SCOP 3.82). SUFFIX: UK retailers still list VF3; the Mitsubishi UK library (parts catalogue, combination chart, installation manual VG79N213H02) lists VF4; EU retailers sell VF5 from late 2025. Core capacities are the same across suffixes in the sources seen - confirm current UK suffix with distributor. "
+    },
+    {
+      "kind": "outdoor",
+      "manufacturer": "Mitsubishi Electric",
+      "series": "MXZ-F multi-split outdoor (R32)",
+      "model": "MXZ-3F54VF4",
+      "label": "Mitsubishi Electric MXZ 3-room multi 5.4 kW",
+      "tier": "standard",
+      "multiSplitCapable": true,
+      "ports": 3,
+      "pairedWith": null,
+      "specs": {
+        "coolingKw": 5.4,
+        "heatingKw": 7.0,
+        "seer": 8.52,
+        "scop": 4.61,
+        "energyClassCooling": null,
+        "energyClassHeating": null,
+        "soundPressureLowDb": null,
+        "soundPressureHighDb": null,
+        "soundPowerDb": 60,
+        "dimensionsMm": {
+          "w": 840,
+          "h": 710,
+          "d": 330
+        },
+        "weightKg": 58,
+        "refrigerant": "R32",
+        "liquidPipeMm": null,
+        "gasPipeMm": null,
+        "maxPipeM": 50,
+        "maxHeightDiffM": 15,
+        "prechargedPipeM": null,
+        "additionalChargeGPerM": null,
+        "powerSupply": "220-240 V, 50 Hz, single phase",
+        "recommendedBreakerA": 25,
+        "wifi": null,
+        "operatingRangeCoolingC": null,
+        "operatingRangeHeatingC": null
+      },
+      "warranty": "Mitsubishi Electric UK: 3 years standard on air conditioning equipment; up to 5 years parts when installed by a Mitsubishi Electric Accredited Installer (Partner Programme). Source: UK installer announcements and pages (MODBS / Weatherite, Carlton Services, HF Group) - SECONDARY, official A2A warranty T&Cs not retrieved. One installer (ACE Services) claims 7-year parts cover via 'Business Solutions Partner' status - unverified. Registration rules for air-to-air splits not confirmed (Lossnay requires registration within 3 months of commissioning; Ecodan uses a guarantee form).",
+      "sources": [
+        {
+          "url": "https://prosatech.de/mediafiles/Bilder/Technische%20Daten/Mitsubishi%20Electric/Technisches-Datenblatt-Mitsubishi-Electric-MXZ-VF4-Multisplit-Aussengeraete.pdf",
+          "title": "Technisches Datenblatt Mitsubishi Electric MXZ-VF4 Multisplit-Aussengeraete (manufacturer data table, German distributor-hosted)"
+        },
+        {
+          "url": "https://confort.mitsubishielectric.fr/system/files/imported/1764675437-RAC-FG-MXZ-3F54VF4-FTI.pdf",
+          "title": "Mitsubishi Electric France - MXZ-3F54VF4 FTI (5.4/7.0 kW, 710x840x330, 58 kg, 2-3 indoor) - via search snippet"
+        },
+        {
+          "url": "https://www.logicool-ac.com/products/mitsubishi-electric-air-conditioning-mxz-multi-split-2/",
+          "title": "Logicool - MXZ Multi-Split (R32) table: connectable units, total / per-room pipe, fuse (columns partly ambiguous)"
+        },
+        {
+          "url": "https://koolit.co.uk/app/uploads/2023/11/Mitsubishi-Electrc-MXZ-F-Multi-Split-Air-Conditioning-System-web.pdf",
+          "title": "Mitsubishi Electric UK - The MXZ-F Multi-Split outdoor unit range brochure (installer-hosted copy; max height 15 m, 10 m if OU higher)"
+        },
+        {
+          "url": "https://library.mitsubishielectric.co.uk/pdf/download_full/5366",
+          "title": "Mitsubishi Electric UK library - MXZ VF4 document incl. indoor combination chart (seen only as search snippet; exact document not opened)"
+        },
+        {
+          "url": "https://modbs.co.uk/news/fullstory.php/aid/2748/Air_conditioning_enjoys__5-year_guarantee_.html",
+          "title": "MODBS - Air conditioning enjoys 5-year guarantee (Mitsubishi accredited installer; secondary)"
+        }
+      ],
+      "confidence": "provisional",
+      "notes": "maxPipeM = total 50 m (Logicool/distributor table); 25 m per room. A Mitsubishi UK model sheet snippet showed 60 m total for a '2-3 unit' row - conflict, 50 m used. Height 15 m (10 m if OU higher). Energy classes not captured (SEER 8.52 / SCOP 4.61). Port pipe sizes, pre-charge and op range not captured. Breaker 25 A from Logicool table (ambiguous columns). Multi SEER/SCOP are the outdoor's rated values; real seasonal efficiency depends on the connected indoor combination (Eurovent: MXZ-2F42VF4 + 2x MSZ-AY20VGK = SEER 7.64 / SCOP 3.82). SUFFIX: UK retailers still list VF3; the Mitsubishi UK library (parts catalogue, combination chart, installation manual VG79N213H02) lists VF4; EU retailers sell VF5 from late 2025. Core capacities are the same across suffixes in the sources seen - confirm current UK suffix with distributor. "
+    },
+    {
+      "kind": "outdoor",
+      "manufacturer": "Mitsubishi Electric",
+      "series": "MXZ-F multi-split outdoor (R32)",
+      "model": "MXZ-4F72VF4",
+      "label": "Mitsubishi Electric MXZ 4-room multi 7.2 kW",
+      "tier": "standard",
+      "multiSplitCapable": true,
+      "ports": 4,
+      "pairedWith": null,
+      "specs": {
+        "coolingKw": 7.2,
+        "heatingKw": 8.6,
+        "seer": 8.13,
+        "scop": 4.07,
+        "energyClassCooling": null,
+        "energyClassHeating": null,
+        "soundPressureLowDb": null,
+        "soundPressureHighDb": null,
+        "soundPowerDb": 63,
+        "dimensionsMm": {
+          "w": 840,
+          "h": 710,
+          "d": 330
+        },
+        "weightKg": 59,
+        "refrigerant": "R32",
+        "liquidPipeMm": null,
+        "gasPipeMm": null,
+        "maxPipeM": 60,
+        "maxHeightDiffM": 15,
+        "prechargedPipeM": null,
+        "additionalChargeGPerM": null,
+        "powerSupply": "220-240 V, 50 Hz, single phase",
+        "recommendedBreakerA": null,
+        "wifi": null,
+        "operatingRangeCoolingC": "-10 to +46",
+        "operatingRangeHeatingC": "-15 to +24"
+      },
+      "warranty": "Mitsubishi Electric UK: 3 years standard on air conditioning equipment; up to 5 years parts when installed by a Mitsubishi Electric Accredited Installer (Partner Programme). Source: UK installer announcements and pages (MODBS / Weatherite, Carlton Services, HF Group) - SECONDARY, official A2A warranty T&Cs not retrieved. One installer (ACE Services) claims 7-year parts cover via 'Business Solutions Partner' status - unverified. Registration rules for air-to-air splits not confirmed (Lossnay requires registration within 3 months of commissioning; Ecodan uses a guarantee form).",
+      "sources": [
+        {
+          "url": "https://prosatech.de/mediafiles/Bilder/Technische%20Daten/Mitsubishi%20Electric/Technisches-Datenblatt-Mitsubishi-Electric-MXZ-VF4-Multisplit-Aussengeraete.pdf",
+          "title": "Technisches Datenblatt Mitsubishi Electric MXZ-VF4 Multisplit-Aussengeraete (manufacturer data table, German distributor-hosted)"
+        },
+        {
+          "url": "https://www.coolingcompany.co.uk/product/mitsubishi-electric-air-conditioning-mxz-4f72vf3-multi-4-x-msz-ap25vgk-2-5kw-wall-a-240v50hz/",
+          "title": "Cooling Company UK - MXZ-4F72VF3 + 4x MSZ-AP25VGK (2-4 indoor; 7.2 (3.7-8.8) / 8.6 (3.4-10.7) kW)"
+        },
+        {
+          "url": "https://www.schiessl-kaelte.com/en_IT/Shop/Air-conditioners-ventilation-systems/Air-conditioners/Air-conditioners/Multi-split-outdoor-units/Mitsubishi-air-conditioner-M-Series-7.2kW-Outdoor-unit-Multi-Split-MXZ-4F72-VF-R32~p403019",
+          "title": "Schiessl - MXZ-4F72VF (op range, factory charge 2.4 kg, SEER 8.53 / SCOP 4.12)"
+        },
+        {
+          "url": "https://www.logicool-ac.com/products/mitsubishi-electric-air-conditioning-mxz-multi-split-2/",
+          "title": "Logicool - MXZ Multi-Split (R32) table: connectable units, total / per-room pipe, fuse (columns partly ambiguous)"
+        },
+        {
+          "url": "https://koolit.co.uk/app/uploads/2023/11/Mitsubishi-Electrc-MXZ-F-Multi-Split-Air-Conditioning-System-web.pdf",
+          "title": "Mitsubishi Electric UK - The MXZ-F Multi-Split outdoor unit range brochure (installer-hosted copy; max height 15 m, 10 m if OU higher)"
+        },
+        {
+          "url": "https://modbs.co.uk/news/fullstory.php/aid/2748/Air_conditioning_enjoys__5-year_guarantee_.html",
+          "title": "MODBS - Air conditioning enjoys 5-year guarantee (Mitsubishi accredited installer; secondary)"
+        }
+      ],
+      "confidence": "provisional",
+      "notes": "maxPipeM = total 60 m; 25 m per room; height 15 m (10 m if OU higher). SEER/SCOP CONFLICT: 8.13/4.07 (Prosatech VF4 table, FR/ES listings) vs 8.53/4.12 (Schiessl) - 8.13/4.07 used. Outdoor SPL 53/48 dB(A) heating/cooling (Schiessl). Port pipe sizes, pre-charge rule and breaker not captured (a 3F/4F installation manual mentions extra charge when 3-4 indoors connected - confirm). Multi SEER/SCOP are the outdoor's rated values; real seasonal efficiency depends on the connected indoor combination (Eurovent: MXZ-2F42VF4 + 2x MSZ-AY20VGK = SEER 7.64 / SCOP 3.82). SUFFIX: UK retailers still list VF3; the Mitsubishi UK library (parts catalogue, combination chart, installation manual VG79N213H02) lists VF4; EU retailers sell VF5 from late 2025. Core capacities are the same across suffixes in the sources seen - confirm current UK suffix with distributor. "
+    }
+  ],
+  "compatibility": [
+    {
+      "outdoorModel": "MXZ-2F42VF4",
+      "maxIndoorUnits": 2,
+      "connectableIndoorSeries": [
+        "MSZ-AY Elegance wall (..VGK)",
+        "MSZ-AP Elegance wall (..VGK, 15-50; superseded by AY)",
+        "MSZ-LN premium wall (..VG/VG2)",
+        "MSZ-EF Zen wall",
+        "SEZ-M ducted / SLZ-M cassette / floor console (M Series multi indoor types - not catalogued here)"
+      ],
+      "connectableIndoorModels": [
+        "MSZ-AY15VGK",
+        "MSZ-AY20VGK",
+        "MSZ-AY25VGK",
+        "MSZ-AP25VGK",
+        "MSZ-LN18VG2W",
+        "MSZ-LN25VG2W"
+      ],
+      "minConnectedKw": null,
+      "maxConnectedKw": null,
+      "maxTotalPipeM": 30,
+      "maxPipePerRoomM": 20,
+      "source": {
+        "url": "https://www.logicool-ac.com/products/mitsubishi-electric-air-conditioning-mxz-multi-split-2/",
+        "title": "Logicool - MXZ Multi-Split (R32) table (UK distributor)"
+      },
+      "confidence": "provisional",
+      "notes": "Pipe 30 m total / 20 m per room also on Sonepar FR (VF4) and Orion UK (VF3); height 15 m (10 m if outdoor above indoor). Connectable MODELS are only those seen sold as manufacturer-approved bundles (Orion UK 2x AP25VGK; climshop FR AY15+AY25, 2x AY20; 4saisons FR LN18+LN25) - NOT the official combination table. Retailer claims for max combination: '2.5 kW + 3.5 kW' (DE) and '42+15' (FR) - official min/max connected capacity not found, left null. Mitsubishi AU guide gives a generic 50-130% of outdoor capacity rule (non-UK). MSZ-HR (Classic) is for MXZ-HA outdoors, not MXZ-F (Logicool, 2024 ME catalogue) - excluded. Combined max running current of all indoor units must not exceed the outdoor limit (3 A in a UK Mitsubishi document)."
+    },
+    {
+      "outdoorModel": "MXZ-3F54VF4",
+      "maxIndoorUnits": 3,
+      "connectableIndoorSeries": [
+        "MSZ-AY Elegance wall (..VGK)",
+        "MSZ-AP Elegance wall (..VGK)",
+        "MSZ-LN premium wall (..VG2)",
+        "MSZ-EF Zen wall",
+        "SEZ-M ducted / SLZ-M cassette / floor console (not catalogued here)"
+      ],
+      "connectableIndoorModels": [
+        "MSZ-AY25VGK",
+        "MSZ-LN25VG2W",
+        "MSZ-AP20VGK"
+      ],
+      "minConnectedKw": null,
+      "maxConnectedKw": null,
+      "maxTotalPipeM": 50,
+      "maxPipePerRoomM": 25,
+      "source": {
+        "url": "https://www.logicool-ac.com/products/mitsubishi-electric-air-conditioning-mxz-multi-split-2/",
+        "title": "Logicool - MXZ Multi-Split (R32) table (UK distributor)"
+      },
+      "confidence": "provisional",
+      "notes": "2-3 indoor units (Mitsubishi FR FTI for VF4). 50 m total / 25 m per room from distributor table and a Mitsubishi service-manual index; one UK model-sheet snippet showed 60 m - confirm. MSZ-AY25VGK and MSZ-LN25VG2 marked compatible on a Mitsubishi UK combination chart (search snippet, https://library.mitsubishielectric.co.uk/pdf/download_full/5366 - document not opened); MSZ-HR25VF row had no marks. MSZ-AP20VGK from an IT bundle (MXZ-3F54VF + 3x AP20VGK). Official connectable capacity range and per-port maximum indoor size not found."
+    },
+    {
+      "outdoorModel": "MXZ-4F72VF4",
+      "maxIndoorUnits": 4,
+      "connectableIndoorSeries": [
+        "MSZ-AY Elegance wall (..VGK)",
+        "MSZ-AP Elegance wall (..VGK)",
+        "MSZ-LN premium wall (..VG2)",
+        "MSZ-EF Zen wall",
+        "SEZ-M ducted / SLZ-M cassette / floor console (not catalogued here)"
+      ],
+      "connectableIndoorModels": [
+        "MSZ-AP25VGK",
+        "MSZ-AP50VGK"
+      ],
+      "minConnectedKw": null,
+      "maxConnectedKw": null,
+      "maxTotalPipeM": 60,
+      "maxPipePerRoomM": 25,
+      "source": {
+        "url": "https://www.coolingcompany.co.uk/product/mitsubishi-electric-air-conditioning-mxz-4f72vf3-multi-4-x-msz-ap25vgk-2-5kw-wall-a-240v50hz/",
+        "title": "Cooling Company UK - MXZ-4F72VF3 + 4x MSZ-AP25VGK (2-4 connectable)"
+      },
+      "confidence": "provisional",
+      "notes": "2-4 indoor units. 60 m total / 25 m per room from Logicool table and Mitsubishi service-manual index; height 15 m (10 m if OU higher). Models listed are from UK bundles only (Cooling Company 4x AP25VGK; Orion 2x AP50VGK). AY and LN wall units are expected to be connectable as for 2F42/3F54 but per-model rules for 4F72 not seen. Official connectable capacity range not found; 5.0 kW indoor units may need port adaptors."
+    }
+  ],
+  "openQuestions": [
+    "ACCESS: WebFetch/curl could not reach any Mitsubishi domain (library.mitsubishielectric.co.uk, les.mitsubishielectric.co.uk, confort.mitsubishielectric.fr) nor EPREL/Eurovent (DNS failure / proxy 403). Every value here comes from search-engine snippets of those documents plus UK/EU distributor pages, so ALL records are 'provisional'. Download and check the UK PI sheets: MSZ-HR (library download_full/4097), MSZ-AY/AP (4788), MSZ-AP 2019 (3699), MXZ-F range (4206) and the UK multi-split combination chart, then upgrade confidence.",
+    "Web search budget for this run was exhausted before every gap could be chased; remaining nulls need a follow-up pass.",
+    "Current UK model suffixes for 2026: MSZ-HR..VF vs ..VFK / ..VFK2 (Wi-Fi) ; MXZ-..VF3 vs ..VF4 vs ..VF5 ; MSZ-LN colour suffixes (W/V/R/B). Confirm against the 2025/2026 Mitsubishi LES UK price list (a 2025 LES price list PDF exists on fsw.uk.com) or distributor stock codes.",
+    "MSZ-AP25/35/50VGK appear superseded in the UK by MSZ-AY25/35/50VGK (2023, secondary sources). Confirm AP availability before quoting; AY should be the default 'standard' Mitsubishi option.",
+    "Multi-split official rules not found: min/max total connected indoor capacity per MXZ-F outdoor, per-port maximum indoor size, which ports are 9.52 vs 12.7 gas, adaptor (different-diameter joint) part numbers for 5.0 kW indoors, and whether the 3F/4F need extra charge when 3-4 indoors are connected.",
+    "MSZ-HR multi compatibility: Logicool and the 2024 Mitsubishi multisplit catalogue tie HR multi units to MXZ-HA outdoors (e.g. MXZ-2HA40VF2), but an older Orion UK listing sells MXZ-2F42VF + 2x MSZ-HR25VF. MXZ-HA outdoors were not catalogued.",
+    "Conflicts to resolve from official data: MSZ-AP50VGK/MUZ-AP50VG gas pipe 9.52 vs 12.7 mm and outdoor sound power (56/64/69 dB); MUZ-AY25VG weight (26.5-31 kg); MUZ-LN25VG2 weight (33/35 kg); MUZ-LN50VG2 max height 12 vs 15 m; MXZ-3F54 total pipe 50 vs 60 m; MXZ-4F72 SEER/SCOP 8.13/4.07 vs 8.53/4.12; MUZ-HR25VF max height 12 vs 10 m.",
+    "Missing outdoor sound power (needed for noise / planning assessment): MUZ-AP50VG, MUZ-AY35VG, MUZ-AY50VG. Missing breaker ratings: MUZ-HR50VF, MUZ-LN35VG2, MUZ-LN50VG2, MXZ-4F72VF4. Mitsubishi UK states fuse ratings are guidance only - electrician must size cable and protection.",
+    "Missing pre-charge / additional-charge data for MUZ-AY..VG and MUZ-HR50VF, and pipe limits for MUZ-AY35VG / MUZ-AY50VG / MUZ-LN35VG2. Missing operating ranges for AY and LN35/LN50 (LN25 FR sheet: -10..+46 cooling, -15..+24 heating). AP range is single-source.",
+    "Warranty: official Mitsubishi Electric UK air-to-air warranty T&Cs not retrieved. Secondary sources: 3 years standard, up to 5 years via Accredited Installer / Partner Programme; one installer claims 7 years parts. Need: accreditation requirements for 'Dang, It's Hot', registration deadline (3 months is stated for Lossnay), servicing conditions.",
+    "7.1 kW not catalogued: MSZ-AP71VGK/MUZ-AP71VG and MSZ-HR71VF exist (Logicool, Spanish HR datasheet); LN tops out at LN60 (6.0 kW). Add if a pilot property needs >5 kW.",
+    "UK-rated vs nominal capacities: several UK retailers quote 'UK rated' cooling (e.g. AP35 3.26 or 3.47 kW) that differs from EN14511 nominal values used here - decide which basis the sizing tool uses.",
+    "FACT-CHECK PASS (2026-10-18, adversarial): this pass had NO web access. The shared WebSearch budget for the run was already used up, and WebFetch failed with a DNS error on every domain tried (orionairsales.co.uk, logicool-ac.com, coolingcompany.co.uk, prosatech.de, eurovent-certification.com, manualslib.com, topten.eu, mitsubishi-electric.co.nz and en.wikipedia.org). No claim could be checked against an independent outside source. Checks were limited to internal arithmetic, consistency across records, and cross-checks with other repo research files. Every claim listed below as unverifiable still needs an outside check.",
+    "Fact-check CONFIRMED (internal arithmetic only): the MUZ-HR25VF charge chain holds together. Factory charge ~0.40 kg + (20 m max - 7 m pre-charged) x 20 g/m = 660 g, which equals the installation-manual maximum charge quoted in the record notes. Three figures from three different documents agree.",
+    "Fact-check CONFIRMED (internal arithmetic only): R32 GWP 675. The Orion MSZ-AP50VGK listing gives 1.00 kg = 0.68 tCO2e, and 1.00 x 0.675 = 0.675, which rounds to 0.68.",
+    "Fact-check CONFIRMED against recalled thresholds (EU Delegated Regulation 626/2011 Annex II as retained in GB, https://eur-lex.europa.eu/eli/reg_del/2011/626/oj, NOT fetched): every energyClassCooling and energyClassHeating value in this file matches its SEER/SCOP. The recalled thresholds are SEER A+++ >= 8.50, A++ 6.10-8.50; SCOP A+++ >= 5.10, A++ 4.60-5.10, A+ 4.00-4.60. The same thresholds would give the null classes as: MSZ/MUZ-AY25 heating A++; MSZ/MUZ-LN35VG2 heating A+++ (SCOP 5.10 is exactly on the boundary); MXZ-3F54VF4 A+++ cooling / A++ heating; MXZ-4F72VF4 A++ cooling / A+ heating. These are DERIVED, not sourced, so they are left null. Confirm them from the EPREL label.",
+    "Fact-check CONFIRMED (cross-file): MSZ-AP35VGK is superseded by MSZ-AY35VGK. docs/research/data/equipment-prices.json records, from a separate search extract, that the Orion page says MSZ-AP35VGK has been replaced by MSZ-AY35VGK. The '2023' date and the AP25/AP50 supersession were not independently checked.",
+    "Fact-check UNVERIFIABLE (no web): Mitsubishi UK warranty (3 years standard; up to 5 years parts with an Accredited Installer). No independent source could be reached, so check the official T&Cs before quoting to customers.",
+    "Fact-check UNVERIFIABLE, internal tension: the 5.0 kW gas pipe size. MSZ-HR50VF and MSZ/MUZ-LN50VG2 are recorded as 9.52 mm gas. However, the MSZ-AP50VGK record has a 12.7 mm conflict (Mitsubishi NZ and a UK retailer), the LN50 notes mention a service-manual extract showing 12.7 mm, and the MXZ notes say 5.0 kW indoor units may need port adaptors (which implies 12.7 mm). Treat the 9.52 mm values for HR50 and LN50 as unconfirmed until the installation manual is checked, before pipe is ordered.",
+    "Fact-check UNVERIFIABLE, internal tension: MSZ-AP25VGK. The notes quote a '6 A BS88 HRC fuse on indoor feed' (Orion), but every indoor record's powerSupply says the indoor unit is fed through the outdoor-unit interconnect. Both cannot apply to a single supply arrangement. Ask the electrician to confirm from the installation manual whether the indoor unit has a separate fused supply.",
+    "Fact-check UNVERIFIABLE: MUZ-AY35VG weight of 27 kg (Climacom, single source). For the sibling MUZ-AY25VG in the same 800x550x285 casing, Orion (31 kg) and Climacom (26.5 kg) conflict, and MUZ-AP25/35VG in the same casing are 31 kg (Orion). Climacom may run about 4-5 kg below Orion, so treat 27 kg as unconfirmed for lifting and bracket planning.",
+    "Fact-check UNVERIFIABLE (no web): MXZ-3F54VF4 total pipe 50 m (vs a 60 m snippet) and 25 A breaker; MXZ-4F72VF4 SEER/SCOP 8.13/4.07 (vs 8.53/4.12); MSZ-LN35VG2 SEER 9.5 (Eurovent snippet); MUZ-LN50VG2 maximum height 12 m vs 15 m; MXZ-2F42VF4 30 m pre-charge. These figures are unchanged. Re-check them against the Mitsubishi UK PI sheets or the Eurovent/EPREL pages when web access is available."
+  ]
+}

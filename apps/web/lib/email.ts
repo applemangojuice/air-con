@@ -1,4 +1,5 @@
 import { BRAND } from "./brand";
+import { realEnv } from "./env-placeholders";
 
 /**
  * The one place email leaves the platform from. Resend under the hood,
@@ -8,41 +9,102 @@ import { BRAND } from "./brand";
  */
 
 export function emailConfigured(): boolean {
-  return Boolean(process.env.RESEND_API_KEY && process.env.EMAIL_FROM);
+  // A template key (re_xxx) isn't a provider: stay honestly in demo mode.
+  return Boolean(realEnv(process.env, "RESEND_API_KEY") && realEnv(process.env, "EMAIL_FROM"));
 }
 
-/** Where team-facing alerts go: LEADS_NOTIFY_EMAIL, else the from-address. */
+/** Where team-facing alerts go: LEADS_NOTIFY_EMAIL, else the from-address. A template inbox (you@dang.ac) is no inbox. */
 export function teamInbox(): string | null {
-  if (process.env.LEADS_NOTIFY_EMAIL) return process.env.LEADS_NOTIFY_EMAIL;
-  const from = process.env.EMAIL_FROM;
+  const leads = realEnv(process.env, "LEADS_NOTIFY_EMAIL");
+  if (leads) return leads;
+  const from = realEnv(process.env, "EMAIL_FROM");
   if (!from) return null;
   const match = from.match(/<([^>]+)>/);
   return match ? match[1] : from;
 }
 
-export async function sendEmail(to: string, subject: string, html: string): Promise<boolean> {
-  const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.EMAIL_FROM;
-  if (!apiKey || !from) return false;
+/** A usable Reply-To: a plausible single address, else nothing (Resend refuses a malformed one). */
+export function replyToAddress(value: string | null | undefined): string | undefined {
+  const v = value?.trim();
+  return v && /^[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]+$/.test(v) ? v : undefined;
+}
+
+/** How long Resend gets to answer before a send counts as failed (Twilio has 10 s, Stripe 15 s). */
+export const EMAIL_TIMEOUT_MS = 10_000;
+
+export interface EmailResult {
+  ok: boolean;
+  /** Resend's id for the message, when it accepted it. */
+  providerRef?: string;
+  error?: string;
+}
+
+/**
+ * Send one email and say what happened. `replyTo` is where the customer's
+ * reply goes: our company address from settings, so a reply (an express
+ * early-start request, a question about a proposal) reaches a monitored
+ * inbox even when EMAIL_FROM is a sending-only or no-reply address.
+ *
+ * Resend gets EMAIL_TIMEOUT_MS to answer. No answer in time is a failed
+ * send (never a hung request): the outbox records it as failed and the cron
+ * or Retry tries again. Resend may still have taken a message it didn't
+ * answer for in time, so in that rare case the family can get it twice.
+ */
+export async function sendEmailResult(to: string, subject: string, html: string, opts: { replyTo?: string; timeoutMs?: number } = {}): Promise<EmailResult> {
+  const apiKey = realEnv(process.env, "RESEND_API_KEY");
+  const from = realEnv(process.env, "EMAIL_FROM");
+  if (!apiKey || !from) return { ok: false, error: "Email isn't set up" };
+  const replyTo = replyToAddress(opts.replyTo);
+  const timeoutMs = opts.timeoutMs ?? EMAIL_TIMEOUT_MS;
   try {
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
-      body: JSON.stringify({ from, to: [to], subject, html }),
+      body: JSON.stringify({ from, to: [to], subject, html, ...(replyTo ? { reply_to: replyTo } : {}) }),
+      signal: AbortSignal.timeout(timeoutMs),
     });
-    if (!res.ok) console.error("email send failed:", res.status, await res.text());
-    return res.ok;
+    const body = await res.text().catch(() => "");
+    if (!res.ok) {
+      console.error("email send failed:", res.status, body);
+      let detail = `HTTP ${res.status}`;
+      try {
+        const message = (JSON.parse(body) as { message?: unknown }).message;
+        if (typeof message === "string" && message) detail = `${message} (HTTP ${res.status})`;
+      } catch {
+        // not JSON: the status says enough
+      }
+      return { ok: false, error: `Resend didn't accept the message: ${detail.slice(0, 200)}` };
+    }
+    let providerRef: string | undefined;
+    try {
+      const id = (JSON.parse(body) as { id?: unknown }).id;
+      if (typeof id === "string" && id) providerRef = id;
+    } catch {
+      // accepted without a readable id: still sent
+    }
+    return providerRef ? { ok: true, providerRef } : { ok: true };
   } catch (err) {
-    console.error("email send failed:", err);
-    return false;
+    const timedOut = err instanceof Error && (err.name === "TimeoutError" || err.name === "AbortError");
+    console.error(timedOut ? `email send timed out after ${timeoutMs} ms` : "email send failed:", timedOut ? "" : err);
+    return {
+      ok: false,
+      error: timedOut
+        ? `Resend didn't answer within ${Math.round(timeoutMs / 1000)} seconds, so it counts as not sent (tried again later)`
+        : `Resend unreachable: ${err instanceof Error ? err.message : String(err)}`,
+    };
   }
 }
 
+/** Send one email: true only when Resend accepted it (see sendEmailResult; same timeout). */
+export async function sendEmail(to: string, subject: string, html: string, opts: { replyTo?: string } = {}): Promise<boolean> {
+  return (await sendEmailResult(to, subject, html, opts)).ok;
+}
+
 /** Team alert: no-op (false) when the inbox isn't configured. */
-export async function sendTeamEmail(subject: string, html: string): Promise<boolean> {
+export async function sendTeamEmail(subject: string, html: string, opts: { replyTo?: string } = {}): Promise<boolean> {
   const to = teamInbox();
   if (!to) return false;
-  return sendEmail(to, subject, html);
+  return sendEmail(to, subject, html, opts);
 }
 
 export function escapeHtml(value: string): string {
@@ -68,4 +130,68 @@ export function brandedEmail(bodyHtml: string): string {
     <p style="margin:0 0 28px;color:#a3a8b4;font-size:12px;border-top:1px solid #ddd5c4;padding-top:16px">${escapeHtml(BRAND.name)} · ${escapeHtml(BRAND.tagline)}</p>
   </td></tr>
 </table>`;
+}
+
+/* ------------------------------------------------------------------ */
+/* The quote email (operational: no marketing in it)                    */
+/* ------------------------------------------------------------------ */
+
+export interface QuoteEmailInput {
+  name: string;
+  /** The permanent /q/[id] link. */
+  link: string;
+  totalGbp: number;
+  roomCount: number;
+  /** yyyy-mm-dd: the last day the price is valid (settings.pricing.quoteValidityDays). */
+  validUntil: string;
+  /** "up to three days" (settings.scheduling.installBlockDays). */
+  installDays: string;
+  /** VAT in plain words from settings, or null to say nothing. */
+  vatLine: string | null;
+  /** "Free" or "£150" (settings.scheduling.surveyFeeGbp). */
+  surveyPrice: string;
+  /** "about 90 minutes", or null. */
+  surveyDuration: string | null;
+  supportEmail: string;
+  /** A real phone number, or null (never the placeholder). */
+  supportPhone: string | null;
+}
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const longDate = (iso: string) => {
+  const d = new Date(`${iso.slice(0, 10)}T12:00:00Z`);
+  return Number.isNaN(d.getTime()) ? iso : `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+};
+const pounds = (gbp: number) => `£${String(Math.round(gbp)).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`;
+
+/**
+ * The customer's copy of their price. Calm and plain: the price is confirmed
+ * at the home survey (never "fixed", "guaranteed" or "doesn't expire"), it's
+ * valid until a stated date, and the one next step is booking the survey.
+ * Every value from the customer is escaped.
+ */
+export function quoteEmail(input: QuoteEmailInput): { subject: string; html: string } {
+  const total = pounds(input.totalGbp);
+  const rooms = `${input.roomCount} room${input.roomCount === 1 ? "" : "s"}`;
+  const survey = [input.surveyPrice.toLowerCase() === "free" ? "free" : input.surveyPrice, input.surveyDuration]
+    .filter(Boolean)
+    .join(", ");
+  const link = escapeHtml(input.link);
+  const contact = input.supportPhone
+    ? `reply to this email or call ${escapeHtml(input.supportPhone)}`
+    : `reply to this email or write to ${escapeHtml(input.supportEmail)}`;
+  const html = brandedEmail(`<p style="margin:0 0 14px">Hi ${escapeHtml(input.name)},</p>
+    <p style="margin:0 0 6px;color:#5d6371;font-size:14px">Your price for heating and cooling ${rooms}:</p>
+    <p style="margin:0 0 6px;font-size:36px;font-weight:700">${total}</p>
+    <p style="margin:0 0 16px;color:#454b58;font-size:14px">Installed over ${escapeHtml(input.installDays)}${input.vatLine ? ` · ${escapeHtml(input.vatLine)}` : ""} · valid until ${longDate(input.validUntil)}</p>
+    <p style="margin:0 0 20px;color:#454b58">We confirm this price at your home survey. It only changes if the survey finds something your answers didn't show, and if it does, your proposal will say exactly what changed and why before you agree to anything.</p>
+    <p style="margin:0 0 24px">
+      <a href="${link}" style="display:inline-block;background:#a84508;color:#ffffff;text-decoration:none;font-weight:600;padding:12px 28px;border-radius:999px">View my quote</a>
+    </p>
+    <p style="margin:0 0 6px;font-size:13px;color:#5d6371">Or copy this link:</p>
+    <p style="margin:0 0 24px;font-size:13px"><a href="${link}" style="color:#a84508">${link}</a></p>
+    <p style="margin:0 0 8px;color:#454b58"><strong>Next step:</strong> book your home survey from that page${survey ? ` (${escapeHtml(survey)})` : ""}, at a time that suits you. There's no obligation.</p>
+    <p style="margin:0 0 28px;color:#454b58">Questions? Just ${contact}.</p>
+    <p style="margin:0 0 20px;color:#5d6371;font-size:12px">You're getting this because you asked for a price on our website. We only email you about this quote unless you asked for news and offers.</p>`);
+  return { subject: `Your price: ${total} for ${rooms}`, html };
 }

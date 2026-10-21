@@ -1,6 +1,8 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { healthReport, type HealthReport } from "@/lib/health";
+import { requireStaff } from "@/lib/auth/server";
+import { PILOT_UPGRADE } from "@/lib/schema-check";
 
 export const metadata: Metadata = {
   title: "System status · ops",
@@ -15,6 +17,7 @@ export const dynamic = "force-dynamic";
  * which table or bucket is missing and what it breaks for customers.
  */
 export default async function OpsStatusPage() {
+  await requireStaff("projects.view-all");
   const report = await healthReport();
 
   return (
@@ -121,9 +124,10 @@ export default async function OpsStatusPage() {
         <p className="font-semibold text-ink-900">Fixing a red row</p>
         <ol className="mt-2 list-decimal space-y-1 pl-5">
           <li>
-            In Supabase → SQL editor, run every file in{" "}
-            <code>supabase/migrations/</code> in order (0001 → 0007). Re-running
-            is safe; they use <code>if not exists</code>.
+            In Supabase → SQL Editor, paste and run <code>{PILOT_UPGRADE}</code>. Re-running it is
+            safe. A brand-new, empty project first needs 0001 to 0009 from{" "}
+            <code>supabase/migrations/</code> (both 0006 files), one at a time. Then{" "}
+            <code>supabase/check-schema.sql</code> should say &ldquo;All present&rdquo;.
           </li>
           <li>
             Confirm <code>SUPABASE_URL</code> and{" "}
@@ -176,7 +180,8 @@ function Banner({ report }: { report: HealthReport }) {
           Connected, but {missing} thing{missing === 1 ? "" : "s"} {missing === 1 ? "is" : "are"} missing
         </p>
         <p className="mt-1 text-sm text-red-600">
-          This is why data isn&apos;t being captured. Run the outstanding migrations below.
+          This is why data isn&apos;t being captured. In Supabase → SQL Editor, paste and run <code>{PILOT_UPGRADE}</code>{" "}
+          (the pilot platform&apos;s tables and columns; safe to run again), then reload this page.
         </p>
       </div>
     );

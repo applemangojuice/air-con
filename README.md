@@ -1,85 +1,70 @@
 # air-con: the operating system for residential air conditioning
 
-Fixed-price quoting with customer self-survey is **live**; the rest of the
-platform (CRM, design studio, installer app, monitoring) has placeholder
-surfaces and a data model already shaped for it. See
-[ARCHITECTURE.md](./ARCHITECTURE.md) for the why behind everything.
+> **Going live with the four pilots? Start with
+> [docs/START-HERE-TOMORROW.md](./docs/START-HERE-TOMORROW.md).** The
+> founder's checklist, step by step, plus guides for the office, the field
+> team and what customers see ([docs/guides/](./docs/guides/)).
+
+Dang, It's Hot: fixed-price quoting with customer self-survey, and the pilot
+platform that runs each installation from the first survey to the last
+payment. See [ARCHITECTURE.md](./ARCHITECTURE.md) for the why behind
+everything, and [docs/pilot-architecture.md](./docs/pilot-architecture.md)
+for the pilot platform's technical contract.
 
 ## What works today
 
-- **Marketing site** (`/`): postcode capture into the quote funnel.
-- **Fixed-price quote funnel** (`/quote`): six-step mobile-first self-survey:
-  address (live postcode validation) → property → rooms (with photos) →
-  outdoor unit → electrics → contact, ending in an instant fixed price with
-  finance options, an Installation Confidence Score, and a full price
-  breakdown. Drafts auto-save to the device.
-- **Saved quotes** (`/q/[id]`): every submitted quote gets a permanent
-  shareable link (optional email via Resend), and starts the project from
-  there.
-- **Project timeline** (`/p/[id]`, playable demo at `/p/demo`): the whole
-  journey on one clickable horizontal timeline: quote → floor plan → final
-  quote → £150 site visit → courier delivery → installation. Future stages
-  are previewable with projected dates; customers book and move their own
-  dates (escalating change fees), tick off installation prep, meet their
-  installer, and track the electrical plan. Backed by a pure, tested stage
-  reducer in the domain package. See
-  [docs/project-workflow.md](./docs/project-workflow.md).
-- **Property Intelligence Engine** (`/ops/intel` + `/a/[id]`): one master
-  record per property (UPRN-keyed) built from EPC, planning and conservation
-  open data plus manual audits. Prefills the quote funnel the moment a known
-  address is picked, generates a personalised landing page per address for
-  mailings, and powers the targeting analytics (filters, mailing CSV export,
-  campaign tagging, business-case maths). Demo dataset covers SW16/SW17 with
-  no database. **New here? [docs/loading-data.md](./docs/loading-data.md) is the
-  start-to-finish guide for getting data in** (demo mode, sample CSVs, or real
-  open-data downloads); [docs/property-intelligence.md](./docs/property-intelligence.md)
-  has the per-source detail.
-- **Ops review** (`/ops/quotes` + `/ops/projects`): incoming surveys and
-  in-flight installations (issue final quotes, record site-visit outcomes,
-  dispatch equipment, assign installers), behind basic auth (`OPS_PASSWORD`).
-- **Scheduling & procurement** (`/ops/schedule` + `/ops/procurement`): live
-  projects laid onto a six-week crew board (conflicts flagged, street
-  batching surfaced) and turned into a weekly order book with per-install
-  pick lists and order-by dates. Pure, tested planners in
-  `packages/domain/src/operations.ts`.
-- **Business case & P&L planner** (`/ops/finance`): assumptions in, monthly
-  P&L out. Unit economics with CAC from the mailing channel, cost dials,
-  breakeven month, cash trough and the funding ask, three scenarios, cash
-  curve and CSV export. Plus the full seed case: bottom-up TAM/SAM/SOM,
-  LTV:CAC with service-plan attach, round and dilution modelling, driver
-  sensitivity on the ask, and a milestone road to Series A whose dates are
-  computed from the live plan. Models in `packages/domain/src/finance.ts`
-  and `investor.ts`, tested.
-- **iOS capture app** (`apps/mobile`): Expo scaffold of the same survey flow
-  with native camera capture and offline drafts, sharing the domain engine.
-  See [docs/capture-process.md](./docs/capture-process.md) for the capture
-  process design and the AR/RoomPlan roadmap.
-- **Pricing engine** (`packages/domain`): deterministic, versioned, tested.
-- **Persistence**: quotes + photos into Supabase when configured; graceful
-  demo mode when not.
-- **Usage analytics** (`/ops/analytics`): first-party, cookieless — visitors,
-  sources, campaigns (UTM), geography, and the quote funnel step by step.
-  Every quote stores its acquisition source.
-- **System status** (`/ops/status` + `/api/health`): live check of every
-  table, bucket and env var, with the exact fix when something's red; a
-  daily GitHub Action fails loudly if production degrades.
-- **Lead recovery**: unfinished quotes surface as a follow-up worklist on
-  `/ops/quotes`, and a daily cron sends one friendly nudge email
-  automatically (`CRON_SECRET` + Resend).
-- **Launch surface**: `/faq`, `/areas/sw16` + `/areas/sw17` local landing
-  pages, `/privacy` + `/terms` (UK GDPR), robots/sitemap/OG/JSON-LD,
-  security headers + per-IP rate limiting, self-hosted fonts, error
-  boundaries, web manifest.
-- **Placeholders**: `/portal` (customer), `/ops` (internal modules), `/how-it-works`.
-- **Design**: the Organic design system (from the owner's Claude Design
-  project) across web and mobile.
+**The pilot platform** (`/ops`, `/field`, `/p/[id]`): one job, end to end,
+for the four pilot homes.
+
+- **Office** (`/ops`): the Board, each project's command centre, New pilot,
+  the design studio (signed off by an F-gas technical lead), the proposal
+  builder (costs, margin, pilot discount, VAT from settings), booking with
+  certificate-checked crews, purchase orders, the compliance checklist,
+  invoices and payments, the Messages log, Staff, Catalogue, Settings, the
+  Pilots comparison, and `/ops/launch` (go-live checks).
+  [Admin guide](./docs/guides/admin.md).
+- **Field app** (`/field`, on a phone): the home survey with measured rooms
+  and drawings on photos, the job pack, a three-day evidence runsheet with
+  F-gas and Part P steps locked to qualified people, issues and variations,
+  end-of-day updates, commissioning and handover. Work saves on the phone
+  and syncs when there's signal. [Field guide](./docs/guides/field.md).
+- **Customer project page** (`/p/[id]`, `/portal`): one next step at a time,
+  the proposal drawn on their own photos, online acceptance with the
+  cancellation information and early-start request, install dates, daily
+  updates, documents, payments and aftercare. Sign-in by emailed link only.
+  [What customers see](./docs/guides/customer-journey.md).
+- **Messages**: 29 email and text types through one logged outbox,
+  with daily reminders and aftercare; texts and card payments are optional
+  ([integrations](./docs/guides/integrations.md)).
+- Honest about the rest: [known limitations](./docs/guides/known-limitations.md),
+  [approvals still needed](./docs/guides/approvals-required.md),
+  [latest test results](./docs/guides/test-results.md).
+
+**Also in the repo**
+
+- **Fixed-price quote funnel** (`/quote`, `/q/[id]`): mobile-first
+  self-survey to an instant price, a saved quote page, and the start of a
+  project.
+- **Property Intelligence Engine** (`/ops/intel`, `/a/[id]`): one record per
+  property from EPC, planning and conservation open data; prefills the
+  quote, powers mailings. Loading data: [docs/loading-data.md](./docs/loading-data.md).
+- **Business case and P&L planner** (`/ops/finance`), **usage analytics**
+  (`/ops/analytics`, cookieless), **system status** (`/ops/status`,
+  `/api/health`, daily GitHub health check), and the abandoned-quote
+  follow-up email.
+- **iOS capture app** (`apps/mobile`): an Expo scaffold of the survey flow;
+  not part of the pilots. See [docs/capture-process.md](./docs/capture-process.md).
+- **Domain engine** (`packages/domain`): pricing, design, costing, proposal,
+  project stages, install runsheet, money and comms rules: pure and tested.
+- **Launch surface**: `/faq`, area pages, `/privacy`, `/terms`, SEO basics,
+  security headers and rate limits. A fictional demo project at `/p/demo`.
 
 ## Run it
 
 ```bash
 pnpm install
 pnpm dev            # web: http://localhost:3000
-pnpm test           # domain engine tests
+pnpm test           # domain and web tests
 pnpm build          # production build (also typechecks)
 
 # iOS capture app (needs Xcode or the Expo Go app)
@@ -87,10 +72,15 @@ cd apps/mobile
 EXPO_PUBLIC_API_URL=http://<your-ip>:3000 pnpm start
 ```
 
-Runs in demo mode with no configuration (including the full project
-timeline at `/p/demo`). To persist quotes and projects, copy
-`apps/web/.env.example` to `apps/web/.env.local` and fill in your Supabase
-project, then run the files in `supabase/migrations/` against it in order.
+Runs with no configuration: in development the local data backend keeps
+everything under `apps/web/.data`, and "Try as…" on `/login` signs you in as
+a DEMO team member ("Load demo pilots" fills it with five fictional homes).
+To use Supabase, copy `apps/web/.env.example` to `apps/web/.env.local`, fill
+in your own values (they ship blank), run every file in
+`supabase/migrations/` from `0001` to `0009` against the project in order
+(both `0006` files), then `supabase/pilot-upgrade.sql` (`0010` to `0014` in
+one go; `0014` grants the service role every table, which Supabase no longer
+does by default).
 
 To load property data, follow [docs/loading-data.md](./docs/loading-data.md):
 demo mode (no setup), a one-click **GitHub Actions** workflow that imports and
@@ -99,5 +89,9 @@ open-data downloads.
 
 ## Deploy
 
-Vercel (root directory: `apps/web`, watching `main`) + Supabase. Checklist
-and smoke tests in [docs/going-live.md](./docs/going-live.md).
+Vercel (root directory: `apps/web`, deploys `main`) + Supabase. The
+founder's step-by-step is [docs/START-HERE-TOMORROW.md](./docs/START-HERE-TOMORROW.md);
+the technical reference (the database upgrade, every variable, the Stripe
+webhook, smoke tests and troubleshooting) is
+[docs/going-live.md](./docs/going-live.md). After the first admin signs in,
+`/ops/launch` checks the live site against it.

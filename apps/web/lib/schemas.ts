@@ -3,7 +3,7 @@ import { z } from "zod";
 /** Shared wire-schema for surveys, used by the quote and draft endpoints. */
 
 const photoSchema = z.object({
-  id: z.string(),
+  id: z.string().max(80),
   kind: z.enum([
     "room",
     "window",
@@ -12,9 +12,15 @@ const photoSchema = z.object({
     "fuse-board",
     "side-access",
   ]),
-  storagePath: z.string().optional(),
-  fileName: z.string().optional(),
+  storagePath: z.string().max(300).optional(),
+  fileName: z.string().max(255).optional(),
 });
+
+/**
+ * A list of photos with at most 40 kept (the quote keeps 40 in all): any
+ * more are dropped rather than refusing the customer's whole answer.
+ */
+const photos = z.preprocess((v) => (Array.isArray(v) ? v.slice(0, 40) : v), z.array(photoSchema));
 
 export const surveySchema = z.object({
   postcode: z.string().min(5).max(10),
@@ -40,7 +46,7 @@ export const surveySchema = z.object({
   rooms: z
     .array(
       z.object({
-        id: z.string(),
+        id: z.string().max(80),
         name: z.string().min(1).max(60),
         type: z.enum([
           "bedroom",
@@ -57,7 +63,7 @@ export const surveySchema = z.object({
         glazing: z.enum(["low", "medium", "high"]),
         orientation: z.enum(["north", "east", "south", "west", "unsure"]),
         hasExternalWall: z.boolean(),
-        photos: z.array(photoSchema),
+        photos,
       }),
     )
     .max(12),
@@ -70,11 +76,11 @@ export const surveySchema = z.object({
       "balcony",
       "unsure",
     ]),
-    photos: z.array(photoSchema),
+    photos,
   }),
   electrics: z.object({
     condition: z.enum(["modern-spare-ways", "modern-full", "older-fuse-box", "unsure"]),
-    photos: z.array(photoSchema),
+    photos,
   }),
 });
 

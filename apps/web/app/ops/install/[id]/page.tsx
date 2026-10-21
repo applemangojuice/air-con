@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { demoInstallJobs } from "@aircon/domain";
 import { RunsheetPlayer } from "@/components/ops/runsheet-player";
 import { fmtDay } from "@/lib/format";
+import { requireStaff } from "@/lib/auth/server";
 
 export const metadata: Metadata = {
   title: "Engineer runsheet · admin",
@@ -22,6 +23,7 @@ export default async function RunsheetPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  await requireStaff("projects.view-all");
   const { id } = await params;
   const job = demoInstallJobs(new Date().toISOString()).find((j) => j.id === id);
   if (!job) notFound();

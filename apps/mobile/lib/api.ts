@@ -1,5 +1,12 @@
-import type { SurveyPhoto } from "@aircon/domain";
+import { uploadContentType, type SurveyPhoto } from "@aircon/domain";
+import { CONSENT_VERSION, SURVEY_PHOTO_TYPES } from "./consent";
 import type { QuoteDraft } from "./store";
+
+/**
+ * SCAFFOLD, NEVER RELEASED (docs/guides/known-limitations.md). It speaks the
+ * same API as the web funnel (apps/web/lib/submit-quote.ts): test it against
+ * the API before any release.
+ */
 
 /** Point at the deployed web app (same API the web funnel uses).
  *  For local dev: EXPO_PUBLIC_API_URL=http://<your-mac-ip>:3000 */
@@ -13,6 +20,8 @@ export type SubmissionResult =
 type LocalPhoto = SurveyPhoto & { uri?: string };
 
 export async function submitSurvey(draft: QuoteDraft): Promise<SubmissionResult> {
+  // The API refuses a quote without the operational consent: never send one the owner didn't tick.
+  if (!draft.consents?.operational) return { status: "error" };
   try {
     const survey = JSON.parse(JSON.stringify(draft.survey)) as QuoteDraft["survey"];
     await uploadPhotos(survey.rooms.flatMap((r) => r.photos));
@@ -22,7 +31,13 @@ export async function submitSurvey(draft: QuoteDraft): Promise<SubmissionResult>
     const res = await fetch(`${API_BASE}/api/quotes`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ survey, contact: draft.contact, source: "ios" }),
+      body: JSON.stringify({
+        survey,
+        contact: draft.contact,
+        source: "ios",
+        // The same shape as the web funnel's: operational (required), marketing (never assumed), the wording version.
+        consents: { operational: true, marketing: draft.consents.marketing, version: CONSENT_VERSION },
+      }),
     });
     if (!res.ok) return { status: "error" };
     const data = (await res.json()) as { demo: boolean; id?: string };
@@ -36,10 +51,17 @@ async function uploadPhotos(photos: LocalPhoto[]): Promise<void> {
   for (const photo of photos) {
     if (photo.storagePath || !photo.uri) continue;
 
+    const file = await fetch(photo.uri);
+    const blob = await file.blob();
+    const fileName = photo.fileName ?? "photo.jpg";
+    // The type the bucket checks (/api/uploads requires it): a blank one is worked out from the name.
+    const contentType = uploadContentType(blob.type, fileName);
+    if (!(SURVEY_PHOTO_TYPES as readonly string[]).includes(contentType)) continue;
+
     const signRes = await fetch(`${API_BASE}/api/uploads`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ fileName: photo.fileName ?? "photo.jpg", kind: photo.kind }),
+      body: JSON.stringify({ fileName, kind: photo.kind, contentType }),
     });
     if (!signRes.ok) continue;
     const sign = (await signRes.json()) as {
@@ -49,11 +71,9 @@ async function uploadPhotos(photos: LocalPhoto[]): Promise<void> {
     };
     if (!sign.configured || !sign.signedUrl || !sign.path) continue;
 
-    const file = await fetch(photo.uri);
-    const blob = await file.blob();
     const put = await fetch(sign.signedUrl, {
       method: "PUT",
-      headers: { "content-type": blob.type || "image/jpeg" },
+      headers: { "content-type": contentType },
       body: blob,
     });
     if (put.ok) photo.storagePath = sign.path;

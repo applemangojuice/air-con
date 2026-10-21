@@ -1,0 +1,124 @@
+name: Apply database upgrade
+
+# Runs supabase/pilot-upgrade.sql (every database change from 0010 on, in one
+# transaction, safe to re-run) against the live Supabase database, then runs
+# supabase/check-schema.sql, a read-only check that every table, column,
+# photo store and safety check the app needs is there. Nothing runs on its
+# own: only when someone presses "Run workflow".
+#
+# You don't need this for the first upgrade: pasting supabase/pilot-upgrade.sql
+# into the Supabase SQL Editor does the same thing. This is the button for
+# the next time, and the check you can run any time.
+#
+# One-time setup (all in the browser, about 5 minutes):
+#   1. Get the database address. supabase.com → your project → click
+#      "Connect" (top of the page) → "Session pooler" → copy the URI. It looks
+#      like  postgresql://postgres.abcd:[YOUR-PASSWORD]@aws-0-eu-west-2.pooler.supabase.com:5432/postgres
+#      Use the Session pooler one: GitHub can't reach the "Direct connection"
+#      address (it's IPv6 only).
+#   2. Put your database password in place of [YOUR-PASSWORD] (no brackets).
+#      Forgotten it, or it has symbols like @ # / ? in it? Supabase → Project
+#      Settings → Database → Reset database password, and pick one with only
+#      letters and numbers. The website doesn't use this password, so
+#      changing it breaks nothing.
+#   3. GitHub → this repo → Settings → Secrets and variables → Actions →
+#      New repository secret:
+#        Name:   SUPABASE_DB_URL
+#        Secret: the full URI from step 2
+#   4. The "Run workflow" button appears on the Actions tab once this file is
+#      on the main branch (GitHub only lists buttons from main).
+#
+# Each time:
+#   GitHub → Actions → "Apply database upgrade" (left list) → Run workflow →
+#   pick "upgrade-then-check" (or "check-only" to just look) → Run workflow.
+#   A green tick means done. A red cross: open the run, then the step with the
+#   red cross; the last lines say what's wrong. If it says "Two households
+#   share a pilot number", nothing was changed: give one of them another
+#   number (the Pilot box on its project page) and run it again.
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "What to do"
+        type: choice
+        options:
+          - upgrade-then-check
+          - check-only
+        default: upgrade-then-check
+
+# Never two runs against the database at once.
+concurrency:
+  group: apply-migrations
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      ACTION: ${{ inputs.action || 'upgrade-then-check' }}
+      # psql: stop at the first error, ignore any local psqlrc, quiet, no prompts.
+      PSQL_FLAGS: -X -q -v ON_ERROR_STOP=1 --no-password
+    steps:
+      - name: Check the secret is set
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo "::error::Missing the repository secret SUPABASE_DB_URL. See the setup steps at the top of .github/workflows/apply-migrations.yml."
+            exit 1
+          fi
+          case "$SUPABASE_DB_URL" in
+            *"[YOUR-PASSWORD]"*)
+              echo "::error::SUPABASE_DB_URL still says [YOUR-PASSWORD]. Put your database password in its place (no brackets) and save the secret again."
+              exit 1 ;;
+            postgres://*|postgresql://*) ;;
+            *)
+              echo "::error::SUPABASE_DB_URL should start with postgresql:// (Supabase → Connect → Session pooler → URI)."
+              exit 1 ;;
+          esac
+          echo "Secret is set. Action: $ACTION"
+
+      - uses: actions/checkout@v4
+
+      - name: Install the Postgres client
+        run: |
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq postgresql-client
+          fi
+          psql --version
+
+      - name: Connect
+        run: |
+          psql $PSQL_FLAGS "$SUPABASE_DB_URL" -At -c "select 'Connected to ' || current_database() || ' (' || split_part(version(), ' ', 2) || ')'" \
+            || { echo "::error::Couldn't connect. Check SUPABASE_DB_URL is the Session pooler URI with the right password (setup step 1 and 2)."; exit 1; }
+
+      - name: Upgrade (supabase/pilot-upgrade.sql)
+        if: ${{ env.ACTION == 'upgrade-then-check' }}
+        run: |
+          # Quiet: re-runs print a note for every "already exists, skipping".
+          # (Set in the session, not PGOPTIONS: the pooler may not pass that on.)
+          psql $PSQL_FLAGS "$SUPABASE_DB_URL" -c "set client_min_messages = warning" -f supabase/pilot-upgrade.sql \
+            || { echo "::error::The upgrade stopped, so nothing was changed (it runs as one transaction). The lines above say why."; exit 1; }
+          echo "Upgrade applied."
+
+      - name: Check every table is there (read-only)
+        run: |
+          psql $PSQL_FLAGS "$SUPABASE_DB_URL" -c "set client_min_messages = notice" -f supabase/check-schema.sql \
+            || { echo "::error::The database is missing something the app needs (named above). Run this workflow with upgrade-then-check."; exit 1; }
+
+      - name: Summary
+        if: ${{ always() }}
+        run: |
+          {
+            echo "### Database upgrade"
+            echo ""
+            echo "- Action: \`$ACTION\`"
+            echo "- Branch: \`${GITHUB_REF_NAME}\` (the files come from here)"
+            echo ""
+            echo "Then open \`/ops/status\` on the live site: every table and photo store should be green."
+          } >> "$GITHUB_STEP_SUMMARY"

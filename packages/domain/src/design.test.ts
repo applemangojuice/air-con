@@ -41,7 +41,7 @@ function intel(overrides?: Partial<PropertyIntel["constraints"]>): PropertyIntel
   };
 }
 
-test("clean three-room home auto-approves with one multi-split", () => {
+test("clean three-room home: one multi-split, every rule passes but noise (MCS 020(a) at 5 m)", () => {
   const input: DesignInput = {
     survey: survey([
       room({ id: "r1", name: "Main bedroom" }),
@@ -51,12 +51,16 @@ test("clean three-room home auto-approves with one multi-split", () => {
     intel: intel(),
   };
   const bp = designSystem(input);
-  assert.equal(bp.verdict, "auto-approved");
   assert.equal(bp.systems.length, 1);
   assert.equal(bp.systems[0]!.topology, "multi");
   assert.ok(bp.systems[0]!.outdoor.ports >= 3);
   assert.equal(bp.rules.length, 8);
-  assert.ok(bp.rules.every((r) => r.status === "pass"));
+  assert.ok(bp.rules.filter((r) => r.id !== "noise").every((r) => r.status === "pass"));
+  // A 66 dB(A) LWA multi-split 5 m from the neighbour is about 47 dB(A): far over the 37.0 dB(A) MCS 020(a) leaves the heat pump.
+  const noise = bp.rules.find((r) => r.id === "noise")!;
+  assert.equal(noise.status, "review");
+  assert.match(noise.detail, /Estimated 47 dB\(A\) at 5 m, over the 37\.0 dB\(A\) MCS 020\(a\) allows/);
+  assert.equal(bp.verdict, "needs-review");
 });
 
 test("single room gets a single split", () => {

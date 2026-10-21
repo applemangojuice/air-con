@@ -1,9 +1,11 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { followUpMailto } from "@/lib/follow-up";
-import { fmtDay, gbp } from "@/lib/format";
+import { followUpMailto, reminderState } from "@/lib/follow-up";
+import { fmtDay, gbp, londonDateOf } from "@/lib/format";
+import { getSettings } from "@/lib/settings-server";
 import { QUOTE_TABS, tabByKey } from "./tabs";
 import { getServiceClient } from "@/lib/supabase-server";
+import { requireStaff } from "@/lib/auth/server";
 
 export const metadata: Metadata = {
   title: "Quote requests · ops",
@@ -34,15 +36,22 @@ interface QuoteRow {
   timeframe: string | null;
   utm_source: string | null;
   follow_up_sent_at: string | null;
+  next_action: string | null;
+  next_action_at: string | null;
+  attribution: unknown;
 }
 
 export default async function OpsQuotesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; sort?: string }>;
 }) {
-  const { tab: tabKey } = await searchParams;
+  await requireStaff("projects.view-all");
+  const { tab: tabKey, sort } = await searchParams;
   const tab = tabByKey(tabKey) ?? QUOTE_TABS[0];
+  // "next": the follow-ups due soonest first (none last), so the chase list is one click.
+  const byNext = sort === "next";
+  const today = londonDateOf(new Date().toISOString());
 
   const supabase = getServiceClient();
 
@@ -53,7 +62,7 @@ export default async function OpsQuotesPage({
           <p className="font-semibold text-ink-900">Demo mode, no database connected</p>
           <p className="mt-2">
             Set <code>SUPABASE_URL</code> and <code>SUPABASE_SERVICE_ROLE_KEY</code> to see
-            customer quote requests here. Set <code>OPS_PASSWORD</code> to protect this page.
+            customer quote requests here.
           </p>
         </div>
       </Shell>
@@ -63,13 +72,19 @@ export default async function OpsQuotesPage({
   let query = supabase
     .from("quote_requests")
     .select(
-      "id, created_at, customer_name, email, postcode, total_gbp, room_count, confidence_score, confidence_band, status, timeframe, utm_source, follow_up_sent_at",
+      "id, created_at, customer_name, email, postcode, total_gbp, room_count, confidence_score, confidence_band, status, timeframe, utm_source, follow_up_sent_at, next_action, next_action_at, attribution",
     )
-    .order("created_at", { ascending: false })
+    .order(byNext ? "next_action_at" : "created_at", byNext ? { ascending: true, nullsFirst: false } : { ascending: false })
     .limit(200);
   if (tab.statuses) query = query.in("status", tab.statuses);
 
-  const [{ data, error }, counts] = await Promise.all([query, tabCounts(supabase)]);
+  const [{ data, error }, counts, replyEmail] = await Promise.all([
+    query,
+    tabCounts(supabase),
+    getSettings()
+      .then((s) => s.company.email)
+      .catch(() => undefined),
+  ]);
 
   if (error) {
     return (
@@ -87,9 +102,10 @@ export default async function OpsQuotesPage({
         <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
           <p className="font-semibold">These people started a quote and didn&apos;t finish.</p>
           <p className="mt-1">
-            They gave an address and an email, so they&apos;re warm. A short personal email
-            (&ldquo;your price is one tap away&rdquo;) recovers a surprising number — the email
-            link on each row is pre-written.
+            They gave an address and an email, so they&apos;re warm. Anyone who left &ldquo;Email
+            me one reminder&rdquo; ticked gets one from the daily job after a day; the email link
+            on their row is the same message, pre-written. Nobody else is reminded: they unticked
+            it, or never saw it.
           </p>
         </div>
       )}
@@ -106,6 +122,15 @@ export default async function OpsQuotesPage({
               <tr className="border-b border-line bg-surface text-left text-xs font-semibold text-ink-500">
                 <th className="px-4 py-3">Received</th>
                 <th className="px-4 py-3">Customer</th>
+                <th className="px-4 py-3">
+                  <Link
+                    href={sortHref(tab.key, !byNext)}
+                    className="hover:text-ink-900 hover:underline"
+                    aria-label={byNext ? "Next action (sorted, soonest first): sort by received instead" : "Next action: sort soonest first"}
+                  >
+                    Next action{byNext ? " ↑" : ""}
+                  </Link>
+                </th>
                 <th className="px-4 py-3">Postcode</th>
                 <th className="px-4 py-3">Rooms</th>
                 <th className="px-4 py-3">Total</th>
@@ -132,6 +157,9 @@ export default async function OpsQuotesPage({
                     {q.customer_name && (
                       <span className="block text-xs text-ink-300">{q.email}</span>
                     )}
+                  </td>
+                  <td className="px-4 py-3">
+                    <NextAction action={q.next_action} at={q.next_action_at} today={today} />
                   </td>
                   <td className="whitespace-nowrap px-4 py-3">{q.postcode}</td>
                   <td className="px-4 py-3">{q.room_count}</td>
@@ -161,13 +189,18 @@ export default async function OpsQuotesPage({
                         <span className="text-xs text-ink-300">
                           Nudged {fmtDay(q.follow_up_sent_at)}
                         </span>
-                      ) : (
+                      ) : reminderState(q.attribution) === "allowed" ? (
                         <a
                           className="font-semibold text-accent-700 hover:underline"
-                          href={followUpMailto(q.email, q.postcode)}
+                          href={followUpMailto(q.email, q.postcode, replyEmail)}
                         >
                           Email them →
                         </a>
+                      ) : (
+                        // Only someone who left "Email me one reminder" ticked is reminded, by us or the daily job.
+                        <span className="text-xs text-ink-500">
+                          {reminderState(q.attribution) === "refused" ? "Asked for no reminder" : "No reminder agreed"}
+                        </span>
                       )}
                     </td>
                   )}
@@ -178,6 +211,27 @@ export default async function OpsQuotesPage({
         </div>
       )}
     </Shell>
+  );
+}
+
+/** The inbox link for `tab`, sorted by next action or (the default) newest received. */
+function sortHref(tab: string, byNext: boolean): string {
+  const qs = new URLSearchParams({ ...(tab === "inbox" ? {} : { tab }), ...(byNext ? { sort: "next" } : {}) }).toString();
+  return qs ? `/ops/quotes?${qs}` : "/ops/quotes";
+}
+
+/** A lead's scheduled follow-up: what, and the London day it's due (red once it's today or past). */
+function NextAction({ action, at, today }: { action: string | null; at: string | null; today: string }) {
+  if (!action || !at || !Number.isFinite(Date.parse(at))) return <span className="text-ink-300">—</span>;
+  const dueOn = londonDateOf(at);
+  const tone = dueOn < today ? "font-semibold text-red-700" : dueOn === today ? "font-semibold text-amber-800" : "text-ink-500";
+  return (
+    <span className="block min-w-40">
+      <span className="text-ink-900">{action}</span>
+      <span className={`block text-xs ${tone}`}>
+        {dueOn < today ? `Overdue since ${fmtDay(dueOn)}` : dueOn === today ? "Due today" : `Due ${fmtDay(dueOn)}`}
+      </span>
+    </span>
   );
 }
 

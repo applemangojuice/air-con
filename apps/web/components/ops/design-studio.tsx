@@ -226,7 +226,7 @@ export function DesignStudio() {
           </label>
           <button
             onClick={run}
-            className="rounded-full bg-accent-600 px-8 py-3 text-base font-bold text-white shadow-sm transition hover:bg-accent-700"
+            className="rounded-full bg-accent-700 px-8 py-3 text-base font-bold text-white shadow-sm transition hover:bg-accent-800"
           >
             Design system
           </button>

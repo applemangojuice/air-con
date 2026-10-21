@@ -1,12 +1,14 @@
 import { getServiceClient } from "@/lib/supabase-server";
 import { tabByKey } from "../tabs";
+import { requireStaffApi } from "@/lib/auth/server";
 
 /**
  * CSV of quote requests for the selected tab — the owner's data, one click,
- * ready for a spreadsheet or a CRM import. Behind the same /ops basic-auth
- * wall as the page (middleware matcher).
+ * ready for a spreadsheet or a CRM import. Same staff sign-in as the page.
  */
 export async function GET(request: Request) {
+  const staff = await requireStaffApi(request, "projects.view-all");
+  if (staff instanceof Response) return staff;
   const url = new URL(request.url);
   const tabKey = url.searchParams.get("tab") ?? "all";
   const tab = tabByKey(tabKey);
@@ -28,7 +30,7 @@ export async function GET(request: Request) {
     let query = supabase
       .from("quote_requests")
       .select(
-        "id, created_at, status, customer_name, email, phone, timeframe, postcode, address_line, total_gbp, room_count, confidence_score, confidence_band, source, utm_source, referrer, booked_at, follow_up_sent_at",
+        "id, created_at, status, customer_name, email, phone, timeframe, postcode, address_line, total_gbp, room_count, confidence_score, confidence_band, source, utm_source, referrer, booked_at, follow_up_sent_at, next_action, next_action_at",
       )
       .order("created_at", { ascending: false })
       .range(from, from + PAGE - 1);
@@ -50,7 +52,7 @@ export async function GET(request: Request) {
     return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   const header =
-    "created_at,status,name,email,phone,timeframe,postcode,address,total_gbp,rooms,confidence,confidence_band,source,utm_source,referrer,booked_at,followed_up_at,quote_url";
+    "created_at,status,name,email,phone,timeframe,postcode,address,total_gbp,rooms,confidence,confidence_band,source,utm_source,referrer,booked_at,followed_up_at,quote_url,next_action,next_action_due";
   const base = (process.env.NEXT_PUBLIC_APP_URL ?? url.origin).replace(/\/$/, "");
   const lines = (data ?? []).map((r) =>
     [
@@ -72,6 +74,8 @@ export async function GET(request: Request) {
       esc(r.booked_at),
       esc(r.follow_up_sent_at),
       esc(`${base}/q/${r.id}`),
+      esc(r.next_action),
+      esc(r.next_action_at),
     ].join(","),
   );
 

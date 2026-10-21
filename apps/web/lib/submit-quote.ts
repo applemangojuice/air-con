@@ -1,21 +1,33 @@
-import type { Survey, SurveyPhoto } from "@aircon/domain";
+import { uploadContentType, type PhotoKind, type Survey, type SurveyPhoto } from "@aircon/domain";
+import { CONSENT_VERSION } from "@/components/site/claims";
 import { getPhotoFile } from "./photo-registry";
+import { SURVEY_PHOTO_TYPES } from "./storage-buckets";
 import { getAttribution } from "./analytics-client";
 import type { QuoteDraft } from "./quote-draft";
-import type { SubmissionState } from "@/components/quote/result";
+
+export type SubmissionState =
+  | { status: "saved"; id: string; emailed: boolean }
+  | { status: "demo" }
+  | { status: "out-of-area"; outcode: string }
+  | { status: "error"; message?: string };
 
 /**
- * Uploads photos straight to Supabase Storage via short-lived signed URLs
- * (keeps big files off our API routes), then persists the survey snapshot.
- * Degrades gracefully: with no Supabase configured the server answers in
- * demo mode and the quote still renders client-side.
+ * Photos go straight to storage through short-lived signed URLs (big files
+ * stay off our API routes), then the survey snapshot is saved. Photos are
+ * normally uploaded the moment they're picked (uploadPhotoFile); this is the
+ * retry for any that didn't make it. The server recomputes the price and
+ * ignores photos without an uploaded copy, so a failed upload can't inflate
+ * the confidence band.
  */
-export async function submitQuote(draft: QuoteDraft): Promise<SubmissionState> {
+export async function submitQuote(
+  draft: QuoteDraft,
+  consents: { marketing: boolean },
+): Promise<SubmissionState> {
   try {
     const survey = structuredClone(draft.survey);
-    await uploadPhotos(survey.rooms.flatMap((r) => r.photos));
-    await uploadPhotos(survey.outdoor.photos);
-    await uploadPhotos(survey.electrics.photos);
+    await uploadMissing(survey.rooms.flatMap((r) => r.photos));
+    await uploadMissing(survey.outdoor.photos);
+    await uploadMissing(survey.electrics.photos);
 
     const res = await fetch("/api/quotes", {
       method: "POST",
@@ -25,10 +37,17 @@ export async function submitQuote(draft: QuoteDraft): Promise<SubmissionState> {
         contact: draft.contact,
         draftId: draft.draftId,
         attribution: getAttribution(),
+        consents: { operational: true, marketing: consents.marketing, version: CONSENT_VERSION },
       }),
     });
-    if (!res.ok) return { status: "error" };
-    const data = (await res.json()) as { demo: boolean; id?: string; emailed?: boolean };
+    const data = (await res.json().catch(() => null)) as
+      | { demo?: boolean; id?: string; emailed?: boolean; error?: string; outcode?: string }
+      | null;
+    if (res.status === 422 && data?.error === "out-of-area") {
+      return { status: "out-of-area", outcode: data.outcode ?? "" };
+    }
+    if (res.status === 429) return { status: "error", message: "Too many tries in a row. Give it a minute, then try again." };
+    if (!res.ok || !data) return { status: "error" };
     return data.demo
       ? { status: "demo" }
       : { status: "saved", id: data.id ?? "", emailed: data.emailed ?? false };
@@ -37,31 +56,89 @@ export async function submitQuote(draft: QuoteDraft): Promise<SubmissionState> {
   }
 }
 
-async function uploadPhotos(photos: SurveyPhoto[]): Promise<void> {
+async function uploadMissing(photos: SurveyPhoto[]): Promise<void> {
   for (const photo of photos) {
     if (photo.storagePath) continue; // already uploaded
     const file = getPhotoFile(photo.id);
     if (!file) continue; // metadata restored from a previous session
+    const result = await uploadPhotoFile(file, photo.kind);
+    if (result.ok) photo.storagePath = result.path;
+  }
+}
 
+export type UploadResult = { ok: true; path: string } | { ok: false; reason: "unconfigured" | "failed" };
+
+/**
+ * One survey photo to storage: shrunk on the phone first (a 6 MB camera
+ * photo becomes a few hundred KB, which matters on one bar of signal), then
+ * PUT to a signed URL from /api/uploads. "unconfigured" means the deployment
+ * has no storage (demo mode): the photo stays on this device only.
+ */
+export async function uploadPhotoFile(file: File, kind: PhotoKind): Promise<UploadResult> {
+  try {
+    const body = await shrinkImage(file);
+    const fileName = jpegName(file.name, body !== file);
+    // The type the bucket checks (some browsers leave it blank: the extension decides).
+    const contentType = uploadContentType(body.type, fileName);
+    if (!(SURVEY_PHOTO_TYPES as readonly string[]).includes(contentType)) return { ok: false, reason: "failed" };
     const signRes = await fetch("/api/uploads", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ fileName: file.name, kind: photo.kind }),
+      body: JSON.stringify({ fileName, kind, contentType }),
     });
-    if (!signRes.ok) continue;
-    const sign = (await signRes.json()) as {
-      configured: boolean;
-      path?: string;
-      signedUrl?: string;
-    };
-    if (!sign.configured || !sign.signedUrl || !sign.path) continue;
-
+    if (!signRes.ok) return { ok: false, reason: "failed" };
+    const sign = (await signRes.json()) as { configured: boolean; path?: string; signedUrl?: string };
+    if (!sign.configured) return { ok: false, reason: "unconfigured" };
+    if (!sign.signedUrl || !sign.path) return { ok: false, reason: "failed" };
     const put = await fetch(sign.signedUrl, {
       method: "PUT",
-      headers: { "content-type": file.type || "application/octet-stream" },
-      body: file,
+      headers: { "content-type": contentType },
+      body,
     });
-    if (put.ok) photo.storagePath = sign.path;
+    return put.ok ? { ok: true, path: sign.path } : { ok: false, reason: "failed" };
+  } catch {
+    return { ok: false, reason: "failed" };
+  }
+}
+
+function jpegName(name: string, converted: boolean): string {
+  const base = (name || "photo").replace(/\.[a-z0-9]+$/i, "") || "photo";
+  return converted ? `${base}.jpg` : name || "photo.jpg";
+}
+
+/** Longest edge after shrinking: plenty for a surveyor to read a fuse board. */
+const MAX_EDGE = 1600;
+
+/**
+ * Downscale a camera photo to a JPEG no larger than MAX_EDGE on its longest
+ * side. Anything that can't be decoded here (an unusual format, an old
+ * browser) goes up as the original file rather than not at all.
+ */
+export async function shrinkImage(file: File): Promise<Blob> {
+  try {
+    if (typeof createImageBitmap !== "function" || !file.type.startsWith("image/")) return file;
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, MAX_EDGE / Math.max(bitmap.width, bitmap.height));
+    const storable = (SURVEY_PHOTO_TYPES as readonly string[]).includes(uploadContentType(file.type, file.name));
+    // Small enough already, and a type the photo bucket stores: send it as it is. Anything else becomes a JPEG.
+    if (scale === 1 && file.size < 1_500_000 && storable) {
+      bitmap.close();
+      return file;
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      bitmap.close();
+      return file;
+    }
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close();
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.82));
+    return blob && blob.size > 0 && (blob.size < file.size || !storable) ? blob : file;
+  } catch {
+    return file;
   }
 }
 
