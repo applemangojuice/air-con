@@ -75,13 +75,8 @@ export async function captureOutcome(projectId: string, stepId: string, outcome:
   await getFieldOutbox().enqueue(op, label);
 }
 
-/** "12,5" or " 12.5 " → 12.5; anything else → null. */
-export function parseReading(text: string): number | null {
-  const t = text.trim().replace(",", ".");
-  if (!/^-?\d+(\.\d+)?$/.test(t)) return null;
-  const n = Number(t);
-  return Number.isFinite(n) ? n : null;
-}
+/** A typed number: a comma only as a decimal point where it can't be a thousands comma ("1,250" is refused). */
+export { parseReading, readingProblem } from "./reading";
 
 /** One location fix, or null (no permission, no fix in time). Never throws. */
 export function locate(timeoutMs = 5000): Promise<{ lat: number; lng: number; accuracyM?: number } | null> {

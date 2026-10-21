@@ -94,6 +94,13 @@ export interface DesignBomLine {
   category: "equipment" | "materials" | "consumables";
   /** Additive (F3): why this quantity, or what to check ("length not measured"). */
   note?: string;
+  /**
+   * Additive (round 11): the rooms (design room ids) whose run on this line is
+   * longer than one coil and needs a brazed joint. The runsheet's hot-work
+   * steps come from this, never from the note's words (two rooms on one coil
+   * item share one line and one note).
+   */
+  brazedRoomIds?: string[];
 }
 
 export interface SystemSelection {
@@ -1107,12 +1114,13 @@ class Bom {
   private lines = new Map<string, DesignBomLine>();
   private metres = new Map<string, { mat: Mat; metres: number; category: DesignBomLine["category"]; notes: Set<string> }>();
 
-  item(item: CatalogueItem, qty: number, category: DesignBomLine["category"], note?: string) {
+  item(item: CatalogueItem, qty: number, category: DesignBomLine["category"], note?: string, brazedRoomId?: string) {
     const key = item.id;
     const line = this.lines.get(key);
     if (line) {
       line.qty = round1(line.qty + qty);
       if (note && !(line.note ?? "").includes(note)) line.note = line.note ? `${line.note}; ${note}` : note;
+      if (brazedRoomId && !(line.brazedRoomIds ?? []).includes(brazedRoomId)) line.brazedRoomIds = [...(line.brazedRoomIds ?? []), brazedRoomId];
       return;
     }
     this.lines.set(key, {
@@ -1123,6 +1131,7 @@ class Bom {
       unit: item.unit ?? "each",
       category,
       ...(note ? { note } : {}),
+      ...(brazedRoomId ? { brazedRoomIds: [brazedRoomId] } : {}),
     });
   }
 
@@ -1287,7 +1296,7 @@ function buildBom(input: {
         else {
           const longest = coils[coils.length - 1]!;
           const n = Math.ceil(run / longest.lengthM!);
-          bom.item(longest.item, n, "materials", `${note}: longer than one coil, needs a brazed joint`);
+          bom.item(longest.item, n, "materials", `${note}: longer than one coil, needs a brazed joint`, roomId);
         }
       } else {
         bom.generic(`pipe-${sizes.liquid}-${sizes.gas}`.replace(/\//g, ""), `Insulated copper pipe pair ${sizes.liquid}" + ${sizes.gas}"`, Math.ceil(run), "m", "materials", note);
