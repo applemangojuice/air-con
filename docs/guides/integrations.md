@@ -207,7 +207,7 @@ database holding a real customer, and `/ops/launch` turns red.
   set where your domain is registered.
 - **Cost:** your registrar's yearly fee.
 
-## Not connected: Sentry, OpenAI, Anthropic, EPC
+## Not connected: Sentry, OpenAI, Anthropic; and the EPC register
 
 - **Sentry** (error alerts): recommended by the research (free Developer
   plan) but **not built in**. Errors show in **Vercel → Logs**, and
@@ -215,6 +215,10 @@ database holding a real customer, and `/ops/launch` turns red.
 - **OpenAI / Anthropic**: only for the phone video-walkthrough app, which is
   not part of the pilots and is off on the live site unless
   `VIDEO_SURVEYS_ENABLED=1`.
-- **EPC Open Data** (`EPC_API_EMAIL`, `EPC_API_KEY`): only for loading the
-  marketing property book through GitHub Actions. Free sign-up. Not needed
-  for the pilots.
+- **EPC register** (`EPC_BEARER_TOKEN`): strongly recommended. With it, any
+  postcode typed on the quote form finds its homes and fills in each home's
+  type, age, size and rooms from its energy certificate; it also loads the
+  property book through GitHub Actions. Free sign-up at
+  get-energy-performance-data.communities.gov.uk. The old `EPC_API_EMAIL` /
+  `EPC_API_KEY` (epc.opendatacommunities.org, closed 30 May 2026) no longer
+  work. See [quote-data.md](../quote-data.md).

@@ -30,7 +30,7 @@ export function DemoResult({
       <div className="mb-6">
         <JourneyStrip current="price" />
       </div>
-      <p role="status" className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+      <p role="status" className="mb-4 rounded-sm border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
         This is a demo site, so your quote wasn&apos;t saved and nothing was emailed.
       </p>
       <QuoteView

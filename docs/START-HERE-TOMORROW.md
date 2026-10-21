@@ -151,7 +151,13 @@ it opens the whole admin console, so the old one (and the old template
 | `CRON_SECRET` | Another 64 random letters and numbers | You make it |
 | `OPS_PASSWORD` | A long password, at least 20 characters. It lets you sign in on launch day while your email domain is still verifying (step 5) | You make it (see below) |
 
-Strongly recommended: `LEADS_NOTIFY_EMAIL`, the inbox that gets team alerts
+Strongly recommended: `EPC_BEARER_TOKEN`, so any postcode typed on the quote
+form finds its homes and fills in the house details from the energy
+certificate. Free: register at
+get-energy-performance-data.communities.gov.uk and copy the API token from
+your account ([quote-data.md](quote-data.md)).
+
+Also strongly recommended: `LEADS_NOTIFY_EMAIL`, the inbox that gets team alerts
 and the 6am morning email. Without it they go to the `EMAIL_FROM` address.
 
 **Making `SESSION_SECRET` and `CRON_SECRET`.** On a Mac: open **Terminal**,

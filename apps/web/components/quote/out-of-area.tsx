@@ -64,7 +64,7 @@ export function OutOfArea({
   }
 
   return (
-    <div className="rounded-2xl border border-line bg-white p-5">
+    <div className="rounded-sm border border-line bg-white p-5">
       <p className="font-semibold text-ink-900">Sorry, we&apos;re not in {place} yet.</p>
       <p className="mt-1.5 text-sm leading-relaxed text-ink-700">
         We&apos;re starting small, in a handful of London postcodes, so every home gets our full attention. Right now
@@ -72,7 +72,7 @@ export function OutOfArea({
       </p>
 
       {state === "done" ? (
-        <p role="status" className="mt-4 rounded-xl bg-sage-50 px-4 py-3 text-sm font-medium text-sage-900">
+        <p role="status" className="mt-4 rounded-sm bg-sage-50 px-4 py-3 text-sm font-medium text-sage-900">
           Thanks. We&apos;ll email {email.trim()} once, when we start installing in {outcode}.
         </p>
       ) : (

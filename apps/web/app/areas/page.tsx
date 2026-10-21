@@ -34,7 +34,7 @@ export default async function AreasPage() {
             {outcodes.map((o) => {
               const page = AREA_PAGES[o.toLowerCase()];
               return (
-                <li key={o} className="rounded-2xl border border-line bg-white px-3 py-3 text-center">
+                <li key={o} className="rounded-sm border border-line bg-white px-3 py-3 text-center">
                   <span className="block text-lg font-bold">{o}</span>
                   {page ? (
                     <Link href={`/areas/${o.toLowerCase()}`} className={`text-xs ${textLink}`}>
@@ -48,12 +48,12 @@ export default async function AreasPage() {
             })}
           </ul>
         ) : (
-          <p className="mt-8 rounded-2xl border border-line bg-white px-4 py-3 text-ink-700">
+          <p className="mt-8 rounded-sm border border-line bg-white px-4 py-3 text-ink-700">
             We&apos;re finalising our first areas. Check back soon.
           </p>
         )}
 
-        <section className="mt-12 rounded-3xl border border-accent-100 bg-accent-50 p-6">
+        <section className="mt-12 rounded-sm border border-accent-100 bg-accent-50 p-6">
           <h2 className="text-xl font-display">Check your postcode</h2>
           <p className="mt-1 text-sm text-ink-700">
             We&apos;ll tell you straight away. If we&apos;re not there yet, you can ask us to email you once when we

@@ -36,6 +36,7 @@ const MORE = [
   { href: "/ops", label: "Console", exact: true },
   { href: "/ops/quotes", label: "Quotes" },
   { href: "/ops/intel", label: "Intel" },
+  { href: "/ops/price-check", label: "Price check" },
   { href: "/ops/analytics", label: "Analytics" },
   { href: "/ops/finance", label: "Finance" },
   // Admins only (finance.export): every customer's money, for the accountant.

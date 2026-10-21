@@ -6,9 +6,9 @@ import { Logo } from "./logo";
  * at this size; links keep a visible focus ring from globals.css.
  */
 export function SiteHeader() {
-  const link = "rounded-full px-3 py-2 hover:bg-surface";
+  const link = "px-3 py-2 hover:text-ink-950";
   return (
-    <header className="sticky top-0 z-40 border-b border-line bg-cream/90 backdrop-blur">
+    <header className="sticky top-0 z-40 border-b border-line bg-white/95 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-2 px-4 sm:px-6">
         <Link href="/" aria-label="Dang, It's Hot home page" className="shrink-0">
           <Logo />
@@ -25,7 +25,7 @@ export function SiteHeader() {
           </Link>
           <Link
             href="/quote"
-            className="ml-1 whitespace-nowrap rounded-full bg-accent-700 px-4 py-2 font-semibold text-white shadow-sm transition hover:brightness-90"
+            className="ml-2 whitespace-nowrap rounded-sm bg-accent-700 px-4 py-2 font-semibold text-white transition hover:bg-accent-800"
           >
             Get my price
           </Link>

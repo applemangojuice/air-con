@@ -45,7 +45,9 @@ air-con/
 
 Design system: the UI on both apps uses the **Dang, It's Hot** brand tokens
 pulled from the collateral in `apps/web/public/brand/` (paper ground, ink
-blue-black, hot orange accent, splash blue second accent, Caprasimo/Figtree).
+blue-black, hot orange accent, splash blue second accent, Figtree throughout,
+small 4px corners on the public site; Caprasimo only in the share image and
+emails).
 Web: `apps/web/app/globals.css`; mobile: `apps/mobile/lib/theme.ts`. Change
 the look by editing those two files together; the square mark lives in
 `apps/web/app/icon.svg` and `components/site/logo.tsx`.

@@ -107,7 +107,7 @@ export function RoomsStep({
       nextLabel="Looks right, continue"
     >
       {/* The price, always visible while they edit */}
-      <div className="ink-gradient sticky top-2 z-10 rounded-3xl p-5 text-white shadow-lg">
+      <div className="ink-gradient sticky top-2 z-10 rounded-sm p-5 text-white shadow-lg">
         <p className="text-xs font-semibold uppercase tracking-wide text-white/75">Your price</p>
         <p className="mt-1 text-4xl font-display" aria-live="polite" aria-atomic>
           <span className="sr-only">Your price is now </span>
@@ -121,7 +121,7 @@ export function RoomsStep({
       </div>
 
       {/* What we've already filled in, one compact line, changeable */}
-      <div className="flex items-center gap-3 rounded-2xl border border-line bg-white px-4 py-2.5 text-xs text-ink-700">
+      <div className="flex items-center gap-3 rounded-sm border border-line bg-white px-4 py-2.5 text-xs text-ink-700">
         <p className="min-w-0 flex-1">
           <span className="font-semibold text-ink-500">Priced for: </span>
           <span className="font-medium">
@@ -138,7 +138,7 @@ export function RoomsStep({
           <button
             type="button"
             onClick={onBack}
-            className="min-h-9 shrink-0 rounded-full border border-line px-3 font-semibold text-accent-700 transition hover:bg-accent-50"
+            className="min-h-9 shrink-0 rounded-sm border border-line px-3 font-semibold text-accent-700 transition hover:bg-accent-50"
           >
             Change
           </button>
@@ -152,7 +152,7 @@ export function RoomsStep({
             const open = editingId === room.id;
             const panelId = `room-${room.id}`;
             return (
-              <li key={room.id} className="overflow-hidden rounded-2xl border border-line">
+              <li key={room.id} className="overflow-hidden rounded-sm border border-line">
                 <div className="flex w-full items-center justify-between gap-2 bg-white px-4 py-3">
                   <div className="min-w-0 flex-1">
                     <span className="block truncate font-semibold">{room.name}</span>
@@ -167,7 +167,7 @@ export function RoomsStep({
                     aria-expanded={open}
                     aria-controls={panelId}
                     onClick={() => setEditingId(open ? null : room.id)}
-                    className="min-h-10 rounded-full px-3 text-sm font-semibold text-accent-700 hover:bg-accent-50"
+                    className="min-h-10 rounded-sm px-3 text-sm font-semibold text-accent-700 hover:bg-accent-50"
                   >
                     {open ? "Done" : "Edit"}
                     <span className="sr-only"> {room.name}</span>
@@ -247,7 +247,7 @@ export function RoomsStep({
           })}
         </ul>
         {rooms.length === 0 && (
-          <p className="rounded-2xl border border-dashed border-line bg-white px-4 py-6 text-center text-sm text-ink-700">
+          <p className="rounded-sm border border-dashed border-line bg-white px-4 py-6 text-center text-sm text-ink-700">
             No rooms yet. Add the rooms you&apos;d like heated and cooled below.
           </p>
         )}
@@ -255,7 +255,7 @@ export function RoomsStep({
 
       {/* Rooms we can't serve */}
       {excluded.length > 0 && (
-        <div className="rounded-2xl border border-line bg-surface p-4">
+        <div className="rounded-sm border border-line bg-surface p-4">
           <p className="text-sm font-semibold text-ink-700">
             Not included: {excluded.map((e) => e.name).join(", ")}
           </p>
@@ -296,7 +296,7 @@ export function RoomsStep({
               key={type}
               type="button"
               onClick={() => addRoom(type)}
-              className="min-h-10 rounded-full border border-line bg-white px-4 py-2 text-sm font-medium text-ink-700 transition hover:border-accent-500 hover:text-accent-700"
+              className="min-h-10 rounded-sm border border-line bg-white px-4 py-2 text-sm font-medium text-ink-700 transition hover:border-accent-500 hover:text-accent-700"
             >
               + {ROOM_TYPE_LABEL[type]}
             </button>
@@ -317,7 +317,7 @@ function LockedOutdoor({ label, reason }: { label: string; reason: string }) {
   return (
     <div>
       <p className="mb-1.5 text-sm font-semibold text-ink-900">Where the outdoor unit goes</p>
-      <div className="rounded-2xl border border-line bg-white px-4 py-3">
+      <div className="rounded-sm border border-line bg-white px-4 py-3">
         <div className="flex items-center justify-between gap-3">
           <p className="text-sm font-medium">{label}</p>
           <button

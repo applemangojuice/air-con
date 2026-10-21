@@ -99,7 +99,7 @@ export function PhotoInput({
           const preview = getPhotoPreview(p.id);
           const s: UploadState | "saved" = p.storagePath ? "saved" : (state[p.id] ?? (getPhotoFile(p.id) ? "uploading" : "failed"));
           return (
-            <li key={p.id} className="relative h-24 w-24 overflow-hidden rounded-2xl border border-line bg-surface">
+            <li key={p.id} className="relative h-24 w-24 overflow-hidden rounded-sm border border-line bg-surface">
               {preview ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={preview} alt={`${label}, photo ${i + 1}`} className="h-full w-full object-cover" />
@@ -109,7 +109,7 @@ export function PhotoInput({
                 </span>
               )}
               <span
-                className={`absolute inset-x-1 bottom-1 rounded-full px-1.5 py-0.5 text-center text-[11px] font-semibold ${
+                className={`absolute inset-x-1 bottom-1 rounded-sm px-1.5 py-0.5 text-center text-[11px] font-semibold ${
                   s === "saved"
                     ? "bg-sage-700 text-white"
                     : s === "failed"
@@ -131,7 +131,7 @@ export function PhotoInput({
                 <button
                   type="button"
                   onClick={() => void upload(p.id)}
-                  className="absolute left-1 top-1 rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-accent-700 shadow-sm"
+                  className="absolute left-1 top-1 rounded-sm bg-white px-2 py-0.5 text-[11px] font-semibold text-accent-700 shadow-sm"
                 >
                   Retry
                 </button>
@@ -143,7 +143,7 @@ export function PhotoInput({
           <button
             type="button"
             onClick={() => inputRef.current?.click()}
-            className="flex h-24 w-24 flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-ink-300 bg-white text-ink-700 transition hover:border-accent-500 hover:text-accent-700"
+            className="flex h-24 w-24 flex-col items-center justify-center gap-1 rounded-sm border-2 border-dashed border-ink-300 bg-white text-ink-700 transition hover:border-accent-500 hover:text-accent-700"
           >
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
               <path

@@ -35,7 +35,7 @@ export function ResumeBanner() {
         <Link
           href="/quote"
           onClick={() => track("resume_banner_clicked")}
-          className="rounded-full bg-accent-700 px-4 py-2 text-sm font-semibold text-white transition hover:brightness-90"
+          className="rounded-sm bg-accent-700 px-4 py-2 text-sm font-semibold text-white transition hover:brightness-90"
         >
           Finish my quote →
         </Link>

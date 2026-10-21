@@ -33,10 +33,15 @@ whole loop is walkable before a single row is imported.
 
 ### 1. EPC register (the backbone). Do this first.
 
-- Go to **https://epc.opendatacommunities.org/** and register (free, instant).
-- Download the bulk **domestic certificates** for the boroughs covering
-  SW16/SW17: **Lambeth**, **Wandsworth**, plus **Merton** and **Croydon** for
-  the fringes. Each download is a zip with a `certificates.csv`.
+- Register at **https://get-energy-performance-data.communities.gov.uk/**
+  (free; it replaced epc.opendatacommunities.org on 30 May 2026) and copy the
+  API token into `EPC_BEARER_TOKEN`.
+- With the token in Vercel, the quote form and `/ops/price-check` look up any
+  postcode live and save what they find (`apps/web/lib/property-lookup.ts`,
+  parsers in `packages/domain/src/property-sources.ts`).
+- In bulk: `pnpm data:fetch-epc --council "Lambeth,Wandsworth,Merton,Croydon"
+  --outcodes SW16,SW17` (or `--postcodes …`) writes a `certificates.csv` the
+  importer reads; so does the service's bulk CSV download.
 - Rows since ~2021 include the **UPRN**; the importer keys on it and falls
   back to a stable synthetic address key when it's missing.
 - Import (from `apps/web`, with Supabase env vars in `.env.local`):

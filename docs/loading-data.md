@@ -1,7 +1,13 @@
 # Loading the data (start here)
 
 This is the practical guide to getting property data into the platform so you
-can see the whole thing work. The data-heavy feature is the **Property
+can see the whole thing work.
+
+> **You don't need to load anything for the quote form to work.** With
+> `EPC_BEARER_TOKEN` set in Vercel, a postcode the database doesn't know is
+> looked up live in the EPC register and saved (see
+> [quote-data.md](./quote-data.md)). Loading in advance is for mailings and
+> for pricing homes before anyone asks. The data-heavy feature is the **Property
 Intelligence Engine** — one master record per house, built from open
 government data (EPC, planning, constraints). Everything else (the demo
 dataset, the funnel prefill, the mailing pages, the analytics) sits on top of
@@ -59,8 +65,11 @@ runners — fetch/generate the data, import it, then recompute archetypes and
 priority scores (the `/ops/intel` **Recompute** button, run headless). Nothing
 runs on your machine. It has two sources:
 
-- **`epc-api`** (default) — pulls **real** certificates from the EPC Open Data
-  API for your target boroughs.
+- **`epc-api`** (default) — pulls **real** certificates from the EPC
+  register's data service
+  ([get-energy-performance-data.communities.gov.uk](https://get-energy-performance-data.communities.gov.uk/),
+  which replaced epc.opendatacommunities.org on 30 May 2026), for a list of
+  postcodes or for whole councils.
 - **`sample`** — the built-in SW16/SW17 sample CSVs (no EPC key needed; good
   for a first smoke test).
 
@@ -77,9 +86,10 @@ runs on your machine. It has two sources:
    - `SUPABASE_SERVICE_ROLE_KEY` — Supabase → Settings → API → `service_role`
      key (a secret; the workflow reads it, it never lands in the repo).
    - For the `epc-api` source, also add (free registration at
-     [epc.opendatacommunities.org](https://epc.opendatacommunities.org/)):
-     - `EPC_API_EMAIL` — the email you registered with
-     - `EPC_API_KEY` — your EPC API key
+     [get-energy-performance-data.communities.gov.uk](https://get-energy-performance-data.communities.gov.uk/)):
+     - `EPC_BEARER_TOKEN` — the API token from your account there (the same
+       value as in Vercel). The old `EPC_API_EMAIL` / `EPC_API_KEY` secrets no
+       longer work: delete them.
 
    These are the *same* Supabase values you already put in Vercel — copy them
    across. The workflow needs its own copy; Vercel's env vars aren't visible to
@@ -89,10 +99,12 @@ runs on your machine. It has two sources:
 
 - **GitHub → Actions tab → "Load property data" → Run workflow.** Inputs:
   - **source** — `epc-api` (real) or `sample`.
-  - **since** — EPC only: `YYYY-MM` to fetch only certificates lodged since
-    then. Leave **empty on the first run** to seed the full history.
-  - **local_authority** — EPC only: ONS codes, default Lambeth + Wandsworth +
-    Merton + Croydon (the SW16/SW17 boroughs).
+  - **postcodes** — EPC only: just these postcodes, comma separated (the
+    pilot homes', a street you're mailing). Fast. Leave empty to load councils.
+  - **since** — EPC only, councils: `YYYY-MM` to fetch only certificates
+    lodged since then. Leave **empty on the first run** to seed the full history.
+  - **councils** — EPC only: council names as the register spells them,
+    default Lambeth, Wandsworth, Merton, Croydon (the SW16/SW17 councils).
   - **outcodes** — which outcodes to keep on import (default `SW16,SW17`).
   - **recompute** — recompute archetypes + priority after import (default yes).
 - Watch it go green, then open `/ops/status` (is the DB healthy?) and
@@ -103,8 +115,8 @@ runs on your machine. It has two sources:
 ### The weekly schedule (new EPCs → marketing signal)
 
 The workflow runs every **Monday 06:00 UTC** (`schedule:` in the file) and, on
-those runs, pulls just the **newly-issued** certificates (from the start of the
-previous month onward). A fresh EPC usually means a sale or a renovation — a
+those runs, pulls just the **newly-issued** certificates (the last eight
+days). A fresh EPC usually means a sale or a renovation — a
 reason someone might want a system — so this list is a live marketing target.
 Re-importing is safe: the importer keeps the newest certificate per address and
 upserts, so nothing is duplicated and existing planning/audit state survives.
@@ -206,12 +218,12 @@ including exact URLs and the CSV columns each importer expects, is in
 [property-intelligence.md](./property-intelligence.md#where-to-get-the-data-in-order).
 The short version:
 
-1. **EPC register** — [epc.opendatacommunities.org](https://epc.opendatacommunities.org/)
-   (free registration, instant). Download the **domestic certificates** for the
-   boroughs covering your target outcodes — for SW16/SW17 that's **Lambeth** and
-   **Wandsworth** (plus **Merton**/**Croydon** for the fringes). Each download
-   is a zip containing `certificates.csv`. Import it with the `epc` command,
-   passing your target outcodes to `--outcodes`.
+1. **EPC register** — [get-energy-performance-data.communities.gov.uk](https://get-energy-performance-data.communities.gov.uk/)
+   (free registration). Easiest: `pnpm data:fetch-epc --postcodes "SW16 1AD,…"`
+   or `--council "Lambeth,Wandsworth" --outcodes SW16,SW17` (from `apps/web`,
+   with `EPC_BEARER_TOKEN` set) writes a CSV the importer reads. The service's
+   bulk CSV download works too. Import with the `epc` command, passing your
+   target outcodes to `--outcodes`.
 2. **Planning applications** — the
    [Planning London Datahub](https://data.london.gov.uk/dataset/planning-london-datahub),
    the national beta at [planning.data.gov.uk](https://www.planning.data.gov.uk/),

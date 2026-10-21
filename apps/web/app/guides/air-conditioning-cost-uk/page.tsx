@@ -99,7 +99,7 @@ export default async function CostGuidePage() {
           {/* Cards on a phone, a table from sm up: no sideways scrolling. */}
           <ul className="mt-4 space-y-3 sm:hidden">
             {table.map((row) => (
-              <li key={row.config} className="rounded-2xl border border-line bg-white p-4">
+              <li key={row.config} className="rounded-sm border border-line bg-white p-4">
                 <div className="flex items-baseline justify-between gap-3">
                   <p className="font-semibold">{row.config}</p>
                   <p className="whitespace-nowrap text-lg font-bold">{gbp(row.price)}</p>
@@ -108,7 +108,7 @@ export default async function CostGuidePage() {
               </li>
             ))}
           </ul>
-          <div className="mt-4 hidden overflow-hidden rounded-2xl border border-line bg-white sm:block">
+          <div className="mt-4 hidden overflow-hidden rounded-sm border border-line bg-white sm:block">
             <table className="w-full text-sm">
               <caption className="sr-only">Guide prices, installed</caption>
               <thead>
@@ -185,7 +185,7 @@ export default async function CostGuidePage() {
           <h2 className="text-2xl font-display">Cost questions, answered straight</h2>
           <div className="mt-4 space-y-3">
             {faqs.map((f) => (
-              <details key={f.q} className="group rounded-2xl border border-line bg-white p-5">
+              <details key={f.q} className="group rounded-sm border border-line bg-white p-5">
                 <summary className="cursor-pointer list-none font-semibold marker:content-none [&::-webkit-details-marker]:hidden">
                   <span className="flex items-center justify-between gap-3">
                     {f.q}

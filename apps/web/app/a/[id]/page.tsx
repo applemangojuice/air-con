@@ -83,7 +83,7 @@ export default async function AddressPage({ params }: { params: Promise<{ id: st
           {intel.address.line1}, {intel.address.postcode}
         </p>
         {sample && (
-          <p role="note" className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">
+          <p role="note" className="mt-3 rounded-sm border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">
             DEMO: a sample page. This address and these facts are made up for the demo, not public records.
           </p>
         )}
@@ -97,7 +97,7 @@ export default async function AddressPage({ params }: { params: Promise<{ id: st
         </p>
 
         {/* What we know */}
-        <section className="mt-8 rounded-3xl border border-line bg-white p-6">
+        <section className="mt-8 rounded-sm border border-line bg-white p-6">
           <h2 className="font-bold">{sample ? "Sample facts (DEMO)" : "Your home, from public records"}</h2>
           <ul className="mt-3 space-y-2">
             {knownFacts.map((fact) => (
@@ -108,7 +108,7 @@ export default async function AddressPage({ params }: { params: Promise<{ id: st
             ))}
           </ul>
           {cls.archetypeName && (
-            <p className="mt-4 rounded-2xl bg-surface/60 px-4 py-3 text-sm text-ink-700">
+            <p className="mt-4 rounded-sm bg-surface/60 px-4 py-3 text-sm text-ink-700">
               Homes like yours match our <strong>{cls.archetypeName}</strong> pattern: a starting point for
               the estimate. Our engineer designs your system after the survey.
             </p>
@@ -123,19 +123,19 @@ export default async function AddressPage({ params }: { params: Promise<{ id: st
 
         {/* Proposed system + price */}
         {indicative && (
-          <section className="mt-6 rounded-3xl border border-line bg-white p-6">
+          <section className="mt-6 rounded-sm border border-line bg-white p-6">
             <h2 className="font-bold">What we&apos;d propose</h2>
             <ul className="mt-3 space-y-2">
               {indicative.rooms.map((room) => (
                 <li key={room.id} className="flex items-center justify-between gap-3 text-sm">
                   <span>{room.name}</span>
-                  <span className="rounded-full bg-sage-50 px-2.5 py-0.5 text-xs font-semibold text-sage-700">
+                  <span className="rounded-sm bg-sage-50 px-2.5 py-0.5 text-xs font-semibold text-sage-700">
                     cooled + heated
                   </span>
                 </li>
               ))}
             </ul>
-            <div className="mt-5 rounded-2xl bg-surface/60 p-4">
+            <div className="mt-5 rounded-sm bg-surface/60 p-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-ink-300">
                 Indicative price, installed
               </p>
@@ -149,7 +149,7 @@ export default async function AddressPage({ params }: { params: Promise<{ id: st
 
         <Link
           href={funnelHref}
-          className="mt-8 block w-full rounded-full bg-accent-700 px-5 py-3.5 text-center font-semibold text-white shadow-sm transition hover:bg-accent-800"
+          className="mt-8 block w-full rounded-sm bg-accent-700 px-5 py-3.5 text-center font-semibold text-white shadow-sm transition hover:bg-accent-800"
         >
           Check the details, get my price
         </Link>

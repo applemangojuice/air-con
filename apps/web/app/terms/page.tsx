@@ -51,7 +51,7 @@ export default async function TermsPage() {
       <SiteHeader />
       <main className="mx-auto w-full max-w-3xl px-4 py-14 sm:px-6">
         {!s.legal.termsReviewed && (
-          <div role="note" className="mb-8 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-amber-950">
+          <div role="note" className="mb-8 rounded-sm border border-amber-300 bg-amber-50 p-4 text-amber-950">
             <p className="font-semibold">Draft: under solicitor review</p>
             <p className="mt-1 text-sm">
               These are the terms we intend to use for our first installations. A solicitor is reviewing them and
@@ -67,7 +67,7 @@ export default async function TermsPage() {
           Version {s.legal.termsVersion} · last updated {LAST_UPDATED}
         </p>
 
-        <div className="mt-6 rounded-2xl border border-line bg-white p-5">
+        <div className="mt-6 rounded-sm border border-line bg-white p-5">
           <h2 className="font-semibold">In short</h2>
           <ul className="mt-2 list-disc space-y-1.5 pl-5 text-ink-700">
             <li>Your online price is a real price, confirmed at a home survey. It only changes for a reason we put in writing.</li>
@@ -114,7 +114,7 @@ export default async function TermsPage() {
                   </p>
                 )}
 
-                <div className="rounded-2xl border border-line bg-white p-5">
+                <div className="rounded-sm border border-line bg-white p-5">
                   <h3 className="font-semibold">Model cancellation instructions</h3>
                   <p className="mt-1 text-sm text-ink-500">For contracts where we supply the equipment.</p>
                   <div className="mt-3 space-y-2 text-sm">
@@ -125,7 +125,7 @@ export default async function TermsPage() {
                       </div>
                     ))}
                   </div>
-                  <details className="mt-4 rounded-xl border border-line p-3 text-sm">
+                  <details className="mt-4 rounded-sm border border-line p-3 text-sm">
                     <summary className="cursor-pointer font-semibold text-ink-900">If we only install equipment you supply</summary>
                     <div className="mt-2 space-y-2">
                       {installOnlyInstructions.map((p, k) => (
@@ -138,7 +138,7 @@ export default async function TermsPage() {
                   </details>
                 </div>
 
-                <div className="rounded-2xl border border-line bg-white p-5">
+                <div className="rounded-sm border border-line bg-white p-5">
                   <h3 className="font-semibold">Model cancellation form</h3>
                   <div className="mt-3 space-y-2 text-sm">
                     {form.map((line, k) => (

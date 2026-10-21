@@ -52,7 +52,7 @@ export function BookSurveyButton({
   const facts = [surveyPrice, surveyDuration, "at a time that suits you", "no obligation"].filter(Boolean).join(" · ");
 
   return (
-    <section aria-labelledby="next-step" className="no-print rounded-3xl border border-accent-100 bg-accent-50 p-6">
+    <section aria-labelledby="next-step" className="no-print rounded-sm border border-accent-100 bg-accent-50 p-6">
       <p className="text-xs font-semibold uppercase tracking-wide text-accent-700">Your next step</p>
       <h2 id="next-step" className="mt-1 text-xl font-display">
         {existingProjectId ? "Your project is underway" : "A home survey to confirm your price"}

@@ -78,14 +78,14 @@ export default async function AboutPage() {
         <h2 className="mt-12 text-2xl font-display">What that looks like in practice</h2>
         <div className="mt-5 grid gap-4 sm:grid-cols-2">
           {pillars.map((p) => (
-            <div key={p.title} className="rounded-2xl border border-line bg-white p-5">
+            <div key={p.title} className="rounded-sm border border-line bg-white p-5">
               <h3 className="font-semibold">{p.title}</h3>
               <p className="mt-1.5 text-sm leading-relaxed text-ink-700">{p.body}</p>
             </div>
           ))}
         </div>
 
-        <div className="mt-12 rounded-3xl border border-accent-100 bg-accent-50 p-6">
+        <div className="mt-12 rounded-sm border border-accent-100 bg-accent-50 p-6">
           <p className="text-lg font-display">Keeping London comfortable, street by street.</p>
           <p className="mt-2 text-sm text-ink-700">
             We&apos;re starting deep in a few postcodes rather than shallow everywhere. And yes, the dog in the

@@ -31,7 +31,7 @@ export default async function StopPage({ searchParams }: { searchParams: Promise
           This link doesn&apos;t work. You can turn follow-ups off from your project page{email ? <>, or email <a className="font-semibold underline" href={`mailto:${email}`}>{email}</a> and we&apos;ll stop them</> : ""}.
         </p>
       ) : project.aftercare.followUpsOptedOutAt ? (
-        <p className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-base font-semibold text-emerald-900">
+        <p className="mt-4 rounded-sm border border-emerald-200 bg-emerald-50 px-4 py-3 text-base font-semibold text-emerald-900">
           They&apos;re already off. We&apos;ll still contact you about any open work, problem or payment.
         </p>
       ) : (

@@ -24,7 +24,7 @@ export function AnalyticsChoice() {
   };
 
   return (
-    <div id="analytics" className="scroll-mt-24 rounded-2xl border border-line bg-white p-4 sm:p-5">
+    <div id="analytics" className="scroll-mt-24 rounded-sm border border-line bg-white p-4 sm:p-5">
       <p className="font-semibold text-ink-900">Usage analytics in this browser</p>
       <p aria-live="polite" className="mt-1 text-sm text-ink-700">
         {state === null
@@ -39,7 +39,7 @@ export function AnalyticsChoice() {
         <button
           type="button"
           onClick={() => choose(!state.off)}
-          className="mt-3 inline-flex min-h-11 items-center rounded-full border border-line bg-white px-4 text-sm font-semibold text-ink-900 transition hover:border-ink-300 hover:bg-surface"
+          className="mt-3 inline-flex min-h-11 items-center rounded-sm border border-line bg-white px-4 text-sm font-semibold text-ink-900 transition hover:border-ink-300 hover:bg-surface"
         >
           {state.off ? "Turn analytics back on" : "Turn analytics off"}
         </button>

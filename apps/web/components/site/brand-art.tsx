@@ -9,7 +9,7 @@ export const BRAND_ART_ALT =
 
 export function BrandArt({ priority = false, className = "" }: { priority?: boolean; className?: string }) {
   return (
-    <div className={`overflow-hidden rounded-3xl border border-line bg-white shadow-lg ${className}`.trim()}>
+    <div className={`overflow-hidden rounded-sm border border-line bg-white shadow-lg ${className}`.trim()}>
       {/* Crop to the top 84% of the 1400×933 artwork: the logo and tagline stay, the services row goes. */}
       <div className="relative aspect-[1400/790] w-full">
         {/* eslint-disable-next-line @next/next/no-img-element */}

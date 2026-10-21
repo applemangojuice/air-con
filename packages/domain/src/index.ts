@@ -49,6 +49,7 @@ export * from "./media.ts";
 export * from "./catalogue.ts";
 export * from "./design-record.ts";
 export * from "./costing.ts";
+export * from "./quote-cost.ts";
 export * from "./proposal.ts";
 export * from "./compliance.ts";
 export * from "./issues.ts";

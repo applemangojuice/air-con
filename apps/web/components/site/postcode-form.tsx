@@ -21,7 +21,7 @@ export function PostcodeForm() {
     <form
       action="/quote"
       method="get"
-      className="mt-8 flex max-w-md gap-2"
+      className="mt-8 flex max-w-md"
       onSubmit={(e) => {
         e.preventDefault();
         const clean = postcode.trim();
@@ -43,13 +43,13 @@ export function PostcodeForm() {
         autoComplete="postal-code"
         autoCapitalize="characters"
         spellCheck={false}
-        className="min-h-12 w-full min-w-0 rounded-full border border-line bg-white px-5 py-3 text-base uppercase shadow-sm outline-none transition placeholder:normal-case placeholder:text-ink-500 focus:border-accent-500 focus:ring-2 focus:ring-accent-100"
+        className="min-h-13 w-full min-w-0 rounded-l-sm border border-r-0 border-ink-300 bg-white px-4 py-3 text-base uppercase outline-none transition placeholder:normal-case placeholder:text-ink-500 focus:border-ink-900"
       />
       <button
         type="submit"
-        className="min-h-12 shrink-0 rounded-full bg-ink-900 px-5 py-3 font-semibold text-white transition hover:bg-ink-700"
+        className="min-h-13 shrink-0 rounded-r-sm bg-accent-700 px-6 py-3 font-semibold text-white transition hover:bg-accent-800"
       >
-        Start
+        Get my price
       </button>
     </form>
   );

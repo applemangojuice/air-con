@@ -135,7 +135,7 @@ export default async function FaqPage() {
         <section className="mx-auto max-w-3xl px-4 py-12 sm:px-6">
           <div className="space-y-3">
             {faqs.map((f) => (
-              <details key={f.q} className="group rounded-2xl border border-line bg-white p-5 open:shadow-sm">
+              <details key={f.q} className="group rounded-sm border border-line bg-white p-5 open:shadow-sm">
                 <summary className="cursor-pointer list-none font-semibold text-ink-900 marker:content-none [&::-webkit-details-marker]:hidden">
                   <span className="flex items-center justify-between gap-3">
                     {f.q}
@@ -149,7 +149,7 @@ export default async function FaqPage() {
             ))}
           </div>
 
-          <div className="mt-10 rounded-2xl border border-accent-100 bg-accent-50 p-6">
+          <div className="mt-10 rounded-sm border border-accent-100 bg-accent-50 p-6">
             <p className="font-semibold">Something we haven&apos;t answered?</p>
             <p className="mt-1 text-sm text-ink-700">
               Email{" "}

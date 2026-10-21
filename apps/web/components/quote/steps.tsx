@@ -213,7 +213,7 @@ export function AddressStep({
       nextLabel="Continue"
     >
       {notice && (
-        <p role="alert" className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+        <p role="alert" className="rounded-sm border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           {notice}
         </p>
       )}
@@ -241,7 +241,7 @@ export function AddressStep({
         {status && check.state === "checking" && <p className="text-sm text-ink-500">{status}</p>}
         {status && unknown && <p className="text-sm font-medium text-red-700">{status}</p>}
         {inArea && (
-          <div className={`rounded-2xl border p-4 ${unverified ? "border-amber-200 bg-amber-50" : "border-sage-200 bg-sage-50"}`}>
+          <div className={`rounded-sm border p-4 ${unverified ? "border-amber-200 bg-amber-50" : "border-sage-200 bg-sage-50"}`}>
             <p className={`text-sm font-semibold ${unverified ? "text-amber-900" : "text-sage-900"}`}>{status}</p>
             <p className={`mt-1 text-sm ${unverified ? "text-amber-900" : "text-sage-800"}`}>
               A few taps about your home and your price appears. No salesperson, and nobody rings you to
@@ -397,7 +397,7 @@ export function HouseStep({ draft, setSurvey, setLayout, step, totalSteps, onNex
       nextLabel="Show my price"
     >
       {draft.prefilledFromIntel && (
-        <div className="rounded-2xl border border-sage-200 bg-sage-50 p-4">
+        <div className="rounded-sm border border-sage-200 bg-sage-50 p-4">
           <p className="text-sm font-semibold text-sage-900">We&apos;ve filled this in from public records</p>
           <p className="mt-1 text-sm text-sage-800">
             For {draft.survey.addressLine}. Give it a once-over and fix anything that&apos;s off.
@@ -546,7 +546,7 @@ export function DetailsStep({
       busyLabel="Saving your quote…"
       footer={
         saveError ? (
-          <p role="alert" className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          <p role="alert" className="mt-4 rounded-sm border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
             {saveError}
           </p>
         ) : null
@@ -557,7 +557,7 @@ export function DetailsStep({
           ref={summaryRef}
           tabIndex={-1}
           role="alert"
-          className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 outline-none"
+          className="rounded-sm border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 outline-none"
         >
           <p className="font-semibold">Just a couple of things before we save:</p>
           <ul className="mt-1 list-disc pl-5">
@@ -635,7 +635,7 @@ export function DetailsStep({
         />
       </Group>
 
-      <fieldset className="min-w-0 rounded-2xl border border-line bg-white px-4 py-2">
+      <fieldset className="min-w-0 rounded-sm border border-line bg-white px-4 py-2">
         <legend className="px-1 text-sm font-semibold text-ink-900">Keeping in touch</legend>
         <ConsentBox
           checked={consent.operational}

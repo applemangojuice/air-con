@@ -85,7 +85,7 @@ export default async function SavedQuotePage({
         </div>
 
         {justSaved && (
-          <div role="status" className="no-print mb-5 rounded-2xl border border-sage-200 bg-sage-50 px-4 py-3 text-sm text-sage-900">
+          <div role="status" className="no-print mb-5 rounded-sm border border-sage-200 bg-sage-50 px-4 py-3 text-sm text-sage-900">
             <p className="font-semibold">Your quote is saved.</p>
             <p className="mt-0.5">
               {sp.emailed === "1"
@@ -110,7 +110,7 @@ export default async function SavedQuotePage({
           afterHero={
             <>
               {expired && (
-                <p className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                <p className="mb-4 rounded-sm border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
                   This price was valid until {fmtDate(until)}. Book a survey and we&apos;ll confirm today&apos;s price
                   for your home in your proposal.
                 </p>
@@ -123,7 +123,7 @@ export default async function SavedQuotePage({
                   surveyDuration={surveyDurationCopy(settings)}
                 />
               ) : (
-                <section className="rounded-3xl border border-line bg-white p-6">
+                <section className="rounded-sm border border-line bg-white p-6">
                   <h2 className="text-lg font-bold">We&apos;re not installing in {coverage.outcode} at the moment</h2>
                   <p className="mt-2 text-sm text-ink-700">
                     So we can&apos;t book a survey there yet. Email{" "}

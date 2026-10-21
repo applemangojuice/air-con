@@ -23,7 +23,7 @@ export function JourneyStrip({ current = "price" }: { current?: ProjectStageId }
               <span
                 className={`whitespace-nowrap text-[11px] font-medium ${
                   state === "now"
-                    ? "rounded-full bg-accent-100 px-2 py-0.5 text-accent-700"
+                    ? "rounded-sm bg-accent-100 px-2 py-0.5 text-accent-700"
                     : state === "done"
                       ? "text-ink-500"
                       : "sr-only sm:not-sr-only sm:text-ink-500"

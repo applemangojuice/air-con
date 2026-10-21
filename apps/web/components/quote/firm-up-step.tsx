@@ -43,10 +43,10 @@ export function FirmUpStep({
       nextLabel={added > 0 ? "Continue" : "Skip for now"}
     >
       {/* Live confidence meter */}
-      <div className="rounded-2xl border border-line bg-white p-4">
+      <div className="rounded-sm border border-line bg-white p-4">
         <div className="flex items-center justify-between gap-3">
           <p className="text-sm font-semibold text-ink-900">Price confidence</p>
-          <p aria-live="polite" className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${band.tone}`}>
+          <p aria-live="polite" className={`rounded-sm border px-2.5 py-0.5 text-xs font-semibold ${band.tone}`}>
             {band.label} · {confidence.score}/100
           </p>
         </div>

@@ -44,7 +44,11 @@ for the four pilot homes.
 
 - **Fixed-price quote funnel** (`/quote`, `/q/[id]`): mobile-first
   self-survey to an instant price, a saved quote page, and the start of a
-  project.
+  project. Any postcode finds its homes live in the EPC register and prefills
+  the picked one: [what data the quote flow needs](./docs/quote-data.md).
+- **Price check** (`/ops/price-check`): any home through the same engine,
+  with our cost and the margin, for pricing the pilot homes and tuning the
+  rules for every home.
 - **Property Intelligence Engine** (`/ops/intel`, `/a/[id]`): one record per
   property from EPC, planning and conservation open data; prefills the
   quote, powers mailings. Loading data: [docs/loading-data.md](./docs/loading-data.md).

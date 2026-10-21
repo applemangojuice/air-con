@@ -68,7 +68,7 @@ export default function OurProcessPage() {
           <div className="mx-auto max-w-3xl">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <h2 className="text-2xl font-display">An example installation</h2>
-              <span className="rounded-full bg-ink-900 px-3 py-1 text-xs font-bold tracking-wide text-white">DEMO · playable</span>
+              <span className="rounded-sm bg-ink-900 px-3 py-1 text-xs font-bold tracking-wide text-white">DEMO · playable</span>
             </div>
             <p className="mt-2 text-sm text-ink-500">
               This is the project page every customer gets, running a fictional DEMO home. Book the
@@ -76,7 +76,7 @@ export default function OurProcessPage() {
               is saved.
             </p>
           </div>
-          <div className="mt-6 rounded-3xl border border-line bg-cream p-4 sm:p-6 lg:p-8">
+          <div className="mt-6 rounded-sm border border-line bg-cream p-4 sm:p-6 lg:p-8">
             <DemoHub initialProject={demoProject} />
           </div>
         </section>
@@ -89,14 +89,14 @@ export default function OurProcessPage() {
               <p className="mt-2 leading-relaxed text-ink-500">{s.body}</p>
             </div>
           ))}
-          <div className="rounded-3xl border border-accent-100 bg-accent-50 p-8 text-center">
+          <div className="rounded-sm border border-accent-100 bg-accent-50 p-8 text-center">
             <h2 className="text-2xl font-bold">See your price</h2>
             <p className="mx-auto mt-2 max-w-md text-ink-500">
               About two minutes on your phone. Your price is confirmed at your home survey.
             </p>
             <Link
               href="/quote"
-              className="mt-5 inline-block rounded-full bg-accent-700 px-6 py-3 font-semibold text-white transition hover:bg-accent-800"
+              className="mt-5 inline-block rounded-sm bg-accent-700 px-6 py-3 font-semibold text-white transition hover:bg-accent-800"
             >
               Get my price
             </Link>

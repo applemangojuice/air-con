@@ -83,7 +83,7 @@ export default async function AreaPageView({ params }: { params: Promise<{ outco
             <p className="mt-4 text-lg text-ink-700">{area.intro}</p>
             {covered ? (
               <>
-                <p className="mt-4 inline-flex rounded-full border border-sage-200 bg-sage-50 px-3 py-1 text-sm font-semibold text-sage-900">
+                <p className="mt-4 inline-flex rounded-sm border border-sage-200 bg-sage-50 px-3 py-1 text-sm font-semibold text-sage-900">
                   We install in {area.outcode}
                 </p>
                 <div className="mt-6">
@@ -94,7 +94,7 @@ export default async function AreaPageView({ params }: { params: Promise<{ outco
                 <p className="mt-2 text-sm text-ink-500">About two minutes. If we already know your address, most of it is filled in.</p>
               </>
             ) : (
-              <p className="mt-6 rounded-2xl border border-line bg-white px-4 py-3 text-sm text-ink-700">
+              <p className="mt-6 rounded-sm border border-line bg-white px-4 py-3 text-sm text-ink-700">
                 We&apos;re not installing in {area.outcode} at the moment.{" "}
                 <Link href="/areas" className={textLink}>
                   See where we install
@@ -126,7 +126,7 @@ export default async function AreaPageView({ params }: { params: Promise<{ outco
             </p>
             <div className="mt-6 grid gap-4 sm:grid-cols-2">
               {examples.map((ex) => (
-                <div key={ex.label} className="rounded-2xl border border-line bg-white p-5">
+                <div key={ex.label} className="rounded-sm border border-line bg-white p-5">
                   <p className="font-semibold">{ex.label}</p>
                   <p className="mt-2 text-3xl font-display">{gbp(ex.price)}</p>
                   <p className="mt-1 text-sm text-ink-700">{roomsSummary(ex.rooms)}</p>
@@ -146,7 +146,7 @@ export default async function AreaPageView({ params }: { params: Promise<{ outco
             local on the day, not fighting the South Circular.
           </p>
           {covered && (
-            <div className="mt-8 rounded-2xl border border-accent-100 bg-accent-50 p-6">
+            <div className="mt-8 rounded-sm border border-accent-100 bg-accent-50 p-6">
               <p className="font-semibold">Ready when you are</p>
               <p className="mt-1 text-sm text-ink-700">Start with your postcode and see your price in about two minutes.</p>
               <Link href="/quote" className={`mt-4 ${primaryBtn}`}>

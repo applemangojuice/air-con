@@ -18,7 +18,7 @@ import { LegalLinks } from "./legal-links";
  */
 
 export const inputCls =
-  "w-full min-h-12 rounded-full border border-line bg-white px-5 py-3 text-base text-ink-900 outline-none transition placeholder:text-ink-500 focus:border-accent-500 focus:ring-2 focus:ring-accent-100 aria-invalid:border-red-600";
+  "w-full min-h-12 rounded-sm border border-line bg-white px-5 py-3 text-base text-ink-900 outline-none transition placeholder:text-ink-500 focus:border-accent-500 focus:ring-2 focus:ring-accent-100 aria-invalid:border-red-600";
 
 export { primaryBtn, secondaryBtn };
 
@@ -90,7 +90,7 @@ export interface Option<T extends string | number | boolean> {
 }
 
 const cardCls = (selected: boolean) =>
-  `relative flex h-full cursor-pointer flex-col rounded-2xl border px-3 py-3 text-left transition has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent-500 has-[:focus-visible]:ring-offset-2 ${
+  `relative flex h-full cursor-pointer flex-col rounded-sm border px-3 py-3 text-left transition has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent-500 has-[:focus-visible]:ring-offset-2 ${
     selected ? "border-accent-700 bg-accent-50 ring-1 ring-accent-700" : "border-line bg-white hover:border-ink-500"
   }`;
 
@@ -153,7 +153,7 @@ export function NumberRow({
         return (
           <label
             key={n}
-            className={`flex h-12 flex-1 cursor-pointer items-center justify-center rounded-xl border text-sm font-semibold transition has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent-500 has-[:focus-visible]:ring-offset-2 ${
+            className={`flex h-12 flex-1 cursor-pointer items-center justify-center rounded-sm border text-sm font-semibold transition has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent-500 has-[:focus-visible]:ring-offset-2 ${
               selected
                 ? "border-accent-700 bg-accent-50 text-accent-700 ring-1 ring-accent-700"
                 : "border-line bg-white text-ink-900 hover:border-ink-500"
@@ -275,7 +275,7 @@ export function StepShell({
           {title}
         </h1>
         {badge && (
-          <span className="rounded-full border border-line bg-white px-2.5 py-0.5 text-xs font-semibold text-ink-700">
+          <span className="rounded-sm border border-line bg-white px-2.5 py-0.5 text-xs font-semibold text-ink-700">
             {badge}
           </span>
         )}

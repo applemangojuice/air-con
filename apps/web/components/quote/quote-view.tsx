@@ -50,10 +50,10 @@ export function QuoteView({
   return (
     <div>
       {/* Hero */}
-      <div className="ink-gradient overflow-hidden rounded-3xl p-6 text-white sm:p-8">
+      <div className="ink-gradient overflow-hidden rounded-sm p-6 text-white sm:p-8">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm font-medium text-white/80">Your price</p>
-          <span className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${band.tone}`}>
+          <span className={`rounded-sm border px-2.5 py-0.5 text-xs font-semibold ${band.tone}`}>
             {band.label} · {quote.confidence.score}/100
           </span>
         </div>
@@ -62,7 +62,7 @@ export function QuoteView({
           {roomCount} room{roomCount === 1 ? "" : "s"} · heating and cooling · {installDurationCopy(settings).toLowerCase()}
           {vat.short ? ` · ${vat.short}` : ""}
         </p>
-        <p className="mt-4 rounded-2xl bg-white/10 px-4 py-3 text-sm leading-relaxed text-white/90">{PRICE_PROMISE}</p>
+        <p className="mt-4 rounded-sm bg-white/10 px-4 py-3 text-sm leading-relaxed text-white/90">{PRICE_PROMISE}</p>
       </div>
 
       <p className="mt-4 text-sm text-ink-700">
@@ -81,7 +81,7 @@ export function QuoteView({
         </h2>
         <ul className="mt-3 space-y-3">
           {quote.systems.map((system, i) => (
-            <li key={i} className="rounded-2xl border border-line bg-white p-4">
+            <li key={i} className="rounded-sm border border-line bg-white p-4">
               <p className="font-semibold">{system.outdoorLabel}</p>
               <ul className="mt-2 space-y-1.5">
                 {system.rooms.map((room) => (
@@ -112,7 +112,7 @@ export function QuoteView({
           {showBreakdown ? "Hide" : "Show"} the price breakdown
         </button>
         <div id={breakdownId} hidden={!showBreakdown}>
-          <ul className="mt-3 divide-y divide-line rounded-2xl border border-line bg-white">
+          <ul className="mt-3 divide-y divide-line rounded-sm border border-line bg-white">
             {quote.lines.map((line, i) => (
               <li key={i} className="flex items-start justify-between gap-4 px-4 py-3 text-sm">
                 <span>
@@ -134,7 +134,7 @@ export function QuoteView({
       {/* What the survey confirms, in the customer's words: the details the answers didn't cover
           (nothing can be added here, so never as instructions) and the engine's flags (written for the office). */}
       {checks.length > 0 && (
-        <section className="mt-6 rounded-2xl border border-line bg-surface p-4">
+        <section className="mt-6 rounded-sm border border-line bg-surface p-4">
           <h2 className="text-sm font-bold">Your surveyor will check</h2>
           <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-ink-700">
             {checks.map((check) => (
@@ -145,7 +145,7 @@ export function QuoteView({
       )}
 
       {warranty && (
-        <section className="mt-4 rounded-2xl border border-line bg-white p-4">
+        <section className="mt-4 rounded-sm border border-line bg-white p-4">
           <h2 className="text-sm font-bold">{warranty.headline}</h2>
           <p className="mt-1 text-sm text-ink-700">{warranty.body} All on top of your statutory rights.</p>
         </section>
@@ -153,7 +153,7 @@ export function QuoteView({
 
       {/* Finance: a regulated promotion. Only with every fact on record (financeOffered), and only the lender's own example, word for word. */}
       {finance && (
-        <section className="mt-8 rounded-2xl border border-line bg-white p-4 sm:p-5">
+        <section className="mt-8 rounded-sm border border-line bg-white p-4 sm:p-5">
           <h2 className="text-lg font-bold">Spreading the cost</h2>
           <p className="mt-2 whitespace-pre-line text-sm text-ink-900">{finance.representativeExample}</p>
           {financeDisclosure(finance, settings.company.tradingName).map((line) => (
