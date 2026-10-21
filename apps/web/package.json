@@ -12,7 +12,9 @@
     "test:e2e:pilot": "node scripts/e2e-pilot.mjs",
     "data:sample": "node scripts/make-sample-data.mjs",
     "data:fetch-epc": "node --experimental-strip-types scripts/fetch-epc.mjs",
+    "data:bulk-epc": "node --experimental-strip-types scripts/bulk-epc.mjs",
     "data:import": "node scripts/import-intel.mjs",
+    "data:enrich": "node --experimental-strip-types scripts/enrich-intel.mjs",
     "data:recompute": "node --experimental-strip-types scripts/recompute-intel.mjs",
     "data:seed": "node scripts/make-sample-data.mjs && node scripts/import-intel.mjs epc scripts/sample-data/epc-certificates.csv --outcodes SW16,SW17 && node scripts/import-intel.mjs planning scripts/sample-data/planning.csv --outcodes SW16,SW17 && node scripts/import-intel.mjs constraints scripts/sample-data/constraints.csv && node --experimental-strip-types scripts/recompute-intel.mjs"
   },

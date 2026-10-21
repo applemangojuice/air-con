@@ -3,6 +3,14 @@ import { test } from "node:test";
 import { classifyProperty, emptyConstraints, emptyMarketing, emptyPlanning, prefillFromIntel, type PropertyIntel } from "./intelligence.ts";
 import {
   addressLineFrom,
+  boundingBox,
+  constraintsAtPoint,
+  epcBulkRow,
+  parsePlanningAreas,
+  parsePostcodesBulk,
+  planningAreasUrl,
+  pointInArea,
+  postcodesBulkRequest,
   epcCertificateUrl,
   epcFromCertificate,
   epcSearchUrl,
@@ -260,4 +268,96 @@ test("merge: the book's id, audit and marketing survive; a newer certificate rep
   assert.equal(lookupNeeds(same).epcDetail, false);
 
   assert.equal(mergeLookedUp(undefined, fresh), fresh);
+});
+
+test("bulk CSV rows: one home per row, keyed on UPRN or address, dates and bands normalised", () => {
+  const row = epcBulkRow({
+    CERTIFICATE_NUMBER: "1234-5678",
+    ADDRESS1: "Flat 2",
+    ADDRESS2: "14 Larkhall Rise",
+    POSTCODE: "sw162qt",
+    UPRN: "UPRN-000100023336957",
+    PROPERTY_TYPE: "Flat",
+    BUILT_FORM: "Mid-Terrace",
+    CONSTRUCTION_AGE_BAND: "England and Wales: 1900-1929",
+    TOTAL_FLOOR_AREA: "61",
+    CURRENT_ENERGY_RATING: "d",
+    LODGEMENT_DATE: "03/07/2022",
+  })!;
+  assert.equal(row.key, "uprn:100023336957");
+  assert.equal(row.line1, "Flat 2, 14 Larkhall Rise");
+  assert.equal(row.postcode, "SW16 2QT");
+  assert.equal(row.lodgedAt, "2022-07-03");
+  assert.equal(row.epc.builtForm, "Mid-Terrace");
+  assert.equal(row.epc.currentRating, "D");
+  assert.equal(row.epc.certificateNumber, "1234-5678");
+  assert.equal(epcBulkRow({ CERTIFICATE_NUMBER: "x", POSTCODE: "SW16 2QT" }), undefined, "no address");
+  assert.match(epcBulkRow({ ADDRESS1: "1 Road", POSTCODE: "SW16 2QT" })!.key, /^1 ROAD SW162QT$/);
+});
+
+test("postcodes.io bulk: request body capped at 100, answers keyed by formatted postcode", () => {
+  const req = postcodesBulkRequest(Array.from({ length: 150 }, (_, i) => `sw16 ${i % 9}aa`));
+  assert.equal(req.url, "https://api.postcodes.io/postcodes");
+  assert.equal(JSON.parse(req.body).postcodes.length, 100);
+  const points = parsePostcodesBulk({
+    status: 200,
+    result: [
+      { query: "sw162qt", result: { latitude: 51.42, longitude: -0.13, admin_district: "Lambeth" } },
+      { query: "ZZ1 1ZZ", result: null },
+    ],
+  });
+  assert.deepEqual([...points.keys()], ["SW16 2QT"]);
+  assert.equal(points.get("SW16 2QT")!.district, "Lambeth");
+});
+
+/** A square conservation area with a square hole in it, plus an Article 4 area elsewhere. */
+const AREAS = {
+  type: "FeatureCollection",
+  features: [
+    {
+      type: "Feature",
+      geometry: {
+        type: "Polygon",
+        coordinates: [
+          [[-0.14, 51.42], [-0.12, 51.42], [-0.12, 51.44], [-0.14, 51.44], [-0.14, 51.42]],
+          [[-0.135, 51.425], [-0.13, 51.425], [-0.13, 51.43], [-0.135, 51.43], [-0.135, 51.425]],
+        ],
+      },
+      properties: { entity: "44001", dataset: "conservation-area", name: "Streatham Common" },
+    },
+    {
+      type: "Feature",
+      geometry: { type: "MultiPolygon", coordinates: [[[[-0.2, 51.5], [-0.19, 51.5], [-0.19, 51.51], [-0.2, 51.51], [-0.2, 51.5]]]] },
+      properties: { entity: "77002", dataset: "article-4-direction-area", name: "Clapham" },
+    },
+    { type: "Feature", geometry: { type: "Point", coordinates: [-0.1, 51.4] }, properties: { entity: "1", dataset: "listed-building", name: "A point" } },
+  ],
+};
+
+test("planning areas: shapes parsed once, points matched locally, holes respected", () => {
+  const areas = parsePlanningAreas(AREAS);
+  assert.equal(areas.length, 2, "points are skipped: only areas can contain a postcode");
+  const inside = { latitude: 51.435, longitude: -0.125 };
+  const inHole = { latitude: 51.4275, longitude: -0.1325 };
+  const outside = { latitude: 51.45, longitude: -0.125 };
+  assert.equal(pointInArea(inside, areas[0]!), true);
+  assert.equal(pointInArea(inHole, areas[0]!), false);
+  assert.equal(pointInArea(outside, areas[0]!), false);
+  assert.deepEqual(constraintsAtPoint(areas, inside), {
+    constraints: { conservationArea: true, listedBuilding: false, article4: false },
+    names: ["Conservation area: Streatham Common"],
+  });
+  assert.equal(constraintsAtPoint(areas, { latitude: 51.505, longitude: -0.195 }).constraints.article4, true);
+  assert.deepEqual(parsePlanningAreas({ nope: 1 }), []);
+});
+
+test("bounding box and the area query", () => {
+  const box = boundingBox([{ latitude: 51.42, longitude: -0.13 }, { latitude: 51.44, longitude: -0.11 }], 0.01)!;
+  assert.deepEqual(box.map((v) => Math.round(v * 1000) / 1000), [-0.14, 51.41, -0.1, 51.45]);
+  assert.equal(boundingBox([]), undefined);
+  const url = new URL(planningAreasUrl(box, 500));
+  assert.equal(url.pathname, "/entity.geojson");
+  assert.equal(url.searchParams.get("geometry_relation"), "intersects");
+  assert.match(url.searchParams.get("geometry")!, /^POLYGON\(\(-0\.140000 51\.410000,/);
+  assert.equal(url.searchParams.get("offset"), "500");
 });

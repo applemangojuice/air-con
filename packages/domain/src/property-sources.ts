@@ -103,7 +103,7 @@ export function formatPostcode(raw: string): string {
  */
 export function addressLineFrom(...parts: unknown[]): string {
   return parts
-    .map((p) => text(p))
+    .map((p) => text(p)?.replace(/\s+/g, " "))
     .filter((p): p is string => Boolean(p))
     .slice(0, 2)
     .join(", ");
@@ -331,9 +331,14 @@ export interface ConstraintFinding {
 /** The entity search answer, { entities: [{ dataset, name, reference }], count }. */
 export function parsePlanningConstraints(json: unknown): ConstraintFinding | undefined {
   if (!isObj(json) || !Array.isArray(json.entities)) return undefined;
+  return findingFromEntities(json.entities);
+}
+
+/** Constraint entities ({ dataset, name, reference }) as flags and names. */
+export function findingFromEntities(entities: unknown[]): ConstraintFinding {
   const constraints = emptyConstraints();
   const names: string[] = [];
-  for (const e of json.entities) {
+  for (const e of entities) {
     if (!isObj(e)) continue;
     const dataset = typeof e.dataset === "string" ? e.dataset : "";
     const name = text(e.name) ?? text(e.reference) ?? "unnamed";
@@ -349,6 +354,114 @@ export function parsePlanningConstraints(json: unknown): ConstraintFinding | und
     }
   }
   return { constraints, names: [...new Set(names)] };
+}
+
+/* ------------------------------------------------------------------ */
+/* Bulk: many postcodes at once (the importer's enrichment step)       */
+/* ------------------------------------------------------------------ */
+
+/** postcodes.io takes up to 100 postcodes per POST /postcodes. */
+export const POSTCODES_BULK_MAX = 100;
+
+export function postcodesBulkRequest(postcodes: string[], base = POSTCODES_IO_BASE): { url: string; body: string } {
+  return {
+    url: new URL("/postcodes", base).toString(),
+    body: JSON.stringify({ postcodes: postcodes.slice(0, POSTCODES_BULK_MAX).map(formatPostcode) }),
+  };
+}
+
+/** { result: [{ query, result: { latitude, longitude, admin_district } | null }] } → formatted postcode → point. */
+export function parsePostcodesBulk(json: unknown): Map<string, PostcodePoint> {
+  const out = new Map<string, PostcodePoint>();
+  if (!isObj(json) || !Array.isArray(json.result)) return out;
+  for (const r of json.result) {
+    if (!isObj(r) || typeof r.query !== "string") continue;
+    const point = parsePostcodeLookup({ result: r.result });
+    if (point) out.set(formatPostcode(r.query), point);
+  }
+  return out;
+}
+
+/** [west, south, east, north] around some points, padded (degrees) so edge postcodes' areas are caught. */
+export type BBox = [number, number, number, number];
+
+export function boundingBox(points: PostcodePoint[], padDeg = 0.005): BBox | undefined {
+  if (points.length === 0) return undefined;
+  let w = Infinity;
+  let s = Infinity;
+  let e = -Infinity;
+  let n = -Infinity;
+  for (const p of points) {
+    w = Math.min(w, p.longitude);
+    e = Math.max(e, p.longitude);
+    s = Math.min(s, p.latitude);
+    n = Math.max(n, p.latitude);
+  }
+  return [w - padDeg, s - padDeg, e + padDeg, n + padDeg];
+}
+
+/** Every constraint area intersecting a box, with its shape, a page (≤500) at a time. */
+export function planningAreasUrl(bbox: BBox, offset = 0, base = PLANNING_DATA_BASE): string {
+  const [w, s, e, n] = bbox.map((v) => v.toFixed(6));
+  const u = new URL("/entity.geojson", base);
+  for (const d of CONSTRAINT_DATASETS) u.searchParams.append("dataset", d);
+  u.searchParams.set("geometry", `POLYGON((${w} ${s},${e} ${s},${e} ${n},${w} ${n},${w} ${s}))`);
+  u.searchParams.set("geometry_relation", "intersects");
+  u.searchParams.set("limit", "500");
+  u.searchParams.set("offset", String(offset));
+  return u.toString();
+}
+
+type Ring = [number, number][];
+export interface PlanningArea {
+  entity: string;
+  dataset: string;
+  name: string;
+  /** Polygons, each an outer ring then holes, [lng, lat]. */
+  polygons: Ring[][];
+}
+
+/** A FeatureCollection of constraint areas. Features without a Polygon/MultiPolygon are skipped. */
+export function parsePlanningAreas(json: unknown): PlanningArea[] {
+  if (!isObj(json) || !Array.isArray(json.features)) return [];
+  const out: PlanningArea[] = [];
+  for (const f of json.features) {
+    if (!isObj(f) || !isObj(f.geometry) || !isObj(f.properties)) continue;
+    const g = f.geometry as { type?: unknown; coordinates?: unknown };
+    const polygons =
+      g.type === "Polygon" ? [g.coordinates as Ring[]] : g.type === "MultiPolygon" ? (g.coordinates as Ring[][]) : null;
+    if (!Array.isArray(polygons)) continue;
+    const p = f.properties;
+    out.push({
+      entity: String(p.entity ?? p.reference ?? out.length),
+      dataset: typeof p.dataset === "string" ? p.dataset : "",
+      name: text(p.name) ?? text(p.reference) ?? "unnamed",
+      polygons,
+    });
+  }
+  return out;
+}
+
+function inRing(x: number, y: number, ring: Ring): boolean {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i]!;
+    const [xj, yj] = ring[j]!;
+    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
+/** Is the point inside the area (inside an outer ring and outside its holes)? */
+export function pointInArea(point: PostcodePoint, area: PlanningArea): boolean {
+  const x = point.longitude;
+  const y = point.latitude;
+  return area.polygons.some((rings) => Array.isArray(rings) && rings.length > 0 && inRing(x, y, rings[0]!) && !rings.slice(1).some((h) => inRing(x, y, h)));
+}
+
+/** The same finding the live per-home check gives, from areas fetched once for a whole district. */
+export function constraintsAtPoint(areas: PlanningArea[], point: PostcodePoint): ConstraintFinding {
+  return findingFromEntities(areas.filter((a) => pointInArea(point, a)).map((a) => ({ dataset: a.dataset, name: a.name })));
 }
 
 /* ------------------------------------------------------------------ */
@@ -424,4 +537,34 @@ export function mergeLookedUp(existing: PropertyIntel | undefined, fresh: Proper
     epc,
     ...(Object.keys(sources).length ? { sources } : {}),
   };
+}
+
+/* ------------------------------------------------------------------ */
+/* Bulk: one row of the EPC register's CSV files                       */
+/* ------------------------------------------------------------------ */
+
+export interface EpcBulkRow {
+  /** UPRN when the row has one, else the normalised address and postcode: one home. */
+  key: string;
+  line1: string;
+  postcode: string;
+  uprn?: string;
+  lodgedAt: string;
+  epc: NonNullable<PropertyIntel["epc"]>;
+}
+
+/**
+ * A row of the bulk domestic CSV (the national file, a council download
+ * from the website, or the retired service's files) as one home's
+ * certificate. undefined for a row with no address or postcode.
+ */
+export function epcBulkRow(row: Record<string, string>): EpcBulkRow | undefined {
+  const postcodeRaw = text(pick(row, "POSTCODE"));
+  const line1 = addressLineFrom(pick(row, "ADDRESS1"), pick(row, "ADDRESS2")) || text(pick(row, "ADDRESS")) || "";
+  if (!postcodeRaw || !line1) return undefined;
+  const postcode = formatPostcode(postcodeRaw);
+  const uprn = normaliseUprn(pick(row, "UPRN"));
+  const epc = epcFromCertificate(row) ?? {};
+  const lodgedAt = normaliseEpcDate(pick(row, "LODGEMENT_DATE", "INSPECTION_DATE")) ?? "";
+  return { key: uprn ? `uprn:${uprn}` : addressKey(line1, postcode), line1, postcode, ...(uprn ? { uprn } : {}), lodgedAt, epc };
 }

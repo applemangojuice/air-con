@@ -50,17 +50,22 @@ them: they no longer do anything.
 
 `/ops/status` lists every setting and whether it's set.
 
-## Loading an area in advance
+## Loading your whole area in advance (recommended)
 
-Live lookups mean you don't have to load anything for the quote form to work.
-Loading in advance is for mailings (`/ops/intel`) and for pricing homes before
-anyone asks:
+Live lookups mean the quote form works without loading anything, but each new
+postcode and each picked home then waits on outside services. Load the area in
+bulk once and every home is already complete in the database:
 
-- **GitHub → Actions → Load property data → Run workflow.** Put the
-  postcodes you care about (the pilot homes', a street you're leafleting) in
-  **postcodes**, or leave it empty to load whole councils.
-- **Or in the office:** type a postcode on `/ops/price-check`. It looks the
-  postcode up and saves every home there, the same as the quote form.
+- **GitHub → Actions → Load property data → Run workflow** with source
+  **epc-bulk**. It downloads the EPC register's national file, keeps your
+  outcodes (default: the whole service area), and adds every home's location
+  and planning constraints. About 10–20 minutes, then a weekly top-up runs by
+  itself.
+- **A council download instead:** request it on the EPC website (filter by
+  local authority; the link arrives by email), then run the workflow with
+  source **file-url** and paste the link.
+- **Just a few postcodes** (the pilot homes'): source **epc-api** with them in
+  **postcodes**, or type each one on `/ops/price-check`.
 
 Details: [loading-data.md](./loading-data.md).
 

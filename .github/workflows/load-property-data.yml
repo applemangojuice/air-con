@@ -1,33 +1,37 @@
 name: Load property data
 
-# Loads the Property Intelligence book into your Supabase database without you
-# running anything locally. Two sources:
-#   - epc-api: fetch REAL certificates from the EPC register's data service
-#              (get-energy-performance-data.communities.gov.uk; default).
-#   - sample:  the built-in SW16/SW17 sample CSVs (no EPC key needed).
-# It imports the data, then recomputes archetypes + priority scores (the
-# /ops/intel "Recompute scores" button, headless).
+# Loads the property database in bulk, so the quote form and the price check
+# already know every home in your area: no outside call when a customer
+# types their postcode or picks their home. Runs on GitHub; nothing on your
+# machine.
+#
+# Sources:
+#   - epc-bulk (default): the EPC register's national file of every domestic
+#                certificate in England and Wales, streamed and kept to your
+#                OUTCODES. The whole area in one go (about 10-20 minutes).
+#   - file-url:  a file you were sent, e.g. a council download from the EPC
+#                website (Download data → filter by local authority; the link
+#                arrives by email). Paste the link in "file_url".
+#   - epc-api:   just some postcodes ("postcodes"), or councils' new
+#                certificates since a date. What the weekly run uses.
+#   - sample:    the made-up SW16/SW17 sample book (no EPC token needed).
+#
+# After the EPC import, every home gets its postcode centre (postcodes.io, 100
+# postcodes a request) and its planning constraints (planning.data.gov.uk:
+# conservation areas, Article 4 and listed outlines fetched once per outcode
+# and matched locally), then archetypes and priority scores are recomputed.
 #
 # One-time setup (all in the browser):
 #   1. Supabase project with supabase/migrations/ applied (SQL editor).
 #   2. Repo → Settings → Secrets and variables → Actions → New repository secret:
 #        SUPABASE_URL                = https://YOUR-PROJECT.supabase.co
 #        SUPABASE_SERVICE_ROLE_KEY   = Supabase → Settings → API → service_role
-#      For the EPC API source, also add (free registration at
-#      https://get-energy-performance-data.communities.gov.uk/, which replaced
-#      epc.opendatacommunities.org on 30 May 2026):
-#        EPC_BEARER_TOKEN            = the API token from your account there
+#        EPC_BEARER_TOKEN            = your API token from
+#                                      https://get-energy-performance-data.communities.gov.uk/
 #      (the old EPC_API_EMAIL / EPC_API_KEY secrets no longer work: delete them)
 #
-# Postcodes the database doesn't hold are also looked up live on the quote
-# form when EPC_BEARER_TOKEN is set in Vercel, so this load is for mailings
-# and the /ops/intel book, not for the quote form to work.
-#
-# The weekly schedule below pulls just the newly-issued certificates (a new EPC
-# usually means a sale or renovation — a live marketing signal). Run it once
-# manually with an empty "since" to seed the full history first.
-#
-# See docs/loading-data.md for the full walkthrough.
+# First run: source epc-bulk with your outcodes. After that the Monday run
+# keeps it topped up with new certificates. See docs/loading-data.md.
 
 on:
   workflow_dispatch:
@@ -36,31 +40,38 @@ on:
         description: "Data source"
         type: choice
         options:
+          - epc-bulk
+          - file-url
           - epc-api
           - sample
-        default: epc-api
-      postcodes:
-        description: "EPC only: just these postcodes, comma separated (e.g. the pilot homes'). Leave empty to load whole councils"
+        default: epc-bulk
+      outcodes:
+        description: "Outcodes to keep (default: the whole service area)"
+        type: string
+        default: "SW2,SW4,SW11,SW12,SW16,SW17,SW18,SW19,SE19,SE25,SE27,CR0,CR2,CR4,CR7,CR8,E3"
+      file_url:
+        description: "file-url only: the link to the .zip or .csv"
         type: string
         default: ""
-      since:
-        description: "EPC only, councils: certificates lodged since YYYY-MM (empty = all history)"
+      postcodes:
+        description: "epc-api only: just these postcodes, comma separated. Empty = councils below"
         type: string
         default: ""
       councils:
-        description: "EPC only: council names as the register spells them"
+        description: "epc-api only: council names as the register spells them"
         type: string
         default: "Lambeth,Wandsworth,Merton,Croydon"
-      outcodes:
-        description: "Outcodes to keep on import"
+      since:
+        description: "epc-api councils only: certificates lodged since YYYY-MM (empty = all history)"
         type: string
-        default: "SW16,SW17"
+        default: ""
       recompute:
-        description: "Recompute archetypes + priority after import"
+        description: "Add locations and planning constraints, then recompute archetypes + priority"
         type: boolean
         default: true
 
-  # Weekly pull of newly-issued EPCs, for marketing targeting. Uses the EPC API.
+  # Weekly: the councils' newly lodged certificates (a new EPC often means a
+  # sale or a renovation), then locations, constraints and scores for them.
   schedule:
     - cron: "0 6 * * 1" # 06:00 UTC every Monday
 
@@ -75,12 +86,14 @@ permissions:
 jobs:
   load:
     runs-on: ubuntu-latest
+    timeout-minutes: 120
     env:
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       EPC_BEARER_TOKEN: ${{ secrets.EPC_BEARER_TOKEN }}
-      SOURCE: ${{ inputs.source || 'epc-api' }}
-      OUTCODES: ${{ inputs.outcodes || 'SW16,SW17' }}
+      SOURCE: ${{ github.event_name == 'schedule' && 'epc-api' || inputs.source }}
+      OUTCODES: ${{ inputs.outcodes || 'SW2,SW4,SW11,SW12,SW16,SW17,SW18,SW19,SE19,SE25,SE27,CR0,CR2,CR4,CR7,CR8,E3' }}
+      FILE_URL: ${{ inputs.file_url || '' }}
       COUNCILS: ${{ inputs.councils || 'Lambeth,Wandsworth,Merton,Croydon' }}
       POSTCODES: ${{ inputs.postcodes || '' }}
     steps:
@@ -91,9 +104,13 @@ jobs:
             echo "Add them under Settings → Secrets and variables → Actions (values: Supabase → Settings → API)."
             exit 1
           fi
-          if [ "$SOURCE" = "epc-api" ] && [ -z "$EPC_BEARER_TOKEN" ]; then
-            echo "::error::Source is epc-api but the EPC_BEARER_TOKEN secret is missing."
+          if { [ "$SOURCE" = "epc-bulk" ] || [ "$SOURCE" = "epc-api" ]; } && [ -z "$EPC_BEARER_TOKEN" ]; then
+            echo "::error::Source is $SOURCE but the EPC_BEARER_TOKEN secret is missing."
             echo "Register free at https://get-energy-performance-data.communities.gov.uk/ and add your API token, or run with source=sample."
+            exit 1
+          fi
+          if [ "$SOURCE" = "file-url" ] && [ -z "$FILE_URL" ]; then
+            echo "::error::Source is file-url but no file_url was given."
             exit 1
           fi
           echo "Secrets OK for source=$SOURCE."
@@ -110,9 +127,26 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # Scheduled runs get the last 8 days (a day's overlap) so each week picks up new certs;
-      # manual runs use the "since" input (empty = full history).
+      # ---- source: epc-bulk / file-url (whole areas from one file) ----
+      - name: Read the bulk EPC file
+        if: ${{ env.SOURCE == 'epc-bulk' || env.SOURCE == 'file-url' }}
+        working-directory: apps/web
+        run: |
+          if [ "$SOURCE" = "epc-bulk" ]; then
+            node --experimental-strip-types scripts/bulk-epc.mjs --national --outcodes "$OUTCODES" --out scripts/data/epc-certificates.csv
+          else
+            node --experimental-strip-types scripts/bulk-epc.mjs --file "$FILE_URL" --outcodes "$OUTCODES" --out scripts/data/epc-certificates.csv
+          fi
+
+      - name: Import EPC (bulk)
+        if: ${{ env.SOURCE == 'epc-bulk' || env.SOURCE == 'file-url' }}
+        working-directory: apps/web
+        run: node scripts/import-intel.mjs epc scripts/data/epc-certificates.csv --outcodes "$OUTCODES" --no-log
+
+      # ---- source: epc-api (some postcodes, or new certificates) ----
+      # Scheduled runs get the last 8 days (a day's overlap); manual runs use "since".
       - name: Resolve "since"
+        if: ${{ env.SOURCE == 'epc-api' }}
         run: |
           if [ "${{ github.event_name }}" = "schedule" ]; then
             echo "SINCE=$(date -u -d "8 days ago" +%Y-%m-%d)" >> "$GITHUB_ENV"
@@ -120,9 +154,8 @@ jobs:
             echo "SINCE=${{ inputs.since }}" >> "$GITHUB_ENV"
           fi
 
-      # ---- source: epc-api (real data) ----
       - name: Fetch EPC certificates
-        if: ${{ (inputs.source || 'epc-api') == 'epc-api' }}
+        if: ${{ env.SOURCE == 'epc-api' }}
         working-directory: apps/web
         run: |
           if [ -n "$POSTCODES" ]; then
@@ -137,8 +170,8 @@ jobs:
               --out scripts/data/epc-certificates.csv
           fi
 
-      - name: Import EPC (real)
-        if: ${{ (inputs.source || 'epc-api') == 'epc-api' }}
+      - name: Import EPC (api)
+        if: ${{ env.SOURCE == 'epc-api' }}
         working-directory: apps/web
         # Named postcodes are kept whatever their outcode; council loads keep OUTCODES only.
         run: |
@@ -150,15 +183,21 @@ jobs:
 
       # ---- source: sample (no EPC key) ----
       - name: Generate + import sample data
-        if: ${{ (inputs.source || 'epc-api') == 'sample' }}
+        if: ${{ env.SOURCE == 'sample' }}
         working-directory: apps/web
         run: |
           node scripts/make-sample-data.mjs
-          node scripts/import-intel.mjs epc scripts/sample-data/epc-certificates.csv --outcodes "$OUTCODES"
-          node scripts/import-intel.mjs planning scripts/sample-data/planning.csv --outcodes "$OUTCODES"
+          node scripts/import-intel.mjs epc scripts/sample-data/epc-certificates.csv --outcodes SW16,SW17
+          node scripts/import-intel.mjs planning scripts/sample-data/planning.csv --outcodes SW16,SW17
           node scripts/import-intel.mjs constraints scripts/sample-data/constraints.csv
 
-      # ---- shared: recompute derived fields ----
+      # ---- shared: locations, planning constraints, scores ----
+      # Not for the made-up sample homes: their postcodes are real places.
+      - name: Add locations and planning constraints
+        if: ${{ env.SOURCE != 'sample' && (github.event_name != 'workflow_dispatch' || inputs.recompute) }}
+        working-directory: apps/web
+        run: node --experimental-strip-types scripts/enrich-intel.mjs
+
       - name: Recompute archetypes + priority scores
         if: ${{ github.event_name != 'workflow_dispatch' || inputs.recompute }}
         working-directory: apps/web
@@ -172,9 +211,9 @@ jobs:
             echo ""
             echo "- Source: \`$SOURCE\`"
             echo "- Outcodes kept: \`$OUTCODES\`"
-            [ "$SOURCE" = "epc-api" ] && echo "- Councils: \`$COUNCILS\`"
+            [ "$SOURCE" = "file-url" ] && echo "- File: a link you provided"
+            [ "$SOURCE" = "epc-api" ] && [ -z "$POSTCODES" ] && echo "- Councils: \`$COUNCILS\`, since \`${SINCE:-all history}\`"
             [ -n "$POSTCODES" ] && echo "- Postcodes: \`$POSTCODES\`"
-            [ "$SOURCE" = "epc-api" ] && echo "- Since: \`${SINCE:-all history}\`"
             echo ""
             echo "Open \`/ops/status\` to confirm the tables are healthy and \`/ops/intel\` to see the book."
           } >> "$GITHUB_STEP_SUMMARY"

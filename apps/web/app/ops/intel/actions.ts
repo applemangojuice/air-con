@@ -69,14 +69,15 @@ export async function recomputeAction(): Promise<void> {
       break;
     }
     if (!data || data.length === 0) break;
-    for (const row of data) {
-      const intel = row.intel as PropertyIntel;
-      const { error: upErr } = await supabase
-        .from("properties")
-        .update(denormaliseIntel(intel))
-        .eq("id", row.id);
-      if (!upErr) updated++;
+    // One upsert per page, not one update per home: a borough-sized book fits in the request's time.
+    const { error: upErr } = await supabase
+      .from("properties")
+      .upsert(data.map((row) => ({ id: row.id as string, ...denormaliseIntel(row.intel as PropertyIntel) })));
+    if (upErr) {
+      console.error("recompute save failed:", upErr.message);
+      break;
     }
+    updated += data.length;
     if (data.length < page) break;
     from += page;
   }

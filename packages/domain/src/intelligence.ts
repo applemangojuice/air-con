@@ -317,6 +317,41 @@ export function defaultConfigFromIntel(intel: PropertyIntel): DefaultConfig | un
 }
 
 /* ------------------------------------------------------------------ */
+/* The database row                                                    */
+/* ------------------------------------------------------------------ */
+
+/**
+ * The `properties` row for a record: the snapshot plus the flat columns the
+ * filters use, recomputed from it on every save so they can't drift. One
+ * mapping for the app, the importer's recompute and the bulk enrichment.
+ */
+export function propertyRow(intel: PropertyIntel, nowIso: string) {
+  const cls = classifyProperty(intel);
+  const priority = scoreMarketing(intel);
+  return {
+    id: intel.id,
+    uprn: intel.uprn ?? null,
+    address_line: intel.address.line1,
+    address_key: `${normaliseAddress(intel.address.line1)} ${intel.address.postcode.replace(/\s+/g, "")}`,
+    postcode: intel.address.postcode,
+    outcode: intel.address.outcode,
+    archetype_id: cls.archetypeId ?? null,
+    archetype_confidence: cls.confidence,
+    planning_risk: cls.planningRisk,
+    has_loft_conversion: intel.planning.loftConversion,
+    epc_rating: intel.epc?.currentRating ?? null,
+    floor_area_m2: intel.epc?.totalFloorAreaM2 ? Math.round(intel.epc.totalFloorAreaM2) : null,
+    audited: Boolean(intel.audit),
+    priority_score: priority.score,
+    priority_band: priority.band,
+    lead_status: intel.marketing.leadStatus,
+    campaign: intel.marketing.campaign ?? null,
+    updated_at: nowIso,
+    intel,
+  };
+}
+
+/* ------------------------------------------------------------------ */
 /* Marketing priority                                                  */
 /* ------------------------------------------------------------------ */
 

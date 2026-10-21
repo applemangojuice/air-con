@@ -40,6 +40,7 @@
 
 import { writeFileSync, mkdirSync, readFileSync, existsSync } from "node:fs";
 import { resolve, dirname } from "node:path";
+import { EPC_CSV_COLUMNS, epcCsvLine } from "./epc-csv.mjs";
 import {
   EPC_API_BASE,
   epcCertificateUrl,
@@ -172,31 +173,7 @@ console.log(`${latest.length} home(s), newest certificate each. Fetching certifi
 
 /* ---------------- 2. each certificate -------------------------------- */
 
-const COLUMNS = [
-  "CERTIFICATE_NUMBER",
-  "ADDRESS1",
-  "POSTCODE",
-  "UPRN",
-  "PROPERTY_TYPE",
-  "BUILT_FORM",
-  "CONSTRUCTION_AGE_BAND",
-  "TOTAL_FLOOR_AREA",
-  "NUMBER_HABITABLE_ROOMS",
-  "WALLS_DESCRIPTION",
-  "ROOF_DESCRIPTION",
-  "WINDOWS_DESCRIPTION",
-  "MAINHEAT_DESCRIPTION",
-  "HOTWATER_DESCRIPTION",
-  "CURRENT_ENERGY_RATING",
-  "POTENTIAL_ENERGY_RATING",
-  "LODGEMENT_DATE",
-];
-const csvCell = (v) => {
-  const s = v === undefined || v === null ? "" : String(v);
-  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-};
-
-const lines = [COLUMNS.join(",")];
+const lines = [EPC_CSV_COLUMNS.join(",")];
 let done = 0;
 let missing = 0;
 let next = 0;
@@ -212,29 +189,7 @@ async function worker() {
     }
     if (!epc) missing++;
     // A certificate that won't load still gives the address, UPRN and rating from the search.
-    lines.push(
-      [
-        hit.certificateNumber,
-        hit.line1,
-        hit.postcode,
-        hit.uprn,
-        epc?.propertyType,
-        epc?.builtForm,
-        epc?.constructionAgeBand,
-        epc?.totalFloorAreaM2,
-        epc?.habitableRooms,
-        epc?.wallDescription,
-        epc?.roofDescription,
-        epc?.glazingDescription,
-        epc?.mainHeatDescription,
-        epc?.hotWaterDescription,
-        epc?.currentRating ?? hit.band,
-        epc?.potentialRating,
-        epc?.lodgedAt ?? hit.registeredAt,
-      ]
-        .map(csvCell)
-        .join(","),
-    );
+    lines.push(epcCsvLine({ ...hit, epc, lodgedAt: hit.registeredAt }));
     done++;
     if (done % 25 === 0 || done === latest.length) process.stdout.write(`\r  ${done}/${latest.length} certificates`);
   }

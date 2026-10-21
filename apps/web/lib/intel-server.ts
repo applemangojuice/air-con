@@ -4,7 +4,7 @@ import {
   emptyMarketing,
   normaliseAddress,
   outcodeOf,
-  scoreMarketing,
+  propertyRow,
   syntheticId,
   type PropertyIntel,
 } from "@aircon/domain";
@@ -20,29 +20,10 @@ import { demoModeAllowed } from "./auth/demo-guard";
  * whole platform is explorable before any data is imported.
  */
 
+/** The flat columns plus the snapshot (without the id), recomputed on every save. */
 export function denormaliseIntel(intel: PropertyIntel) {
-  const cls = classifyProperty(intel);
-  const priority = scoreMarketing(intel);
-  return {
-    uprn: intel.uprn ?? null,
-    address_line: intel.address.line1,
-    address_key: `${normaliseAddress(intel.address.line1)} ${intel.address.postcode.replace(/\s+/g, "")}`,
-    postcode: intel.address.postcode,
-    outcode: intel.address.outcode,
-    archetype_id: cls.archetypeId ?? null,
-    archetype_confidence: cls.confidence,
-    planning_risk: cls.planningRisk,
-    has_loft_conversion: intel.planning.loftConversion,
-    epc_rating: intel.epc?.currentRating ?? null,
-    floor_area_m2: intel.epc?.totalFloorAreaM2 ? Math.round(intel.epc.totalFloorAreaM2) : null,
-    audited: Boolean(intel.audit),
-    priority_score: priority.score,
-    priority_band: priority.band,
-    lead_status: intel.marketing.leadStatus,
-    campaign: intel.marketing.campaign ?? null,
-    updated_at: new Date().toISOString(),
-    intel,
-  };
+  const { id: _id, ...row } = propertyRow(intel, new Date().toISOString());
+  return row;
 }
 
 export async function saveIntel(supabase: SupabaseClient, intel: PropertyIntel): Promise<boolean> {

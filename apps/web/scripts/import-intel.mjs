@@ -9,6 +9,8 @@
  *   node scripts/import-intel.mjs planning applications.csv --outcodes SW16,SW17
  *   node scripts/import-intel.mjs constraints constraints.csv
  *
+ *   --no-log   don't copy each home into property_assessments (bulk loads)
+ *
  * Dataset shapes (see docs/property-intelligence.md for where to get them):
  *  - epc: the EPC register bulk "certificates.csv" (one row per certificate;
  *    the newest certificate per address wins).
@@ -18,7 +20,7 @@
  *    conservation_area, listed_building, article_4 (true/false-ish values).
  */
 
-import { createClient } from "@supabase/supabase-js";
+import { scriptDb } from "./script-db.mjs";
 import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -104,6 +106,9 @@ const outcodes = (outcodesArg ?? "")
   .split(",")
   .map((s) => s.trim().toUpperCase())
   .filter(Boolean);
+// --no-log: skip the per-home copy in property_assessments. For borough-sized
+// bulk loads, where it would double the database for no new information.
+const writeLog = !rest.includes("--no-log");
 
 if (!kind || !filePath || !["epc", "planning", "constraints"].includes(kind)) {
   console.error("Usage: node scripts/import-intel.mjs <epc|planning|constraints> <file.csv> [--outcodes SW16,SW17]");
@@ -114,20 +119,9 @@ if (!existsSync(filePath)) {
   process.exit(1);
 }
 
-// Pick up .env.local the way Next would, without adding a dependency.
-if (!process.env.SUPABASE_URL && existsSync(".env.local")) {
-  for (const line of readFileSync(".env.local", "utf8").split("\n")) {
-    const m = line.match(/^([A-Z0-9_]+)=(.*)$/);
-    if (m && !process.env[m[1]]) process.env[m[1]] = m[2].replace(/^"|"$/g, "");
-  }
-}
-const url = process.env.SUPABASE_URL;
-const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-if (!url || !key) {
-  console.error("Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (or fill apps/web/.env.local).");
-  process.exit(1);
-}
-const supabase = createClient(url, key, { auth: { persistSession: false } });
+// Supabase from env or .env.local; DATA_BACKEND=file (with
+// --experimental-strip-types) imports into the local data instead.
+const supabase = await scriptDb();
 
 const records = toObjects(parseCsv(readFileSync(filePath, "utf8")));
 console.log(`${records.length} rows in ${filePath}`);
@@ -163,7 +157,7 @@ async function upsertBatch(rows, source) {
     const chunk = rows.slice(i, i + 200);
     const { error } = await supabase.from("properties").upsert(chunk);
     if (error) throw new Error(`upsert failed: ${error.message}`);
-    const { error: logError } = await supabase.from("property_assessments").insert(
+    const { error: logError } = !writeLog ? { error: null } : await supabase.from("property_assessments").insert(
       chunk.map((r) => ({ property_id: r.id, source, assessment: r.intel })),
     );
     if (logError) console.warn("assessment log failed:", logError.message);

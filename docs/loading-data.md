@@ -63,15 +63,28 @@ This is the "I don't run anything myself" path. A workflow
 (`.github/workflows/load-property-data.yml`) does the entire load on GitHub's
 runners — fetch/generate the data, import it, then recompute archetypes and
 priority scores (the `/ops/intel` **Recompute** button, run headless). Nothing
-runs on your machine. It has two sources:
+runs on your machine. Sources:
 
-- **`epc-api`** (default) — pulls **real** certificates from the EPC
-  register's data service
-  ([get-energy-performance-data.communities.gov.uk](https://get-energy-performance-data.communities.gov.uk/),
-  which replaced epc.opendatacommunities.org on 30 May 2026), for a list of
-  postcodes or for whole councils.
-- **`sample`** — the built-in SW16/SW17 sample CSVs (no EPC key needed; good
+- **`epc-bulk`** (default, recommended) — the EPC register's **national file**
+  of every domestic certificate in England and Wales, downloaded once,
+  streamed, and kept to your outcodes (default: the whole service area). Every
+  home in your area in one run of about 10–20 minutes, instead of an API call
+  per home.
+- **`file-url`** — a file you were sent: a **council download** from the EPC
+  website ([get-energy-performance-data.communities.gov.uk](https://get-energy-performance-data.communities.gov.uk/)
+  → sign in → Download data → domestic → filter by local authority; the link
+  arrives by email). Paste the link into **file_url**.
+- **`epc-api`** — just some postcodes, or councils' certificates lodged since a
+  date, through the search API. What the weekly run uses.
+- **`sample`** — the built-in SW16/SW17 sample CSVs (no EPC token needed; good
   for a first smoke test).
+
+After any EPC source, the run also gives every home its **postcode centre**
+(postcodes.io, 100 postcodes per request) and its **planning constraints**
+(conservation areas, Article 4 directions and listed-building outlines from
+planning.data.gov.uk, fetched once per outcode and matched locally), then
+recomputes archetypes and priority. A loaded home needs **no outside call**
+when a customer picks it on the quote form.
 
 ### One-time setup (all in the browser)
 
@@ -98,15 +111,14 @@ runs on your machine. It has two sources:
 ### Running it
 
 - **GitHub → Actions tab → "Load property data" → Run workflow.** Inputs:
-  - **source** — `epc-api` (real) or `sample`.
-  - **postcodes** — EPC only: just these postcodes, comma separated (the
-    pilot homes', a street you're mailing). Fast. Leave empty to load councils.
-  - **since** — EPC only, councils: `YYYY-MM` to fetch only certificates
-    lodged since then. Leave **empty on the first run** to seed the full history.
-  - **councils** — EPC only: council names as the register spells them,
-    default Lambeth, Wandsworth, Merton, Croydon (the SW16/SW17 councils).
-  - **outcodes** — which outcodes to keep on import (default `SW16,SW17`).
-  - **recompute** — recompute archetypes + priority after import (default yes).
+  - **source** — `epc-bulk` (whole area), `file-url`, `epc-api` or `sample`.
+  - **outcodes** — which outcodes to keep (default: the whole service area).
+  - **file_url** — `file-url` only: the link to the .zip or .csv.
+  - **postcodes** — `epc-api` only: just these postcodes, comma separated.
+  - **councils**, **since** — `epc-api` only: councils' certificates lodged
+    since `YYYY-MM`.
+  - **recompute** — add locations and planning constraints, then recompute
+    (default yes).
 - Watch it go green, then open `/ops/status` (is the DB healthy?) and
   `/ops/intel` (the book) on your deployment.
 - If a required secret is missing, the first step fails immediately telling you
@@ -123,13 +135,20 @@ upserts, so nothing is duplicated and existing planning/audit state survives.
 The certificate's lodgement date is stored on each record
 (`intel.epc.lodgedAt`), ready for a "recently certified" filter later.
 
-**Recommended first run:** trigger it once manually with **source `epc-api`**
-and **since empty** to seed the full borough history, then let the Monday
-schedule keep it topped up with new certificates.
+**Recommended first run:** trigger it once manually with **source
+`epc-bulk`** to load every home in your outcodes, then let the Monday schedule
+keep it topped up with new certificates. Re-run `epc-bulk` every few months to
+catch anything the weekly runs missed; it's safe to repeat.
 
-> Planning and constraints don't have a clean bulk API, so the `epc-api` source
-> loads EPC only (the backbone). Enrich with planning/constraints via the
-> `sample` source or the manual importer (Path 3) when you have those files.
+From your own computer the same steps are:
+
+```bash
+cd apps/web
+node --experimental-strip-types scripts/bulk-epc.mjs --national --outcodes SW16,SW17   # or --file council.zip
+node scripts/import-intel.mjs epc scripts/data/epc-certificates.csv --no-log
+node --experimental-strip-types scripts/enrich-intel.mjs
+node --experimental-strip-types scripts/recompute-intel.mjs
+```
 
 ---
 
