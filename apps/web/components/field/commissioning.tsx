@@ -22,7 +22,7 @@ import {
 import { DecayPanel } from "./decay-panel";
 import { BlockerList } from "@/components/kit/blocker-list";
 import { withAnswers, type SignAnswer, type TargetAnswer } from "./answers";
-import { parseReading, readingProblem } from "./capture";
+import { parseReading } from "./capture";
 import { londonTime, personName, whenLabel } from "./format";
 import { answerHeader, postAnswer, useCatchUp, useFieldJob } from "./server-answer";
 import { HeaderTitle, SyncBadge } from "./sync-badge";
@@ -77,7 +77,7 @@ function TargetRow({ projectId, target, canEdit, locked, onAnswer }: { projectId
     setError(null);
     const lo = recordOnly || !showMin || !min.trim() ? undefined : parseReading(min);
     const hi = recordOnly || !showMax || !max.trim() ? undefined : parseReading(max);
-    if (lo === null || hi === null) return setError(readingProblem(lo === null ? min : max) ?? "Numbers only.");
+    if (lo === null || hi === null) return setError("Numbers only.");
     setBusy(true);
     const r = await postAnswer<{ applied: TargetAnswer }>(
       `/api/field/jobs/${projectId}/targets`,

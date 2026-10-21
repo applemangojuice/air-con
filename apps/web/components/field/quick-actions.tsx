@@ -21,7 +21,7 @@ import {
 import { BlockerList } from "@/components/kit/blocker-list";
 import { getFieldOutbox, newOpId, type SyncOp } from "@/lib/field-outbox";
 import { prepareImage } from "@/lib/media-client";
-import { locate, nowIso, parseReading, readingProblem } from "./capture";
+import { locate, nowIso, parseReading } from "./capture";
 import { PICKER_PAGE, pickerShown, reuseUrls, type SignedUrls } from "./day-photos";
 import { editDraft, firstStep, followDefaults, isDirty, openDraft, reopenDraft, type EndDayDraft } from "./end-day-draft";
 import { londonDateOf, londonTime, telHref, fmtDay } from "./format";
@@ -612,7 +612,7 @@ function IssueSheet({ open, onClose, data, variation }: { open: boolean; onClose
       if (detail.trim().length < 3) return setError("Say what the customer asked for, for the office.");
     } else if (variation) {
       const v = parseReading(pounds);
-      if (v === null) return setError(readingProblem(pounds, "pounds") ?? "Enter your estimate in pounds (before any VAT).");
+      if (v === null) return setError("Enter your estimate in pounds (before any VAT).");
       pence = Math.round(v * 100);
       if (detail.trim().length < 3) return setError("Describe the change for the customer.");
     }

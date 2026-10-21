@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { EVIDENCE_KIND_LABEL, NUMERIC_KINDS, VIDEO_LENGTH_HINT, windowText, type InstallStep, type SlotView } from "@aircon/domain";
-import { canScanBarcodes, capturePhoto, captureValue, locate, parseReading, readBarcode, readingProblem, uploadProblem } from "./capture";
+import { canScanBarcodes, capturePhoto, captureValue, locate, parseReading, readBarcode, uploadProblem } from "./capture";
 import { SignaturePad, type SignaturePadHandle } from "./signature-pad";
 import { Sheet } from "./sheet";
 import { londonTime, personName } from "./format";
@@ -110,7 +110,7 @@ export function Slot({ projectId, step, slot, waiting, refused, imageUrl, disabl
   function saveText() {
     if (numeric) {
       const v = parseReading(text);
-      if (v === null) return setError(readingProblem(text, spec.unit) ?? `Type the reading as a number${spec.unit ? ` in ${spec.unit}` : ""}.`);
+      if (v === null) return setError(`Type the reading as a number${spec.unit ? ` in ${spec.unit}` : ""}.`);
       void run(() => captureValue(projectId, spec, label, { value: v }));
       return;
     }

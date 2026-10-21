@@ -93,13 +93,6 @@ export interface EvidenceSpec {
   targetKey?: TargetKey;
   /** Where the window (min/max) came from, and whether anyone has confirmed it. */
   window?: WindowSource;
-  /**
-   * Round 11: the slots (spec ids) this reading adds up: the charge step's
-   * as-built length against each room's as-built run on that system. Once
-   * every one is in, a figure more than `RUNS_SUM_TOLERANCE_M` off their sum
-   * is an exception for the tech lead (`runsSumCheck`).
-   */
-  sumOf?: string[];
 }
 
 export interface InstallStep {
@@ -1045,7 +1038,6 @@ interface SlotDef {
   role?: EvidenceRole;
   targetKey?: TargetKey;
   window?: WindowSource;
-  sumOf?: string[];
 }
 
 interface StepDef {
@@ -1120,7 +1112,6 @@ function specFromSlot(stepKey: string, s: SlotDef): EvidenceSpec {
   if (s.role) spec.role = s.role;
   if (s.targetKey) spec.targetKey = s.targetKey;
   if (s.window) spec.window = s.window;
-  if (s.sumOf?.length) spec.sumOf = [...s.sumOf];
   return spec;
 }
 
@@ -1396,20 +1387,9 @@ export function runsheetFromDesign(
     .filter(Boolean)
     .join("; ");
   // Rooms whose run is longer than one coil: the bill of materials says a brazed joint is needed (hot work).
-  // By room id (round 11): two rooms on one coil item share a line and its note, so the note's first
-  // room isn't the one with the joint. A line from before the ids were recorded is read part by part.
-  const brazedIds = new Set<string>();
-  const brazedNames = new Set<string>();
-  for (const l of variant.bom ?? []) {
-    if (l.brazedRoomIds) {
-      for (const id of l.brazedRoomIds) brazedIds.add(id);
-      continue;
-    }
-    for (const part of (l.note ?? "").split("; ")) {
-      if (/needs a brazed joint/.test(part)) brazedNames.add(part.split(":")[0]!.trim());
-    }
-  }
-  const brazedRooms = rooms.filter((r) => brazedIds.has(r.id) || brazedNames.has(r.name));
+  const brazedRooms = new Set(
+    (variant.bom ?? []).filter((l) => /needs a brazed joint/.test(l.note ?? "")).map((l) => (l.note ?? "").split(":")[0]!.trim()),
+  );
   const heightAccess = systems.filter((s) => s.accessEquipment && HEIGHT_ACCESS.includes(s.accessEquipment));
   const heavy = systems.filter((s) => (weightOf(s.outdoor) ?? 0) > TWO_PERSON_LIFT_KG);
   const risks: string[] = [];
@@ -1428,7 +1408,7 @@ export function runsheetFromDesign(
   if (needsAsbestosCheck) risks.push(house ? `possible asbestos (house era ${house.era}, survey says ${house.asbestosRisk})` : "asbestos not assessed in the survey");
   if (measured?.site.petsKids) risks.push(`pets or children: ${measured.site.petsKids}`);
   if (measured?.risks.concealedServicesConcern) risks.push("concealed services flagged at survey");
-  if (brazedRooms.length) risks.push(`hot work: a brazed joint in the pipe run to ${brazedRooms.map((r) => r.name).join(", ")} (clear what burns, extinguisher and fire blanket, fire watch)`);
+  if (brazedRooms.size) risks.push(`hot work: a brazed joint in the pipe run to ${[...brazedRooms].join(", ")} (clear what burns, extinguisher and fire blanket, fire watch)`);
 
   const defs: StepDef[] = [];
   const add = (d: StepDef) => defs.push(d);
@@ -1683,7 +1663,8 @@ export function runsheetFromDesign(
       ],
     });
   }
-  for (const r of brazedRooms) {
+  for (const r of rooms) {
+    if (!brazedRooms.has(r.name)) continue;
     add({
       key: `d2-joint-${r.key}`,
       phase: 6,
@@ -1694,9 +1675,7 @@ export function runsheetFromDesign(
       systemId: r.systemId,
       requires: "fgas",
       critical: true,
-      // A route that ended up within one coil has no joint: only the tech lead marks it N/A, with a reason.
-      allowNa: true,
-      guidance: `${BRAZED_JOINT_GUIDANCE} The design's run of ${r.pipeRunM} m is longer than one coil; if the as-built route fits one coil after all, there's no joint: the tech lead marks this N/A with a reason.`,
+      guidance: BRAZED_JOINT_GUIDANCE,
       slots: [
         { key: "hotwork", kind: "check", label: "Hot work: anything that burns cleared or shielded, extinguisher and fire blanket at hand" },
         { key: "nitrogen", kind: "check", label: "Oxygen-free nitrogen flowing through the pipe while brazing, at low pressure through a regulator" },
@@ -1919,8 +1898,6 @@ export function runsheetFromDesign(
           label: s.rooms.length > 1 ? "As-built pipe length, all runs added up (one way)" : "As-built one-way pipe length",
           unit: "m",
           role: "as-built-length",
-          // Checked against each room's as-built run on this system (the Pipework steps): the charge comes from this figure.
-          ...(s.rooms.length ? { sumOf: s.rooms.map((r) => `d2-pipework-${r.key}.run`) } : {}),
           ...(totalLimits.min !== undefined ? { min: totalLimits.min } : {}),
           ...(totalLimits.max !== undefined ? { max: totalLimits.max } : {}),
           window: totalLimits.min !== undefined || totalLimits.max !== undefined ? totalLimits.window : RECORD_ONLY("Measured as built, not the design length."),
@@ -2447,15 +2424,6 @@ export function stepView(job: Pick<InstallJobV2, "evidence" | "exceptionReviews"
   const test = decayTest(job, step) ?? undefined;
   const charge = chargeCheck(job, step) ?? undefined;
   let slots = step.evidence.map((spec) => slotView(job, spec));
-  // A figure that should add up the rooms' as-built runs, and doesn't: the tech lead's, like a reading outside its window.
-  slots = slots.map((v) => {
-    if (!v.spec.sumOf?.length || v.state !== "pass" || !v.record) return v;
-    const sum = runsSumCheck(job, v.spec);
-    if (!sum || sum.result !== "off") return v;
-    return v.review?.resolution === "accepted"
-      ? { spec: v.spec, state: "accepted" as const, record: v.record, review: v.review, why: sum.words }
-      : { spec: v.spec, state: "exception" as const, record: v.record, why: sum.words };
-  });
   if (charge?.result === "outside") {
     // Outside the job's tolerance, the weighed figure waits for the tech lead; an acceptance counts only if made after the length it was judged against.
     slots = slots.map((v) => {
@@ -2968,42 +2936,6 @@ export interface ChargeCheckView {
   lengthAt?: string;
   /** The check in words, the same on every surface. */
   words: string;
-}
-
-/** How far the charge step's as-built length may be from the rooms' as-built runs added up (m): rounding and a tape's slack. */
-export const RUNS_SUM_TOLERANCE_M = 0.5;
-
-export interface RunsSumView {
-  /** incomplete: a room's run or the figure itself isn't in yet. */
-  result: "incomplete" | "matches" | "off";
-  sumM?: number;
-  typedM?: number;
-  words: string;
-}
-
-/**
- * A reading that adds up other slots (`EvidenceSpec.sumOf`: the as-built
- * length against each room's as-built run) compared with their sum. Null for
- * a slot without it (a runsheet from before round 11).
- */
-export function runsSumCheck(job: Pick<InstallJob, "evidence">, spec: EvidenceSpec): RunsSumView | null {
-  if (!spec.sumOf?.length) return null;
-  const runs = spec.sumOf.map((id) => latestEvidence(job, id)).map((r) => (r && typeof r.value === "number" && Number.isFinite(r.value) ? r.value : undefined));
-  const typed = capturedNumber(job, spec);
-  if (runs.some((v) => v === undefined)) return { result: "incomplete", ...(typed ? { typedM: typed.value } : {}), words: "Each room's as-built run is checked against this once they're all in." };
-  const sumM = Math.round(runs.reduce<number>((a, v) => a + v!, 0) * 100) / 100;
-  const parts = runs.length > 1 ? ` (${runs.join(" + ")} m)` : "";
-  const what = runs.length > 1 ? `the rooms' as-built runs add up to ${sumM} m${parts}` : `the room's as-built run is ${sumM} m`;
-  if (!typed) return { result: "incomplete", sumM, words: `Type the as-built length: ${what}.` };
-  const off = Math.abs(typed.value - sumM) > RUNS_SUM_TOLERANCE_M + 1e-9;
-  return {
-    result: off ? "off" : "matches",
-    sumM,
-    typedM: typed.value,
-    words: off
-      ? `Typed ${typed.value} m, but ${what}: the charge is worked out from this figure. Type it again, or the tech lead signs it off with a reason.`
-      : `Matches ${what}.`,
-  };
 }
 
 /** A captured number on a slot (latest wins), with when it was taken. */
