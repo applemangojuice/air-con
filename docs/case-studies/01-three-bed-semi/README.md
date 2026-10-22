@@ -1,0 +1,46 @@
+# Case study 01: three-bed semi with garage
+
+The first property used to work out the internal process from a quote
+request to a fitted system: how many indoor and outdoor units, the output
+each room needs, and where each unit goes.
+
+## Step 1: current floor plan
+
+![Current floor plan](./floor-plan-current.png)
+
+Redrawn from the estate agent's plan (Benson & Partners) with the owner's
+mark-up applied. The agent's plan is not to scale, so room sizes here are
+the agent's figures and are measured again on survey before any sizing.
+Regenerate the drawing with `python3 floor-plan.py floor-plan-current.svg`.
+
+| Floor  | Room             | Agent's size    |
+| ------ | ---------------- | --------------- |
+| Ground | Kitchen / Dining | 4.93m x 3.15m   |
+| Ground | Living Room      | 4.95m x 3.56m   |
+| Ground | Garage           | not given       |
+| First  | Bedroom 1        | 4.88m x 3.40m   |
+| First  | Bedroom 2        | 2.49m x 2.36m   |
+| First  | Bedroom 3        | 3.12m x 2.54m   |
+| First  | Bathroom         | 2.26m x 2.24m   |
+
+### Changes from the old plan (orange numbers on the drawing)
+
+1. The lean-to at the back is gone. The kitchen's back door now opens
+   straight outside.
+2. The inner porch door into the living room is gone; the porch is open to
+   the living room.
+3. New door from the porch into the garage.
+4. The small lobby in front of Bedroom 3, and its door, are gone. The lobby
+   space is now part of Bedroom 3.
+5. The bathroom door now opens off the landing.
+6. Bedroom 3's door now opens off the landing, in its right-hand wall.
+7. A partition closes off the cupboard over the stairs in Bedroom 2.
+
+### To confirm with the owner
+
+- Item 4: is the bathroom's old door into the lobby blocked up, so the
+  only way in is the new door off the landing?
+- Item 7: is the line in Bedroom 2 a new stud wall with a cupboard door, or
+  wardrobe doors?
+- Bedroom 2's door position, which the old plan shows unclearly.
+- Which way the house faces, so units can be placed with sun gain in mind.
