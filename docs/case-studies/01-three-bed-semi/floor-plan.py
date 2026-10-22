@@ -61,15 +61,15 @@ L(553,97,553,195); L(553,275,553,297); window(553,195,553,275)
 # internal
 L(490,293,490,535,EXT); L(490,570,490,580,EXT)
 door(490,570,0,-1,-1,0,34)                                             # NEW porch -> garage
-L(490,297,600,297,INT); L(655,297,770,297,INT); L(770,297,770,350,INT); L(770,350,965,350,INT)
-door(600,297,1,0,0,1,52)                                               # kitchen <-> living
+L(490,297,553,297,EXT)                                                 # kitchen/living wall removed: one open-plan room
 L(573,528,573,580,INT); L(565,530,573,530,INT); L(490,530,505,530,INT)   # porch nibs, inner door removed
 stairs(497,340,555,465,8)
 room(386,440,"Garage")
-room(760,190,"Kitchen / Dining","4.93m x 3.15m","16'2\" x 10'4\"")
-room(730,450,"Living Room","4.95m x 3.56m","16'3\" x 11'8\"")
+room(760,190,"Kitchen / Dining area","was 4.93m x 3.15m","16'2\" x 10'4\"")
+room(730,450,"Living area","was 4.95m x 3.56m","16'3\" x 11'8\"")
+s.append('<text x="745" y="320" class="small" text-anchor="middle">OPEN-PLAN, ONE ROOM</text>')
 s.append('<text x="535" y="562" class="small" text-anchor="middle">Porch</text>')
-marker(620,70,1); marker(535,510,2); marker(462,553,3)
+marker(620,70,1); marker(640,301,8); marker(535,510,2); marker(462,553,3)
 s.append('<text x="625" y="690" class="floor" text-anchor="middle">Ground Floor</text>')
 
 # ---------- FIRST FLOOR ----------

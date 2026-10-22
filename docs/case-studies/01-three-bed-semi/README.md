@@ -15,8 +15,7 @@ Regenerate the drawing with `python3 floor-plan.py floor-plan-current.svg`.
 
 | Floor  | Room             | Agent's size    |
 | ------ | ---------------- | --------------- |
-| Ground | Kitchen / Dining | 4.93m x 3.15m   |
-| Ground | Living Room      | 4.95m x 3.56m   |
+| Ground | Open-plan kitchen, dining and living (one room) | was 4.93m x 3.15m (kitchen) + 4.95m x 3.56m (living) |
 | Ground | Garage           | not given       |
 | First  | Bedroom 1        | 4.88m x 3.40m   |
 | First  | Bedroom 2        | 2.49m x 2.36m   |
@@ -37,6 +36,9 @@ Regenerate the drawing with `python3 floor-plan.py floor-plan-current.svg`.
 7. The bathroom's right-hand wall was knocked down and the bathroom now
    runs over the old cupboard, up to a new wall against Bedroom 2. Its new
    width (about 3.1m) is scaled from the old plan and needs measuring.
+8. The wall between the living room and the kitchen/dining room is gone.
+   The ground floor (apart from the garage and porch) is one open-plan
+   room, with the stairs rising inside it. It is sized as one space.
 
 ### To confirm with the owner
 
