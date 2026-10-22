@@ -21,7 +21,7 @@ Regenerate the drawing with `python3 floor-plan.py floor-plan-current.svg`.
 | First  | Bedroom 1        | 4.88m x 3.40m   |
 | First  | Bedroom 2        | 2.49m x 2.36m   |
 | First  | Bedroom 3        | 3.12m x 2.54m   |
-| First  | Bathroom         | 2.26m x 2.24m   |
+| First  | Bathroom         | approx. 3.1m x 2.24m (extended; agent's 2.26m x 2.24m was before) |
 
 ### Changes from the old plan (orange numbers on the drawing)
 
@@ -34,13 +34,13 @@ Regenerate the drawing with `python3 floor-plan.py floor-plan-current.svg`.
    space is now part of Bedroom 3.
 5. The bathroom door now opens off the landing.
 6. Bedroom 3's door now opens off the landing, in its right-hand wall.
-7. A partition closes off the cupboard over the stairs in Bedroom 2.
+7. The bathroom's right-hand wall was knocked down and the bathroom now
+   runs over the old cupboard, up to a new wall against Bedroom 2. Its new
+   width (about 3.1m) is scaled from the old plan and needs measuring.
 
 ### To confirm with the owner
 
 - Item 4: is the bathroom's old door into the lobby blocked up, so the
   only way in is the new door off the landing?
-- Item 7: is the line in Bedroom 2 a new stud wall with a cupboard door, or
-  wardrobe doors?
 - Bedroom 2's door position, which the old plan shows unclearly.
 - Which way the house faces, so units can be placed with sun gain in mind.

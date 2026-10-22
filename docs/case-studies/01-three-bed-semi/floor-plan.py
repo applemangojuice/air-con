@@ -84,9 +84,7 @@ L(1742,97,1742,580)
 # internal
 L(1163,232,1290,232,INT); L(1335,232,1460,232,INT)
 door(1335,232,-1,0,0,-1,45)                                            # NEW bathroom door off landing
-L(1380,97,1380,232,INT)
-L(1462,97,1462,140,4); L(1462,200,1462,232,4)                          # cupboard front (partition)
-door(1462,200,0,-1,1,0,30)
+L(1462,97,1462,232,INT)                                                # new wall: bathroom extended over the old cupboard
 L(1268,232,1268,240,INT); L(1268,290,1268,580,INT)
 door(1268,240,0,1,-1,0,50)                                             # NEW bedroom 3 door off landing
 stairs(1275,297,1335,465,8,False)
@@ -95,13 +93,12 @@ L(1340,297,1360,297,INT); L(1415,297,1742,297,INT)
 door(1360,297,1,0,0,1,52)                                              # bedroom 1
 L(1460,232,1460,240,INT)
 door(1460,240,0,1,1,0,52)                                             # bedroom 2 (assumed)
-room(1270,150,"Bathroom","2.26m x 2.24m","7'5\" x 7'4\"",cls="roomsm")
-s.append('<text x="1421" y="165" class="small" text-anchor="middle">Cpd</text>')
+room(1312,150,"Bathroom","approx. 3.1m x 2.24m",cls="roomsm")
 room(1600,165,"Bedroom 2","2.49m x 2.36m","8'2\" x 7'9\"")
 room(1165,420,"Bedroom 3","3.12m x 2.54m","10'3\" x 8'4\"")
 room(1540,430,"Bedroom 1","4.88m x 3.40m","16'0\" x 11'2\"")
 s.append('<text x="1370" y="270" class="small" text-anchor="middle">Landing</text>')
-marker(1110,265,4); marker(1312,205,5); marker(1238,265,6); marker(1490,120,7)
+marker(1110,265,4); marker(1312,205,5); marker(1238,265,6); marker(1440,120,7)
 s.append('<text x="1400" y="690" class="floor" text-anchor="middle">First Floor</text>')
 
 svg = f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="240 20 1540 740" width="1540" height="740" font-family="Helvetica, Arial, sans-serif">
