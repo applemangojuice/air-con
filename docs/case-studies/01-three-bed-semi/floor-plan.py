@@ -1,5 +1,6 @@
 import math, sys
 out = sys.argv[1]
+PROPOSED = len(sys.argv) > 2 and sys.argv[2] == "proposed"
 WALL = "#1f2328"; EXT = 12; INT = 7
 s = []
 def L(x1,y1,x2,y2,w=EXT,c=WALL,cap="square"):
@@ -94,22 +95,54 @@ door(1360,297,1,0,0,1,52)                                              # bedroom
 L(1460,232,1460,240,INT)
 door(1460,240,0,1,1,0,52)                                             # bedroom 2 (assumed)
 room(1312,150,"Bathroom","approx. 3.1m x 2.24m",cls="roomsm")
-room(1600,165,"Bedroom 2","2.49m x 2.36m","8'2\" x 7'9\"")
+room(1635,165,"Bedroom 2","2.49m x 2.36m","8'2\" x 7'9\"")
 room(1165,420,"Bedroom 3","3.12m x 2.54m","10'3\" x 8'4\"")
 room(1540,430,"Bedroom 1","4.88m x 3.40m","16'0\" x 11'2\"")
 s.append('<text x="1370" y="270" class="small" text-anchor="middle">Landing</text>')
 marker(1110,265,4); marker(1312,205,5); marker(1238,265,6); marker(1440,120,7)
 s.append('<text x="1400" y="690" class="floor" text-anchor="middle">First Floor</text>')
 
+OV=[]
+BLUE="#1c6dd0"; PIPE="#c2410c"
+def indoor(x,y,w,h,label,ax,ay,lx,ly,anchor="middle"):
+    OV.append(f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="3" fill="{BLUE}"/>')
+    cx,cy=x+w/2,y+h/2
+    OV.append(f'<line x1="{cx}" y1="{cy}" x2="{cx+ax}" y2="{cy+ay}" stroke="{BLUE}" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#arr)"/>')
+    OV.append(f'<text x="{lx}" y="{ly}" class="unit" text-anchor="{anchor}">{label}</text>')
+def pipe(pts,label=None,lx=0,ly=0,anchor="middle"):
+    OV.append('<polyline points="%s" fill="none" stroke="%s" stroke-width="2.5" stroke-dasharray="2 4" stroke-linecap="round"/>'%(" ".join(f"{x},{y}" for x,y in pts),PIPE))
+    if label: OV.append(f'<text x="{lx}" y="{ly}" class="pipe" text-anchor="{anchor}">{label}</text>')
+# outdoor unit: ground level, side return, on the kitchen's east face
+OV.append(f'<rect x="505" y="112" width="40" height="88" fill="#fff" stroke="{PIPE}" stroke-width="3"/>')
+OV.append(f'<circle cx="525" cy="156" r="14" fill="none" stroke="{PIPE}" stroke-width="2"/>')
+OV.append('<text x="495" y="130" class="pipe" text-anchor="end">Outdoor unit</text>')
+OV.append('<text x="495" y="146" class="pipesm" text-anchor="end">4-port multi, ~8 kW</text>')
+OV.append('<text x="495" y="161" class="pipesm" text-anchor="end">ground level, screened</text>')
+OV.append('<text x="495" y="176" class="pipesm" text-anchor="end">from the neighbour</text>')
+indoor(830,104,90,14,"A: 3.5 kW",0,140,822,136,"end")
+pipe([(830,111),(560,111),(545,120)])
+indoor(1488,104,80,14,"C: 2.5 kW",0,60,1528,200)
+indoor(1565,303,90,14,"B: 2.5 kW",0,110,1665,316,"start")
+indoor(1067,330,14,85,"D: 2.5 kW",110,0,1090,320,"start")
+pipe([(1610,303),(1610,240),(1700,240),(1700,97)],"via loft",1620,262,"start")
+pipe([(1060,372),(1048,372)])
+OV.append('<text x="1050" y="612" class="pipesm" text-anchor="start">First-floor pipes leave through the rear and east walls and drop to the outdoor unit in trunking.</text>')
+# compass: garden (top of plan) is south
+OV.append('<g transform="translate(1735,640)"><circle r="20" fill="#fff" stroke="#1f2328" stroke-width="1.5"/><path d="M0,16 L-7,-4 L0,0 L7,-4 Z" fill="#1f2328"/><text y="-6" x="0" class="small" text-anchor="middle" dy="-16">S</text><text x="0" y="40" class="small" text-anchor="middle">N</text></g>')
+if PROPOSED:
+    MK=[]
+
 svg = f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="240 20 1540 740" width="1540" height="740" font-family="Helvetica, Arial, sans-serif">
 <style>
 .room{{font-size:21px;fill:#1f2328}} .roomsm{{font-size:16px;fill:#1f2328}} .dim{{font-size:15px;fill:#555}}
 .small{{font-size:12px;fill:#555;letter-spacing:.5px}} .floor{{font-size:30px;font-weight:700;fill:#1f2328}}
-.mk{{font-size:13px;font-weight:700;fill:#fff}} .note{{font-size:13px;fill:#666}}
+.mk{{font-size:13px;font-weight:700;fill:#fff}} .unit{{font-size:14px;font-weight:700;fill:#1c6dd0}} .pipe{{font-size:13px;font-weight:700;fill:#c2410c}} .pipesm{{font-size:12px;fill:#c2410c}} .note{{font-size:13px;fill:#666}}
 </style>
+<defs><marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1c6dd0"/></marker></defs>
 <rect x="240" y="20" width="1540" height="740" fill="#ffffff"/>
 {"".join(s)}
+{"".join(OV) if PROPOSED else ""}
 {"".join(MK)}
-<text x="250" y="745" class="note">Current layout, redrawn from the agent's plan with the owner's edits. Not to scale: room sizes are the agent's figures and must be measured on survey. Orange numbers mark changes from the old plan.</text>
+<text x="250" y="745" class="note">Redrawn from the agent's plan with the owner's edits. Not to scale; measure on survey. {"Blue: indoor units (arrow = airflow). Orange: outdoor unit and pipe routes. Proposed positions, to confirm on survey." if PROPOSED else "Orange numbers mark changes from the old plan."}</text>
 </svg>'''
 open(out,"w").write(svg)
