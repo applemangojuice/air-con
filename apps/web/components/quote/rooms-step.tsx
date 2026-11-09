@@ -66,6 +66,7 @@ export function RoomsStep({
   onPhotoUploaded,
   step,
   totalSteps,
+  progressStep,
   onNext,
   onBack,
   excluded,
@@ -99,6 +100,7 @@ export function RoomsStep({
     <StepShell
       step={step}
       totalSteps={totalSteps}
+      progressStep={progressStep}
       title="Your home, your price"
       subtitle="We've laid out your rooms from your answers. Remove any you don't need and the price updates as you go. The hallway can fend for itself."
       onNext={onNext}
@@ -132,7 +134,8 @@ export function RoomsStep({
             {draft.survey.property.bedrooms} bed{draft.survey.property.bedrooms === 1 ? "" : "s"}
             {draft.survey.property.floorAreaM2 ? ` · ~${draft.survey.property.floorAreaM2} m²` : ""}
           </span>
-          {draft.prefilledFromIntel && <span className="text-ink-500"> (from public records)</span>}
+          {draft.prefillSource === "records" && <span className="text-ink-500"> (from public records)</span>}
+          {draft.prefillSource === "neighbours" && <span className="text-ink-500"> (guessed from nearby homes)</span>}
         </p>
         {onBack && (
           <button

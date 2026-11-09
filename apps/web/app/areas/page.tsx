@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { SiteFooter } from "@/components/site/footer";
 import { SiteHeader } from "@/components/site/header";
-import { PostcodeForm } from "@/components/site/postcode-form";
+import { AddressForm } from "@/components/site/address-form";
 import { textLink } from "@/components/site/styles";
 import { getPublicSettings } from "@/lib/public-settings";
 import { AREA_PAGES } from "./area-data";
@@ -54,12 +54,12 @@ export default async function AreasPage() {
         )}
 
         <section className="mt-12 rounded-3xl border border-accent-100 bg-accent-50 p-6">
-          <h2 className="text-xl font-display">Check your postcode</h2>
+          <h2 className="text-xl font-display">See your price</h2>
           <p className="mt-1 text-sm text-ink-700">
             We&apos;ll tell you straight away. If we&apos;re not there yet, you can ask us to email you once when we
             are.
           </p>
-          <PostcodeForm />
+          <AddressForm />
         </section>
       </main>
       <SiteFooter />

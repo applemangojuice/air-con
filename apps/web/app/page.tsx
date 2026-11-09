@@ -2,9 +2,8 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { SiteHeader } from "@/components/site/header";
 import { SiteFooter } from "@/components/site/footer";
-import { PostcodeForm } from "@/components/site/postcode-form";
+import { AddressForm } from "@/components/site/address-form";
 import { ResumeBanner } from "@/components/site/resume-banner";
-import { BrandArt } from "@/components/site/brand-art";
 import {
   cancellationSummary,
   fgasClaim,
@@ -29,7 +28,7 @@ export const revalidate = 60;
 
 export const metadata: Metadata = {
   description:
-    "Heat pumps that cool your home in summer and warm it in winter. Your price online in about two minutes, confirmed at a home survey. Now installing in our first London postcodes.",
+    "Heat pumps that cool your home in summer and warm it in winter. Type your address and see your price straight away, confirmed at a survey. Now installing in our first London postcodes.",
 };
 
 export default async function HomePage() {
@@ -44,26 +43,33 @@ export default async function HomePage() {
   const surveyFacts = [surveyPriceCopy(settings), surveyDurationCopy(settings)].filter(Boolean).join(", ");
   const outcodes = settings.serviceArea.slice().sort((a, b) => a.localeCompare(b, "en", { numeric: true }));
 
+  // The five steps the customer sees (the domain's CUSTOMER_JOURNEY): the
+  // platform's booking, kit and handover stages are the plumbing in between.
   const steps = [
     {
       n: "01",
-      title: "Get your price online",
-      body: "A few taps about your home and your price appears, in about two minutes. If we already know your address, most of it's filled in. No email needed to see it.",
+      title: "Your price, straight away",
+      body: "Type your address and your price appears: worked out from public records for your home, or from the homes around it. Refine it room by room if you like. No email needed to see it.",
     },
     {
       n: "02",
-      title: "A home survey",
-      body: `${surveyFacts ? `${surveyFacts}. ` : ""}A surveyor measures each room, checks where the units and pipes can go, and looks at your fuse board. No sales pitch.`,
+      title: "A virtual survey",
+      body: `A guided video walk-round on your phone, or a visit if we need to measure up.${surveyFacts ? ` ${surveyFacts[0]!.toUpperCase()}${surveyFacts.slice(1)}.` : ""} We check each room, where the units and pipes can go, and your fuse board. No sales pitch.`,
     },
     {
       n: "03",
-      title: "Your proposal, in writing",
-      body: "Designed on photos of your own rooms and signed off by a qualified engineer. If the price differs from your online price, it says exactly why. Then you decide.",
+      title: "Purchase, in writing",
+      body: "Your proposal is designed on photos of your own rooms and signed off by a qualified engineer. If the price differs from your online price, it says exactly why. Accept online and pick your install dates.",
     },
     {
       n: "04",
       title: "Installed and handed over",
       body: `${installDurationCopy(settings)}, with an update at the end of each day. We commission it in heating and cooling, show you how it all works, and hand over your paperwork.`,
+    },
+    {
+      n: "05",
+      title: "Aftercare",
+      body: "Your documents, photos and guarantees stay on your project page. We check in after a week and when the season turns, and anything not right is one tap to report.",
     },
   ];
 
@@ -114,7 +120,7 @@ export default async function HomePage() {
       <main>
         {/* Hero */}
         <section className="warm-gradient">
-          <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 pb-16 pt-12 sm:px-6 sm:pt-20 lg:grid-cols-[1fr_460px]">
+          <div className="mx-auto max-w-6xl px-4 pb-16 pt-12 sm:px-6 sm:pt-20">
             <div className="max-w-2xl">
               <p className="inline-flex items-center gap-2 rounded-full border border-accent-100 bg-white px-3 py-1 text-xs font-semibold text-accent-700">
                 <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-accent-500" />
@@ -124,12 +130,12 @@ export default async function HomePage() {
                 Dang, it&apos;s hot. <span className="text-accent-700">Let&apos;s fix that.</span>
               </h1>
               <p className="mt-5 max-w-xl text-lg text-ink-700">
-                Heat pumps that cool your home in summer and warm it in winter. Get your price in about two
-                minutes, then we visit to confirm it. No salesperson, no clipboard, no more sleeping on top of the
-                duvet with a wet flannel.
+                Heat pumps that cool your home in summer and warm it in winter. Pop your address in and your price
+                is the next thing you see, confirmed at a survey. No salesperson, no clipboard, no more sleeping on
+                top of the duvet with a wet flannel.
               </p>
 
-              <PostcodeForm />
+              <AddressForm />
               <p className="mt-3 text-sm text-ink-500">
                 Free and no obligation. No email needed to see your price.
               </p>
@@ -142,7 +148,6 @@ export default async function HomePage() {
                 </Link>
               </p>
             </div>
-            <BrandArt priority />
           </div>
         </section>
 
@@ -150,9 +155,9 @@ export default async function HomePage() {
         <section id="how-it-works" className="mx-auto max-w-6xl scroll-mt-20 px-4 py-20 sm:px-6">
           <h2 className="text-3xl font-display sm:text-4xl">From &ldquo;maybe&rdquo; to installed</h2>
           <p className="mt-3 max-w-2xl text-ink-700">
-            Four steps, one at a time, and you can see what&apos;s next at every point.
+            Five steps, one at a time, and you can see what&apos;s next at every point.
           </p>
-          <ol className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          <ol className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-5">
             {steps.map((s) => (
               <li key={s.n} className="rounded-2xl border border-line bg-surface p-6">
                 <span className="text-sm font-bold text-accent-700">{s.n}</span>
@@ -280,7 +285,7 @@ export default async function HomePage() {
                 <p className="mt-2 text-sm text-ink-700">We&apos;re finalising our first areas. Check back soon.</p>
               )}
               <p className="mt-4 text-sm text-ink-700">
-                Not on the list? Pop your postcode in anyway: if we&apos;re not there yet, you can ask us to email
+                Not on the list? Pop your address in anyway: if we&apos;re not there yet, you can ask us to email
                 you once when we are.
               </p>
             </div>
@@ -312,7 +317,7 @@ export default async function HomePage() {
           <div className="mx-auto max-w-6xl px-4 py-20 text-center sm:px-6">
             <h2 className="text-3xl font-display text-white sm:text-4xl">Ready to see your price?</h2>
             <p className="mx-auto mt-3 max-w-md text-white/80">
-              About two minutes on your phone. No obligation, no pushy calls. Worst case, you go back to your fan
+              Your address, then your price. No obligation, no pushy calls. Worst case, you go back to your fan
               knowing exactly what freedom costs.
             </p>
             <div className="mt-8">

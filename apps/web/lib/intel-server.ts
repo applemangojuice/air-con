@@ -2,10 +2,12 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   classifyProperty,
   emptyMarketing,
+  guessFromNeighbours,
   normaliseAddress,
   outcodeOf,
   scoreMarketing,
   syntheticId,
+  type NeighbourGuess,
   type PropertyIntel,
 } from "@aircon/domain";
 import { selectAllPages } from "./repo/base";
@@ -122,6 +124,23 @@ export async function addressesForPostcode(
     .order("address_line")
     .limit(60);
   return (data ?? []).map((r) => ({ id: r.id, line1: r.address_line }));
+}
+
+/**
+ * No record for the exact address? The homes at the same postcode stand in
+ * (guessFromNeighbours): the funnel prices from them and says so. Null when
+ * we hold nothing for that postcode.
+ */
+export async function neighbourGuessForPostcode(postcode: string): Promise<NeighbourGuess | null> {
+  const clean = postcode.toUpperCase().replace(/\s+/g, "");
+  const supabase = getServiceClient();
+  if (!supabase) {
+    return guessFromNeighbours(demoDataset().filter((p) => p.address.postcode.replace(/\s+/g, "") === clean)) ?? null;
+  }
+  const spaced = clean.length > 3 ? `${clean.slice(0, -3)} ${clean.slice(-3)}` : clean;
+  const { data } = await supabase.from("properties").select("intel").in("postcode", [clean, spaced]).limit(60);
+  const neighbours = (data ?? []).map((r) => r.intel as PropertyIntel).filter(Boolean);
+  return guessFromNeighbours(neighbours) ?? null;
 }
 
 /* ------------------------------------------------------------------ */

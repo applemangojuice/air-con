@@ -156,3 +156,32 @@ test("business case maths is deterministic and sane", () => {
   assert.equal(bc.expectedGrossProfitGbp, 7650);
   assert.ok(bc.roi > 8);
 });
+
+test("neighbour guess: commonest type sets the era and size; nothing to go on → undefined", async () => {
+  const { guessFromNeighbours } = await import("./intelligence.ts");
+  const house = (n: number, area: number, rooms: number) =>
+    intel({
+      id: `h${n}`,
+      epc: {
+        propertyType: "House",
+        builtForm: "Mid-Terrace",
+        constructionAgeBand: "England and Wales: 1900-1929",
+        totalFloorAreaM2: area,
+        habitableRooms: rooms,
+      },
+    });
+  const flat = intel({
+    id: "f1",
+    epc: { propertyType: "Flat", builtForm: "Mid-Terrace", constructionAgeBand: "England and Wales: 2003-2006", totalFloorAreaM2: 48, habitableRooms: 3 },
+  });
+  const guess = guessFromNeighbours([house(1, 96, 5), house(2, 110, 6), house(3, 102, 5), flat])!;
+  assert.equal(guess.type, "terraced");
+  assert.equal(guess.era, "pre-1930", "the flat's era doesn't drag a Victorian terrace to 2000+");
+  assert.equal(guess.bedrooms, 3, "median of the houses' bedrooms (habitable rooms minus two)");
+  assert.equal(guess.floorAreaM2, 102);
+  assert.equal(guess.sampleSize, 4);
+  // An even count takes the mean of the middle two.
+  assert.equal(guessFromNeighbours([house(1, 100, 5), house(2, 110, 5)])!.floorAreaM2, 105);
+  assert.equal(guessFromNeighbours([]), undefined);
+  assert.equal(guessFromNeighbours([intel({ epc: undefined })]), undefined, "a record with no type can't guess");
+});

@@ -6,7 +6,7 @@ import { track } from "@/lib/analytics-client";
 import { primaryBtn } from "./ui";
 
 /**
- * The one next action after a price: "Book my home survey". It turns the
+ * The one next action after a price: "Book my survey". It turns the
  * saved quote into a project (POST /api/projects {quoteId} → {id}, idempotent
  * server-side) and lands on the project page, where the survey slot is
  * picked. On a revisit with a project already started it simply opens it.
@@ -55,12 +55,12 @@ export function BookSurveyButton({
     <section aria-labelledby="next-step" className="no-print rounded-3xl border border-accent-100 bg-accent-50 p-6">
       <p className="text-xs font-semibold uppercase tracking-wide text-accent-700">Your next step</p>
       <h2 id="next-step" className="mt-1 text-xl font-display">
-        {existingProjectId ? "Your project is underway" : "A home survey to confirm your price"}
+        {existingProjectId ? "Your project is underway" : "A survey to confirm your price"}
       </h2>
       <p className="mt-2 text-sm leading-relaxed text-ink-700">
         {existingProjectId
           ? "Everything from here lives on your project page: your survey, your proposal and every date."
-          : "A surveyor visits to measure your rooms, check where the units and pipes can go, and look at your fuse board. Then we design your system and send a proposal with your price in writing."}
+          : "A guided video walk-round on your phone, or a visit if we need to measure up: your rooms, where the units and pipes can go, and your fuse board. Then we design your system and send a proposal with your price in writing."}
       </p>
       {!existingProjectId && <p className="mt-2 text-sm font-medium text-ink-900">{facts}</p>}
       <button
@@ -70,7 +70,7 @@ export function BookSurveyButton({
         aria-busy={state === "sending" || undefined}
         className={`${primaryBtn} mt-5 w-full`}
       >
-        {state === "sending" ? "Setting up your project…" : existingProjectId ? "Open my project" : "Book my home survey"}
+        {state === "sending" ? "Setting up your project…" : existingProjectId ? "Open my project" : "Book my survey"}
       </button>
       <p aria-live="polite" className="mt-2 text-center text-sm">
         {state === "error" && (

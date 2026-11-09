@@ -104,3 +104,29 @@ test("postcode step: an unknown postcode in an outcode we cover is a soft note, 
   assert.equal(postcodeOutcome(false, "found", true).inArea, false);
   assert.equal(postcodeOutcome(true, "checking", true).inArea, false);
 });
+
+test("address matching: a bare house number finds its street, ambiguity stays as typed", async () => {
+  const { matchHouse } = await import("../lib/address-lookup.ts");
+  const known = [
+    { line1: "12 Example Road", intelId: "i-12" },
+    { line1: "112 Example Road" },
+    { line1: "12a Example Road" },
+    { line1: "Flat 1, 14 Example Road" },
+    { line1: "Flat 2, 14 Example Road" },
+    { line1: "Rose Cottage, Example Road" },
+  ];
+  assert.equal(matchHouse("12", known)?.intelId, "i-12", "12 is 12, not 112 or 12a");
+  assert.equal(matchHouse("12A", known)?.line1, "12a Example Road");
+  assert.equal(matchHouse("12 example road", known)?.intelId, "i-12", "a full line matches itself, whatever the case");
+  assert.equal(matchHouse("rose cottage", known)?.line1, "Rose Cottage, Example Road");
+  assert.equal(matchHouse("14", known), undefined, "two flats at 14: let them say which");
+  assert.equal(matchHouse("", known), undefined);
+  assert.equal(matchHouse("12", []), undefined);
+});
+
+test("a draft remembers where its prefill came from", () => {
+  const stored = { ...newDraft("SW16 2BE"), prefillSource: "neighbours" as const, configured: true };
+  const d = normaliseDraft(JSON.parse(JSON.stringify(stored)))!;
+  assert.equal(d.prefillSource, "neighbours");
+  assert.equal(normaliseDraft(JSON.parse(JSON.stringify(newDraft())))!.prefillSource, undefined);
+});

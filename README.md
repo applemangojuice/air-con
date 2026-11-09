@@ -42,8 +42,10 @@ for the four pilot homes.
 
 **Also in the repo**
 
-- **Fixed-price quote funnel** (`/quote`, `/q/[id]`): mobile-first
-  self-survey to an instant price, a saved quote page, and the start of a
+- **Fixed-price quote funnel** (`/quote`, `/q/[id]`): address in, price
+  out. The home is filled in from public records or guessed from the
+  neighbours, the price shows before any email is asked for, and the email
+  gates refining or saving it. Then a saved quote page and the start of a
   project.
 - **Property Intelligence Engine** (`/ops/intel`, `/a/[id]`): one record per
   property from EPC, planning and conservation open data; prefills the

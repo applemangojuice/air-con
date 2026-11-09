@@ -14,15 +14,15 @@ export const dynamic = "force-dynamic";
 
 const sections = [
   {
-    title: "1. You tell us about your home",
-    body: "Our guided questions walk you through your home room by room: how big each room is, which way it faces, where your fuse board is, where the outdoor unit could live. Add a few photos if you like. If we already know your address, some of it is pre-filled from public records.",
+    title: "1. Your address, then your price",
+    body: "Type your address and your price appears, worked out from public records for your home or, if we hold none, from the homes around it. Then refine it if you like: room by room, how big each is, which way it faces, where the outdoor unit could live, a few photos. You see the price before we ask for an email.",
   },
   {
     title: "2. We size the system and give you a price",
     body: "Behind the scenes, a heat-load model estimates the cooling each room needs from its size, glazing, orientation and use, then picks the smallest unit that comfortably covers it. Oversized units short-cycle and waste money; undersized ones never keep up. Your price comes with a confidence score, so you can see how firm it is and what would firm it up.",
   },
   {
-    title: "3. A home survey confirms it",
+    title: "3. A survey confirms it",
     body: PRICE_PROMISE,
   },
   {
