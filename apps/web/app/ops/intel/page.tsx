@@ -101,6 +101,11 @@ export default async function OpsIntelPage({ searchParams }: { searchParams: Pro
         </div>
         <div className="flex items-center gap-3">
           {!demo && (
+            <Link href="/ops/intel/data" className="rounded-full border border-line px-4 py-2 text-sm font-semibold text-ink-700 transition hover:bg-surface">
+              Data preview
+            </Link>
+          )}
+          {!demo && (
             <Link
               href="/ops/intel/import"
               className="rounded-full bg-accent-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-accent-700"

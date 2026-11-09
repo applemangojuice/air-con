@@ -13,6 +13,7 @@
  */
 
 import { normaliseAddress, type PropertyIntel } from "@aircon/domain";
+import { shortAgeBand } from "./intel-fields";
 
 /* ------------------------------------------------------------------ */
 /* Columns                                                             */
@@ -45,13 +46,10 @@ export const EPC_FIELDS = {
   ageBand: ["CONSTRUCTION_AGE_BAND"],
   floorArea: ["TOTAL_FLOOR_AREA", "TOTAL_FLOOR_AREA_M2"],
   rooms: ["NUMBER_HABITABLE_ROOMS", "HABITABLE_ROOMS"],
-  walls: ["WALLS_DESCRIPTION", "WALL_DESCRIPTION"],
-  roof: ["ROOF_DESCRIPTION"],
   windows: ["WINDOWS_DESCRIPTION", "GLAZED_TYPE"],
-  heating: ["MAINHEAT_DESCRIPTION", "MAIN_HEATING_DESCRIPTION"],
-  hotWater: ["HOTWATER_DESCRIPTION", "HOT_WATER_DESCRIPTION"],
   currentRating: ["CURRENT_ENERGY_RATING", "CURRENT_ENERGY_EFFICIENCY_BAND", "ENERGY_RATING_CURRENT"],
-  potentialRating: ["POTENTIAL_ENERGY_RATING", "POTENTIAL_ENERGY_EFFICIENCY_BAND", "ENERGY_RATING_POTENTIAL"],
+  // Walls, roof, heating, hot water and the potential rating aren't kept: nothing in
+  // the app reads them (lib/intel-fields.ts), and they were a sixth of each home's space.
 } as const;
 
 export type EpcField = keyof typeof EPC_FIELDS;
@@ -272,25 +270,23 @@ export function epcCandidate(row: EpcRow, outcodes: string[] = []): EpcCandidate
   const lodged = isoDay(row.lodged);
   const uprn = row.uprn && /^\d{1,12}$/.test(row.uprn) ? row.uprn : undefined;
   const num = (v?: string) => (v && Number.isFinite(Number(v)) && Number(v) > 0 ? Number(v) : undefined);
+  // Only what the app uses, and nothing empty: every byte here is stored once per home.
+  const epc: NonNullable<PropertyIntel["epc"]> = {};
+  if (row.propertyType) epc.propertyType = row.propertyType;
+  if (row.builtForm) epc.builtForm = row.builtForm;
+  if (row.ageBand) epc.constructionAgeBand = shortAgeBand(row.ageBand);
+  const area = num(row.floorArea);
+  if (area) epc.totalFloorAreaM2 = area;
+  const rooms = num(row.rooms);
+  if (rooms) epc.habitableRooms = rooms;
+  if (row.windows) epc.glazingDescription = row.windows;
+  if (row.currentRating) epc.currentRating = row.currentRating;
+  if (lodged) epc.lodgedAt = lodged;
   const intel: PropertyIntel = {
     id: uprn ?? syntheticId(line1, postcode),
     uprn,
     address: { line1, postcode, outcode },
-    epc: {
-      propertyType: row.propertyType ?? "",
-      builtForm: row.builtForm ?? "",
-      constructionAgeBand: row.ageBand ?? "",
-      totalFloorAreaM2: num(row.floorArea),
-      habitableRooms: num(row.rooms),
-      wallDescription: row.walls ?? "",
-      roofDescription: row.roof ?? "",
-      glazingDescription: row.windows ?? "",
-      mainHeatDescription: row.heating ?? "",
-      hotWaterDescription: row.hotWater ?? "",
-      currentRating: row.currentRating ?? "",
-      potentialRating: row.potentialRating ?? "",
-      lodgedAt: lodged || undefined,
-    },
+    epc,
     planning: { loftConversion: false, rearExtension: false, sideExtension: false, garageConversion: false },
     constraints: { conservationArea: false, listedBuilding: false, article4: false },
     marketing: { leadStatus: "untouched" },
