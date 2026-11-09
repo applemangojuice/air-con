@@ -114,8 +114,8 @@ Git → Production Branch, normally `main`).
      (logged and rate limited), for when email is down. It is not a password
      wall in front of the console: everyone else signs in by magic link.
      Leave it unset if you don't want it.
-   - `LEADS_NOTIFY_EMAIL` (where lead alerts go), `GETADDRESS_API_KEY`
-     (address autofill). The video walkthrough endpoints (the iOS capture
+   - `LEADS_NOTIFY_EMAIL` (where lead alerts go), `OS_PLACES_API_KEY`
+     (address autofill; `GETADDRESS_API_KEY` also works). The video walkthrough endpoints (the iOS capture
      app, not part of the pilot) are off in production unless
      `VIDEO_SURVEYS_ENABLED=1`; only then do `OPENAI_API_KEY` /
      `ANTHROPIC_API_KEY` matter.

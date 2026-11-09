@@ -2375,3 +2375,19 @@ test("round 9: an older home warns at booking when nobody on the crew has asbest
   const trained = c({ asbestosAwarenessNeeded: true, crew: [{ ...INSTALLER, qualifications: [...INSTALLER.qualifications, awareness] }, TECH_LEAD, SPARKY] });
   assert.equal(severityOf(blockersFor(p, trained, "booking"), "no-asbestos-awareness"), undefined);
 });
+
+test("customer journey: five steps that between them cover every platform stage exactly once", async () => {
+  const { CUSTOMER_JOURNEY, PROJECT_STAGES, journeyStepFor } = await import("./project.ts");
+  assert.deepEqual(
+    CUSTOMER_JOURNEY.map((s) => s.label),
+    ["Price", "Virtual survey", "Purchase", "Install", "Aftercare"],
+  );
+  const covered = CUSTOMER_JOURNEY.flatMap((s) => [...s.stages]);
+  assert.deepEqual([...covered].sort(), [...PROJECT_STAGES].sort(), "every stage belongs to a step");
+  assert.equal(new Set(covered).size, covered.length, "no stage belongs to two steps");
+  // The platform's plumbing collapses into the moments the customer cares about.
+  assert.equal(journeyStepFor("booking"), "purchase");
+  assert.equal(journeyStepFor("kit"), "purchase");
+  assert.equal(journeyStepFor("handover"), "install");
+  assert.equal(journeyStepFor("price"), "price");
+});

@@ -19,6 +19,7 @@ export function FirmUpStep({
   onPhotoUploaded,
   step,
   totalSteps,
+  progressStep,
   onNext,
   onBack,
 }: StepProps) {
@@ -35,6 +36,7 @@ export function FirmUpStep({
     <StepShell
       step={step}
       totalSteps={totalSteps}
+      progressStep={progressStep}
       title="Firm up your price"
       badge="Optional"
       subtitle="A few photos help your surveyor arrive prepared and mean fewer surprises when we confirm your price. Not at home? Skip this: your surveyor checks it all anyway."

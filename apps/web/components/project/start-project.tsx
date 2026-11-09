@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { PROJECT_STAGES, STAGE_INFO } from "@aircon/domain";
+import { CUSTOMER_JOURNEY } from "@aircon/domain";
 
 /**
  * "Start my installation plan" on a saved quote (/q/[id]): turns the quote
@@ -41,15 +41,15 @@ export function StartProjectPanel({ quoteId, existingProjectId }: { quoteId: str
       <h2 className="text-lg font-bold text-ink-900">{existingProjectId ? "Your project is under way" : "Ready when you are"}</h2>
       <p className="mt-2 text-sm text-ink-700">Everything from here lives on one private project page, with a clear next step at every stage:</p>
       <ol className="mt-3 flex flex-wrap gap-x-1.5 gap-y-1 text-sm font-medium text-ink-700">
-        {PROJECT_STAGES.map((stage, i) => (
-          <li key={stage}>
-            {STAGE_INFO[stage].label}
-            {i < PROJECT_STAGES.length - 1 && <span className="text-ink-500"> →</span>}
+        {CUSTOMER_JOURNEY.map((step, i) => (
+          <li key={step.id}>
+            {step.label}
+            {i < CUSTOMER_JOURNEY.length - 1 && <span className="text-ink-500"> →</span>}
           </li>
         ))}
       </ol>
       <p className="mt-3 text-sm text-ink-700">
-        First, you book a home survey: we measure up and turn your price into a real design. Nothing is agreed until you&apos;ve seen your proposal.
+        First, you book your survey, a video walk-round on your phone or a visit if we need to measure up, and we turn your price into a real design. Nothing is agreed until you&apos;ve seen your proposal.
       </p>
 
       {state.status === "emailed" ? (

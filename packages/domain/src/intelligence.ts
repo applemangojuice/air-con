@@ -283,6 +283,57 @@ export function prefillFromIntel(intel: PropertyIntel): PropertyPrefill {
   return { type, era, bedrooms, floorAreaM2 };
 }
 
+/** A guess at a home we hold no record for, from the homes around it. */
+export interface NeighbourGuess extends PropertyPrefill {
+  /** How many neighbouring records the guess rests on. */
+  sampleSize: number;
+}
+
+const mode = <T extends string>(values: (T | undefined)[]): T | undefined => {
+  const counts = new Map<T, number>();
+  for (const v of values) if (v) counts.set(v, (counts.get(v) ?? 0) + 1);
+  let best: T | undefined;
+  let bestN = 0;
+  for (const [v, n] of counts) {
+    if (n > bestN) {
+      best = v;
+      bestN = n;
+    }
+  }
+  return best;
+};
+
+const median = (values: (number | undefined)[]): number | undefined => {
+  const nums = values.filter((n): n is number => typeof n === "number" && Number.isFinite(n)).sort((a, b) => a - b);
+  if (nums.length === 0) return undefined;
+  const mid = Math.floor(nums.length / 2);
+  return nums.length % 2 ? nums[mid]! : Math.round((nums[mid - 1]! + nums[mid]!) / 2);
+};
+
+/**
+ * No record for this exact address? Price it like its neighbours: the most
+ * common property type and era at the postcode, the median bedrooms and
+ * floor area. Streets are built in runs, so this is usually right, and the
+ * customer corrects anything that isn't. Undefined when there is nothing to
+ * go on (no neighbours, or none with a type), so the caller falls back to a
+ * typical home rather than a guess dressed up as knowledge.
+ */
+export function guessFromNeighbours(neighbours: PropertyIntel[]): NeighbourGuess | undefined {
+  const prefills = neighbours.map(prefillFromIntel).filter((p) => p.type);
+  if (prefills.length === 0) return undefined;
+  // Homes of the commonest type set the era and size: a block of flats on a
+  // street of houses shouldn't shrink everyone's bedrooms.
+  const type = mode(prefills.map((p) => p.type));
+  const alike = prefills.filter((p) => p.type === type);
+  return {
+    type,
+    era: mode(alike.map((p) => p.era)) ?? mode(prefills.map((p) => p.era)),
+    bedrooms: median(alike.map((p) => p.bedrooms)),
+    floorAreaM2: median(alike.map((p) => p.floorAreaM2)),
+    sampleSize: prefills.length,
+  };
+}
+
 /**
  * The proposed installation for a property before anyone has answered a
  * single question: prefill → default configuration → pricing-engine input.

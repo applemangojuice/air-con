@@ -11,6 +11,7 @@ There are a few ways in. Pick the one that matches what you're trying to do.
 
 | You want to… | Do this | Needs a database? | Runs where? |
 | --- | --- | --- | --- |
+| **Load the real EPC download (the easy way)** | **Upload page** (below) | Yes (Supabase) | Your browser |
 | **Just see how it works** | Demo mode | No | Your machine (`pnpm dev`) |
 | **Load data without touching a terminal** | **GitHub Actions** (below) | Yes (Supabase) | GitHub, one click |
 | **Run the real import pipeline locally** | Sample CSVs → importer | Yes (Supabase) | Your machine |
@@ -19,6 +20,58 @@ There are a few ways in. Pick the one that matches what you're trying to do.
 **Don't want to run any commands yourself?** Jump to
 [Automatic loading with GitHub Actions](#automatic-loading-with-github-actions) —
 it does the whole import + recompute for you from the Actions tab.
+
+---
+
+## Upload the EPC download in the browser (start here for real data)
+
+The government's EPC open data moved in 2026 from epc.opendatacommunities.org
+(retired 30 May 2026) to
+[Get energy performance of buildings data](https://get-energy-performance-data.communities.gov.uk/).
+Its domestic download is a zip of one CSV per year (`certificates-2008.csv`
+to the latest, about 8.6 GB unzipped).
+
+1. Sign in there with GOV.UK One Login and download the **domestic** data.
+2. In the app: **Property intelligence → Import EPC data**
+   (`/ops/intel/import`, admins only). Choose **the zip as downloaded**
+   (don't unzip it: it's several times bigger unzipped; unzipped CSVs work
+   too). It reads every file's columns first, in seconds, and stops there if
+   anything is wrong.
+3. **Count the homes.** One pass over every certificate (a few minutes,
+   nothing saved) lists each London postcode district grouped by area, with
+   its homes (estimated within a few percent), certificates (exact) and the
+   database space they'd take (about 1.6 KB a home). The count is kept in the
+   browser for that zip, so it isn't repeated, and a stopped count resumes.
+4. **Tick and save.** Your service area starts ticked ("All of London" and
+   "Clear" are there too); the running total shows the space against the free
+   plan's 500 MB. **Save** writes only the ticked districts. Keep the tab open.
+   To add districts later, choose the same zip again, tick more, and save.
+
+The 2026 download holds 38 files: `certificates-YEAR.csv` (2008 to the
+latest, about 28 GB unzipped, the same 93 lower-case columns each) and
+`recommendations-YEAR.csv` (improvement suggestions keyed by
+`certificate_number`, no addresses, about 70 GB). The import reads the
+certificates and skips the recommendations, saying so before it starts.
+
+**Database space:** each home takes about 1.5 KB. Supabase's free plan has
+500 MB, so on it, load the outcodes you're working in first (say SW16, SW17)
+and check **Supabase → Project → Usage** before adding more; Pro (8 GB) takes
+the whole service area easily.
+
+The browser reads the CSVs straight out of the zip on your own computer
+(ZIP64, stored and deflate entries; tested at about 170 MB a second of
+unzipped data in Chromium) and sends only the rows in your outcodes, 500 at a
+time. A dropped connection or a busy server is retried until it gets through.
+If it stops (Stop, sleep, a closed tab, a sign-out), choose the same zip again
+and press **Resume**: the browser remembers which year files are done and how
+many rows of the current one the server has, so nothing is sent twice. Each home keeps its newest certificate whichever
+order the years arrive in, and planning, constraints, audits and campaigns
+already on a record survive. Homes are scored as they're saved, so there's
+no Recompute to press. Running it again is safe.
+
+> **The GitHub Actions `epc-api` source and `scripts/fetch-epc.mjs` still
+> call the retired API**, so they fail until they're moved to the new
+> service's API. Use the upload page meanwhile.
 
 ---
 

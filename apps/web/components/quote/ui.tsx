@@ -205,6 +205,7 @@ export function Progress({ step, totalSteps }: { step: number; totalSteps: numbe
 export function StepShell({
   step,
   totalSteps,
+  progressStep,
   title,
   subtitle,
   badge,
@@ -217,8 +218,12 @@ export function StepShell({
   busyLabel = "One moment…",
   footer,
 }: {
+  /** Which screen this is (focus moves to the heading when it changes). */
   step: number;
-  totalSteps: number;
+  /** Steps in the progress bar; omit it (or 0) on screens outside the numbered form, such as the price itself. */
+  totalSteps?: number;
+  /** The step's position in the progress bar, when it differs from `step`. */
+  progressStep?: number;
   title: string;
   subtitle?: ReactNode;
   badge?: string;
@@ -268,7 +273,7 @@ export function StepShell({
         }
       }}
     >
-      <Progress step={step} totalSteps={totalSteps} />
+      {totalSteps ? <Progress step={progressStep ?? step} totalSteps={totalSteps} /> : <div className="mb-8" />}
 
       <div className="flex flex-wrap items-center gap-2">
         <h1 ref={headingRef} tabIndex={-1} className="text-2xl font-display outline-none sm:text-3xl">

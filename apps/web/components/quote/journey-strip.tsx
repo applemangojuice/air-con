@@ -1,19 +1,21 @@
-import { PROJECT_STAGES, STAGE_INFO, type ProjectStageId } from "@aircon/domain";
+import { CUSTOMER_JOURNEY, journeyStepFor, type ProjectStageId } from "@aircon/domain";
 
 /**
- * The whole journey in one line (Price → Survey → … → Aftercare), so the
- * customer can see the price is the first step, not the last. Labels come
- * from the domain's v2 stage list. Later stages collapse to dots on a phone.
+ * The whole journey in one line (Price → Virtual survey → Purchase → Install
+ * → Aftercare), so the customer can see the price is the first step, not
+ * the last. Five customer-facing steps from the domain's CUSTOMER_JOURNEY;
+ * the platform's eight stages map onto them. Later steps collapse to dots
+ * on a phone.
  */
 export function JourneyStrip({ current = "price" }: { current?: ProjectStageId }) {
-  const currentIdx = PROJECT_STAGES.indexOf(current);
+  const currentIdx = CUSTOMER_JOURNEY.findIndex((s) => s.id === journeyStepFor(current));
   return (
     <div>
       <ol aria-label="Your journey" className="flex flex-wrap items-center justify-center gap-x-1.5 gap-y-1">
-        {PROJECT_STAGES.map((stage, i) => {
+        {CUSTOMER_JOURNEY.map((step, i) => {
           const state = i < currentIdx ? "done" : i === currentIdx ? "now" : "later";
           return (
-            <li key={stage} className="flex items-center gap-1.5" aria-current={state === "now" ? "step" : undefined}>
+            <li key={step.id} className="flex items-center gap-1.5" aria-current={state === "now" ? "step" : undefined}>
               {i > 0 && (
                 <span
                   aria-hidden
@@ -29,7 +31,7 @@ export function JourneyStrip({ current = "price" }: { current?: ProjectStageId }
                       : "sr-only sm:not-sr-only sm:text-ink-500"
                 }`}
               >
-                {STAGE_INFO[stage].label}
+                {step.label}
               </span>
               {state === "later" && (
                 <span aria-hidden className="text-[11px] text-ink-500 sm:hidden">

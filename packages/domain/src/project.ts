@@ -161,6 +161,34 @@ export const STAGE_INFO: Record<ProjectStageId, StageInfo> = {
   },
 };
 
+/* ------------------------------------------------------------------ */
+/* The customer's view of the journey                                 */
+/* ------------------------------------------------------------------ */
+
+/**
+ * What the customer is shown as "the steps": five, not eight. The eight
+ * PROJECT_STAGES are how the platform runs a job (booking, kit and handover
+ * are real work with real gates), but to the customer they are the plumbing
+ * between the moments that matter: a price, a survey, buying, the install,
+ * and being looked after afterwards. Every stage maps to exactly one step.
+ */
+export const CUSTOMER_JOURNEY = [
+  { id: "price", label: "Price", stages: ["price"] },
+  { id: "survey", label: "Virtual survey", stages: ["survey"] },
+  { id: "purchase", label: "Purchase", stages: ["proposal", "booking", "kit"] },
+  { id: "install", label: "Install", stages: ["install", "handover"] },
+  { id: "aftercare", label: "Aftercare", stages: ["aftercare"] },
+] as const satisfies readonly { id: string; label: string; stages: readonly ProjectStageId[] }[];
+
+export type CustomerJourneyStepId = (typeof CUSTOMER_JOURNEY)[number]["id"];
+
+/** The customer-facing step a platform stage belongs to. */
+export function journeyStepFor(stage: ProjectStageId): CustomerJourneyStepId {
+  const step = CUSTOMER_JOURNEY.find((s) => (s.stages as readonly ProjectStageId[]).includes(stage));
+  // Every stage is listed above (project.test.ts checks), so this is only for the type.
+  return step?.id ?? "price";
+}
+
 const NUMBER_WORDS = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"];
 const numberWord = (n: number) => NUMBER_WORDS[n] ?? String(n);
 const capitalise = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);

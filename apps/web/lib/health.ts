@@ -228,11 +228,11 @@ function envReport(): EnvCheck[] {
       note: "Where new-lead and lost-lead alerts go. Defaults to the EMAIL_FROM address.",
     },
     {
-      key: "GETADDRESS_API_KEY",
+      key: "OS_PLACES_API_KEY",
       label: "Address autofill",
-      set: has("GETADDRESS_API_KEY"),
+      set: has("OS_PLACES_API_KEY") || has("GETADDRESS_API_KEY"),
       required: false,
-      note: "Postcode → address lookup for the funnel. Optional.",
+      note: "Postcode → every address at it, on the quote form, for homes the property database doesn't hold. OS Places (OS_PLACES_API_KEY), or getAddress.io (GETADDRESS_API_KEY) if that's what you have. Optional: without either, customers type their address.",
     },
     {
       key: "CRON_SECRET",

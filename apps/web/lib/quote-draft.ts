@@ -2,6 +2,8 @@ import type { KitchenLivingLayout, RoomType, Survey, SurveyPhoto, SurveyRoom } f
 
 export type Timeframe = "asap" | "1-3-months" | "researching";
 
+export type PrefillSource = "records" | "neighbours";
+
 export interface Contact {
   name: string;
   email: string;
@@ -27,6 +29,13 @@ export interface QuoteDraft {
   intelId?: string;
   /** True when the house answers were pre-filled from public records. */
   prefilledFromIntel?: boolean;
+  /**
+   * Where the house answers behind the instant price came from: public
+   * records for this address, the homes around it at the same postcode, or
+   * (unset) a typical home. Shown with the price, so a guess is never
+   * dressed up as knowledge.
+   */
+  prefillSource?: PrefillSource;
   /** Set once the customer has generated a default configuration. */
   configured: boolean;
   /**
@@ -85,7 +94,9 @@ export function newRoom(type: RoomType, existing: SurveyRoom[]): SurveyRoom {
   };
 }
 
-const STORAGE_KEY = "aircon.quote-draft.v2";
+// v3: the price-first flow renumbered the steps, so a v2 draft's `step`
+// would open the wrong screen. Old drafts are simply not restored.
+const STORAGE_KEY = "aircon.quote-draft.v3";
 
 const uploaded = (p: SurveyPhoto | null | undefined): p is SurveyPhoto =>
   Boolean(p) && typeof p!.storagePath === "string" && p!.storagePath.length > 0;
