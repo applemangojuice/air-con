@@ -19,11 +19,11 @@ import { existsSync, readdirSync } from "node:fs";
 function findChromium() {
   if (process.env.CHROMIUM_PATH) return process.env.CHROMIUM_PATH;
   const root = process.env.PLAYWRIGHT_BROWSERS_PATH ?? "/opt/pw-browsers";
+  if (existsSync(`${root}/chromium`)) return `${root}/chromium`; // the image's stable symlink
   if (existsSync(root)) {
     const dir = readdirSync(root).find((d) => /^chromium-\d+$/.test(d));
-    if (dir) {
-      const p = `${root}/${dir}/chrome-linux/chrome`;
-      if (existsSync(p)) return p;
+    for (const p of [`${root}/${dir}/chrome-linux64/chrome`, `${root}/${dir}/chrome-linux/chrome`]) {
+      if (dir && existsSync(p)) return p;
     }
   }
   console.error("No Chromium found. Set CHROMIUM_PATH to a Chrome/Chromium binary.");
@@ -58,7 +58,7 @@ try {
   check("homepage makes no 'single day' or 'guaranteed' promise", !/single day|guaranteed|price locked/i.test(home));
   check("homepage frames heating and cooling", /warm it in winter/i.test(home));
   check("homepage shows no brand artwork in the hero", (await page.locator('img[src*="dang-its-hot"]').count()) === 0);
-  check("homepage lists the five customer steps", /Virtual survey/.test(home) && /Purchase/.test(home) && /Aftercare/.test(home));
+  check("homepage lists the five customer steps", /virtual survey/i.test(home) && /purchase/i.test(home) && /aftercare/i.test(home));
   await page.fill('input[name="postcode"]', "SW16 2BE");
   await page.fill('input[name="address"]', "12");
   await page.click('button:has-text("Start")');

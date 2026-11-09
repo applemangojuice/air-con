@@ -73,8 +73,9 @@ function findChromium() {
   if (existsSync(root)) {
     const dir = readdirSync(root).find((d) => /^chromium-\d+$/.test(d));
     if (dir) {
-      const p = `${root}/${dir}/chrome-linux/chrome`;
-      if (existsSync(p)) return p;
+      for (const p of [`${root}/${dir}/chrome-linux64/chrome`, `${root}/${dir}/chrome-linux/chrome`]) {
+        if (existsSync(p)) return p;
+      }
     }
   }
   console.error("No Chromium found. Set CHROMIUM_PATH to a Chrome/Chromium binary.");
