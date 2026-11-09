@@ -89,32 +89,22 @@ export interface Option<T extends string | number | boolean> {
   hint?: string;
 }
 
-const cardCls = (selected: boolean, locked = false) =>
-  `relative flex h-full flex-col rounded-2xl border px-3 py-3 text-left transition has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent-500 has-[:focus-visible]:ring-offset-2 ${
-    selected
-      ? "border-accent-700 bg-accent-50 ring-1 ring-accent-700"
-      : locked
-        ? "border-line bg-white opacity-50"
-        : "border-line bg-white hover:border-ink-500"
-  } ${locked ? "cursor-default" : "cursor-pointer"}`;
+const cardCls = (selected: boolean) =>
+  `relative flex h-full cursor-pointer flex-col rounded-2xl border px-3 py-3 text-left transition has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent-500 has-[:focus-visible]:ring-offset-2 ${
+    selected ? "border-accent-700 bg-accent-50 ring-1 ring-accent-700" : "border-line bg-white hover:border-ink-500"
+  }`;
 
-/**
- * Option cards as native radios. Put them inside a <Group> for the legend.
- * `locked` shows the answer without letting it change (the price screen:
- * what we assumed, and how you'd change it, once you've gone through Edit).
- */
+/** Option cards as native radios. Put them inside a <Group> for the legend. */
 export function OptionCards<T extends string | number | boolean>({
   options,
   value,
   onChange,
   columns = 2,
-  locked = false,
 }: {
   options: Option<T>[];
   value: T;
   onChange: (value: T) => void;
   columns?: 2 | 3;
-  locked?: boolean;
 }) {
   const name = useId();
   return (
@@ -122,13 +112,12 @@ export function OptionCards<T extends string | number | boolean>({
       {options.map((o, i) => {
         const selected = o.value === value;
         return (
-          <label key={String(o.value)} className={cardCls(selected, locked)}>
+          <label key={String(o.value)} className={cardCls(selected)}>
             <input
               type="radio"
               name={name}
               value={i}
               checked={selected}
-              disabled={locked}
               onChange={() => onChange(o.value)}
               className="sr-only"
             />
@@ -143,53 +132,17 @@ export function OptionCards<T extends string | number | boolean>({
   );
 }
 
-/**
- * A locked question on the price screen: the same look as a <Group>, with
- * the answer highlighted and one action, Edit, which opens the form (after
- * the email gate).
- */
-export function LockedGroup({
-  legend,
-  onEdit,
-  children,
-}: {
-  legend: ReactNode;
-  onEdit: () => void;
-  children: ReactNode;
-}) {
-  const id = useId();
-  return (
-    <div role="group" aria-labelledby={id} className="min-w-0">
-      <div className="mb-1.5 flex items-center justify-between gap-3">
-        <p id={id} className="text-sm font-semibold text-ink-900">
-          {legend}
-        </p>
-        <button
-          type="button"
-          onClick={onEdit}
-          className="min-h-9 shrink-0 rounded-full border border-line bg-white px-3 text-xs font-semibold text-accent-700 transition hover:bg-accent-50"
-        >
-          Edit<span className="sr-only">: {legend}</span>
-        </button>
-      </div>
-      {children}
-    </div>
-  );
-}
-
 /** Compact 1…N+ picker, as radios in one row. Put it inside a <Group>. */
 export function NumberRow({
   value,
   onChange,
   max,
   maxLabel,
-  locked = false,
 }: {
   value: number;
   onChange: (value: number) => void;
   max: number;
   maxLabel?: string;
-  locked?: boolean;
 }) {
   const name = useId();
   const options = Array.from({ length: max }, (_, i) => i + 1);
@@ -200,20 +153,17 @@ export function NumberRow({
         return (
           <label
             key={n}
-            className={`flex h-12 flex-1 items-center justify-center rounded-xl border text-sm font-semibold transition has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent-500 has-[:focus-visible]:ring-offset-2 ${
+            className={`flex h-12 flex-1 cursor-pointer items-center justify-center rounded-xl border text-sm font-semibold transition has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent-500 has-[:focus-visible]:ring-offset-2 ${
               selected
                 ? "border-accent-700 bg-accent-50 text-accent-700 ring-1 ring-accent-700"
-                : locked
-                  ? "border-line bg-white text-ink-900 opacity-50"
-                  : "border-line bg-white text-ink-900 hover:border-ink-500"
-            } ${locked ? "cursor-default" : "cursor-pointer"}`}
+                : "border-line bg-white text-ink-900 hover:border-ink-500"
+            }`}
           >
             <input
               type="radio"
               name={name}
               value={n}
               checked={selected}
-              disabled={locked}
               onChange={() => onChange(n)}
               className="sr-only"
             />

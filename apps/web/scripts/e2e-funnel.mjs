@@ -81,18 +81,18 @@ try {
   await page.waitForSelector("text=/£[0-9,]+/");
   const priceScreen = (await page.locator("main").textContent()) ?? "";
   check("price shows before any email field", (await page.locator('input[type="email"]').count()) === 0);
-  check("price screen says what it rests on", /What we.ve assumed/.test(priceScreen) && /(public records|homes around you|typical home)/.test(priceScreen));
+  check("price screen says what it rests on", /Priced for/.test(priceScreen) && /(public records|homes around you|typical home)/.test(priceScreen));
   check("price screen is not a numbered step", !/Step \d of \d/.test(priceScreen));
   const strip = page.locator('[aria-label="Your journey"] li');
   check("journey strip has five steps, price first", (await strip.count()) === 5 && /Price/.test((await strip.first().textContent()) ?? ""));
   check("journey strip reads virtual survey, purchase, install, aftercare", /Virtual survey.*Purchase.*Install.*Aftercare/s.test((await page.locator('[aria-label="Your journey"]').textContent()) ?? ""));
   check("terms and privacy linked on the step", (await page.locator('a[href="/terms"]').count()) > 0 && (await page.locator('a[href="/privacy"]').count()) > 0);
   check("a secondary save path is offered", (await page.locator('button:has-text("Looks right, save it")').count()) === 1);
-  const lockedTiles = page.locator('[role="group"] input[type="radio"][disabled]');
-  check("the house questions show as locked tiles with the answer lit", (await lockedTiles.count()) >= 15 && (await page.locator('[role="group"] input[type="radio"]:checked').count()) >= 5);
-  check("every assumed answer has its own Edit", (await page.locator('[role="group"] button:has-text("Edit")').count()) === 6);
-  // Edit on a tile goes through the same gate as the main button.
-  await page.locator('[role="group"] button:has-text("Edit")').first().click();
+  const card = page.locator('[data-testid="assumptions"]');
+  check("one small card shows what the price rests on, with the assumed answers lit", (await card.count()) === 1 && (await card.locator("[data-selected]").count()) >= 3);
+  check("the card has no era or layout question, and one Edit", !/built|kitchen/i.test((await card.textContent()) ?? "") && (await card.locator('button:has-text("Edit")').count()) === 1);
+  // Edit on the card goes through the same gate as the main button.
+  await card.locator('button:has-text("Edit")').click();
 
   // 3. The email gate: address confirmed, email required, reminder offered.
   await page.waitForSelector("text=Edit your quote");
