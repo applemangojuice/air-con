@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { lookupAddresses } from "@/lib/address-lookup";
+import { lookupAddresses } from "@/lib/address-provider";
 import { isValidUkPostcode } from "@/lib/format";
 import { enforceRateLimit } from "@/lib/rate-limit";
 

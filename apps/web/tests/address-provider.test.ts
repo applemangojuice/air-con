@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { registerAppResolver } from "./helpers/resolve-app.ts";
 
 registerAppResolver();
-const { addressProvider, lookupAddresses, osFirstLine, titleCase } = await import("../lib/address-lookup.ts");
+const { addressProvider, lookupAddresses, osFirstLine, titleCase } = await import("../lib/address-provider.ts");
 
 type Call = { url: string; init?: unknown };
 
