@@ -28,7 +28,7 @@ texts). `/ops/launch` and `/ops/status` say the same in more detail.
 | [Resend](#resend-email) | Every email | **Required** | $0 (Free) |
 | [Twilio](#twilio-texts) | Reminder and on-my-way texts | Optional | ≈ $5 *unverified* |
 | [Stripe](#stripe-card-payments) | Card payments | Optional | Per payment *unverified* |
-| [getAddress.io](#getaddressio-address-lookup) | Address autofill on the website quote form | Optional | *unverified* |
+| [OS Places](#os-places-address-lookup) (or getAddress.io) | Address autofill on the website quote form | Optional | ≈ 3p a postcode looked up, only for homes not in your own data |
 | [postcodes.io](#postcodesio-postcode-check) | Postcode check on the quote form | Built in | $0 |
 | [GitHub](#github-code-health-check-database-button) | The code, the daily health check, the database button | Required (already in use) | $0 |
 | [Your domain and DNS](#your-domain-and-dns) | The web address and email sending | Required | Your registrar's fee |
@@ -171,19 +171,36 @@ database holding a real customer, and `/ops/launch` turns red.
   payment. Untick **Card (Stripe)** in **Settings → Payments** until it's set
   up.
 
-## getAddress.io (address lookup)
+## OS Places (address lookup)
 
-- **Does:** fills in the address list on the public quote form once a
-  postcode is typed. Known addresses come from the app's own property data
-  first.
-- **Optional.** Key: `GETADDRESS_API_KEY` from getaddress.io. Without it,
-  people type their address. Not used by the New pilot form (you type it).
-- **Cost:** free and paid tiers *unverified*.
+- **Does:** lists every address at a postcode on the public quote form, so
+  the customer picks theirs instead of typing it. The form asks **your own
+  property database first** (free: the homes loaded from EPC data). OS Places
+  is asked only when the database has nothing for that postcode, or the
+  customer taps **My address isn't listed**. Not used by the New pilot form
+  (you type it).
+- **Optional.** Key: `OS_PLACES_API_KEY`. Get it at osdatahub.os.uk: sign up,
+  choose the **Premium** plan (a business plan; it asks for a card), create a
+  **project**, add **OS Places API** to it and copy the project's **API key**.
+  Without it (and without getAddress.io), people type their address.
+- **Cost (from OS's plans page, November 2026; check before you sign up):**
+  about **£0.0294 a lookup**, each lookup returning up to 100 addresses.
+  OS Places is **not** covered by the Data Hub's free £1,000 a month of
+  premium data, because Royal Mail owns part of the address data. £0.0182 of
+  each lookup is Royal Mail's and is invoiced up front each quarter in blocks
+  of 100; the other £0.01 is billed monthly. Each postcode is cached for a
+  day, so a customer coming back costs nothing. 200 quotes a month is at most
+  about £6.
+- **Trial:** a 60-day trial (2,000 lookups) is for testing only, not a live
+  site.
+- **getAddress.io instead:** set `GETADDRESS_API_KEY` and leave
+  `OS_PLACES_API_KEY` empty. If both are set, OS Places is used.
 
 ## postcodes.io (postcode check)
 
-- **Does:** checks a postcode is real on the quote form. A free public
-  service; no key, no account, no cost.
+- **Does:** checks a postcode is real on the quote form, and suggests
+  postcodes while the customer types one. A free public service; no key, no
+  account, no cost.
 
 ## GitHub (code, health check, database button)
 

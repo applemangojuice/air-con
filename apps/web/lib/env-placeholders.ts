@@ -31,6 +31,7 @@ const KNOWN_PLACEHOLDERS = new Set(
     "your-service-role-key",
     "https://your-project.supabase.co",
     "your-getaddress-key",
+    "your-os-places-key",
     "your-twilio-auth-token",
     "your-epc-api-key",
     "re_xxx",
@@ -82,6 +83,7 @@ export const PLACEHOLDER_CHECKED_KEYS = [
   "TWILIO_ACCOUNT_SID",
   "TWILIO_AUTH_TOKEN",
   "GETADDRESS_API_KEY",
+  "OS_PLACES_API_KEY",
   "OPENAI_API_KEY",
   "ANTHROPIC_API_KEY",
 ] as const;

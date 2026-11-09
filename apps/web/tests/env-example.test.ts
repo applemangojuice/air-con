@@ -86,7 +86,7 @@ test("demo and developer switches are listed but commented out, so pasting the f
 
 test("the optional group holds the providers", () => {
   const optional = live(section("2. OPTIONAL"));
-  for (const k of ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_FROM", "GETADDRESS_API_KEY", "LEADS_NOTIFY_EMAIL", "OPS_PASSWORD"]) {
+  for (const k of ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_FROM", "GETADDRESS_API_KEY", "OS_PLACES_API_KEY", "LEADS_NOTIFY_EMAIL", "OPS_PASSWORD"]) {
     assert.ok(optional.includes(k), k);
   }
   // The Stripe webhook needs every event the handler records from, or refunds and disputes go unseen.

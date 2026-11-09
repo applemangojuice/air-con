@@ -130,8 +130,9 @@ export default async function PrivacyPage() {
             <li>
               <strong>Service providers</strong> who process data on our instructions: Supabase (database and photo
               storage), Vercel (hosting), Resend (email), Twilio (texts), Stripe (card payments: Stripe handles your
-              card details and we never see the full number), getAddress.io (address lookup) and postcodes.io (your
-              browser checks the postcode you type there).
+              card details and we never see the full number), Ordnance Survey or getAddress.io (we send them only the
+              postcode, to list the addresses at it) and postcodes.io (your browser checks the postcode you type
+              there, and suggests postcodes as you type).
             </li>
             <li>
               <strong>Where the law requires it</strong>: for example registering electrical work with a

@@ -98,58 +98,92 @@ function usePostcodeCheck(postcode: string, onGeo: (geo: SurveyGeo | undefined) 
   return check;
 }
 
-/** Postcode → known properties from the Property Intelligence Engine. */
+/** Postcode → known properties from the Property Intelligence Engine (free: our own database). */
 function useIntelAddresses(postcode: string, enabled: boolean) {
-  const [matches, setMatches] = useState<{ id: string; line1: string }[]>([]);
+  const [state, setState] = useState<{ postcode: string; matches: { id: string; line1: string }[] } | null>(null);
   useEffect(() => {
     if (!enabled || !isValidUkPostcode(postcode)) {
-      setMatches([]);
+      setState(null);
       return;
     }
     let cancelled = false;
     const timer = setTimeout(async () => {
+      let matches: { id: string; line1: string }[] = [];
       try {
         const res = await fetch(`/api/intel/addresses?postcode=${encodeURIComponent(postcode)}`);
-        if (!res.ok || cancelled) return;
-        const data = (await res.json()) as { matches: { id: string; line1: string }[] };
-        if (!cancelled) setMatches(data.matches);
+        if (res.ok) matches = ((await res.json()) as { matches: { id: string; line1: string }[] }).matches;
       } catch {
-        if (!cancelled) setMatches([]);
+        // Unreachable: treated as "none known", so the full list takes over.
       }
+      if (!cancelled) setState({ postcode, matches });
     }, 400);
     return () => {
       cancelled = true;
       clearTimeout(timer);
     };
   }, [postcode, enabled]);
-  return matches;
+  const current = state?.postcode === postcode ? state : null;
+  return { matches: current?.matches ?? [], settled: current !== null };
 }
 
-/** Postcode → selectable address list (getAddress.io behind /api/addresses). */
+/**
+ * Postcode → every address at it (OS Places or getAddress.io behind
+ * /api/addresses). Each call is paid, so it only runs when `enabled`: the
+ * database had nothing for the postcode, or the customer said theirs isn't listed.
+ */
 function useAddressList(postcode: string, enabled: boolean) {
-  const [addresses, setAddresses] = useState<string[]>([]);
+  const [state, setState] = useState<{ postcode: string; addresses: string[] } | null>(null);
   useEffect(() => {
-    if (!enabled || !isValidUkPostcode(postcode)) {
-      setAddresses([]);
+    if (!enabled || !isValidUkPostcode(postcode)) return;
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      let addresses: string[] = [];
+      try {
+        const res = await fetch(`/api/addresses?postcode=${encodeURIComponent(postcode)}`);
+        if (res.ok) {
+          const data = (await res.json()) as { configured: boolean; addresses: string[] };
+          if (data.configured) addresses = data.addresses;
+        }
+      } catch {
+        // Unreachable: the customer types their address instead.
+      }
+      if (!cancelled) setState({ postcode, addresses });
+    }, 250);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [postcode, enabled]);
+  const current = state?.postcode === postcode ? state : null;
+  return { addresses: current?.addresses ?? [], loading: enabled && isValidUkPostcode(postcode) && current === null };
+}
+
+/** Postcode suggestions while typing, from postcodes.io (free, no key). */
+function usePostcodeSuggestions(partial: string) {
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  useEffect(() => {
+    const compact = partial.replace(/\s+/g, "");
+    if (compact.length < 2 || compact.length > 7 || isValidUkPostcode(partial)) {
+      setSuggestions([]);
       return;
     }
     let cancelled = false;
     const timer = setTimeout(async () => {
       try {
-        const res = await fetch(`/api/addresses?postcode=${encodeURIComponent(postcode)}`);
+        const res = await fetch(`https://api.postcodes.io/postcodes/${encodeURIComponent(compact)}/autocomplete?limit=8`);
         if (!res.ok || cancelled) return;
-        const data = (await res.json()) as { configured: boolean; addresses: string[] };
-        if (!cancelled) setAddresses(data.configured ? data.addresses : []);
+        const data = (await res.json()) as { result: string[] | null };
+        if (!cancelled) setSuggestions(data.result ?? []);
       } catch {
-        if (!cancelled) setAddresses([]);
+        if (!cancelled) setSuggestions([]);
       }
-    }, 400);
+    }, 250);
     return () => {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [postcode, enabled]);
-  return addresses;
+  }, [partial]);
+  return suggestions;
 }
 
 export function AddressStep({
@@ -171,16 +205,24 @@ export function AddressStep({
   const formatOk = isValidUkPostcode(postcode);
   const { covered, outcode } = coverageFor(settings.serviceArea, postcode);
   const { inArea, outOfArea, unverified, unknown } = postcodeOutcome(formatOk, check.state, covered);
-  const intelMatches = useIntelAddresses(postcode, inArea);
-  const addresses = useAddressList(postcode, inArea);
-  const [manual, setManual] = useState(false);
+  const postcodeSuggestions = usePostcodeSuggestions(postcode);
+  // Our own database first (free); the paid full list only when it has nothing
+  // for this postcode, or the customer says their home isn't in it.
+  const intel = useIntelAddresses(postcode, inArea);
+  const intelMatches = intel.matches;
+  const [stage, setStage] = useState<{ postcode: string; step: "full" | "manual" } | null>(null);
+  const pickStage = stage?.postcode === postcode ? stage.step : "auto";
+  const wantFull = inArea && ((intel.settled && intelMatches.length === 0) || pickStage === "full");
+  const { addresses, loading: addressesLoading } = useAddressList(postcode, wantFull && pickStage !== "manual");
+  const manual = pickStage === "manual";
   const district = check.state === "found" ? check.geo.district : undefined;
 
   // Optional here (price before personal details): empty is fine, a typo isn't.
   const emailOk = email === "" || EMAIL_RE.test(email);
   const ready = inArea && addressLine.trim().length >= 5 && emailOk;
-  const showIntelPicker = intelMatches.length > 0 && !manual;
+  const showIntelPicker = intelMatches.length > 0 && pickStage === "auto";
   const showPicker = !showIntelPicker && addresses.length > 0 && !manual;
+  const findingAddresses = !showIntelPicker && !manual && (addressesLoading || (inArea && !intel.settled));
 
   const status =
     !formatOk || check.state === "idle"
@@ -224,11 +266,18 @@ export function AddressStep({
             autoCapitalize="characters"
             spellCheck={false}
             placeholder="e.g. SW16 2BE"
+            list={postcodeSuggestions.length > 0 ? "postcode-suggestions" : undefined}
             onChange={(e) => setSurvey({ postcode: e.target.value.toUpperCase() })}
             onBlur={(e) => setSurvey({ postcode: normalisePostcode(e.target.value) })}
           />
         )}
       </TextField>
+
+      <datalist id="postcode-suggestions">
+        {postcodeSuggestions.map((p) => (
+          <option key={p} value={p} />
+        ))}
+      </datalist>
 
       {/* One live region for the whole check: screen readers hear the outcome. */}
       <div id="postcode-status" aria-live="polite" className="-mt-4">
@@ -286,7 +335,7 @@ export function AddressStep({
                   </select>
                   <button
                     type="button"
-                    onClick={() => setManual(true)}
+                    onClick={() => setStage({ postcode, step: "full" })}
                     className="mt-1.5 min-h-10 text-sm font-semibold text-accent-700 underline-offset-2 hover:underline"
                   >
                     My address isn&apos;t listed
@@ -315,7 +364,7 @@ export function AddressStep({
                   </select>
                   <button
                     type="button"
-                    onClick={() => setManual(true)}
+                    onClick={() => setStage({ postcode, step: "manual" })}
                     className="mt-1.5 min-h-10 text-sm font-semibold text-accent-700 underline-offset-2 hover:underline"
                   >
                     My address isn&apos;t listed
@@ -323,6 +372,10 @@ export function AddressStep({
                 </>
               )}
             </TextField>
+          ) : findingAddresses ? (
+            <p className="text-sm text-ink-500" role="status">
+              Finding the addresses at {normalisePostcode(postcode)}…
+            </p>
           ) : (
             <TextField label="Your address" hint="House number and street.">
               {(c) => (
