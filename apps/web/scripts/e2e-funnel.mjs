@@ -83,7 +83,7 @@ try {
   check("price shows before any email field", (await page.locator('input[type="email"]').count()) === 0);
   check("it's called a guide price, confirmed at the survey, with the virtual-survey note", /Guide price/.test(priceScreen) && /Confirmed at your survey/.test(priceScreen) && /virtual survey/i.test(priceScreen));
   check("price screen says what it started from", /Priced for/.test(priceScreen) && /(public records|homes around you|typical home)/.test(priceScreen));
-  check("price screen shows the engine's confidence as its statistic", /Price confidence/.test(priceScreen) && /\d+\/100/.test(priceScreen));
+  check("no confidence score on the guide price", !/confidence/i.test(priceScreen) && !/\d+\/100/.test(priceScreen));
   check("price screen is not a numbered step", !/Step \d of \d/.test(priceScreen));
   const strip = page.locator('[aria-label="Your journey"] li');
   check("journey strip has five steps, price first", (await strip.count()) === 5 && /Price/.test((await strip.first().textContent()) ?? ""));

@@ -4,7 +4,7 @@ import { useId, useMemo } from "react";
 import { generateQuote, type Survey } from "@aircon/domain";
 import { gbp } from "@/lib/format";
 import type { QuoteDraft } from "@/lib/quote-draft";
-import { BAND_COPY, installDurationCopy, vatCopy, type PublicSettings } from "@/components/site/claims";
+import { installDurationCopy, vatCopy, type PublicSettings } from "@/components/site/claims";
 import { TYPE_OPTIONS } from "./steps";
 import { StepShell } from "./ui";
 
@@ -103,19 +103,6 @@ export function PriceStep({
       {!pricing && (
         <>
           <BasicsCard property={survey.property} onAdjust={onAdjust} basis={basis} />
-
-          {/* The one statistic we can stand behind: the engine's own confidence in this price. */}
-          {quote && (
-            <div className="flex items-center justify-between gap-3 rounded-2xl border border-line bg-white px-4 py-3">
-              <div>
-                <p className="text-sm font-semibold text-ink-900">Price confidence</p>
-                <p className="mt-0.5 text-xs text-ink-500">{BAND_COPY[quote.confidence.band].body}</p>
-              </div>
-              <p className={`shrink-0 rounded-full border px-2.5 py-0.5 text-xs font-semibold ${BAND_COPY[quote.confidence.band].tone}`}>
-                {BAND_COPY[quote.confidence.band].label} · {quote.confidence.score}/100
-              </p>
-            </div>
-          )}
 
           {/* Discreet, and the honest version of "fixed": the survey refines it. */}
           <p className="text-xs leading-relaxed text-ink-500">
