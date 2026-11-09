@@ -11,6 +11,7 @@ There are a few ways in. Pick the one that matches what you're trying to do.
 
 | You want to… | Do this | Needs a database? | Runs where? |
 | --- | --- | --- | --- |
+| **Load the real EPC download (the easy way)** | **Upload page** (below) | Yes (Supabase) | Your browser |
 | **Just see how it works** | Demo mode | No | Your machine (`pnpm dev`) |
 | **Load data without touching a terminal** | **GitHub Actions** (below) | Yes (Supabase) | GitHub, one click |
 | **Run the real import pipeline locally** | Sample CSVs → importer | Yes (Supabase) | Your machine |
@@ -19,6 +20,34 @@ There are a few ways in. Pick the one that matches what you're trying to do.
 **Don't want to run any commands yourself?** Jump to
 [Automatic loading with GitHub Actions](#automatic-loading-with-github-actions) —
 it does the whole import + recompute for you from the Actions tab.
+
+---
+
+## Upload the EPC download in the browser (start here for real data)
+
+The government's EPC open data moved in 2026 from epc.opendatacommunities.org
+(retired 30 May 2026) to
+[Get energy performance of buildings data](https://get-energy-performance-data.communities.gov.uk/).
+Its domestic download is a zip of one CSV per year (`certificates-2008.csv`
+to the latest, about 8.6 GB unzipped).
+
+1. Sign in there with GOV.UK One Login and download the **domestic** data.
+2. Double-click the zip to unzip it.
+3. In the app: **Property intelligence → Import EPC data**
+   (`/ops/intel/import`, admins only). Choose all the year files at once,
+   check the outcodes (it starts with your service area), press **Import**,
+   and keep the tab open.
+
+The browser reads the files on your own computer (about 2 minutes for the
+whole country's files on a recent laptop) and sends only the rows in your
+outcodes, 500 at a time. Each home keeps its newest certificate whichever
+order the years arrive in, and planning, constraints, audits and campaigns
+already on a record survive. Homes are scored as they're saved, so there's
+no Recompute to press. Running it again is safe.
+
+> **The GitHub Actions `epc-api` source and `scripts/fetch-epc.mjs` still
+> call the retired API**, so they fail until they're moved to the new
+> service's API. Use the upload page meanwhile.
 
 ---
 

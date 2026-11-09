@@ -7,7 +7,7 @@ import {
   getArchetype,
 } from "@aircon/domain";
 import { gbp } from "@/lib/format";
-import { queryIntel, type IntelFilters, type IntelRow } from "@/lib/intel-server";
+import { countProperties, queryIntel, type IntelFilters, type IntelRow } from "@/lib/intel-server";
 import { getServiceClient } from "@/lib/supabase-server";
 import { recomputeAction, seedSampleBookAction, tagCampaignAction } from "./actions";
 import { requireStaff } from "@/lib/auth/server";
@@ -62,10 +62,12 @@ export default async function OpsIntelPage({ searchParams }: { searchParams: Pro
   const filters = readFilters(sp);
   const demo = !getServiceClient();
 
-  const [rows, everything] = await Promise.all([
+  const [rows, everything, total] = await Promise.all([
     queryIntel(filters),
-    queryIntel({}), // whole-book coverage stats
+    queryIntel({}), // whole-book coverage stats (up to the first 5,000 homes)
+    countProperties(), // the true size of the book; null in demo mode
   ]);
+  const bookSize = total ?? everything.length;
 
   const audited = everything.filter((r) => r.audited).length;
   const withArchetype = everything.filter((r) => r.archetype_id).length;
@@ -83,7 +85,7 @@ export default async function OpsIntelPage({ searchParams }: { searchParams: Pro
   const outcodes = [...new Set(everything.map((r) => r.outcode))].sort();
   const bc = businessCase(rows.length);
   const qs = filterQuery(filters);
-  const connectedButEmpty = !demo && everything.length === 0;
+  const connectedButEmpty = !demo && bookSize === 0;
   const canSeedSample = await demoModeAllowed();
 
   return (
@@ -98,6 +100,14 @@ export default async function OpsIntelPage({ searchParams }: { searchParams: Pro
           </p>
         </div>
         <div className="flex items-center gap-3">
+          {!demo && (
+            <Link
+              href="/ops/intel/import"
+              className="rounded-full bg-accent-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-accent-700"
+            >
+              Import EPC data
+            </Link>
+          )}
           <form action={recomputeAction}>
             <button className="rounded-full border border-line px-4 py-2 text-sm font-semibold text-ink-700 transition hover:bg-surface">
               Recompute scores
@@ -118,8 +128,11 @@ export default async function OpsIntelPage({ searchParams }: { searchParams: Pro
           <p className="mt-1 text-sm text-amber-700">
             The database is connected but the <code>properties</code> table is empty — that&apos;s
             why this reads 0. The SW16/SW17 sample homes you may have seen before only appear in
-            demo mode (no database). Seed the sample book to explore the tools now, or run the EPC
-            importer (see <code>docs/property-intelligence.md</code>) for the real thing.
+            demo mode (no database). Seed the sample book to explore the tools now, or{" "}
+            <Link href="/ops/intel/import" className="font-semibold underline">
+              import the EPC data
+            </Link>{" "}
+            for the real thing.
           </p>
           {canSeedSample ? (
             <form action={seedSampleBookAction} className="mt-3">
@@ -137,7 +150,11 @@ export default async function OpsIntelPage({ searchParams }: { searchParams: Pro
 
       {/* Coverage */}
       <div className="grid gap-3 sm:grid-cols-4">
-        <Stat label="Properties" value={everything.length.toLocaleString("en-GB")} />
+        <Stat
+          label="Properties"
+          value={bookSize.toLocaleString("en-GB")}
+          hint={bookSize > everything.length ? `Stats below cover the first ${everything.length.toLocaleString("en-GB")}` : undefined}
+        />
         <Stat
           label="Classified"
           value={`${everything.length ? Math.round((withArchetype / everything.length) * 100) : 0}%`}

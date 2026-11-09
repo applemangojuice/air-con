@@ -120,8 +120,11 @@ export async function addressesForPostcode(
     .select("id, address_line")
     .in("postcode", [clean, spaced])
     .order("address_line")
-    .limit(60);
-  return (data ?? []).map((r) => ({ id: r.id, line1: r.address_line }));
+    .limit(200);
+  // House numbers in number order (2 before 10), as people expect in a picker.
+  return (data ?? [])
+    .map((r) => ({ id: r.id, line1: r.address_line }))
+    .sort((a, b) => a.line1.localeCompare(b.line1, "en", { numeric: true }));
 }
 
 /* ------------------------------------------------------------------ */
