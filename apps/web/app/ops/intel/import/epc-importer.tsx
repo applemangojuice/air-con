@@ -18,6 +18,14 @@ import {
   type EpcRow,
 } from "@/lib/epc-import";
 import { listZipEntries, openZipEntry, readZipEntryFirstLine, zipEntryProblem } from "@/lib/zip-reader";
+import {
+  FREE_PLAN_BYTES,
+  LONDON_AREAS,
+  LondonTally,
+  areaOf,
+  formatBytes,
+  type DistrictCount,
+} from "@/lib/epc-scan";
 
 /* ------------------------------------------------------------------ */
 /* What gets read: the CSVs inside a zip, or CSV files chosen directly */
@@ -187,7 +195,7 @@ async function sendBatch(
 /* The page                                                            */
 /* ------------------------------------------------------------------ */
 
-type Phase = "idle" | "checking" | "ready" | "running" | "paused" | "done" | "failed";
+type Phase = "idle" | "checking" | "ready" | "counting" | "counted" | "running" | "paused" | "done" | "failed";
 
 interface Progress {
   partIndex: number;
@@ -234,24 +242,86 @@ function duration(seconds: number): string {
   return m < 90 ? `about ${m} minutes` : `about ${(m / 60).toFixed(1)} hours`;
 }
 
-export function EpcImporter({ defaultOutcodes }: { defaultOutcodes: string }) {
+/** The count, kept in this browser per download: which files are counted, and the tally so far. */
+interface SavedCount {
+  done: string[];
+  tally: ReturnType<LondonTally["toJSON"]>;
+  complete: boolean;
+}
+const countKey = (files: File[]) => runKey(files).replace(/^epc-import:/, "epc-count:");
+function loadCount(key: string): SavedCount | null {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as SavedCount) : null;
+  } catch {
+    return null;
+  }
+}
+function saveCount(key: string, value: SavedCount) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // No room or private browsing: counting still works, it just can't pick up after a stop.
+  }
+}
+
+/** Read one part start to finish, handing each piece of text to `take`. */
+async function readPart(
+  part: Part,
+  stopped: () => boolean,
+  onBytes: (partBytes: number) => void,
+  take: (text: string) => Promise<void> | void,
+) {
+  let partBytes = 0;
+  const reader = (
+    await part.open((n) => {
+      partBytes += n;
+    })
+  ).getReader();
+  const decoder = new TextDecoder("utf-8");
+  try {
+    for (;;) {
+      if (stopped()) throw new StopImport();
+      const { value, done } = await reader.read();
+      if (done) break;
+      await take(decoder.decode(value, { stream: true }));
+      onBytes(partBytes);
+    }
+  } finally {
+    await reader.cancel().catch(() => {});
+  }
+  await take(decoder.decode());
+}
+
+export function EpcImporter({ defaultOutcodes, bookSize }: { defaultOutcodes: string; bookSize: number | null }) {
+  const serviceArea = parseOutcodes(defaultOutcodes);
   const [files, setFiles] = useState<File[]>([]);
   const [parts, setParts] = useState<Part[]>([]);
   const [check, setCheck] = useState<{ found: string[]; missing: string[]; skipped: string[] } | null>(null);
-  const [outcodeText, setOutcodeText] = useState(defaultOutcodes);
+  const [districts, setDistricts] = useState<DistrictCount[] | null>(null);
+  const [countSoFar, setCountSoFar] = useState<SavedCount | null>(null);
+  const [ticked, setTicked] = useState<string[]>(serviceArea);
+  // Which area sections start open (those with ticks when the list appears); after that they stay as the admin leaves them.
+  const [openAtStart, setOpenAtStart] = useState<Set<string>>(new Set());
+  const showDistricts = (list: DistrictCount[], ticks: string[]) => {
+    setDistricts(list);
+    setTicked(ticks);
+    setOpenAtStart(new Set(ticks.map(areaOf)));
+  };
   const [phase, setPhase] = useState<Phase>("idle");
+  const [mode, setMode] = useState<"count" | "save">("count");
   const [progress, setProgress] = useState<Progress>(EMPTY);
   const [message, setMessage] = useState<string | null>(null);
   const [waitNote, setWaitNote] = useState<string | null>(null);
   const [saved, setSaved] = useState<SavedRun | null>(null);
   const stopRef = useRef(false);
 
-  const outcodes = parseOutcodes(outcodeText);
-  const busy = phase === "checking" || phase === "running";
+  const outcodes = [...ticked].sort((a, b) => a.localeCompare(b, "en", { numeric: true }));
+  const busy = phase === "checking" || phase === "counting" || phase === "running";
 
-  // Warn before closing the tab mid-import (it would resume, but why lose the time).
+  // Warn before closing the tab mid-way (it would resume, but why lose the time).
   useEffect(() => {
-    if (phase !== "running") return;
+    if (phase !== "running" && phase !== "counting") return;
     const warn = (e: BeforeUnloadEvent) => {
       e.preventDefault();
     };
@@ -259,9 +329,9 @@ export function EpcImporter({ defaultOutcodes }: { defaultOutcodes: string }) {
     return () => window.removeEventListener("beforeunload", warn);
   }, [phase]);
 
-  // Keep the screen (and so the laptop) awake while importing, where the browser allows it.
+  // Keep the screen (and so the laptop) awake while working, where the browser allows it.
   useEffect(() => {
-    if (phase !== "running" || !("wakeLock" in navigator)) return;
+    if ((phase !== "running" && phase !== "counting") || !("wakeLock" in navigator)) return;
     let lock: { release: () => Promise<void> } | null = null;
     const take = async () => {
       try {
@@ -281,11 +351,13 @@ export function EpcImporter({ defaultOutcodes }: { defaultOutcodes: string }) {
     };
   }, [phase]);
 
-  /** Read every file's columns before anything is sent, so a wrong file fails in seconds, not an hour in. */
+  /** Read every file's columns before anything else, so a wrong file fails in seconds, not an hour in. */
   async function choose(chosen: File[]) {
     setFiles(chosen);
     setParts([]);
     setCheck(null);
+    setDistricts(null);
+    setCountSoFar(null);
     setProgress(EMPTY);
     setMessage(null);
     setWaitNote(null);
@@ -322,16 +394,112 @@ export function EpcImporter({ defaultOutcodes }: { defaultOutcodes: string }) {
         skipped: skipped.sort((a, b) => a.localeCompare(b, "en", { numeric: true })),
       });
       setParts(found);
+
       const run = loadRun(runKey(chosen));
       setSaved(run);
-      if (run?.outcodes) setOutcodeText(run.outcodes);
-      setPhase("ready");
+      const counted = loadCount(countKey(chosen));
+      setCountSoFar(counted);
+      if (counted?.complete) {
+        const list = LondonTally.fromJSON(counted.tally).districts();
+        const seen = new Set(list.map((d) => d.outcode));
+        showDistricts(list, run?.outcodes ? parseOutcodes(run.outcodes) : serviceArea.filter((o) => seen.has(o)));
+        setPhase("counted");
+      } else {
+        if (run?.outcodes) setTicked(parseOutcodes(run.outcodes));
+        setPhase("ready");
+      }
     } catch (err) {
       setPhase("failed");
       setMessage(err instanceof Error ? err.message : String(err));
     }
   }
 
+  function startProgress(doneKeys: string[]) {
+    const doneBytes = parts.filter((x) => doneKeys.includes(x.key)).reduce((n, x) => n + x.size, 0);
+    return {
+      ...EMPTY,
+      partCount: parts.length,
+      bytesTotal: parts.reduce((n, x) => n + x.size, 0),
+      bytesDone: doneBytes,
+      startedAt: Date.now(),
+      bytesAtStart: doneBytes,
+    };
+  }
+
+  /** Step 2: count homes per London district, saving nothing. */
+  async function count(fresh: boolean) {
+    const key = countKey(files);
+    const prior = fresh ? null : loadCount(key);
+    const state: SavedCount = prior && !prior.complete ? prior : { done: [], tally: new LondonTally().toJSON(), complete: false };
+    const total = LondonTally.fromJSON(state.tally);
+    stopRef.current = false;
+    setMode("count");
+    setMessage(null);
+    setPhase("counting");
+    const stopped = () => stopRef.current;
+    const p: Progress = startProgress(state.done);
+    let lastPaint = 0;
+    const paint = (force = false) => {
+      const now = Date.now();
+      if (force || now - lastPaint > 250) {
+        lastPaint = now;
+        setProgress({ ...p });
+      }
+    };
+    try {
+      for (const [index, part] of parts.entries()) {
+        p.partIndex = index + 1;
+        p.partLabel = part.label;
+        if (state.done.includes(part.key)) continue;
+        paint(true);
+        const partTally = new LondonTally();
+        const columns = mapEpcColumns(splitCsvRecord(await part.firstLine()));
+        // Every row passes through here and is counted, never kept: nothing builds up in memory.
+        const csv = new CsvRecordStream((raw) => {
+          if (partTally.addRow(raw, columns)) p.matched++;
+          return false;
+        });
+        const partStart = p.bytesDone;
+        await readPart(
+          part,
+          stopped,
+          (b) => {
+            p.bytesDone = partStart + b;
+            paint();
+          },
+          (text) => {
+            p.scanned += csv.push(text).scanned;
+          },
+        );
+        p.scanned += csv.end().scanned;
+        total.merge(partTally);
+        state.done.push(part.key);
+        state.tally = total.toJSON();
+        saveCount(key, state);
+        p.bytesDone = partStart + part.size;
+        paint(true);
+      }
+      state.complete = true;
+      saveCount(key, state);
+      const list = total.districts();
+      setCountSoFar(state);
+      const seen = new Set(list.map((d) => d.outcode));
+      showDistricts(list, ticked.filter((o) => seen.has(o)));
+      setPhase("counted");
+    } catch (err) {
+      paint(true);
+      setCountSoFar(loadCount(key));
+      if (err instanceof StopImport) {
+        setPhase("ready");
+        setMessage("Counting stopped. Press Resume counting to carry on from the file it was on.");
+      } else {
+        setPhase("failed");
+        setMessage(err instanceof Error ? err.message : String(err));
+      }
+    }
+  }
+
+  /** Step 3: save the ticked districts' homes to the database. */
   async function run(fresh: boolean) {
     const key = runKey(files);
     if (fresh) clearRun(key);
@@ -343,6 +511,7 @@ export function EpcImporter({ defaultOutcodes }: { defaultOutcodes: string }) {
     setSaved(state);
 
     stopRef.current = false;
+    setMode("save");
     setMessage(null);
     setWaitNote(null);
     setPhase("running");
@@ -352,17 +521,7 @@ export function EpcImporter({ defaultOutcodes }: { defaultOutcodes: string }) {
     // need not be sent at all. (After a resume this starts empty; the server still keeps
     // the newest, it just does more of the checking.)
     const newestSent = new Map<string, string>();
-    const doneBytes = parts.filter((p) => state.done.includes(p.key)).reduce((n, p) => n + p.size, 0);
-    const p: Progress = {
-      ...EMPTY,
-      partCount: parts.length,
-      bytesTotal: parts.reduce((n, x) => n + x.size, 0),
-      bytesDone: doneBytes,
-      saved: state.totals.saved,
-      older: state.totals.older,
-      startedAt: Date.now(),
-      bytesAtStart: doneBytes,
-    };
+    const p: Progress = { ...startProgress(state.done), saved: state.totals.saved, older: state.totals.older };
     let lastPaint = 0;
     const paint = (force = false) => {
       const now = Date.now();
@@ -425,26 +584,15 @@ export function EpcImporter({ defaultOutcodes }: { defaultOutcodes: string }) {
         };
 
         const partStart = p.bytesDone;
-        let partBytes = 0;
-        const reader = (
-          await part.open((n) => {
-            partBytes += n;
-          })
-        ).getReader();
-        const decoder = new TextDecoder("utf-8");
-        try {
-          for (;;) {
-            if (stopped()) throw new StopImport();
-            const { value, done } = await reader.read();
-            if (done) break;
-            await take(csv.push(decoder.decode(value, { stream: true })));
-            p.bytesDone = partStart + partBytes;
+        await readPart(
+          part,
+          stopped,
+          (b) => {
+            p.bytesDone = partStart + b;
             paint();
-          }
-        } finally {
-          await reader.cancel().catch(() => {});
-        }
-        await take(csv.push(decoder.decode()));
+          },
+          (text) => take(csv.push(text)),
+        );
         await take(csv.end());
         await flush();
 
@@ -484,11 +632,28 @@ export function EpcImporter({ defaultOutcodes }: { defaultOutcodes: string }) {
   const gb = (b: number) => `${(b / 1e9).toFixed(b < 1e9 ? 2 : 1)} GB`;
   const resumable = saved && (saved.done.length > 0 || saved.partial) && phase !== "running";
   const totalBytes = files.reduce((t, f) => t + f.size, 0);
+  const countResumable = countSoFar && !countSoFar.complete && countSoFar.done.length > 0 && phase !== "counting";
+
+  const tickedSet = new Set(ticked);
+  const tickedRows = (districts ?? []).filter((d) => tickedSet.has(d.outcode));
+  const tickedHomes = tickedRows.reduce((t, d) => t + d.homes, 0);
+  const tickedBytes = tickedRows.reduce((t, d) => t + d.bytes, 0);
+  const byArea = LONDON_AREAS.map((a) => ({ ...a, rows: (districts ?? []).filter((d) => areaOf(d.outcode) === a.area) })).filter(
+    (a) => a.rows.length > 0,
+  );
+  const setTick = (outcode: string, on: boolean) =>
+    setTicked((t) => (on ? [...new Set([...t, outcode])] : t.filter((o) => o !== outcode)));
+  const setTicks = (list: string[], on: boolean) =>
+    setTicked((t) => (on ? [...new Set([...t, ...list])] : t.filter((o) => !list.includes(o))));
+  const showProgress =
+    phase === "counting" || phase === "running" || phase === "paused" || phase === "done" || (phase === "failed" && progress.partCount > 0) ||
+    (phase === "ready" && progress.partCount > 0);
+  const lockTicks = busy || phase === "paused";
 
   return (
     <section className="mt-6 space-y-5 rounded-2xl border border-line p-5">
       <label className="block">
-        <span className="text-sm font-semibold">The EPC download</span>
+        <span className="text-sm font-semibold">1. The EPC download</span>
         <span className="block text-sm text-ink-500">
           The zip as you downloaded it (no need to unzip it), or the CSV files if you&apos;ve unzipped them.
         </span>
@@ -535,81 +700,232 @@ export function EpcImporter({ defaultOutcodes }: { defaultOutcodes: string }) {
         </div>
       )}
 
-      <label className="block">
-        <span className="text-sm font-semibold">Postcodes to keep</span>
-        <span className="block text-sm text-ink-500">
-          The start of the postcode (the outcode), separated by commas. Starts as your service area.
-        </span>
-        <input
-          className="mt-1.5 w-full rounded-xl border border-line px-3 py-2 text-sm uppercase"
-          value={outcodeText}
-          disabled={busy || phase === "paused"}
-          onChange={(e) => setOutcodeText(e.target.value)}
-        />
-        <span className="mt-1 block text-sm text-ink-500">
-          {outcodes.length > 0 ? `Keeping ${outcodes.length}: ${outcodes.join(", ")}` : "Add at least one outcode, like SW16."}
-        </span>
-      </label>
-
-      {resumable && (
-        <p className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-          This download was part-imported before: {saved!.done.length} of {parts.length || "its"} files done
-          {saved!.totals.saved ? `, ${n(saved!.totals.saved)} homes saved` : ""}. Resume carries on from there.
-        </p>
+      {parts.length > 0 && !districts && (
+        <div className="space-y-2">
+          <p className="text-sm font-semibold">2. Count the homes in each London postcode</p>
+          <p className="text-sm text-ink-500">
+            Reads every certificate once (a few minutes) and saves nothing. You then tick which postcodes to save.
+          </p>
+          <div className="flex flex-wrap gap-3">
+            {countResumable ? (
+              <>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void count(false)}
+                  className="rounded-full bg-accent-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-accent-700 disabled:opacity-50"
+                >
+                  Resume counting ({countSoFar!.done.length} of {parts.length} files done)
+                </button>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void count(true)}
+                  className="rounded-full border border-line px-5 py-2 text-sm font-semibold text-ink-700 disabled:opacity-50"
+                >
+                  Count from the beginning
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void count(true)}
+                className="rounded-full bg-accent-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-accent-700 disabled:opacity-50"
+              >
+                Count the homes
+              </button>
+            )}
+            {phase === "counting" && (
+              <button
+                type="button"
+                onClick={() => {
+                  stopRef.current = true;
+                }}
+                className="rounded-full border border-line px-5 py-2 text-sm font-semibold text-ink-700"
+              >
+                Stop
+              </button>
+            )}
+          </div>
+        </div>
       )}
 
-      <div className="flex flex-wrap gap-3">
-        {resumable ? (
-          <>
+      {districts && (
+        <div className="space-y-3">
+          <p className="text-sm font-semibold">2. Tick the postcodes to save</p>
+          <div
+            className={`rounded-2xl border p-4 text-sm ${tickedBytes > FREE_PLAN_BYTES * 0.6 ? "border-amber-200 bg-amber-50 text-amber-900" : "border-line bg-surface text-ink-800"}`}
+          >
+            <p className="font-semibold">
+              Ticked: {outcodes.length} postcode{outcodes.length === 1 ? "" : "s"}, about {n(tickedHomes)} homes, about{" "}
+              {formatBytes(tickedBytes)} of database space.
+            </p>
+            <p className="mt-1">
+              {bookSize !== null ? `Your book has ${n(bookSize)} homes now. ` : ""}
+              Supabase&apos;s free plan has {formatBytes(FREE_PLAN_BYTES)} for everything
+              {tickedBytes > FREE_PLAN_BYTES * 0.6
+                ? ": this is more than the free plan comfortably holds. Tick fewer postcodes, or move to Pro (8 GB) first."
+                : ", so this fits."}
+            </p>
+            <p className="mt-1 text-ink-500">
+              Home counts are estimates (within a few percent); certificate counts are exact. Homes already in the book are
+              updated, not added twice.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2 text-sm">
             <button
               type="button"
-              disabled={parts.length === 0 || outcodes.length === 0}
-              onClick={() => void run(false)}
-              className="rounded-full bg-accent-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-accent-700 disabled:opacity-50"
+              disabled={lockTicks}
+              onClick={() => setTicked(serviceArea.filter((o) => districts.some((d) => d.outcode === o)))}
+              className="rounded-full border border-line px-3 py-1.5 font-semibold text-ink-700 disabled:opacity-50"
             >
-              Resume
+              Just my service area
             </button>
             <button
               type="button"
-              disabled={parts.length === 0 || outcodes.length === 0}
-              onClick={() => void run(true)}
-              className="rounded-full border border-line px-5 py-2 text-sm font-semibold text-ink-700 disabled:opacity-50"
+              disabled={lockTicks}
+              onClick={() => setTicked(districts.map((d) => d.outcode))}
+              className="rounded-full border border-line px-3 py-1.5 font-semibold text-ink-700 disabled:opacity-50"
             >
-              Start again from the beginning
+              All of London
             </button>
-          </>
-        ) : (
-          <button
-            type="button"
-            disabled={busy || parts.length === 0 || outcodes.length === 0}
-            onClick={() => void run(true)}
-            className="rounded-full bg-accent-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-accent-700 disabled:opacity-50"
-          >
-            {phase === "done" ? "Import again" : "Import"}
-          </button>
-        )}
-        {phase === "running" && (
-          <button
-            type="button"
-            onClick={() => {
-              stopRef.current = true;
-            }}
-            className="rounded-full border border-line px-5 py-2 text-sm font-semibold text-ink-700"
-          >
-            Stop
-          </button>
-        )}
-      </div>
+            <button
+              type="button"
+              disabled={lockTicks}
+              onClick={() => setTicked([])}
+              className="rounded-full border border-line px-3 py-1.5 font-semibold text-ink-700 disabled:opacity-50"
+            >
+              Clear
+            </button>
+          </div>
+          <div className="divide-y divide-line rounded-2xl border border-line">
+            {byArea.map((a) => {
+              const list = a.rows.map((r) => r.outcode);
+              const on = list.filter((o) => tickedSet.has(o)).length;
+              const homes = a.rows.reduce((t, r) => t + r.homes, 0);
+              return (
+                <details key={a.area} open={openAtStart.has(a.area)} className="group">
+                  <summary className="flex cursor-pointer flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 text-sm">
+                    <input
+                      type="checkbox"
+                      aria-label={`All of ${a.area}`}
+                      disabled={lockTicks}
+                      checked={on === list.length}
+                      ref={(el) => {
+                        if (el) el.indeterminate = on > 0 && on < list.length;
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) => setTicks(list, e.target.checked)}
+                    />
+                    <span className="font-semibold">
+                      {a.area} · {a.name}
+                    </span>
+                    <span className="text-ink-500">
+                      {list.length} postcode{list.length === 1 ? "" : "s"}, about {n(homes)} homes
+                      {a.outer ? " (also reaches beyond Greater London)" : ""}
+                    </span>
+                    {on > 0 && <span className="text-accent-700">{on} ticked</span>}
+                  </summary>
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-ink-500">
+                        <th className="w-10 px-4 py-1" />
+                        <th className="py-1 font-medium">Postcode</th>
+                        <th className="py-1 text-right font-medium">Homes</th>
+                        <th className="py-1 text-right font-medium">Certificates</th>
+                        <th className="px-4 py-1 text-right font-medium">Space</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {a.rows.map((r) => (
+                        <tr key={r.outcode} className="border-t border-line/60">
+                          <td className="px-4 py-1">
+                            <input
+                              type="checkbox"
+                              aria-label={r.outcode}
+                              disabled={lockTicks}
+                              checked={tickedSet.has(r.outcode)}
+                              onChange={(e) => setTick(r.outcode, e.target.checked)}
+                            />
+                          </td>
+                          <td className="py-1 font-medium">{r.outcode}</td>
+                          <td className="py-1 text-right tabular-nums">{n(r.homes)}</td>
+                          <td className="py-1 text-right tabular-nums text-ink-500">{n(r.certificates)}</td>
+                          <td className="px-4 py-1 text-right tabular-nums text-ink-500">{formatBytes(r.bytes)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </details>
+              );
+            })}
+          </div>
 
-      {(phase === "running" || phase === "paused" || phase === "done" || (phase === "failed" && progress.partCount > 0)) && (
+          <p className="pt-2 text-sm font-semibold">3. Save them to the database</p>
+          {resumable && (
+            <p className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+              Saving was part-done before: {saved!.done.length} of {parts.length} files done
+              {saved!.totals.saved ? `, ${n(saved!.totals.saved)} homes saved` : ""} for {saved!.outcodes}. Resume carries on
+              from there.
+            </p>
+          )}
+          <div className="flex flex-wrap gap-3">
+            {resumable ? (
+              <>
+                <button
+                  type="button"
+                  disabled={outcodes.length === 0}
+                  onClick={() => void run(false)}
+                  className="rounded-full bg-accent-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-accent-700 disabled:opacity-50"
+                >
+                  Resume saving
+                </button>
+                <button
+                  type="button"
+                  disabled={outcodes.length === 0}
+                  onClick={() => void run(true)}
+                  className="rounded-full border border-line px-5 py-2 text-sm font-semibold text-ink-700 disabled:opacity-50"
+                >
+                  Save the ticked postcodes from the beginning
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                disabled={busy || outcodes.length === 0}
+                onClick={() => void run(true)}
+                className="rounded-full bg-accent-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-accent-700 disabled:opacity-50"
+              >
+                {outcodes.length === 0
+                  ? "Tick at least one postcode"
+                  : `Save ${outcodes.length} postcode${outcodes.length === 1 ? "" : "s"} (about ${n(tickedHomes)} homes)`}
+              </button>
+            )}
+            {phase === "running" && (
+              <button
+                type="button"
+                onClick={() => {
+                  stopRef.current = true;
+                }}
+                className="rounded-full border border-line px-5 py-2 text-sm font-semibold text-ink-700"
+              >
+                Stop
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {showProgress && (
         <div role="status" aria-live="polite" className="space-y-2">
           <div className="flex items-baseline justify-between text-sm">
             <span className="font-semibold">
-              {phase === "done" ? "Done" : `${Math.floor(pct)}%`}
+              {phase === "done" ? "Done" : `${mode === "count" ? "Counting" : "Saving"}: ${Math.floor(pct)}%`}
             </span>
             <span className="text-ink-500">
               {gb(progress.bytesDone)} of {gb(progress.bytesTotal)} read
-              {phase === "running" && duration(remaining) ? ` · ${duration(remaining)} left` : ""}
+              {(phase === "running" || phase === "counting") && duration(remaining) ? ` · ${duration(remaining)} left` : ""}
             </span>
           </div>
           <div className="h-3 overflow-hidden rounded-full bg-surface" aria-hidden>
@@ -627,17 +943,21 @@ export function EpcImporter({ defaultOutcodes }: { defaultOutcodes: string }) {
               <dd className="font-semibold">{n(progress.scanned)}</dd>
             </div>
             <div>
-              <dt className="text-ink-500">In your postcodes</dt>
+              <dt className="text-ink-500">{mode === "count" ? "In London" : "In your postcodes"}</dt>
               <dd className="font-semibold">{n(progress.matched)}</dd>
             </div>
-            <div>
-              <dt className="text-ink-500">Homes saved or updated</dt>
-              <dd className="font-semibold">{n(progress.saved)}</dd>
-            </div>
-            <div>
-              <dt className="text-ink-500">Older certificates skipped</dt>
-              <dd className="font-semibold">{n(progress.older)}</dd>
-            </div>
+            {mode === "save" && (
+              <>
+                <div>
+                  <dt className="text-ink-500">Homes saved or updated</dt>
+                  <dd className="font-semibold">{n(progress.saved)}</dd>
+                </div>
+                <div>
+                  <dt className="text-ink-500">Older certificates skipped</dt>
+                  <dd className="font-semibold">{n(progress.older)}</dd>
+                </div>
+              </>
+            )}
           </dl>
         </div>
       )}
@@ -656,7 +976,8 @@ export function EpcImporter({ defaultOutcodes }: { defaultOutcodes: string }) {
           <Link href="/ops/intel" className="font-semibold text-accent-700 hover:underline">
             See the book →
           </Link>{" "}
-          Homes are scored as they&apos;re saved, so there&apos;s no need to press Recompute.
+          Homes are scored as they&apos;re saved, so there&apos;s no need to press Recompute. To add more postcodes later,
+          choose the same zip again: the counts are remembered.
         </p>
       )}
     </section>

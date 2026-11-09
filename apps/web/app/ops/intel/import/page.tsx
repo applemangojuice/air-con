@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { requireStaff } from "@/lib/auth/server";
 import { getSettings } from "@/lib/settings-server";
 import { getServiceClient } from "@/lib/supabase-server";
+import { countProperties } from "@/lib/intel-server";
 import { EpcImporter } from "./epc-importer";
 
 export const metadata: Metadata = { title: "Import EPC data" };
@@ -11,6 +12,7 @@ export default async function EpcImportPage() {
   await requireStaff("settings.edit");
   const settings = await getSettings();
   const connected = Boolean(getServiceClient());
+  const bookSize = connected ? await countProperties() : null;
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
@@ -43,16 +45,18 @@ export default async function EpcImportPage() {
           bigger). Unzipped CSV files work too.
         </li>
         <li>
-          It checks every file&apos;s columns first, in a few seconds. Then check the postcodes and press Import.
+          It checks every file&apos;s columns in a few seconds, then counts the homes in each London postcode (a few
+          minutes, nothing saved yet).
         </li>
+        <li>Tick the postcodes you want: it shows how many homes and how much database space they take. Then save.</li>
         <li>
           Keep this tab open and the laptop plugged in. If it stops (sleep, Wi-Fi, closing the tab), choose the same
-          zip again and press Resume: it carries on where it left off.
+          zip again: counting and saving both pick up where they left off.
         </li>
       </ol>
 
       {connected ? (
-        <EpcImporter defaultOutcodes={settings.serviceArea.outcodes.join(", ")} />
+        <EpcImporter defaultOutcodes={settings.serviceArea.outcodes.join(", ")} bookSize={bookSize} />
       ) : (
         <p className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
           No database is connected, so there&apos;s nowhere to save the homes. Connect Supabase first (see

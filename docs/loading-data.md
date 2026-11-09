@@ -36,8 +36,16 @@ to the latest, about 8.6 GB unzipped).
    (`/ops/intel/import`, admins only). Choose **the zip as downloaded**
    (don't unzip it: it's several times bigger unzipped; unzipped CSVs work
    too). It reads every file's columns first, in seconds, and stops there if
-   anything is wrong. Check the outcodes (it starts with your service area),
-   press **Import**, and keep the tab open.
+   anything is wrong.
+3. **Count the homes.** One pass over every certificate (a few minutes,
+   nothing saved) lists each London postcode district grouped by area, with
+   its homes (estimated within a few percent), certificates (exact) and the
+   database space they'd take (about 1.6 KB a home). The count is kept in the
+   browser for that zip, so it isn't repeated, and a stopped count resumes.
+4. **Tick and save.** Your service area starts ticked ("All of London" and
+   "Clear" are there too); the running total shows the space against the free
+   plan's 500 MB. **Save** writes only the ticked districts. Keep the tab open.
+   To add districts later, choose the same zip again, tick more, and save.
 
 The 2026 download holds 38 files: `certificates-YEAR.csv` (2008 to the
 latest, about 28 GB unzipped, the same 93 lower-case columns each) and
