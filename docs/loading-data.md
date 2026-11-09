@@ -32,15 +32,20 @@ Its domestic download is a zip of one CSV per year (`certificates-2008.csv`
 to the latest, about 8.6 GB unzipped).
 
 1. Sign in there with GOV.UK One Login and download the **domestic** data.
-2. Double-click the zip to unzip it.
-3. In the app: **Property intelligence → Import EPC data**
-   (`/ops/intel/import`, admins only). Choose all the year files at once,
-   check the outcodes (it starts with your service area), press **Import**,
-   and keep the tab open.
+2. In the app: **Property intelligence → Import EPC data**
+   (`/ops/intel/import`, admins only). Choose **the zip as downloaded**
+   (don't unzip it: it's several times bigger unzipped; unzipped CSVs work
+   too). It reads every file's columns first, in seconds, and stops there if
+   anything is wrong. Check the outcodes (it starts with your service area),
+   press **Import**, and keep the tab open.
 
-The browser reads the files on your own computer (about 2 minutes for the
-whole country's files on a recent laptop) and sends only the rows in your
-outcodes, 500 at a time. Each home keeps its newest certificate whichever
+The browser reads the CSVs straight out of the zip on your own computer
+(ZIP64, stored and deflate entries; tested at about 170 MB a second of
+unzipped data in Chromium) and sends only the rows in your outcodes, 500 at a
+time. A dropped connection or a busy server is retried until it gets through.
+If it stops (Stop, sleep, a closed tab, a sign-out), choose the same zip again
+and press **Resume**: the browser remembers which year files are done and how
+many rows of the current one the server has, so nothing is sent twice. Each home keeps its newest certificate whichever
 order the years arrive in, and planning, constraints, audits and campaigns
 already on a record survive. Homes are scored as they're saved, so there's
 no Recompute to press. Running it again is safe.

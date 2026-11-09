@@ -19,9 +19,9 @@ export default async function EpcImportPage() {
       </Link>
       <h1 className="mt-3 text-2xl font-display">Import EPC data</h1>
       <p className="mt-2 text-sm text-ink-600">
-        Load the government&apos;s energy certificate files into the book. Your browser reads them on this
-        computer and sends only the homes in the postcodes below, so the full download (gigabytes) never leaves
-        your laptop. Each home keeps its newest certificate, and anything we&apos;ve learned about a home
+        Load the government&apos;s energy certificate download into the book. Your browser reads it on this
+        computer, straight out of the zip, and sends only the homes in the postcodes below: the gigabytes never
+        leave your laptop and nothing is unzipped to disk. Each home keeps its newest certificate, and anything we&apos;ve learned about a home
         (audits, planning, campaigns) is kept.
       </p>
 
@@ -38,9 +38,17 @@ export default async function EpcImportPage() {
           </a>{" "}
           (sign in with GOV.UK One Login).
         </li>
-        <li>Double-click the zip to unzip it. You get one file per year, certificates-2008.csv to the latest.</li>
-        <li>Choose all of them below (click the first, then Cmd+A), check the postcodes, and press Import.</li>
-        <li>Keep this tab open until it says done. A full set takes roughly 10 to 30 minutes.</li>
+        <li>
+          Choose the zip below exactly as it downloaded: there&apos;s no need to unzip it (it would be several times
+          bigger). Unzipped CSV files work too.
+        </li>
+        <li>
+          It checks every file&apos;s columns first, in a few seconds. Then check the postcodes and press Import.
+        </li>
+        <li>
+          Keep this tab open and the laptop plugged in. If it stops (sleep, Wi-Fi, closing the tab), choose the same
+          zip again and press Resume: it carries on where it left off.
+        </li>
       </ol>
 
       {connected ? (
