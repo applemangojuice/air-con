@@ -49,7 +49,7 @@ export default async function HomePage() {
     {
       n: "01",
       title: "Your price, straight away",
-      body: "Type your address and your price appears: worked out from public records for your home, or from the homes around it. Refine it room by room if you like. No email needed to see it.",
+      body: "Type your postcode, pick your address, and your price appears: worked out from public records for your home, or from the homes around it. Edit any answer if you like. No email needed to see it.",
     },
     {
       n: "02",
@@ -130,9 +130,9 @@ export default async function HomePage() {
                 Dang, it&apos;s hot. <span className="text-accent-700">Let&apos;s fix that.</span>
               </h1>
               <p className="mt-5 max-w-xl text-lg text-ink-700">
-                Heat pumps that cool your home in summer and warm it in winter. Pop your address in and your price
-                is the next thing you see, confirmed at a survey. No salesperson, no clipboard, no more sleeping on
-                top of the duvet with a wet flannel.
+                Heat pumps that cool your home in summer and warm it in winter. Pop your postcode in, pick your
+                address, and your price is the next thing you see, confirmed at a survey. No salesperson, no
+                clipboard, no more sleeping on top of the duvet with a wet flannel.
               </p>
 
               <AddressForm />
@@ -285,7 +285,7 @@ export default async function HomePage() {
                 <p className="mt-2 text-sm text-ink-700">We&apos;re finalising our first areas. Check back soon.</p>
               )}
               <p className="mt-4 text-sm text-ink-700">
-                Not on the list? Pop your address in anyway: if we&apos;re not there yet, you can ask us to email
+                Not on the list? Pop your postcode in anyway: if we&apos;re not there yet, you can ask us to email
                 you once when we are.
               </p>
             </div>
@@ -317,7 +317,7 @@ export default async function HomePage() {
           <div className="mx-auto max-w-6xl px-4 py-20 text-center sm:px-6">
             <h2 className="text-3xl font-display text-white sm:text-4xl">Ready to see your price?</h2>
             <p className="mx-auto mt-3 max-w-md text-white/80">
-              Your address, then your price. No obligation, no pushy calls. Worst case, you go back to your fan
+              Your postcode, then your price. No obligation, no pushy calls. Worst case, you go back to your fan
               knowing exactly what freedom costs.
             </p>
             <div className="mt-8">

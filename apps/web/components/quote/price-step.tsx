@@ -1,43 +1,28 @@
 "use client";
 
 import { useMemo } from "react";
-import { generateQuote, type ExcludedRoom } from "@aircon/domain";
+import { generateQuote } from "@aircon/domain";
 import { gbp } from "@/lib/format";
-import { ROOM_TYPE_LABEL, type QuoteDraft } from "@/lib/quote-draft";
+import type { QuoteDraft } from "@/lib/quote-draft";
 import { installDurationCopy, vatCopy, type PublicSettings } from "@/components/site/claims";
+import { HouseFields } from "./steps";
 import { secondaryBtn, StepShell } from "./ui";
 
-const TYPE_LABEL: Record<string, string> = {
-  detached: "Detached",
-  "semi-detached": "Semi-detached",
-  terraced: "Terraced",
-  flat: "Flat",
-  bungalow: "Bungalow",
-};
-
-const ERA_LABEL: Record<string, string> = {
-  "pre-1930": "before 1930",
-  "1930-1950": "1930s–40s",
-  "1950-2000": "1950s–90s",
-  "2000+": "2000+",
-};
-
-const SIZE_LABEL = { small: "Small", medium: "Medium", large: "Large", xl: "Very large" } as const;
-
 /**
- * The instant price: the first thing after the address. Rooms and house
- * details were filled in without a single question, from public records
- * for the address, from the homes around it, or (failing both) a typical
- * home, and the screen says which. Looking costs nothing. Going further,
- * to refine it or save it, is where we ask for an email.
+ * The instant price: the first thing after the address. The house questions
+ * were answered for them, from public records for the address, from the
+ * homes around it, or (failing both) a typical home, and the screen says
+ * which. Under the price sit the same tiles the form uses, locked, with the
+ * assumed answer lit up and an Edit button on each: the result and how
+ * you'd change it, in one view. Changing anything, or saving, goes through
+ * the email gate first.
  */
 export function PriceStep({
   draft,
   settings,
   step,
   pricing,
-  excluded,
-  onRefine,
+  onEdit,
   onSave,
   onChangeAddress,
 }: {
@@ -46,8 +31,7 @@ export function PriceStep({
   step: number;
   /** Still working out the prefill: show the shell, not a number. */
   pricing: boolean;
-  excluded: ExcludedRoom[];
-  onRefine: () => void;
+  onEdit: () => void;
   onSave: () => void;
   onChangeAddress: () => void;
 }) {
@@ -55,12 +39,11 @@ export function PriceStep({
   const rooms = survey.rooms;
   const vat = vatCopy(settings);
   const quote = useMemo(() => (!pricing && rooms.length > 0 ? generateQuote(survey) : null), [survey, rooms.length, pricing]);
-  const p = survey.property;
   const where = [survey.addressLine.trim(), survey.postcode].filter(Boolean).join(", ");
 
   const basis =
     draft.prefillSource === "records"
-      ? "From public records for this address."
+      ? "Filled in from public records for this address."
       : draft.prefillSource === "neighbours"
         ? "Our best guess from the homes around you: we hold no record for this address yet."
         : "A typical home at this postcode: we hold no records here yet.";
@@ -81,8 +64,8 @@ export function PriceStep({
           </button>
         </>
       }
-      onNext={pricing ? undefined : onRefine}
-      nextLabel="Refine my quote"
+      onNext={pricing ? undefined : onEdit}
+      nextLabel="Edit my quote"
       footer={
         pricing ? null : (
           <>
@@ -90,8 +73,8 @@ export function PriceStep({
               Looks right, save it
             </button>
             <p className="mt-4 text-sm leading-relaxed text-ink-500">
-              Refining takes about two minutes: add or remove rooms, fix the details, add a photo or two. Either way,
-              we ask for your email first so your quote is saved as you go.
+              Editing takes about two minutes: change any answer above, add or remove rooms, add a photo or two.
+              Either way, we ask for your email first so your quote is saved as you go.
             </p>
           </>
         )
@@ -120,35 +103,21 @@ export function PriceStep({
 
       {!pricing && (
         <>
-          {/* What it rests on, said plainly */}
-          <div className="rounded-2xl border border-line bg-white px-4 py-3 text-sm">
-            <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Priced for</p>
-            <p className="mt-1 font-medium text-ink-900">
-              {TYPE_LABEL[p.type] ?? p.type} · built {ERA_LABEL[p.era] ?? p.era} · {p.bedrooms} bed
-              {p.bedrooms === 1 ? "" : "s"}
-              {p.floorAreaM2 ? ` · ~${p.floorAreaM2} m²` : ""}
+          <div className="rounded-2xl border border-line bg-white px-4 py-3">
+            <p className="text-sm font-semibold text-ink-900">What we&apos;ve assumed about your home</p>
+            <p className="mt-1 text-xs leading-relaxed text-ink-500">
+              {basis} Each answer below is what your price rests on. Anything off? Press Edit.
             </p>
-            <p className="mt-1 text-xs leading-relaxed text-ink-500">{basis} Anything off? Refine it below.</p>
           </div>
 
-          <section aria-label="Rooms included">
-            <p className="mb-1.5 text-sm font-semibold text-ink-900">Rooms included</p>
-            <ul className="divide-y divide-line rounded-2xl border border-line bg-white">
-              {rooms.map((room) => (
-                <li key={room.id} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
-                  <span className="font-medium">{room.name}</span>
-                  <span className="text-right text-xs text-ink-500">
-                    {ROOM_TYPE_LABEL[room.type]} · {SIZE_LABEL[room.size]}
-                  </span>
-                </li>
-              ))}
-            </ul>
-            {excluded.length > 0 && (
-              <p className="mt-2 text-xs text-ink-500">
-                Not included: {excluded.map((e) => e.name).join(", ")}. {excluded[0]!.reason}
-              </p>
-            )}
-          </section>
+          <HouseFields
+            property={survey.property}
+            layout={draft.layout}
+            onProperty={() => undefined}
+            onLayout={() => undefined}
+            locked
+            onEdit={onEdit}
+          />
         </>
       )}
     </StepShell>

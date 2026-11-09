@@ -14,8 +14,8 @@ export const dynamic = "force-dynamic";
 
 const sections = [
   {
-    title: "1. Your address, then your price",
-    body: "Type your address and your price appears, worked out from public records for your home or, if we hold none, from the homes around it. Then refine it if you like: room by room, how big each is, which way it faces, where the outdoor unit could live, a few photos. You see the price before we ask for an email.",
+    title: "1. Your postcode, then your price",
+    body: "Type your postcode, pick your address, and your price appears, worked out from public records for your home or, if we hold none, from the homes around it. Every answer behind it is on the screen, so you can see what we assumed and edit it: room by room, how big each is, which way it faces, where the outdoor unit could live, a few photos. You see the price before we ask for an email.",
   },
   {
     title: "2. We size the system and give you a price",

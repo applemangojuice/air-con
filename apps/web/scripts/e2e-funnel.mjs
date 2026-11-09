@@ -60,7 +60,18 @@ try {
   check("homepage shows no brand artwork in the hero", (await page.locator('img[src*="dang-its-hot"]').count()) === 0);
   check("homepage lists the five customer steps", /virtual survey/i.test(home) && /purchase/i.test(home) && /aftercare/i.test(home));
   await page.fill('input[name="postcode"]', "SW16 2BE");
-  await page.fill('input[name="address"]', "12");
+  // Postcode in → the addresses we know there, as a dropdown; a house field only when we know none.
+  await page.waitForSelector('select[name="address"], input[name="address"]', { timeout: 15000 });
+  const picker = page.locator('select[name="address"]');
+  let homeAddress = "12";
+  if (await picker.count()) {
+    await picker.selectOption({ index: 1 });
+    homeAddress = await picker.inputValue();
+    check("known addresses offered as a dropdown from the postcode alone", homeAddress.length > 0);
+  } else {
+    await page.fill('input[name="address"]', homeAddress);
+    check("no known addresses: a house field is offered instead", true);
+  }
   await page.click('button:has-text("Start")');
   await page.waitForURL("**/quote**");
   check("address form navigates to /quote", page.url().includes("/quote"));
@@ -70,20 +81,24 @@ try {
   await page.waitForSelector("text=/£[0-9,]+/");
   const priceScreen = (await page.locator("main").textContent()) ?? "";
   check("price shows before any email field", (await page.locator('input[type="email"]').count()) === 0);
-  check("price screen says what it rests on", /Priced for/.test(priceScreen) && /(public records|homes around you|typical home)/.test(priceScreen));
+  check("price screen says what it rests on", /What we.ve assumed/.test(priceScreen) && /(public records|homes around you|typical home)/.test(priceScreen));
   check("price screen is not a numbered step", !/Step \d of \d/.test(priceScreen));
   const strip = page.locator('[aria-label="Your journey"] li');
   check("journey strip has five steps, price first", (await strip.count()) === 5 && /Price/.test((await strip.first().textContent()) ?? ""));
   check("journey strip reads virtual survey, purchase, install, aftercare", /Virtual survey.*Purchase.*Install.*Aftercare/s.test((await page.locator('[aria-label="Your journey"]').textContent()) ?? ""));
   check("terms and privacy linked on the step", (await page.locator('a[href="/terms"]').count()) > 0 && (await page.locator('a[href="/privacy"]').count()) > 0);
   check("a secondary save path is offered", (await page.locator('button:has-text("Looks right, save it")').count()) === 1);
-  await page.click('button:has-text("Refine my quote")');
+  const lockedTiles = page.locator('[role="group"] input[type="radio"][disabled]');
+  check("the house questions show as locked tiles with the answer lit", (await lockedTiles.count()) >= 15 && (await page.locator('[role="group"] input[type="radio"]:checked').count()) >= 5);
+  check("every assumed answer has its own Edit", (await page.locator('[role="group"] button:has-text("Edit")').count()) === 6);
+  // Edit on a tile goes through the same gate as the main button.
+  await page.locator('[role="group"] button:has-text("Edit")').first().click();
 
   // 3. The email gate: address confirmed, email required, reminder offered.
-  await page.waitForSelector("text=Refine your quote");
+  await page.waitForSelector("text=Edit your quote");
   const addressInput = page.locator('input[autocomplete="address-line1"]');
   const typed = await addressInput.inputValue();
-  check("the house typed on the homepage is carried over", typed.startsWith("12"));
+  check("the address from the homepage is carried over", typed.startsWith(homeAddress.split(",")[0]));
   if (typed.trim().length < 5) await addressInput.fill("12 Example Road");
   await page.click('button[type="submit"]');
   await page.waitForSelector("text=/Add an email address/");

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import type { KitchenLivingLayout, Survey, SurveyGeo } from "@aircon/domain";
 import { fetchKnownAddresses, type KnownAddress } from "@/lib/address-lookup";
 import { isValidUkPostcode, normalisePostcode } from "@/lib/format";
@@ -11,7 +11,7 @@ import { REMINDER_NOTICE } from "@/lib/follow-up-notice";
 import { MARKETING_CONSENT, OPERATIONAL_CONSENT, coverageFor, type PublicSettings } from "@/components/site/claims";
 import { OutOfArea } from "./out-of-area";
 import { postcodeOutcome } from "./postcode-outcome";
-import { Group, NumberRow, OptionCards, StepShell, TextField, inputCls } from "./ui";
+import { Group, LockedGroup, NumberRow, OptionCards, StepShell, TextField, inputCls } from "./ui";
 
 export interface StepProps {
   draft: QuoteDraft;
@@ -315,7 +315,7 @@ export function RefineGateStep({
   return (
     <StepShell
       step={step}
-      title={intent === "refine" ? "Refine your quote" : "Save your quote"}
+      title={intent === "refine" ? "Edit your quote" : "Save your quote"}
       subtitle={
         intent === "refine"
           ? "Your email first, so your quote is saved as you go and you can pick it up on any device. Then your home, room by room."
@@ -376,7 +376,6 @@ export function RefineGateStep({
 
 export function HouseStep({ draft, setSurvey, setLayout, step, totalSteps, progressStep, onNext, onBack }: StepProps) {
   const p = draft.survey.property;
-  const set = (update: Partial<Survey["property"]>) => setSurvey({ property: { ...p, ...update } });
 
   return (
     <StepShell
@@ -406,83 +405,151 @@ export function HouseStep({ draft, setSurvey, setLayout, step, totalSteps, progr
           </p>
         </div>
       )}
-      <Group legend="What kind of home is it?">
-        <OptionCards
-          columns={3}
-          value={p.type}
-          onChange={(type) => set({ type })}
-          options={[
-            { value: "detached", label: "Detached" },
-            { value: "semi-detached", label: "Semi-detached" },
-            { value: "terraced", label: "Terraced" },
-            { value: "flat", label: "Flat" },
-            { value: "bungalow", label: "Bungalow" },
-          ]}
-        />
-      </Group>
-
-      <Group legend="Roughly when was it built?">
-        <OptionCards
-          value={p.era}
-          onChange={(era) => set({ era })}
-          options={[
-            { value: "pre-1930", label: "Before 1930", hint: "Victorian · Edwardian" },
-            { value: "1930-1950", label: "1930s – 40s" },
-            { value: "1950-2000", label: "1950s – 1990s" },
-            { value: "2000+", label: "2000 or later", hint: "Modern build" },
-          ]}
-        />
-      </Group>
-
-      <Group legend="Bedrooms, studies and offices">
-        <NumberRow value={p.bedrooms} onChange={(bedrooms) => set({ bedrooms })} max={6} maxLabel="6+" />
-      </Group>
-
-      <Group legend="Bathrooms">
-        <NumberRow value={p.bathrooms ?? 1} onChange={(bathrooms) => set({ bathrooms })} max={4} maxLabel="4+" />
-      </Group>
-
-      <Group legend="Kitchen and living rooms">
-        <OptionCards<KitchenLivingLayout>
-          value={draft.layout}
-          onChange={setLayout}
-          options={[
-            { value: "open-plan", label: "One open-plan kitchen and living room" },
-            { value: "separate", label: "Separate kitchen and living room" },
-            { value: "two-receptions", label: "Two living rooms and a kitchen" },
-            { value: "other", label: "Something else" },
-          ]}
-        />
-      </Group>
-
-      <TextField
-        label="Rough size of your home"
-        optional
-        hint="In square metres. It's on your EPC or the listing. We split it across your rooms."
-      >
-        {(c) => (
-          <div className="flex items-center gap-2">
-            <input
-              {...c}
-              className={inputCls}
-              type="number"
-              inputMode="numeric"
-              min={30}
-              max={1000}
-              placeholder="e.g. 95"
-              value={p.floorAreaM2 ?? ""}
-              onChange={(e) => {
-                const n = Number(e.target.value);
-                set({ floorAreaM2: e.target.value && Number.isFinite(n) && n >= 10 && n <= 2000 ? n : undefined });
-              }}
-            />
-            <span className="shrink-0 text-sm font-medium text-ink-500" aria-hidden>
-              m²
-            </span>
-          </div>
-        )}
-      </TextField>
+      <HouseFields
+        property={p}
+        layout={draft.layout}
+        onProperty={(update) => setSurvey({ property: { ...p, ...update } })}
+        onLayout={setLayout}
+      />
     </StepShell>
+  );
+}
+
+const TYPE_OPTIONS = [
+  { value: "detached", label: "Detached" },
+  { value: "semi-detached", label: "Semi-detached" },
+  { value: "terraced", label: "Terraced" },
+  { value: "flat", label: "Flat" },
+  { value: "bungalow", label: "Bungalow" },
+] as const;
+
+const ERA_OPTIONS = [
+  { value: "pre-1930", label: "Before 1930", hint: "Victorian · Edwardian" },
+  { value: "1930-1950", label: "1930s – 40s" },
+  { value: "1950-2000", label: "1950s – 1990s" },
+  { value: "2000+", label: "2000 or later", hint: "Modern build" },
+] as const;
+
+const LAYOUT_OPTIONS: { value: KitchenLivingLayout; label: string }[] = [
+  { value: "open-plan", label: "One open-plan kitchen and living room" },
+  { value: "separate", label: "Separate kitchen and living room" },
+  { value: "two-receptions", label: "Two living rooms and a kitchen" },
+  { value: "other", label: "Something else" },
+];
+
+/** A question's frame: a fieldset while editing, a locked group with Edit on the price screen. */
+function FieldGroup({
+  locked,
+  onEdit,
+  legend,
+  hint,
+  children,
+}: {
+  locked: boolean;
+  onEdit: () => void;
+  legend: string;
+  hint?: string;
+  children: ReactNode;
+}) {
+  return locked ? (
+    <LockedGroup legend={legend} onEdit={onEdit}>
+      {children}
+    </LockedGroup>
+  ) : (
+    <Group legend={legend} hint={hint}>
+      {children}
+    </Group>
+  );
+}
+
+/**
+ * The house questions, one set of tiles used twice: live on the "Tell us
+ * about your home" step, and locked on the price screen, where each group
+ * shows the answer we assumed with an Edit button that leads (through the
+ * email gate) back here. Same tiles both times, so the price screen shows
+ * both the result and exactly how you'd change it.
+ */
+export function HouseFields({
+  property: p,
+  layout,
+  onProperty,
+  onLayout,
+  locked = false,
+  onEdit,
+}: {
+  property: Survey["property"];
+  layout: KitchenLivingLayout;
+  onProperty: (update: Partial<Survey["property"]>) => void;
+  onLayout: (layout: KitchenLivingLayout) => void;
+  locked?: boolean;
+  /** Required when locked: what Edit does. */
+  onEdit?: () => void;
+}) {
+  const edit = onEdit ?? (() => undefined);
+  const wrap = { locked, onEdit: edit };
+
+  return (
+    <>
+      <FieldGroup {...wrap} legend="What kind of home is it?">
+        <OptionCards columns={3} value={p.type} onChange={(type) => onProperty({ type })} options={[...TYPE_OPTIONS]} locked={locked} />
+      </FieldGroup>
+
+      <FieldGroup {...wrap} legend="Roughly when was it built?">
+        <OptionCards value={p.era} onChange={(era) => onProperty({ era })} options={[...ERA_OPTIONS]} locked={locked} />
+      </FieldGroup>
+
+      <FieldGroup {...wrap} legend="Bedrooms, studies and offices">
+        <NumberRow value={p.bedrooms} onChange={(bedrooms) => onProperty({ bedrooms })} max={6} maxLabel="6+" locked={locked} />
+      </FieldGroup>
+
+      <FieldGroup {...wrap} legend="Bathrooms">
+        <NumberRow value={p.bathrooms ?? 1} onChange={(bathrooms) => onProperty({ bathrooms })} max={4} maxLabel="4+" locked={locked} />
+      </FieldGroup>
+
+      <FieldGroup {...wrap} legend="Kitchen and living rooms">
+        <OptionCards<KitchenLivingLayout> value={layout} onChange={onLayout} options={LAYOUT_OPTIONS} locked={locked} />
+      </FieldGroup>
+
+      {locked ? (
+        <LockedGroup legend="Rough size of your home" onEdit={edit}>
+          <p className="rounded-2xl border border-line bg-white px-4 py-3 text-sm">
+            {p.floorAreaM2 ? (
+              <span className="font-semibold text-accent-700">About {p.floorAreaM2} m²</span>
+            ) : (
+              <span className="text-ink-500">Not known: we split a typical size across your rooms.</span>
+            )}
+          </p>
+        </LockedGroup>
+      ) : (
+        <TextField
+          label="Rough size of your home"
+          optional
+          hint="In square metres. It's on your EPC or the listing. We split it across your rooms."
+        >
+          {(c) => (
+            <div className="flex items-center gap-2">
+              <input
+                {...c}
+                className={inputCls}
+                type="number"
+                inputMode="numeric"
+                min={30}
+                max={1000}
+                placeholder="e.g. 95"
+                value={p.floorAreaM2 ?? ""}
+                onChange={(e) => {
+                  const n = Number(e.target.value);
+                  onProperty({ floorAreaM2: e.target.value && Number.isFinite(n) && n >= 10 && n <= 2000 ? n : undefined });
+                }}
+              />
+              <span className="shrink-0 text-sm font-medium text-ink-500" aria-hidden>
+                m²
+              </span>
+            </div>
+          )}
+        </TextField>
+      )}
+    </>
   );
 }
 

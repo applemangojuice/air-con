@@ -323,8 +323,7 @@ export function QuoteWizard({
             settings={settings}
             step={step}
             pricing={pricing}
-            excluded={config.excluded}
-            onRefine={() => openGate("refine")}
+            onEdit={() => openGate("refine")}
             onSave={() => openGate("save")}
             onChangeAddress={() => {
               pricingRun.current++; // abandon a lookup still running
