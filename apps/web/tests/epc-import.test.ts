@@ -151,14 +151,40 @@ test("the 2026 bulk download's real columns (lower case) map, and its recommenda
   assert.equal(map.uprn, at("uprn"));
   assert.equal(map.lodged, at("lodgement_date"), "the date, not lodgement_datetime");
   assert.equal(map.currentRating, at("current_energy_rating"));
-  assert.equal(map.potentialRating, at("potential_energy_rating"));
   assert.equal(map.floorArea, at("total_floor_area"));
   assert.equal(map.rooms, at("number_habitable_rooms"));
   assert.equal(map.windows, at("windows_description"));
-  assert.equal(map.heating, at("mainheat_description"));
+  // Walls, roof, heating, hot water and the potential rating aren't read at all: nothing uses them.
+  assert.deepEqual(Object.keys(map).sort(), ["address", "address1", "address2", "ageBand", "builtForm", "currentRating", "floorArea", "lodged", "postcode", "propertyType", "rooms", "uprn", "windows"]);
 
   const recommendations = mapEpcColumns(
     "certificate_number,improvement_item,improvement_id,improvement_summary_text,improvement_descr_text,indicative_cost".split(","),
   );
   assert.equal(epcColumnProblems(recommendations).length, 2);
+});
+
+test("a record keeps only what the app uses: no empty values, a short age band", async () => {
+  const header = "address1,postcode,uprn,lodgement_date,construction_age_band,walls_description,mainheat_description,potential_energy_rating,windows_description,property_type,built_form".split(",");
+  const m = mapEpcColumns(header);
+  const c = epcCandidate(
+    epcRowFromFields("12 Example Road,SW16 1AD,1001,2020-02-02,England and Wales: 1900-1929,Solid brick,Boiler,B,,House,".split(","), m),
+  )!;
+  assert.deepEqual(c.intel.epc, { propertyType: "House", constructionAgeBand: "1900-1929", lodgedAt: "2020-02-02" });
+
+  const { slimIntel, UNUSED_EPC_KEYS, fieldStats } = await import("../lib/intel-fields.ts");
+  assert.deepEqual(UNUSED_EPC_KEYS, ["wallDescription", "roofDescription", "mainHeatDescription", "hotWaterDescription", "potentialRating"]);
+  const old = {
+    ...c.intel,
+    epc: { ...c.intel.epc, constructionAgeBand: "England and Wales: before 1900", wallDescription: "Solid brick", potentialRating: "B", builtForm: "" },
+  };
+  const slim = slimIntel(old);
+  assert.equal(slim.changed, true);
+  assert.deepEqual(slim.intel.epc, { propertyType: "House", constructionAgeBand: "before 1900", lodgedAt: "2020-02-02" });
+  assert.equal(slimIntel(slim.intel).changed, false, "slimming twice changes nothing");
+
+  const stats = fieldStats([old, slim.intel]);
+  const walls = stats.find((f) => f.path === "epc.wallDescription")!;
+  assert.equal(walls.usedFor, null);
+  assert.equal(walls.fillRate, 0.5);
+  assert.deepEqual(walls.top, [{ value: "Solid brick", count: 1 }]);
 });
