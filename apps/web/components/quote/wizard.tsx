@@ -18,7 +18,7 @@ import { REMINDER_NOTICE_VERSION } from "@/lib/follow-up-notice";
 import { track } from "@/lib/analytics-client";
 import { isValidUkPostcode, normalisePostcode } from "@/lib/format";
 import { coverageFor, type PublicSettings } from "@/components/site/claims";
-import { AddressStep, DetailsStep, HouseStep, RefineGateStep, type ConsentState, type GateIntent, type StepProps } from "./steps";
+import { AddressStep, DetailsStep, HouseStep, RefineGateStep, type ConsentState, type StepProps } from "./steps";
 import { PriceStep } from "./price-step";
 import { RoomsStep } from "./rooms-step";
 import { FirmUpStep } from "./firm-up-step";
@@ -27,12 +27,12 @@ import { JourneyStrip } from "./journey-strip";
 
 /**
  * Price first. The address comes in (from the home page, or the address
- * screen), the home is filled in from what we know, and the price is the
- * next thing they see. Going further costs an email: then the numbered
- * refine form (home → rooms → photos → save), or straight to saving.
+ * screen), the home is filled in from what we know, and the guide price is
+ * the next thing they see, with the basics adjustable right there. Going
+ * further costs an email: then the numbered refine form (home → rooms →
+ * photos → save).
  *
  *   address? → PRICE → email gate → house → rooms → firm up → details
- *                                 ↘ (save) ─────────────────→ details
  */
 const STEP = { address: 0, price: 1, gate: 2, house: 3, rooms: 4, firmUp: 5, details: 6 } as const;
 const REFINE_STEPS = 4; // house, rooms, firm up, details
@@ -54,7 +54,6 @@ export function QuoteWizard({
   const router = useRouter();
   const [draft, setDraft] = useState<QuoteDraft>(() => newDraft(initialPostcode ? normalisePostcode(initialPostcode) : ""));
   const [step, setStep] = useState<number>(STEP.address);
-  const [intent, setIntent] = useState<GateIntent>("refine");
   const [ready, setReady] = useState(false);
   const [pricing, setPricing] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -192,14 +191,19 @@ export function QuoteWizard({
     void showInstantPrice(draft);
   }
 
-  /** Price screen → the email gate, remembering where they're headed. */
-  function openGate(which: GateIntent) {
-    setIntent(which);
-    track("quote_gate", { intent: which });
+  /** A basic changed on the guide-price card: re-lay the rooms and re-price, there and then. */
+  function adjustBasics(update: Partial<Survey["property"]>) {
+    setDraft((d) => configure({ ...d, survey: { ...d.survey, property: { ...d.survey.property, ...update } } }));
+    track("quote_adjust", { fields: Object.keys(update) });
+  }
+
+  /** Price screen → the email gate. */
+  function openGate() {
+    track("quote_gate", {});
     setStep(STEP.gate);
   }
 
-  /** The email gate → refine (house) or save (details). The server draft starts here. */
+  /** The email gate → the refine form. The server draft starts here. */
   async function nextFromGate() {
     // The reminder box sits under the email: leaving it is their answer (ticked unless they unticked it).
     let current: QuoteDraft = { ...draft, reminder: draft.reminder !== false };
@@ -213,8 +217,8 @@ export function QuoteWizard({
       if (id) current = { ...current, draftId: id };
     }
     setDraft(current);
-    track("quote_refine", { intent, draftSaved: Boolean(current.draftId) });
-    setStep(intent === "refine" ? STEP.house : STEP.details);
+    track("quote_refine", { draftSaved: Boolean(current.draftId) });
+    setStep(STEP.house);
   }
 
   function nextFromHouse() {
@@ -286,7 +290,6 @@ export function QuoteWizard({
     setSaveError(null);
     setNotice(null);
     setDemo(false);
-    setIntent("refine");
     setStep(STEP.address);
   }
 
@@ -294,8 +297,7 @@ export function QuoteWizard({
     return <DemoResult draft={draft} settings={settings} onStartOver={startOver} />;
   }
 
-  // The numbered form is the refine path only; saving straight away has one screen left.
-  const inRefineForm = intent === "refine" && step >= STEP.house;
+  const inRefineForm = step >= STEP.house;
   const common: StepProps = {
     draft,
     settings,
@@ -323,8 +325,8 @@ export function QuoteWizard({
             settings={settings}
             step={step}
             pricing={pricing}
-            onEdit={() => openGate("refine")}
-            onSave={() => openGate("save")}
+            onAdjust={adjustBasics}
+            onRefine={openGate}
             onChangeAddress={() => {
               pricingRun.current++; // abandon a lookup still running
               setPricing(false);
@@ -333,7 +335,7 @@ export function QuoteWizard({
           />
         );
       case STEP.gate:
-        return <RefineGateStep {...common} intent={intent} onNext={nextFromGate} onBack={() => setStep(STEP.price)} setReminder={setReminder} />;
+        return <RefineGateStep {...common} onNext={nextFromGate} onBack={() => setStep(STEP.price)} setReminder={setReminder} />;
       case STEP.house:
         return <HouseStep {...common} onNext={nextFromHouse} onBack={() => setStep(STEP.price)} />;
       case STEP.rooms:
@@ -345,7 +347,7 @@ export function QuoteWizard({
           <DetailsStep
             {...common}
             onNext={finish}
-            onBack={() => setStep(intent === "save" ? STEP.price : STEP.firmUp)}
+            onBack={() => setStep(STEP.firmUp)}
             consent={consent}
             setConsent={setConsent}
             saveError={saveError}

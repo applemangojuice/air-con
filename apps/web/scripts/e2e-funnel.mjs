@@ -76,26 +76,33 @@ try {
   await page.waitForURL("**/quote**");
   check("address form navigates to /quote", page.url().includes("/quote"));
 
-  // 2. The instant price: no email asked, the home filled in for them.
-  await page.waitForSelector("text=Here's your price", { timeout: 20000 });
+  // 2. The guide price: no email asked, the home filled in for them, the basics adjustable.
+  await page.waitForSelector("text=Your guide price", { timeout: 20000 });
   await page.waitForSelector("text=/£[0-9,]+/");
   const priceScreen = (await page.locator("main").textContent()) ?? "";
   check("price shows before any email field", (await page.locator('input[type="email"]').count()) === 0);
-  check("price screen says what it rests on", /Priced for/.test(priceScreen) && /(public records|homes around you|typical home)/.test(priceScreen));
+  check("it's called a guide price, confirmed at the survey, with the virtual-survey note", /Guide price/.test(priceScreen) && /Confirmed at your survey/.test(priceScreen) && /virtual survey/i.test(priceScreen));
+  check("price screen says what it started from", /Priced for/.test(priceScreen) && /(public records|homes around you|typical home)/.test(priceScreen));
+  check("price screen shows the engine's confidence as its statistic", /Price confidence/.test(priceScreen) && /\d+\/100/.test(priceScreen));
   check("price screen is not a numbered step", !/Step \d of \d/.test(priceScreen));
   const strip = page.locator('[aria-label="Your journey"] li');
   check("journey strip has five steps, price first", (await strip.count()) === 5 && /Price/.test((await strip.first().textContent()) ?? ""));
   check("journey strip reads virtual survey, purchase, install, aftercare", /Virtual survey.*Purchase.*Install.*Aftercare/s.test((await page.locator('[aria-label="Your journey"]').textContent()) ?? ""));
   check("terms and privacy linked on the step", (await page.locator('a[href="/terms"]').count()) > 0 && (await page.locator('a[href="/privacy"]').count()) > 0);
-  check("a secondary save path is offered", (await page.locator('button:has-text("Looks right, save it")').count()) === 1);
-  const card = page.locator('[data-testid="assumptions"]');
-  check("one small card shows what the price rests on, with the assumed answers lit", (await card.count()) === 1 && (await card.locator("[data-selected]").count()) >= 3);
-  check("the card has no era or layout question, and one Edit", !/built|kitchen/i.test((await card.textContent()) ?? "") && (await card.locator('button:has-text("Edit")').count()) === 1);
-  // Edit on the card goes through the same gate as the main button.
-  await card.locator('button:has-text("Edit")').click();
+  const card = page.locator('[data-testid="basics"]');
+  check("one small card: home, bedrooms, bathrooms, size, no era or layout", (await card.count()) === 1 && /Home.*Bedrooms.*Bathrooms.*Size/s.test((await card.textContent()) ?? "") && !/built|kitchen/i.test((await card.textContent()) ?? ""));
+  check("the assumed answers are lit", (await card.locator("input[data-selected]").count()) >= 3);
+  // The basics are live before any email: tap 4+ bedrooms and the pill takes, the price re-renders.
+  const priceBefore = (await page.locator("text=/£[0-9,]+/").first().textContent()) ?? "";
+  await card.locator('label:has-text("4+")').first().click();
+  check("tapping a basic changes the selection", await card.locator('label:has-text("4+") input').first().isChecked());
+  const priceAfter = (await page.locator("text=/£[0-9,]+/").first().textContent()) ?? "";
+  check("a price is still shown after adjusting", /£[0-9,]+/.test(priceAfter) && priceBefore.length > 0);
+  check("one button, Refine my quote, and no save or edit buttons", (await page.locator('button:has-text("Refine my quote")').count()) === 1 && (await page.locator('button:has-text("Looks right")').count()) === 0 && (await card.locator("button").count()) === 0);
+  await page.click('button:has-text("Refine my quote")');
 
   // 3. The email gate: address confirmed, email required, reminder offered.
-  await page.waitForSelector("text=Edit your quote");
+  await page.waitForSelector("text=Refine your quote");
   const addressInput = page.locator('input[autocomplete="address-line1"]');
   const typed = await addressInput.inputValue();
   check("the address from the homepage is carried over", typed.startsWith(homeAddress.split(",")[0]));
@@ -160,7 +167,7 @@ try {
   await page.goto(`${BASE}/quote?postcode=${encodeURIComponent("E8 1AA")}&address=12`, { waitUntil: "networkidle" });
   await page.waitForSelector("text=/not in .*E8/i", { timeout: 15000 });
   check("out-of-area postcode is told the truth", (await page.locator("text=/we cover/i").count()) === 0);
-  check("no price is shown out of area", !/Here's your price/.test((await page.locator("main").textContent()) ?? ""));
+  check("no price is shown out of area", !/guide price/i.test((await page.locator("main").textContent()) ?? ""));
   await page.fill('input[type="email"]', "later@example.com");
   await page.click('button:has-text("Tell me when")');
   await page.waitForSelector("text=/We'll email/", { timeout: 15000 });
@@ -180,7 +187,7 @@ try {
     await page.locator("select").first().selectOption({ index: 1 });
   }
   await page.click('button:has-text("Show my price")');
-  await page.waitForSelector("text=Here's your price", { timeout: 20000 });
+  await page.waitForSelector("text=Your guide price", { timeout: 20000 });
   await page.waitForSelector("text=/£[0-9,]+/");
   check("a direct visit gets the price straight after the address", true);
 } catch (err) {

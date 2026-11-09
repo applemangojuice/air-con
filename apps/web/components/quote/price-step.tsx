@@ -1,30 +1,32 @@
 "use client";
 
-import { useMemo, type ReactNode } from "react";
-import { generateQuote } from "@aircon/domain";
+import { useId, useMemo } from "react";
+import { generateQuote, type Survey } from "@aircon/domain";
 import { gbp } from "@/lib/format";
 import type { QuoteDraft } from "@/lib/quote-draft";
-import { installDurationCopy, vatCopy, type PublicSettings } from "@/components/site/claims";
+import { BAND_COPY, installDurationCopy, vatCopy, type PublicSettings } from "@/components/site/claims";
 import { TYPE_OPTIONS } from "./steps";
-import { secondaryBtn, StepShell } from "./ui";
+import { StepShell } from "./ui";
+
+type Property = Survey["property"];
 
 /**
- * The instant price: the first thing after the address. The house questions
- * were answered for them, from public records for the address, from the
+ * The guide price: the first thing after the address. The home was filled
+ * in without a question, from public records for the address, from the
  * homes around it, or (failing both) a typical home, and the screen says
- * which. Under the price, one small card shows the answers it rests on
- * (home type, bedrooms, bathrooms, size) as pills with the assumed one lit,
- * and one Edit button. Era and layout are prefilled too but live only on
- * the full form: the survey confirms them, and they'd crowd the card.
- * Changing anything, or saving, goes through the email gate first.
+ * which. Under the price, one small card holds the four basics the guide
+ * rests on (home type, bedrooms, bathrooms, size in 20 m² bands) as pills
+ * they can tap, and the price follows. Era and layout are prefilled too but
+ * live only on the full form. One button: Refine my quote, which asks for
+ * an email and then opens that form with everything pre-populated.
  */
 export function PriceStep({
   draft,
   settings,
   step,
   pricing,
-  onEdit,
-  onSave,
+  onAdjust,
+  onRefine,
   onChangeAddress,
 }: {
   draft: QuoteDraft;
@@ -32,8 +34,9 @@ export function PriceStep({
   step: number;
   /** Still working out the prefill: show the shell, not a number. */
   pricing: boolean;
-  onEdit: () => void;
-  onSave: () => void;
+  /** A basic changed on the card: re-lay the rooms and re-price. */
+  onAdjust: (update: Partial<Property>) => void;
+  onRefine: () => void;
   onChangeAddress: () => void;
 }) {
   const { survey } = draft;
@@ -44,15 +47,15 @@ export function PriceStep({
 
   const basis =
     draft.prefillSource === "records"
-      ? "Filled in from public records for this address."
+      ? "We started from public records for this address."
       : draft.prefillSource === "neighbours"
-        ? "Our best guess from the homes around you: we hold no record for this address yet."
-        : "A typical home at this postcode: we hold no records here yet.";
+        ? "We started from the homes around you: we hold no record for this address yet."
+        : "We started from a typical home: we hold no records at this postcode yet.";
 
   return (
     <StepShell
       step={step}
-      title={pricing ? "Working out your price…" : "Here's your price"}
+      title={pricing ? "Working out your guide price…" : "Your guide price"}
       subtitle={
         <>
           For {where}.{" "}
@@ -65,31 +68,26 @@ export function PriceStep({
           </button>
         </>
       }
-      onNext={pricing ? undefined : onEdit}
-      nextLabel="Edit my quote"
+      onNext={pricing ? undefined : onRefine}
+      nextLabel="Refine my quote"
       footer={
         pricing ? null : (
-          <>
-            <button type="button" onClick={onSave} className={`${secondaryBtn} mt-3 w-full`}>
-              Looks right, save it
-            </button>
-            <p className="mt-4 text-sm leading-relaxed text-ink-500">
-              Editing takes about two minutes: change any answer above, add or remove rooms, add a photo or two.
-              Either way, we ask for your email first so your quote is saved as you go.
-            </p>
-          </>
+          <p className="mt-4 text-xs leading-relaxed text-ink-500">
+            Refining takes about two minutes: your home room by room, with what we know already filled in. We ask
+            for your email first, so your quote is saved as you go.
+          </p>
         )
       }
     >
-      {/* The price, or its shell while we look the home up */}
+      {/* The guide price, or its shell while we look the home up */}
       <div className="ink-gradient rounded-3xl p-5 text-white shadow-lg" aria-busy={pricing || undefined}>
-        <p className="text-xs font-semibold uppercase tracking-wide text-white/75">Your price</p>
+        <p className="text-xs font-semibold uppercase tracking-wide text-white/75">Guide price</p>
         <p className="mt-1 text-4xl font-display" aria-live="polite" aria-atomic>
           {pricing ? (
             <span className="inline-block h-9 w-36 animate-pulse rounded-lg bg-white/20 align-middle" aria-label="Working it out" />
           ) : (
             <>
-              <span className="sr-only">Your price is </span>
+              <span className="sr-only">Your guide price is </span>
               {quote ? gbp(quote.totalGbp) : "–"}
             </>
           )}
@@ -102,95 +100,155 @@ export function PriceStep({
         <p className="mt-1 text-xs text-white/75">Confirmed at your survey.</p>
       </div>
 
-      {!pricing && <AssumptionsCard property={survey.property} basis={basis} onEdit={onEdit} />}
+      {!pricing && (
+        <>
+          <BasicsCard property={survey.property} onAdjust={onAdjust} basis={basis} />
+
+          {/* The one statistic we can stand behind: the engine's own confidence in this price. */}
+          {quote && (
+            <div className="flex items-center justify-between gap-3 rounded-2xl border border-line bg-white px-4 py-3">
+              <div>
+                <p className="text-sm font-semibold text-ink-900">Price confidence</p>
+                <p className="mt-0.5 text-xs text-ink-500">{BAND_COPY[quote.confidence.band].body}</p>
+              </div>
+              <p className={`shrink-0 rounded-full border px-2.5 py-0.5 text-xs font-semibold ${BAND_COPY[quote.confidence.band].tone}`}>
+                {BAND_COPY[quote.confidence.band].label} · {quote.confidence.score}/100
+              </p>
+            </div>
+          )}
+
+          {/* Discreet, and the honest version of "fixed": the survey refines it. */}
+          <p className="text-xs leading-relaxed text-ink-500">
+            A guide, not a final price. Our swift virtual survey, a video walk-round on your phone, lets us refine
+            this quote properly before you decide anything.
+          </p>
+        </>
+      )}
     </StepShell>
   );
 }
 
-/** 1, 2, 3, 4+: the compact count row. */
+/* ------------------------------------------------------------------ */
+/* The basics card                                                     */
+/* ------------------------------------------------------------------ */
+
 const COUNTS = [1, 2, 3, 4] as const;
 
+/** Floor area in 20 m² bands; picking one sets the band's middle. */
+const SIZE_BANDS: { label: string; min: number; max: number; value: number }[] = [
+  { label: "under 60", min: 0, max: 60, value: 50 },
+  { label: "60–80", min: 60, max: 80, value: 70 },
+  { label: "80–100", min: 80, max: 100, value: 90 },
+  { label: "100–120", min: 100, max: 120, value: 110 },
+  { label: "120–140", min: 120, max: 140, value: 130 },
+  { label: "140+", min: 140, max: Infinity, value: 150 },
+];
+
+/** Which band an area falls in, if we know it. */
+export function sizeBandFor(areaM2: number | undefined): number | undefined {
+  if (!areaM2) return undefined;
+  const i = SIZE_BANDS.findIndex((b) => areaM2 >= b.min && areaM2 < b.max);
+  return i === -1 ? undefined : i;
+}
+
 /**
- * What the price rests on, in one small card: a row of pills per question
- * with the assumed answer lit. Nothing here is interactive except Edit;
- * the pills are the summary, and the form (after the email gate) is where
- * answers change.
+ * The four basics the guide price rests on, each a row of pills: tap one
+ * and the price follows. Everything else about the home (era, layout, the
+ * rooms themselves) waits for the full form after the email gate.
  */
-function AssumptionsCard({
+function BasicsCard({
   property: p,
+  onAdjust,
   basis,
-  onEdit,
 }: {
-  property: QuoteDraft["survey"]["property"];
+  property: Property;
+  onAdjust: (update: Partial<Property>) => void;
   basis: string;
-  onEdit: () => void;
 }) {
-  const count = (n: number | undefined, fallback: number) => Math.min(4, Math.max(1, n ?? fallback));
+  const beds = Math.min(4, Math.max(1, p.bedrooms));
+  const baths = Math.min(4, Math.max(1, p.bathrooms ?? 1));
+  const band = sizeBandFor(p.floorAreaM2);
   return (
-    <section aria-labelledby="assumptions" data-testid="assumptions" className="rounded-2xl border border-line bg-white p-3">
-      <div className="flex items-center justify-between gap-3">
-        <h2 id="assumptions" className="text-sm font-semibold text-ink-900">
-          Priced for
-        </h2>
-        <button
-          type="button"
-          onClick={onEdit}
-          className="min-h-8 shrink-0 rounded-full border border-line bg-white px-3 text-xs font-semibold text-accent-700 transition hover:bg-accent-50"
-        >
-          Edit
-        </button>
+    <section aria-labelledby="basics" data-testid="basics" className="rounded-2xl border border-line bg-white p-3">
+      <h2 id="basics" className="text-sm font-semibold text-ink-900">
+        Priced for
+      </h2>
+      <p className="mt-0.5 text-xs text-ink-500">Tap to adjust: the guide price updates.</p>
+      <div className="mt-2.5 space-y-2.5">
+        <PillRow
+          legend="Home"
+          options={TYPE_OPTIONS.map((o) => ({ value: o.value, label: o.label === "Semi-detached" ? "Semi" : o.label }))}
+          value={p.type}
+          onChange={(type) => onAdjust({ type })}
+        />
+        <PillRow
+          legend="Bedrooms"
+          options={COUNTS.map((n) => ({ value: n, label: n === 4 ? "4+" : String(n) }))}
+          value={beds}
+          // 4+ keeps a larger count we already hold (six bedrooms from the records stay six).
+          onChange={(n) => onAdjust({ bedrooms: n === 4 && p.bedrooms > 4 ? p.bedrooms : n })}
+        />
+        <PillRow
+          legend="Bathrooms"
+          options={COUNTS.map((n) => ({ value: n, label: n === 4 ? "4+" : String(n) }))}
+          value={baths}
+          onChange={(n) => onAdjust({ bathrooms: n === 4 && (p.bathrooms ?? 1) > 4 ? p.bathrooms : n })}
+        />
+        <PillRow
+          legend="Size, m²"
+          options={SIZE_BANDS.map((b, i) => ({ value: i, label: b.label }))}
+          value={band}
+          onChange={(i) => onAdjust({ floorAreaM2: SIZE_BANDS[i]!.value })}
+        />
       </div>
-      <dl className="mt-2 space-y-2">
-        <Row label="Home">
-          {TYPE_OPTIONS.map((o) => (
-            <Pill key={o.value} selected={o.value === p.type}>
-              {o.label === "Semi-detached" ? "Semi" : o.label}
-            </Pill>
-          ))}
-        </Row>
-        <Row label="Bedrooms">
-          {COUNTS.map((n) => (
-            <Pill key={n} selected={count(p.bedrooms, 3) === n}>
-              {n === 4 ? "4+" : n}
-            </Pill>
-          ))}
-        </Row>
-        <Row label="Bathrooms">
-          {COUNTS.map((n) => (
-            <Pill key={n} selected={count(p.bathrooms, 1) === n}>
-              {n === 4 ? "4+" : n}
-            </Pill>
-          ))}
-        </Row>
-        <Row label="Size">
-          {p.floorAreaM2 ? (
-            <Pill selected>about {p.floorAreaM2} m²</Pill>
-          ) : (
-            <span className="text-xs text-ink-500">not known, so a typical size</span>
-          )}
-        </Row>
-      </dl>
       <p className="mt-2.5 text-xs leading-relaxed text-ink-500">{basis}</p>
     </section>
   );
 }
 
-function Row({ label, children }: { label: string; children: ReactNode }) {
+/** A row of pills as native radios: one tab stop, arrow keys, announced as "2 of 4". */
+function PillRow<T extends string | number>({
+  legend,
+  options,
+  value,
+  onChange,
+}: {
+  legend: string;
+  options: { value: T; label: string }[];
+  value: T | undefined;
+  onChange: (value: T) => void;
+}) {
+  const name = useId();
   return (
-    <div className="flex items-center gap-2">
-      <dt className="w-[4.5rem] shrink-0 text-xs text-ink-500">{label}</dt>
-      <dd className="flex min-w-0 flex-wrap gap-1">{children}</dd>
-    </div>
+    <fieldset className="flex min-w-0 items-start gap-2">
+      <legend className="sr-only">{legend}</legend>
+      <span aria-hidden className="w-[4.5rem] shrink-0 pt-1 text-xs text-ink-500">
+        {legend}
+      </span>
+      <div className="flex min-w-0 flex-wrap gap-1">
+        {options.map((o) => {
+          const selected = o.value === value;
+          return (
+            <label
+              key={String(o.value)}
+              className={`cursor-pointer rounded-full px-2.5 py-1 text-xs font-semibold transition has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent-500 has-[:focus-visible]:ring-offset-1 ${
+                selected ? "bg-accent-700 text-white" : "bg-surface text-ink-700 hover:bg-accent-50 hover:text-accent-700"
+              }`}
+            >
+              <input
+                type="radio"
+                name={name}
+                checked={selected}
+                onChange={() => onChange(o.value)}
+                data-selected={selected || undefined}
+                className="sr-only"
+              />
+              {o.label}
+            </label>
+          );
+        })}
+      </div>
+    </fieldset>
   );
 }
 
-function Pill({ selected = false, children }: { selected?: boolean; children: ReactNode }) {
-  return (
-    <span
-      data-selected={selected || undefined}
-      className={`rounded-full px-2.5 py-1 text-xs font-semibold ${selected ? "bg-accent-700 text-white" : "bg-surface text-ink-500"}`}
-    >
-      {children}
-    </span>
-  );
-}

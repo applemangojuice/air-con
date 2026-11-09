@@ -49,7 +49,7 @@ export default async function HomePage() {
     {
       n: "01",
       title: "Your price, straight away",
-      body: "Type your postcode, pick your address, and your price appears: worked out from public records for your home, or from the homes around it. Edit any answer if you like. No email needed to see it.",
+      body: "Type your postcode, pick your address, and your guide price appears: worked out from public records for your home, or from the homes around it. Adjust the basics on the spot, then refine it room by room. No email needed to see it.",
     },
     {
       n: "02",

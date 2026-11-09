@@ -286,14 +286,11 @@ export function AddressStep({
 /* The email gate: before refining or saving the instant price          */
 /* ------------------------------------------------------------------ */
 
-export type GateIntent = "refine" | "save";
-
 /**
- * The point where we ask for an email: once they've seen their price and
- * want to go further (refine it room by room, or save it). Looking costs
- * nothing; going on means the quote is saved as they go. The address is
- * confirmed here too, because the marketing page may only have given us a
- * house number.
+ * The point where we ask for an email: once they've seen their guide price
+ * and want to refine it. Looking costs nothing; going on means the quote
+ * is saved as they go. The address is confirmed here too, because the
+ * marketing page may only have given us a house number.
  */
 export function RefineGateStep({
   draft,
@@ -303,9 +300,8 @@ export function RefineGateStep({
   onNext,
   onBack,
   busy,
-  intent,
   setReminder,
-}: StepProps & { intent: GateIntent; setReminder: (reminder: boolean) => void }) {
+}: StepProps & { setReminder: (reminder: boolean) => void }) {
   const { addressLine } = draft.survey;
   const email = draft.contact.email;
   const emailOk = EMAIL_RE.test(email);
@@ -315,12 +311,8 @@ export function RefineGateStep({
   return (
     <StepShell
       step={step}
-      title={intent === "refine" ? "Edit your quote" : "Save your quote"}
-      subtitle={
-        intent === "refine"
-          ? "Your email first, so your quote is saved as you go and you can pick it up on any device. Then your home, room by room."
-          : "Your email first, so your quote has somewhere to live. Then your name, and it's yours in writing."
-      }
+      title="Refine your quote"
+      subtitle="Your email first, so your quote is saved as you go and you can pick it up on any device. Then your home, room by room, with what we know already filled in."
       onNext={() => {
         setTried(true);
         if (emailOk && addressOk) onNext();
