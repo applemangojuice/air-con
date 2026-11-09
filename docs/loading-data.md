@@ -39,6 +39,17 @@ to the latest, about 8.6 GB unzipped).
    anything is wrong. Check the outcodes (it starts with your service area),
    press **Import**, and keep the tab open.
 
+The 2026 download holds 38 files: `certificates-YEAR.csv` (2008 to the
+latest, about 28 GB unzipped, the same 93 lower-case columns each) and
+`recommendations-YEAR.csv` (improvement suggestions keyed by
+`certificate_number`, no addresses, about 70 GB). The import reads the
+certificates and skips the recommendations, saying so before it starts.
+
+**Database space:** each home takes about 1.5 KB. Supabase's free plan has
+500 MB, so on it, load the outcodes you're working in first (say SW16, SW17)
+and check **Supabase → Project → Usage** before adding more; Pro (8 GB) takes
+the whole service area easily.
+
 The browser reads the CSVs straight out of the zip on your own computer
 (ZIP64, stored and deflate entries; tested at about 170 MB a second of
 unzipped data in Chromium) and sends only the rows in your outcodes, 500 at a

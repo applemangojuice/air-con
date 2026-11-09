@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   CsvRecordStream,
   EPC_BATCH_SIZE,
+  epcCandidate,
   epcColumnProblems,
   epcRowFromFields,
   mapEpcColumns,
@@ -91,8 +92,8 @@ async function partsFrom(files: File[]): Promise<Part[]> {
 interface SavedRun {
   outcodes: string;
   done: string[];
-  /** The part in progress and how many of its matching rows the server already has. */
-  partial?: { key: string; sent: number };
+  /** The part in progress and how many of its matching rows are dealt with (saved, or not needed). */
+  partial?: { key: string; handled: number };
   totals: { saved: number; older: number };
 }
 
@@ -236,7 +237,7 @@ function duration(seconds: number): string {
 export function EpcImporter({ defaultOutcodes }: { defaultOutcodes: string }) {
   const [files, setFiles] = useState<File[]>([]);
   const [parts, setParts] = useState<Part[]>([]);
-  const [check, setCheck] = useState<{ found: string[]; missing: string[] } | null>(null);
+  const [check, setCheck] = useState<{ found: string[]; missing: string[]; skipped: string[] } | null>(null);
   const [outcodeText, setOutcodeText] = useState(defaultOutcodes);
   const [phase, setPhase] = useState<Phase>("idle");
   const [progress, setProgress] = useState<Progress>(EMPTY);
@@ -294,23 +295,31 @@ export function EpcImporter({ defaultOutcodes }: { defaultOutcodes: string }) {
     }
     setPhase("checking");
     try {
-      const found = await partsFrom(chosen);
+      const all = await partsFrom(chosen);
+      // The download also holds files that aren't certificates (recommendations-YEAR.csv: improvement
+      // suggestions, no addresses). Skip those, but refuse when nothing chosen is certificate data.
+      const found: Part[] = [];
+      const skipped: string[] = [];
+      let firstProblem = "";
       let union: EpcColumnMap = {};
-      for (const part of found) {
+      for (const part of all) {
         const header = splitCsvRecord(await part.firstLine());
         const map = mapEpcColumns(header);
         const problems = epcColumnProblems(map);
         if (problems.length > 0) {
-          throw new Error(
-            `${part.label} doesn't look like EPC certificate data: ${problems.join("; ")}. Its first columns are: ${header.slice(0, 12).join(", ")}.`,
-          );
+          skipped.push(part.label);
+          firstProblem ||= `${part.label} doesn't look like EPC certificate data: ${problems.join("; ")}. Its first columns are: ${header.slice(0, 12).join(", ")}.`;
+          continue;
         }
+        found.push(part);
         union = { ...union, ...map };
       }
+      if (found.length === 0) throw new Error(firstProblem);
       const labels = Object.entries(FIELD_LABEL) as [EpcField, string][];
       setCheck({
         found: labels.filter(([f]) => union[f] !== undefined).map(([, l]) => l),
         missing: labels.filter(([f]) => union[f] === undefined).map(([, l]) => l),
+        skipped: skipped.sort((a, b) => a.localeCompare(b, "en", { numeric: true })),
       });
       setParts(found);
       const run = loadRun(runKey(chosen));
@@ -339,6 +348,10 @@ export function EpcImporter({ defaultOutcodes }: { defaultOutcodes: string }) {
     setPhase("running");
     const stopped = () => stopRef.current;
     const outcodeParam = outcodes.join(",");
+    // Newest year first, so a home's newest certificate is sent first and its older ones
+    // need not be sent at all. (After a resume this starts empty; the server still keeps
+    // the newest, it just does more of the checking.)
+    const newestSent = new Map<string, string>();
     const doneBytes = parts.filter((p) => state.done.includes(p.key)).reduce((n, p) => n + p.size, 0);
     const p: Progress = {
       ...EMPTY,
@@ -366,21 +379,21 @@ export function EpcImporter({ defaultOutcodes }: { defaultOutcodes: string }) {
         if (state.done.includes(part.key)) continue;
         paint(true);
 
-        // Rows of this part the server already has (from before a stop): read past them, don't resend.
-        let skip = state.partial?.key === part.key ? state.partial.sent : 0;
-        let sentThisPart = skip;
+        // Matching rows of this part already dealt with before a stop: read past them, don't resend.
+        const resumeAfter = state.partial?.key === part.key ? state.partial.handled : 0;
+        let matchedInPart = 0;
         const csv = new CsvRecordStream(outcodePrefilter(outcodes));
         let columns: EpcColumnMap | null = null;
         let pending: EpcRow[] = [];
         const flush = async () => {
           if (pending.length === 0) return;
           const batch = pending;
+          const handled = matchedInPart;
           const r = await sendBatch(batch, outcodeParam, stopped, setWaitNote);
           pending = [];
-          sentThisPart += batch.length;
           p.saved += r.saved;
           p.older += r.older;
-          state.partial = { key: part.key, sent: sentThisPart };
+          state.partial = { key: part.key, handled };
           state.totals = { saved: p.saved, older: p.older };
           saveRun(key, state);
           paint();
@@ -396,10 +409,16 @@ export function EpcImporter({ defaultOutcodes }: { defaultOutcodes: string }) {
             const row = epcRowFromFields(fields, columns!);
             if (!row.postcode || !outcodes.includes(outcodeOf(row.postcode))) continue;
             p.matched++;
-            if (skip > 0) {
-              skip--;
+            matchedInPart++;
+            if (matchedInPart <= resumeAfter) continue;
+            const candidate = epcCandidate(row, outcodes);
+            if (!candidate) continue;
+            const sentLodged = newestSent.get(candidate.intel.id);
+            if (sentLodged !== undefined && sentLodged >= candidate.lodged) {
+              p.older++;
               continue;
             }
+            newestSent.set(candidate.intel.id, candidate.lodged);
             pending.push(row);
             if (pending.length >= EPC_BATCH_SIZE) await flush();
           }
@@ -501,6 +520,12 @@ export function EpcImporter({ defaultOutcodes }: { defaultOutcodes: string }) {
             {parts.length > 1 ? ` (${parts[parts.length - 1].label} to ${parts[0].label})` : ""}.
           </p>
           <p className="mt-1">Found the {check.found.join(", ")}.</p>
+          {check.skipped.length > 0 && (
+            <p className="mt-1">
+              Skipping {check.skipped.length} other file{check.skipped.length === 1 ? "" : "s"} with no addresses
+              ({check.skipped.length > 2 ? `${check.skipped[0]} to ${check.skipped[check.skipped.length - 1]}` : check.skipped.join(", ")}).
+            </p>
+          )}
           {check.missing.length > 0 && (
             <p className="mt-1">
               Not in these files: {check.missing.join(", ")}. The import works without them
@@ -606,7 +631,7 @@ export function EpcImporter({ defaultOutcodes }: { defaultOutcodes: string }) {
               <dd className="font-semibold">{n(progress.matched)}</dd>
             </div>
             <div>
-              <dt className="text-ink-500">Homes saved</dt>
+              <dt className="text-ink-500">Homes saved or updated</dt>
               <dd className="font-semibold">{n(progress.saved)}</dd>
             </div>
             <div>

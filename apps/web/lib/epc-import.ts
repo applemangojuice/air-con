@@ -161,36 +161,37 @@ export class CsvRecordStream {
     const records: string[][] = [];
     let header: string[] | undefined;
     let scanned = 0;
-    let start = 0;
-    let inQuotes = false;
     const buf = this.buffer;
-    for (let i = 0; i < buf.length; i++) {
-      const c = buf.charCodeAt(i);
-      if (c === 34 /* " */) inQuotes = !inQuotes; // a doubled quote toggles twice: no change
-      else if (c === 10 /* \n */ && !inQuotes) {
-        const raw = buf.slice(start, buf.charCodeAt(i - 1) === 13 ? i - 1 : i);
-        start = i + 1;
-        if (raw.length === 0) continue;
-        if (!this.header) {
-          this.header = splitCsvRecord(raw);
-          header = this.header;
-          continue;
-        }
-        scanned++;
-        if (this.wanted(raw)) records.push(splitCsvRecord(raw));
+    let start = 0; // where the record being read began
+    let pos = 0; // where to look for the next line break
+    let inQuotes = false;
+    const take = (raw: string) => {
+      if (raw.length === 0) return;
+      if (!this.header) {
+        this.header = splitCsvRecord(raw);
+        header = this.header;
+        return;
       }
+      scanned++;
+      if (this.wanted(raw)) records.push(splitCsvRecord(raw));
+    };
+    // Jump from line break to line break (indexOf runs natively, many times faster than
+    // looking at every character), counting the quotes between them: a line break inside
+    // quotes is part of a field, not the end of a record. A doubled quote counts twice.
+    for (;;) {
+      const nl = buf.indexOf("\n", pos);
+      if (nl < 0) break;
+      for (let q = buf.indexOf('"', pos); q !== -1 && q < nl; q = buf.indexOf('"', q + 1)) inQuotes = !inQuotes;
+      pos = nl + 1;
+      if (inQuotes) continue;
+      take(buf.slice(start, nl > start && buf.charCodeAt(nl - 1) === 13 ? nl - 1 : nl));
+      start = pos;
     }
     this.buffer = buf.slice(start);
     if (final && this.buffer.trim().length > 0) {
       const raw = this.buffer.replace(/\r$/, "");
       this.buffer = "";
-      if (!this.header) {
-        this.header = splitCsvRecord(raw);
-        header = this.header;
-      } else {
-        scanned++;
-        if (this.wanted(raw)) records.push(splitCsvRecord(raw));
-      }
+      take(raw);
     }
     return { header, records, scanned };
   }
@@ -223,11 +224,9 @@ export function splitCsvRecord(raw: string): string[] {
 /** A cheap "might this record be in one of these outcodes?" check on raw text. */
 export function outcodePrefilter(outcodes: string[]): (raw: string) => boolean {
   if (outcodes.length === 0) return () => true;
-  const needles = outcodes.map((o) => o.toUpperCase());
-  return (raw) => {
-    const upper = raw.toUpperCase();
-    return needles.some((n) => upper.includes(n));
-  };
+  // The register writes postcodes in capitals; the lower-case form is a cheap safety net.
+  const needles = outcodes.flatMap((o) => [o.toUpperCase(), o.toLowerCase()]);
+  return (raw) => needles.some((n) => raw.includes(n));
 }
 
 /* ------------------------------------------------------------------ */

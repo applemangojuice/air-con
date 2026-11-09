@@ -112,9 +112,15 @@ export async function POST(request: Request) {
       console.error("EPC import: save failed:", error.message);
       return NextResponse.json({ error: `Saving failed after ${saved} homes: ${error.message}`, saved, older, skipped }, { status: 502 });
     }
-    const { error: logError } = await supabase
-      .from("property_assessments")
-      .insert(chunk.map((r) => ({ property_id: r.id, source: "epc-import", assessment: r.intel })));
+    // The history log gets a short note per certificate, not a second copy of the record:
+    // a bulk load can be hundreds of thousands of homes, and the database plan's space is finite.
+    const { error: logError } = await supabase.from("property_assessments").insert(
+      chunk.map((r) => ({
+        property_id: r.id,
+        source: "epc-import",
+        assessment: { via: "bulk-upload", lodgedAt: r.intel.epc?.lodgedAt ?? null, currentRating: r.intel.epc?.currentRating ?? null },
+      })),
+    );
     if (logError) console.warn("EPC import: assessment log failed:", logError.message);
     saved += chunk.length;
   }
