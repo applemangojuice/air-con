@@ -1,9 +1,10 @@
 /**
  * End-to-end smoke of the quote funnel in a real browser:
- * homepage address → instant price (no email) → "Refine my quote" → email
- * gate → house → rooms (price) → firm up (optional, skipped) → details +
- * consent → saved quote page → "Book my survey" → project page. Plus the
- * out-of-area path.
+ * homepage postcode → address → guide price (no email, rooms and size
+ * adjustable) → "Refine my quote" → email gate (one notice, one opt-out) →
+ * "Your home" (rooms ticked, saved as they go) → "Next: confirm your price"
+ * → saved quote page → "Book my virtual survey" → project page. Plus a
+ * returning visitor, the out-of-area path and a direct visit.
  *
  * Run against a production build with a database (file backend is fine):
  *   pnpm build && DATA_BACKEND=file pnpm start -p 3000 &
@@ -76,13 +77,12 @@ try {
   await page.waitForURL("**/quote**");
   check("address form navigates to /quote", page.url().includes("/quote"));
 
-  // 2. The guide price: no email asked, the home filled in for them, the basics adjustable.
+  // 2. The guide price: no email asked, the home filled in for them, rooms and size adjustable.
   await page.waitForSelector("text=Your guide price", { timeout: 20000 });
   await page.waitForSelector("text=/£[0-9,]+/");
   const priceScreen = (await page.locator("main").textContent()) ?? "";
   check("price shows before any email field", (await page.locator('input[type="email"]').count()) === 0);
   check("it's called a guide price, confirmed at the survey, with the virtual-survey note", /Guide price/.test(priceScreen) && /Confirmed at your survey/.test(priceScreen) && /virtual survey/i.test(priceScreen));
-  check("price screen says what it started from", /Priced for/.test(priceScreen) && /(public records|homes around you|typical home)/.test(priceScreen));
   check("no confidence score on the guide price", !/confidence/i.test(priceScreen) && !/\d+\/100/.test(priceScreen));
   check("price screen is not a numbered step", !/Step \d of \d/.test(priceScreen));
   const strip = page.locator('[aria-label="Your journey"] li');
@@ -90,18 +90,26 @@ try {
   check("journey strip reads virtual survey, purchase, install, aftercare", /Virtual survey.*Purchase.*Install.*Aftercare/s.test((await page.locator('[aria-label="Your journey"]').textContent()) ?? ""));
   check("terms and privacy linked on the step", (await page.locator('a[href="/terms"]').count()) > 0 && (await page.locator('a[href="/privacy"]').count()) > 0);
   const card = page.locator('[data-testid="basics"]');
-  check("one small card: home, bedrooms, bathrooms, size, no era or layout", (await card.count()) === 1 && /Home.*Bedrooms.*Bathrooms.*Size/s.test((await card.textContent()) ?? "") && !/built|kitchen/i.test((await card.textContent()) ?? ""));
-  check("the assumed answers are lit", (await card.locator("input[data-selected]").count()) >= 3);
-  // The basics are live before any email: tap 4+ bedrooms and the pill takes, the price re-renders.
-  const priceBefore = (await page.locator("text=/£[0-9,]+/").first().textContent()) ?? "";
-  await card.locator('label:has-text("4+")').first().click();
-  check("tapping a basic changes the selection", await card.locator('label:has-text("4+") input').first().isChecked());
-  const priceAfter = (await page.locator("text=/£[0-9,]+/").first().textContent()) ?? "";
-  check("a price is still shown after adjusting", /£[0-9,]+/.test(priceAfter) && priceBefore.length > 0);
-  check("one button, Refine my quote, and no save or edit buttons", (await page.locator('button:has-text("Refine my quote")').count()) === 1 && (await page.locator('button:has-text("Looks right")').count()) === 0 && (await card.locator("button").count()) === 0);
+  const cardText = async () => (await card.textContent()) ?? "";
+  check("the card says what's priced in a sentence", /Priced for \d+ bedrooms?, .*(kitchen|living)/.test(await cardText()));
+  check("no home type, era, bathrooms or layout on the card", !/terraced|detached|bathroom|built/i.test(await cardText()));
+  const price = async () => (await page.locator("text=/£[0-9,]+/").first().textContent()) ?? "";
+  const before = await price();
+  const chips = card.locator('button[aria-label^="Leave out"]');
+  const chipCount = await chips.count();
+  await chips.last().click();
+  check("✕ on a room takes it out of the price", (await chips.count()) === chipCount - 1 && (await price()) !== before);
+  check("a room left out can be added back", (await card.locator('button:has-text("+ ")').count()) >= 1);
+  await card.locator('button:has-text("+ ")').first().click();
+  check("adding it back restores the price", (await price()) === before && (await chips.count()) === chipCount);
+  await card.locator('button:has-text("+ Bedroom")').click();
+  check("+ Bedroom adds one", (await chips.count()) === chipCount + 1);
+  await card.locator('label:has-text("120–140")').click();
+  check("size bands are tappable", await card.locator('label:has-text("120–140") input').isChecked());
+  check("one button, Refine my quote", (await page.locator('button:has-text("Refine my quote")').count()) === 1 && (await page.locator('button:has-text("Looks right")').count()) === 0);
   await page.click('button:has-text("Refine my quote")');
 
-  // 3. The email gate: address confirmed, email required, reminder offered.
+  // 3. The email gate: address confirmed, email required, the legal-minimum notice with one unticked opt-out.
   await page.waitForSelector("text=Refine your quote");
   const addressInput = page.locator('input[autocomplete="address-line1"]');
   const typed = await addressInput.inputValue();
@@ -110,54 +118,70 @@ try {
   await page.click('button[type="submit"]');
   await page.waitForSelector("text=/Add an email address/");
   check("continuing without an email is refused with a reason", true);
-  await page.fill('input[type="email"]', "e2e@example.com");
-  // Told at collection, free to refuse: one reminder, ticked unless they untick it.
-  const reminder = page.getByLabel(/Email me one reminder if I don't finish/);
-  const offered = (await reminder.count()) === 1 && (await reminder.isChecked());
-  if (offered) await reminder.uncheck();
-  const unticks = offered && !(await reminder.isChecked());
-  if (offered) await reminder.check();
-  check("a reminder email is offered under the email, ticked, and can be unticked", unticks && /Untick and we won't/.test((await page.locator("main").textContent()) ?? ""));
+  const gate = (await page.locator("main").textContent()) ?? "";
+  check("no 'Email me one reminder' box; one notice line instead", !/Email me one reminder/.test(gate) && /one reminder if you stop part-way/.test(gate));
+  const optOut = page.getByLabel(/Don't send me the reminder or any news/);
+  check("one opt-out box, unticked", (await page.locator('input[type="checkbox"]').count()) === 1 && (await optOut.count()) === 1 && !(await optOut.isChecked()));
+  const email = `e2e-${Date.now()}@example.com`;
+  await page.fill('input[type="email"]', email);
   await page.click('button[type="submit"]');
 
-  // 4–6. House, rooms (price), firm-up (skipped): the numbered refine form.
-  await page.waitForSelector("text=Step 1 of 4");
-  check("house step reached, option groups are fieldsets", (await page.locator("fieldset legend").count()) >= 4);
-  check("progressbar is exposed", (await page.locator('[role="progressbar"][aria-valuenow="1"]').count()) === 1);
+  // 4. "Your home": one page. Rooms ticked at the top, not-included under them, the few answers, no photos, no name.
+  await page.waitForSelector("text=Rooms to air-condition", { timeout: 15000 });
+  const homeText = (await page.locator("main").textContent()) ?? "";
+  const rooms = page.locator('[data-testid="rooms"] input[type="checkbox"]');
+  check("rooms to air-condition are listed with ticks, the one left out unticked", (await rooms.count()) >= 4);
+  check("no public-records notice, home type, era or bathrooms", !/public records|What kind of home|when was it built|Bathrooms/i.test(homeText));
+  check("kitchen and living labels in plain words", /One kitchen and living area/.test(homeText) && /Separate kitchen area and living room/.test(homeText) && /Two living rooms and a kitchen area/.test(homeText));
+  check("ownership and timeframe asked here", /Do you own the home/.test(homeText) && /When are you hoping to install/.test(homeText));
+  check("no photo uploads, fuse-board question, name or phone", (await page.locator('input[type="file"]').count()) === 0 && !/fuse board/i.test(homeText) && (await page.locator('input[autocomplete="name"], input[type="tel"]').count()) === 0);
   check("no autofocus keyboard pop on step change", !(await focusIsTextInput()));
-  await page.click('button[type="submit"]');
-  await page.waitForSelector("text=Step 2 of 4");
-  await page.waitForSelector("text=/£[0-9,]+/");
-  check("rooms step shows a price", true);
+  const homePrice = await price();
+  await rooms.first().uncheck();
+  check("unticking a room changes the price", (await price()) !== homePrice);
+  await rooms.first().check();
   check("no finance example without a lender", !/\/mo\b|\bAPR\b/.test((await page.locator("main").textContent()) ?? ""));
-  await page.click('button[type="submit"]');
-  await page.waitForSelector("text=Step 3 of 4");
-  check("optional firm-up step offered", (await page.locator('button:has-text("Skip for now")').count()) === 1);
-  await page.click('button[type="submit"]');
 
-  // 7. Details: consent is required, marketing is optional and unticked.
-  await page.waitForSelector("text=Step 4 of 4");
-  check("email from the gate is carried into the details", (await page.locator('input[type="email"]').inputValue()) === "e2e@example.com");
-  const boxes = page.locator('input[type="checkbox"]');
-  check("two separate consent boxes, both unticked", (await boxes.count()) === 2 && !(await boxes.nth(0).isChecked()) && !(await boxes.nth(1).isChecked()));
-  await page.fill('input[autocomplete="name"]', "DEMO Funnel Tester");
-  await page.click('button[type="submit"]');
-  await page.waitForSelector("text=/Tick the first box/");
-  check("saving without operational consent is refused with a reason", true);
-  await page.locator('label:has-text("Save my quote and keep me posted")').click();
-  await page.click('button[type="submit"]');
+  // 5. Saved as they go: a reload on this device comes back to "Your home".
+  await page.waitForTimeout(3000);
+  await page.reload({ waitUntil: "networkidle" });
+  await page.waitForSelector("text=Rooms to air-condition", { timeout: 15000 });
+  check("a refresh comes back to the same page", true);
 
-  // 8. Saved quote page (or the demo result when there's no database).
-  await page.waitForSelector("text=Book my survey", { timeout: 20000 });
+  // 6. Next: confirm your price → the saved quote page (or the demo result when there's no database).
+  await page.click('button:has-text("Next: confirm your price")');
+  await page.waitForSelector("text=Book my virtual survey", { timeout: 20000 });
   const result = (await page.locator("main").textContent()) ?? "";
   check("price renders on the result", /£[0-9,]+/.test(result));
   check("result says confirmed at survey, not locked", /confirmed at your (home )?survey/i.test(result) && !/price locked|guaranteed/i.test(result));
   check("result states validity", /Valid (until|for)/.test(result));
+  check("the next step is the virtual survey", /Confirm your price with a virtual survey/.test(result));
 
-  // 9. The journey continues: Book my survey → the project page.
-  await page.click('button:has-text("Book my survey")');
+  // 7. Coming back with the same email and postcode on another device: we email the link, no second quote.
+  const other = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  await other.goto(`${BASE}/quote?postcode=${encodeURIComponent("SW16 2BE")}&address=${encodeURIComponent("12 Example Road")}`, { waitUntil: "networkidle" });
+  await other.waitForSelector("text=Your guide price", { timeout: 20000 });
+  await other.click('button:has-text("Refine my quote")');
+  await other.waitForSelector("text=Refine your quote");
+  await other.fill('input[type="email"]', `back-${email}`);
+  await other.click('button[type="submit"]');
+  await other.waitForSelector("text=Rooms to air-condition", { timeout: 15000 });
+  await other.close();
+  const third = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  await third.goto(`${BASE}/quote?postcode=${encodeURIComponent("SW16 2BE")}&address=${encodeURIComponent("12 Example Road")}`, { waitUntil: "networkidle" });
+  await third.waitForSelector("text=Your guide price", { timeout: 20000 });
+  await third.click('button:has-text("Refine my quote")');
+  await third.waitForSelector("text=Refine your quote");
+  await third.fill('input[type="email"]', `back-${email}`);
+  await third.click('button[type="submit"]');
+  await third.waitForSelector("text=Welcome back", { timeout: 15000 });
+  check("same email and postcode again: we email the link instead of a second quote", /emailed you a link/.test((await third.locator("main").textContent()) ?? ""));
+  await third.close();
+
+  // 8. The journey continues: Book my virtual survey → the project page.
+  await page.click('button:has-text("Book my virtual survey")');
   await page.waitForURL("**/p/**", { timeout: 15000 });
-  check("Book my survey lands on the project page", page.url().includes("/p/"));
+  check("Book my virtual survey lands on the project page", page.url().includes("/p/"));
   await page.waitForLoadState("networkidle");
   const hub = (await page.locator("main").textContent()) ?? "";
   check("the browser that saved the quote opens its project (no sign-in wall)", !/Sign in to see your project/.test(hub));
@@ -174,9 +198,11 @@ try {
   check("out-of-area heads-up is stored", true);
 
   // 11. A direct visit with no address: the address screen, then the price.
-  await page.goto(`${BASE}/quote`, { waitUntil: "networkidle" });
+  // "load", not "networkidle": a Next.js prefetch can sit open in the browser (the server answers it at once),
+  // and the screen itself is what's waited for next.
+  await page.goto(`${BASE}/quote`, { waitUntil: "load" });
   await page.evaluate(() => window.localStorage.clear());
-  await page.reload({ waitUntil: "networkidle" });
+  await page.reload({ waitUntil: "load" });
   await page.waitForSelector("text=Where's your home?");
   await page.fill('input[autocomplete="postal-code"]', "SW16 2BE");
   await page.waitForSelector("text=/we cover SW16/i", { timeout: 15000 });

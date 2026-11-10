@@ -2319,8 +2319,9 @@ changelog and the reasons, so nobody "fixes" a deliberate choice back.
       include it.
     - *The unfinished-quote reminder asks first and has a budget*
       (`api/cron/follow-up`, `lib/follow-up.ts`, `lib/follow-up-notice.ts`):
-      step 1 shows **Email me one reminder if I don't finish** under the
-      email (ticked unless unticked); the draft records the answer and the
+      the refine gate shows one line of notice and one unticked opt-out,
+      **Don't send me the reminder or any news** (v2; v1 was an opt-in
+      box, still honoured); the draft records the answer and the
       wording version in its `attribution` JSON (`reminderRecord`; no
       migration), and only a draft that saw this wording and left it ticked
       is reminded (`reminderAllowed`). `pickFollowUps` keeps one per person

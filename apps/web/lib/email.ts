@@ -180,7 +180,8 @@ export function quoteEmail(input: QuoteEmailInput): { subject: string; html: str
   const contact = input.supportPhone
     ? `reply to this email or call ${escapeHtml(input.supportPhone)}`
     : `reply to this email or write to ${escapeHtml(input.supportEmail)}`;
-  const html = brandedEmail(`<p style="margin:0 0 14px">Hi ${escapeHtml(input.name)},</p>
+  // No name yet (the survey asks for it): "Hi," rather than "Hi ,".
+  const html = brandedEmail(`<p style="margin:0 0 14px">Hi${input.name.trim() ? ` ${escapeHtml(input.name.trim())}` : ""},</p>
     <p style="margin:0 0 6px;color:#5d6371;font-size:14px">Your price for heating and cooling ${rooms}:</p>
     <p style="margin:0 0 6px;font-size:36px;font-weight:700">${total}</p>
     <p style="margin:0 0 16px;color:#454b58;font-size:14px">Installed over ${escapeHtml(input.installDays)}${input.vatLine ? ` · ${escapeHtml(input.vatLine)}` : ""} · valid until ${longDate(input.validUntil)}</p>

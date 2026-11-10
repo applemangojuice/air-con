@@ -58,9 +58,10 @@ database holding a real customer, and `/ops/launch` turns red.
 
 ## Vercel (the website)
 
-- **Does:** runs the website and the office and field apps, and three daily
-  jobs (`apps/web/vercel.json`): the morning email at 06:00 UTC, the
-  website quote follow-up at 10:00 UTC, and the daily run (reminders,
+- **Does:** runs the website and the office and field apps, and three
+  scheduled jobs (`apps/web/vercel.json`): the morning email at 06:00 UTC,
+  the website quote follow-up every 10 minutes (needs the Pro plan), and
+  the daily run (reminders,
   proposal expiry, message retries, aftercare) at 16:00 UTC. The functions
   run in London (`lhr1`), next to the database.
 - **Required.** Already in use.

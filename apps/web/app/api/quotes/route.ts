@@ -56,18 +56,27 @@ const bodySchema = z.object({
   /** First-touch acquisition, so a booking traces back to its campaign. */
   attribution: attributionSchema,
   contact: z.object({
-    // Printed in the email we send to the address typed: a name, nothing else (lib/person-name.ts).
-    name: z.string().trim().max(120).refine((n) => personNameProblem(n) === null, "Invalid name"),
+    // The funnel no longer asks for a name (the survey does): blank is fine.
+    // Any name given is printed in the email we send, so it's a name and nothing else (lib/person-name.ts).
+    name: z
+      .string()
+      .trim()
+      .max(120)
+      .optional()
+      .default("")
+      .refine((n) => n === "" || personNameProblem(n) === null, "Invalid name"),
     email: z.string().trim().toLowerCase().email().max(200),
     phone: phoneSchema,
     timeframe: z.enum(["asap", "1-3-months", "researching"]),
   }),
   /**
-   * Operational consent (required to save) and marketing consent (optional,
-   * never assumed), with the wording version the customer saw.
+   * What they were told about emails, and whether they refused the
+   * reminder and news (lib/follow-up-notice.ts), with the wording version.
+   * v2 has no operational tick: emails about the quote they asked for are
+   * what they asked for. v1 clients still send operational: true.
    */
   consents: z.object({
-    operational: z.literal(true),
+    operational: z.literal(true).optional(),
     marketing: z.boolean(),
     version: z.string().max(40).optional(),
   }),
@@ -177,7 +186,7 @@ export async function POST(request: Request) {
   };
 
   const record = {
-    customer_name: contact.name,
+    customer_name: contact.name || null,
     email: contact.email,
     phone: phone || null,
     timeframe: contact.timeframe,
@@ -275,6 +284,9 @@ export async function POST(request: Request) {
 }
 
 type Contact = { name: string; email: string; phone: string; timeframe: string };
+
+/** Who to call them in a team email: their name, or their email until the survey takes a name. */
+const who = (c: Contact) => c.name || c.email;
 type Attribution = { referrer?: string; utmSource?: string; utmCampaign?: string } | undefined;
 
 async function notifyNewLead(
@@ -288,8 +300,8 @@ async function notifyNewLead(
   const base = appUrl();
   const source = attribution?.utmCampaign || attribution?.utmSource || attribution?.referrer || "direct";
   await sendTeamEmail(
-    `New quote: ${escapeHtml(contact.name)} · ${gbpText(totalGbp)}`,
-    `<p><strong>${escapeHtml(contact.name)}</strong> just got a price.</p>
+    `New quote: ${escapeHtml(who(contact))} · ${gbpText(totalGbp)}`,
+    `<p><strong>${escapeHtml(who(contact))}</strong> just got a price.</p>
 <ul>
   <li>Email: ${escapeHtml(contact.email)}</li>
   <li>Phone: ${escapeHtml(contact.phone || "—")}</li>
@@ -306,11 +318,11 @@ async function notifyNewLead(
 
 async function alertLeadLost(contact: Contact, totalGbp: number, postcode: string, reason: string): Promise<void> {
   await sendTeamEmail(
-    `⚠️ Quote FAILED TO SAVE: ${escapeHtml(contact.name)} — recover by hand`,
+    `⚠️ Quote FAILED TO SAVE: ${escapeHtml(who(contact))} — recover by hand`,
     `<p>A customer completed the funnel but the database write failed, so this
 lead is <strong>not</strong> in the system. Reach out to them directly.</p>
 <ul>
-  <li>Name: ${escapeHtml(contact.name)}</li>
+  <li>Name: ${escapeHtml(contact.name || "— (not asked yet)")}</li>
   <li>Email: ${escapeHtml(contact.email)}</li>
   <li>Phone: ${escapeHtml(contact.phone || "—")}</li>
   <li>Postcode: ${escapeHtml(postcode)}</li>

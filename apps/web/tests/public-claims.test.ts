@@ -159,6 +159,8 @@ test("example homes say which rooms they include, and the anchor is the cheapest
   assert.equal(roomsSummary(["Bedroom", "Living room"]), "Bedroom and living room");
 });
 
+const m_text = () => quoteConsentRecord({ marketing: true, hasPhone: false, at: "2026-10-18T10:00:00.000Z" }).marketing.text;
+
 test("consent record: operational and marketing are separate, versioned facts", () => {
   const r = quoteConsentRecord({ marketing: false, hasPhone: true, at: "2026-10-18T10:00:00.000Z" });
   assert.equal(r.operational.given, true);
@@ -166,7 +168,8 @@ test("consent record: operational and marketing are separate, versioned facts", 
   assert.equal(r.marketing.given, false);
   assert.deepEqual(r.marketing.channels, []);
   assert.equal(r.operational.version, r.marketing.version);
-  assert.match(r.operational.text, /No sales calls and no marketing/);
+  assert.match(r.operational.text, /link to your quote/, "the words they were shown at the gate");
+  assert.match(m_text(), /soft opt-in/);
   const m = quoteConsentRecord({ marketing: true, hasPhone: false, at: "2026-10-18T10:00:00.000Z" });
   assert.deepEqual(m.operational.channels, ["email"]);
   assert.deepEqual(m.marketing.channels, ["email"]);

@@ -251,8 +251,10 @@ that isn't set).
 - **A message that fails** shows in red on the Messages page and is retried
   on the next daily run, or straight away with **Retry**.
 - **Website enquiries that weren't finished** (not the pilots) get one
-  friendly reminder email between 24 hours and 7 days after they stopped,
-  sent at 10:00 UTC, and never another, but only if they left **Email me
-  one reminder if I don't finish** ticked under the email on the form's
-  first step (at most 10 a day). It says why it came and how to have the
-  quote deleted.
+  friendly reminder email about 10 minutes after they stop (checked every 10
+  minutes, up to 7 days), with a link that reopens their saved answers on
+  any device, and never another. Not if they ticked **Don't send me the
+  reminder or any news** under the email on the quote form (at most 10 a
+  day). It says why it came and how to have the quote deleted.
+- **Coming back** with the same email and postcode as an unfinished quote
+  doesn't start a second one: we email them the link to the one they have.

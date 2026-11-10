@@ -37,7 +37,8 @@ export async function submitQuote(
         contact: draft.contact,
         draftId: draft.draftId,
         attribution: getAttribution(),
-        consents: { operational: true, marketing: consents.marketing, version: CONSENT_VERSION },
+        // v2: no operational tick (emails about their own quote need none); marketing is the soft opt-in, refused at the gate.
+        consents: { marketing: consents.marketing, version: CONSENT_VERSION },
       }),
     });
     const data = (await res.json().catch(() => null)) as

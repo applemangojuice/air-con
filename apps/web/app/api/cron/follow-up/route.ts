@@ -1,24 +1,24 @@
 import { NextResponse } from "next/server";
 import { cronSecret } from "@/lib/env-placeholders";
 import { constantTimeEqual } from "@/lib/auth/session";
-import { appUrl } from "@/lib/brand";
 import { brandedEmail, emailConfigured, sendEmail } from "@/lib/email";
 import { spendEmailBudget } from "@/lib/email-budget";
-import { FOLLOW_UPS_PER_RUN, followUpLines, followUpSubject, pickFollowUps, reminderAllowed, type FollowUpDraft, type FollowUpRelated } from "@/lib/follow-up";
+import { FOLLOW_UPS_PER_RUN, IDLE_MINUTES, followUpLines, followUpSubject, isIdle, pickFollowUps, reminderAllowed, resumeLink, type FollowUpDraft, type FollowUpRelated } from "@/lib/follow-up";
 import { getSettings } from "@/lib/settings-server";
 import { getServiceClient } from "@/lib/supabase-server";
 
 /**
- * Daily cron: one friendly follow-up email to people who started the quote
- * funnel and stopped. The rules are deliberately conservative:
+ * Every 10 minutes: one friendly follow-up email to people who started the
+ * quote funnel and stopped. The rules are deliberately conservative:
  *
- *  - Only drafts whose owner saw "Email me one reminder if I don't finish"
- *    next to the step-1 email and left it ticked (the draft records the
- *    wording version: lib/follow-up-notice.ts). Older drafts, and any a
- *    script made without the box, are never reminded.
- *  - Only drafts between 24 hours and 7 days old. Younger might still
- *    finish on their own; older is stale (and prevents a mass-mail of
- *    historic drafts the first time this is enabled).
+ *  - Only drafts whose owner saw the email notice at the refine gate and
+ *    didn't tick the opt-out (the draft records the wording version:
+ *    lib/follow-up-notice.ts). Drafts that never saw a known wording, and
+ *    any a script made, are never reminded.
+ *  - Only drafts left alone for IDLE_MINUTES (10) and made in the last 7
+ *    days. Busier ones are still being filled in; older is stale (and
+ *    prevents a mass-mail of historic drafts the first time this runs).
+ *  - The email links straight back to their saved answers (resumeLink).
  *  - One email per person, ever: never an address that finished a quote or
  *    was already reminded (follow_up_sent_at is the flag, set BEFORE
  *    sending so a crash can't cause double-sends).
@@ -54,17 +54,18 @@ export async function GET(request: Request) {
   }
 
   const now = Date.now();
-  const dayAgo = new Date(now - 24 * 3600_000).toISOString();
   const weekAgo = new Date(now - 7 * 24 * 3600_000).toISOString();
+  const idleCutoff = new Date(now - IDLE_MINUTES * 60_000).toISOString();
 
+  // Newest first: a 10-minute reminder is about the people who just left.
   const { data, error } = await supabase
     .from("quote_requests")
     .select("id, email, postcode, created_at, attribution")
     .eq("status", "draft")
     .is("follow_up_sent_at", null)
     .gt("created_at", weekAgo)
-    .lt("created_at", dayAgo)
-    .order("created_at", { ascending: true })
+    .lt("created_at", idleCutoff)
+    .order("created_at", { ascending: false })
     .limit(SCAN);
 
   if (error) {
@@ -74,7 +75,7 @@ export async function GET(request: Request) {
 
   // Only the ones that may be reminded, oldest first; then rule out anyone
   // who finished a quote (another device or row) or was already reminded.
-  const allowed = ((data ?? []) as FollowUpDraft[]).filter((d) => reminderAllowed(d.attribution)).slice(0, 50);
+  const allowed = ((data ?? []) as FollowUpDraft[]).filter((d) => reminderAllowed(d.attribution) && isIdle(d, now)).slice(0, 50);
   let candidates: FollowUpDraft[] = [];
   if (allowed.length > 0) {
     // Addresses are saved lower-case now; older rows may not be, so look both up.
@@ -123,7 +124,7 @@ export async function GET(request: Request) {
       if (heldBack.length === 0 && (await spendEmailBudget("follow-up"))) chunk.push(d);
       else heldBack.push(d.id);
     }
-    const results = await Promise.all(chunk.map((d) => sendFollowUp(d.email, d.postcode, replyTo)));
+    const results = await Promise.all(chunk.map((d) => sendFollowUp(d.email, d.postcode, replyTo, d.id)));
     results.forEach((ok, j) => {
       if (ok) sent++;
       else failed.push(chunk[j]!.id);
@@ -135,7 +136,7 @@ export async function GET(request: Request) {
   }
 
   // A send that FAILED in-band (not a crash), or one the budget held back,
-  // releases its claim, so the next daily run tries again instead of the
+  // releases its claim, so the next run tries again instead of the
   // lead losing their only nudge.
   const release = [...failed, ...heldBack];
   if (release.length > 0) {
@@ -149,14 +150,14 @@ export async function GET(request: Request) {
   return NextResponse.json({ ok: true, sent, failed: failed.length, failedIds: failed, heldBack: heldBack.length });
 }
 
-async function sendFollowUp(to: string, postcode: string, replyTo: string | undefined): Promise<boolean> {
-  const [greeting, opener, link, promise, why, signoff] = followUpLines(postcode, replyTo);
+async function sendFollowUp(to: string, postcode: string, replyTo: string | undefined, draftId: string): Promise<boolean> {
+  const [greeting, opener, link, promise, why, signoff] = followUpLines(postcode, replyTo, draftId);
   return sendEmail(
     to,
     followUpSubject(postcode),
     brandedEmail(`<p style="margin:0 0 14px">${esc(greeting!)}</p>
 <p style="margin:0 0 14px">${esc(opener!)}</p>
-<p style="margin:0 0 24px"><a href="${appUrl()}/quote" style="display:inline-block;background:#a84508;color:#ffffff;text-decoration:none;font-weight:600;padding:12px 28px;border-radius:999px">Finish my quote</a></p>
+<p style="margin:0 0 24px"><a href="${resumeLink(draftId)}" style="display:inline-block;background:#a84508;color:#ffffff;text-decoration:none;font-weight:600;padding:12px 28px;border-radius:999px">Finish my quote</a></p>
 <p style="margin:0 0 14px;font-size:13px"><a href="${link}" style="color:#a84508">${link}</a></p>
 <p style="margin:0 0 14px">${esc(promise!)}</p>
 <p style="margin:0 0 28px">${esc(signoff!).replace(/\n/g, "<br/>")}</p>

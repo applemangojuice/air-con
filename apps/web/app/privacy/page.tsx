@@ -14,7 +14,7 @@ export const metadata: Metadata = {
   description: "How Dang, It's Hot collects, uses and protects your personal data, how long we keep it, and your rights.",
 };
 
-const LAST_UPDATED = "19 Oct 2026";
+const LAST_UPDATED = "10 Nov 2026";
 
 /**
  * Written to match what the platform actually does: the quote funnel and its
@@ -39,7 +39,7 @@ export default async function PrivacyPage() {
         <p className="mt-3 text-sm text-ink-500">Last updated {LAST_UPDATED}</p>
         <p className="mt-5 text-ink-700">
           Short version: we collect what we need to price, survey and install your heating and cooling, we don&apos;t
-          run third-party trackers, we never sell your data, and we only send marketing if you ticked the box for it.
+          run third-party trackers, we never sell your data, and you can refuse news and offers when you give us your email, or in one tap from any email.
           You can ask what we hold, or ask us to correct or delete it, by emailing {mail}.
         </p>
 
@@ -54,19 +54,24 @@ export default async function PrivacyPage() {
         <Section title="What we collect, and why">
           <ul className="list-disc space-y-3 pl-5">
             <Item name="Your quote">
-              Your name, email, optional mobile number, address and the answers you give about your home, plus any
-              photos you add. We use them to work out your price, save your quote and contact you about it.{" "}
+              Your email, address and the answers you give about your home (your name and mobile number come later,
+              when you book your survey). We use them to work out your price, save your quote and contact you about
+              it.{" "}
               <Basis>taking steps at your request before a contract.</Basis>
             </Item>
             <Item name="Saved progress">
-              If you give your email early in the quote, we save your answers so you can come back, and, if you leave
-              &ldquo;Email me one reminder&rdquo; ticked, we send one reminder if you don&apos;t finish (never more). <Basis>legitimate interests: finishing the quote you started.</Basis>
+              Once you give your email, we save your answers as you go so you can come back on any device, and we send
+              one reminder with a link back to them if you stop part-way (never more), unless you ticked &ldquo;Don&apos;t
+              send me the reminder or any news&rdquo;. Start a new quote with the same email and postcode and we email
+              you the link to the one you have, rather than showing it on screen.{" "}
+              <Basis>legitimate interests: finishing the quote you started.</Basis>
             </Item>
             <Item name="Your consents">
-              We record what you agreed to, when, and the exact words you saw: keeping you posted about your quote,
-              and (only if you ticked it) news and offers. If you ask us to tell you when we reach your area, we
-              keep your email and postcode for that one message.{" "}
-              <Basis>consent for marketing; legal obligation to keep a record of it.</Basis>
+              We record what you were told about emails, when, and the exact words you saw, and whether you refused
+              the reminder and news. If you ask us to tell you when we reach your area, we keep your email and postcode
+              for that one message.{" "}
+              <Basis>the soft opt-in for news about our own similar services, which you can refuse at any time; legal
+              obligation to keep a record of it.</Basis>
             </Item>
             <Item name="Your project">
               If you go ahead: survey measurements and notes, photos of your rooms, outside walls, fuse board and the
@@ -112,8 +117,9 @@ export default async function PrivacyPage() {
 
         <Section title="Marketing, and how to stop it">
           <p>
-            We only send news and offers by email if you ticked the box for them, and every one has an unsubscribe
-            link. You can also email {mail} at any time. We keep a note that you opted out so we don&apos;t contact
+            When you ask us for a quote we may send you occasional news and offers about our own heating and cooling
+            services (the &ldquo;soft opt-in&rdquo;), unless you ticked &ldquo;Don&apos;t send me the reminder or any
+            news&rdquo; when you gave us your email. Every one has an unsubscribe link. You can also email {mail} at any time. We keep a note that you opted out so we don&apos;t contact
             you again. Messages about your quote or project (appointments, your proposal, your contract, safety) are
             not marketing; while you have a live quote or project we&apos;ll still send those, and they never include
             sales content.
@@ -178,7 +184,7 @@ export default async function PrivacyPage() {
             </li>
             <li>
               <strong>Your saved quote</strong> (<code>dih_quote</code>): set when you save a quote, it remembers for 7
-              days which quotes were saved from this browser, so &ldquo;Book my home survey&rdquo; can open your project
+              days which quotes were saved from this browser, so &ldquo;Book my virtual survey&rdquo; can open your project
               straight away. It holds only the quote references, signed so it can&apos;t be altered, and it never signs
               you in to anything else.
             </li>

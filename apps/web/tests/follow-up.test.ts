@@ -13,13 +13,14 @@ import { quoteRow } from "./helpers/rows.ts";
 process.env.DATA_BACKEND = "memory";
 delete process.env.SUPABASE_URL;
 registerAppResolver();
-const { FOLLOW_UPS_PER_RUN, followUpLines, followUpMailto, pickFollowUps, reminderAllowed, reminderRecord, reminderState } = await import("../lib/follow-up.ts");
-const { REMINDER_NOTICE, REMINDER_NOTICE_VERSION } = await import("../lib/follow-up-notice.ts");
+const { FOLLOW_UPS_PER_RUN, IDLE_MINUTES, followUpLines, followUpMailto, isIdle, lastActiveAt, pickFollowUps, reminderAllowed, reminderRecord, reminderState, resumeLink } = await import("../lib/follow-up.ts");
+const { QUOTE_EMAIL_OPT_OUT, REMINDER_NOTICE_VERSION } = await import("../lib/follow-up-notice.ts");
 const { EMAIL_BUDGET } = await import("../lib/email-budget.ts");
 const { dueLeadCutoff, loadDueLeads, toDueLeads } = await import("../lib/lead-follow-ups.ts");
 const { requireDb } = await import("../lib/supabase-server.ts");
 const followUpRoute = await import("../app/api/cron/follow-up/route.ts");
 const draftRoute = await import("../app/api/quotes/draft/route.ts");
+const draftIdRoute = await import("../app/api/quotes/draft/[id]/route.ts");
 
 const AT = "2026-10-20T10:00:00.000Z";
 const allowed = { reminder: { ok: true, version: REMINDER_NOTICE_VERSION, at: AT } };
@@ -37,6 +38,7 @@ test("a draft records the reminder box only with the wording it showed; only a t
   assert.equal(reminderState({ consents: { marketing: true } }), "unknown", "a finished quote's attribution");
   assert.equal(reminderState({ reminder: { ok: true, version: "draft-reminder-0" } }), "unknown");
   assert.equal(reminderState({ reminder: { ok: "yes", version: REMINDER_NOTICE_VERSION } }), "unknown");
+  assert.equal(reminderState({ reminder: { ok: true, version: "draft-reminder-1", at: AT } }), "allowed", "a v1 opt-in tick still stands");
   assert.equal(reminderAllowed(allowed), true);
   assert.equal(reminderAllowed({ reminder: { ok: false, version: REMINDER_NOTICE_VERSION } }), false);
 });
@@ -67,11 +69,23 @@ test("the reminder says why it came, that it's the only one, and how to have the
   const lines = followUpLines("SW16 2BE", "hello@demo.dang.invalid");
   const why = lines.find((l) => l.startsWith("You're getting this"));
   assert.ok(why, "an opt-out line");
-  assert.ok(why!.includes(`"${REMINDER_NOTICE.label}"`), "names the box they left ticked");
+  assert.ok(why!.includes(`"${QUOTE_EMAIL_OPT_OUT.label}"`), "names the opt-out they could have ticked");
   assert.match(why!, /We won't email you about it again\. To have your unfinished quote deleted, reply to this email or write to hello@demo\.dang\.invalid\./);
   assert.ok(lines.some((l) => /this is the only nudge we'll send/.test(l)));
   assert.match(followUpLines("SW16 2BE").join("\n"), /write to hello@dang\.ac\./, "the brand address when settings have none");
   assert.ok(decodeURIComponent(followUpMailto("ada@example.test", "SW16 2BE", "hello@demo.dang.invalid")).includes("write to hello@demo.dang.invalid"));
+});
+
+test("idle: a draft is left after 10 minutes untouched, counted from its last activity", () => {
+  const now = Date.parse("2026-10-20T10:00:00Z");
+  const made = "2026-10-20T09:00:00Z";
+  assert.equal(IDLE_MINUTES, 10);
+  assert.equal(isIdle({ created_at: made, attribution: null }, now), true, "no activity recorded: from when it was made");
+  assert.equal(isIdle({ created_at: made, attribution: { funnel: { lastActiveAt: "2026-10-20T09:55:00Z" } } }, now), false, "five minutes ago: still at it");
+  assert.equal(isIdle({ created_at: made, attribution: { funnel: { lastActiveAt: "2026-10-20T09:50:00Z" } } }, now), true);
+  assert.equal(lastActiveAt({ created_at: made, attribution: { funnel: { lastActiveAt: "nonsense" } } }), made);
+  assert.match(resumeLink("1234"), /\/quote\?resume=1234$/, "the email links back to their answers");
+  assert.match(followUpLines("SW16 2BE", undefined, "abcd")[2]!, /resume=abcd/);
 });
 
 /* ---------------------------------------------------------------- */
@@ -104,7 +118,7 @@ async function withLiveEmail(fn: (sent: { to: string; html: string }[]) => Promi
 
 const cron = () => followUpRoute.GET(new Request("http://localhost/api/cron/follow-up", { headers: { authorization: `Bearer ${ENV.CRON_SECRET}` } }));
 
-test("the daily reminder: only ticked drafts, nobody twice, at most 10 a run, and never past its email budget", async () => {
+test("the reminder: only drafts that didn't opt out and were left 10 minutes, nobody twice, at most 10 a run, and never past its email budget", async () => {
   const db = requireDb();
   const twoDaysAgo = new Date(Date.now() - 2 * 24 * 3600_000).toISOString();
   const rows = [
@@ -119,6 +133,8 @@ test("the daily reminder: only ticked drafts, nobody twice, at most 10 a run, an
     quoteRow({ email: "reminded@example.test", status: "draft", created_at: twoDaysAgo, attribution: allowed }),
     quoteRow({ email: "reminded@example.test", status: "draft", created_at: new Date(Date.now() - 6 * 24 * 3600_000).toISOString(), follow_up_sent_at: new Date(Date.now() - 5 * 24 * 3600_000).toISOString() }),
     quoteRow({ email: "too-new@example.test", status: "draft", created_at: new Date().toISOString(), attribution: allowed }),
+    // Made two days ago but touched a minute ago: they're still filling it in.
+    quoteRow({ email: "still-going@example.test", status: "draft", created_at: twoDaysAgo, attribution: { ...allowed, funnel: { lastActiveAt: new Date(Date.now() - 60_000).toISOString() } } }),
   ];
   const { error } = await db.from("quote_requests").insert(rows);
   assert.equal(error, null);
@@ -144,7 +160,7 @@ test("the daily reminder: only ticked drafts, nobody twice, at most 10 a run, an
     assert.equal(waiting?.length, 5, "held back, not marked sent: they're reminded on a later run");
   });
 
-  const { data: untouched } = await db.from("quote_requests").select("email, follow_up_sent_at").in("email", ["unticked@example.test", "before-the-box@example.test", "finished@example.test", "too-new@example.test"]);
+  const { data: untouched } = await db.from("quote_requests").select("email, follow_up_sent_at").in("email", ["unticked@example.test", "before-the-box@example.test", "finished@example.test", "too-new@example.test", "still-going@example.test"]);
   assert.ok(untouched?.every((r) => r.follow_up_sent_at === null), "never claimed");
 });
 
@@ -160,7 +176,34 @@ test("a draft save stores the reminder answer only with the current wording", as
   };
   assert.equal(reminderState(await save("yes@example.test", { reminder: true, reminderNotice: REMINDER_NOTICE_VERSION }, "198.51.100.1")), "allowed");
   assert.equal(reminderState(await save("no@example.test", { reminder: false, reminderNotice: REMINDER_NOTICE_VERSION }, "198.51.100.2")), "refused");
-  assert.equal(await save("old-page@example.test", {}, "198.51.100.3"), null, "no box shown: never reminded");
+  const oldPage = await save("old-page@example.test", {}, "198.51.100.3");
+  assert.equal(reminderState(oldPage), "unknown", "no notice shown: never reminded");
+  assert.equal(typeof (oldPage as { funnel?: { lastActiveAt?: string } }).funnel?.lastActiveAt, "string", "every save records when they were last active");
+});
+
+test("coming back: same email and postcode emails the link instead of a second draft; the link reopens it", async () => {
+  const db = requireDb();
+  const survey = { postcode: "SW16 2BE", addressLine: "3 Demo Street", property: { type: "terraced", era: "pre-1930", bedrooms: 2, ownership: "owner" }, rooms: [], outdoor: { location: "ground-rear", photos: [] }, electrics: { condition: "unsure", photos: [] } };
+  const post = (body: Record<string, unknown>, ip: string) =>
+    draftRoute.POST(new Request("http://localhost/api/quotes/draft", { method: "POST", headers: { "content-type": "application/json", "x-forwarded-for": ip }, body: JSON.stringify({ email: "back@example.test", survey, layout: "open-plan", reminder: true, reminderNotice: REMINDER_NOTICE_VERSION, ...body }) }));
+  const first = (await (await post({}, "198.51.100.11")).json()) as { id: string };
+  assert.ok(first.id);
+
+  const again = (await (await post({ survey: { ...survey, postcode: "sw162be" } }, "198.51.100.12")).json()) as { id?: string; resumeSent?: boolean };
+  assert.equal(again.resumeSent, true, "the postcode matches however it's typed");
+  assert.equal(again.id, undefined, "never the id: the link goes to the inbox, not to whoever typed the address");
+  const { data: rows } = await db.from("quote_requests").select("id").eq("email", "back@example.test");
+  assert.equal(rows?.length, 1, "no second draft");
+
+  const fresh = (await (await post({ fresh: true }, "198.51.100.13")).json()) as { id?: string };
+  assert.ok(fresh.id && fresh.id !== first.id, "they can still start again");
+
+  const get = (id: string) => draftIdRoute.GET(new Request(`http://localhost/api/quotes/draft/${id}`), { params: Promise.resolve({ id }) });
+  const opened = (await (await get(first.id)).json()) as { email: string; layout: string; survey: { addressLine: string }; reminder: boolean };
+  assert.deepEqual([opened.email, opened.layout, opened.survey.addressLine, opened.reminder], ["back@example.test", "open-plan", "3 Demo Street", true]);
+  await db.from("quote_requests").update({ status: "new" }).eq("id", first.id);
+  assert.equal((await get(first.id)).status, 404, "a finished quote has its own page, not a resume link");
+  assert.equal((await get("not-a-uuid")).status, 404);
 });
 
 /* ---------------------------------------------------------------- */

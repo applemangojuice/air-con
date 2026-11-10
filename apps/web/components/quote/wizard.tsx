@@ -2,53 +2,61 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { buildDefaultConfig, type KitchenLivingLayout, type NeighbourGuess, type Survey } from "@aircon/domain";
+import type { KitchenLivingLayout, NeighbourGuess, RoomType, Survey } from "@aircon/domain";
 import { fetchKnownAddresses, matchHouse } from "@/lib/address-lookup";
 import {
   clearDraft,
   loadDraft,
   mapSurveyPhotos,
   newDraft,
+  newRoom,
   saveDraft,
   type Contact,
   type QuoteDraft,
 } from "@/lib/quote-draft";
+import { addBedroom, addLivingRoom, configFor, configure, declineRoom, declinedFromSaved, includeRoom } from "@/lib/room-plan";
 import { submitQuote } from "@/lib/submit-quote";
 import { REMINDER_NOTICE_VERSION } from "@/lib/follow-up-notice";
 import { track } from "@/lib/analytics-client";
 import { isValidUkPostcode, normalisePostcode } from "@/lib/format";
 import { coverageFor, type PublicSettings } from "@/components/site/claims";
-import { AddressStep, DetailsStep, HouseStep, RefineGateStep, type ConsentState, type StepProps } from "./steps";
+import { AddressStep, RefineGateStep, type StepProps } from "./steps";
 import { PriceStep } from "./price-step";
-import { RoomsStep } from "./rooms-step";
-import { FirmUpStep } from "./firm-up-step";
+import { HomeStep } from "./home-step";
 import { DemoResult } from "./result";
 import { JourneyStrip } from "./journey-strip";
 
 /**
- * Price first. The address comes in (from the home page, or the address
- * screen), the home is filled in from what we know, and the guide price is
- * the next thing they see, with the basics adjustable right there. Going
- * further costs an email: then the numbered refine form (home → rooms →
- * photos → save).
+ * Price first, and as few questions as possible. The address comes in
+ * (from the home page, or the address screen), the home is filled in from
+ * what we know, and the guide price is the next thing they see, with the
+ * rooms and size adjustable right there. Going further costs an email, and
+ * from then on the quote is saved as they go (a few seconds after each
+ * change), so leaving is safe: the reminder, ten minutes after they stop,
+ * links straight back. "Your home" is the one refine page; its button saves
+ * the quote and opens its page, where the virtual survey is booked.
  *
- *   address? → PRICE → email gate → house → rooms → firm up → details
+ *   address? → PRICE → email gate → your home → /q/[id] (book the virtual survey)
  */
-const STEP = { address: 0, price: 1, gate: 2, house: 3, rooms: 4, firmUp: 5, details: 6 } as const;
-const REFINE_STEPS = 4; // house, rooms, firm up, details
+const STEP = { address: 0, price: 1, gate: 2, home: 3 } as const;
 /** How long we wait for records before pricing a typical home instead. */
 const PREFILL_TIMEOUT_MS = 6000;
+/** Saving as they go: this long after the last change. */
+const SYNC_AFTER_MS = 2500;
 
 export function QuoteWizard({
   initialPostcode,
   initialAddress,
   initialIntel,
+  initialResume,
   settings,
 }: {
   initialPostcode?: string;
-  /** The house (number, name or full line) typed on the marketing page. */
+  /** The house (number, name or full line) chosen on the marketing page. */
   initialAddress?: string;
   initialIntel?: string;
+  /** An unfinished quote's id, from a reminder or "pick up" email. */
+  initialResume?: string;
   settings: PublicSettings;
 }) {
   const router = useRouter();
@@ -58,20 +66,26 @@ export function QuoteWizard({
   const [pricing, setPricing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [demo, setDemo] = useState(false);
+  const [resumeSent, setResumeSent] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  // Consent is given fresh on the last step, never restored from storage.
-  const [consent, setConsent] = useState<ConsentState>({ operational: false, marketing: false });
   const restored = useRef(false);
   const finished = useRef(false);
   const pricingRun = useRef(0);
+  const syncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSynced = useRef<string>("");
 
-  // First load: an address from the marketing page is priced straight away;
-  // otherwise a saved draft goes back to the screen it was on (a refresh, or
-  // a tab the phone discarded, loses nothing); otherwise the address screen.
+  // First load: a resume link reloads its saved answers; an address from the
+  // marketing page is priced straight away; otherwise a draft saved on this
+  // device goes back to the screen it was on; otherwise the address screen.
   useEffect(() => {
     if (restored.current) return;
     restored.current = true;
+    if (initialResume) {
+      window.history.replaceState(null, "", "/quote");
+      void resume(initialResume);
+      return;
+    }
     const fromLink = initialPostcode ? normalisePostcode(initialPostcode) : null;
     if (fromLink && (initialAddress || initialIntel)) {
       const fresh: QuoteDraft = {
@@ -91,10 +105,10 @@ export function QuoteWizard({
       const samePostcode = !fromLink || fromLink.replace(/\s/g, "") === saved.survey.postcode.replace(/\s/g, "");
       setDraft({ ...saved, survey: { ...saved.survey, postcode } });
       const s = saved.step ?? STEP.address;
-      const priced = saved.configured && saved.survey.rooms.length > 0;
-      if (samePostcode && priced && coverageFor(settings.serviceArea, postcode).covered && s >= STEP.price && s <= STEP.details) {
-        // The gate itself isn't a place to come back to: the price is.
-        setStep(s === STEP.gate ? STEP.price : s);
+      const priced = saved.configured && saved.survey.rooms.length + (saved.declinedRooms?.length ?? 0) > 0;
+      if (samePostcode && priced && coverageFor(settings.serviceArea, postcode).covered && s >= STEP.price && s <= STEP.home) {
+        // The gate itself isn't a place to come back to: the price is (or their rooms, once they're saving).
+        setStep(s === STEP.gate ? STEP.price : s === STEP.home && !saved.draftId ? STEP.price : s);
       }
     }
     setReady(true);
@@ -109,9 +123,26 @@ export function QuoteWizard({
     window.scrollTo({ top: 0 });
   }, [step]);
 
+  // Saved as they go: once there's a server draft, every change reaches it a
+  // few seconds later, so the reminder knows when they stopped and a resume
+  // link opens exactly this.
+  useEffect(() => {
+    if (!ready || finished.current || !draft.draftId) return;
+    const snapshot = JSON.stringify([draft.survey, draft.layout, draft.contact.email, draft.reminder]);
+    if (snapshot === lastSynced.current) return;
+    if (syncTimer.current) clearTimeout(syncTimer.current);
+    syncTimer.current = setTimeout(() => {
+      lastSynced.current = snapshot;
+      syncServerDraft(draft);
+    }, SYNC_AFTER_MS);
+    return () => {
+      if (syncTimer.current) clearTimeout(syncTimer.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draft, ready]);
+
   const setSurvey = (update: Partial<Survey>) => setDraft((d) => ({ ...d, survey: { ...d.survey, ...update } }));
   const setContact = (update: Partial<Contact>) => setDraft((d) => ({ ...d, contact: { ...d.contact, ...update } }));
-  const setLayout = (layout: KitchenLivingLayout) => setDraft((d) => ({ ...d, layout }));
 
   /** A photo reached storage: record its path wherever it sits in the survey. */
   const onPhotoUploaded = useCallback((photoId: string, storagePath: string) => {
@@ -128,7 +159,7 @@ export function QuoteWizard({
   }
 
   // Exclusions and outdoor options derive deterministically from the house
-  // answers, recomputed live so the rooms screen always matches them.
+  // answers, recomputed live so every screen matches them.
   const config = useMemo(() => configFor(draft), [draft]);
 
   /**
@@ -152,26 +183,66 @@ export function QuoteWizard({
     setStep(STEP.price);
     d = await Promise.race([prefill(d), new Promise<QuoteDraft>((resolve) => setTimeout(() => resolve(d), PREFILL_TIMEOUT_MS))]);
     if (run !== pricingRun.current) return; // they changed the address meanwhile
-    // Photos already taken for a room of the same name are kept across re-pricing.
-    const priced = configure(d);
+    const priced = configure({ ...d, declinedRooms: [] });
     setDraft(priced);
     setPricing(false);
     track("quote_start", { prefill: priced.prefillSource ?? "typical", fromLink: Boolean(initialAddress || initialIntel) });
   }
 
+  /** A resume link: their saved answers, on whatever device they opened it. */
+  async function resume(id: string) {
+    try {
+      const res = await fetch(`/api/quotes/draft/${encodeURIComponent(id)}`);
+      if (!res.ok) throw new Error(String(res.status));
+      const data = (await res.json()) as {
+        id: string;
+        email: string;
+        survey: Survey;
+        layout?: KitchenLivingLayout;
+        prefillSource?: QuoteDraft["prefillSource"];
+        reminder?: boolean;
+      };
+      const base = newDraft(data.survey.postcode);
+      const d: QuoteDraft = {
+        ...base,
+        draftId: data.id,
+        survey: { ...base.survey, ...data.survey },
+        contact: { ...base.contact, email: data.email },
+        layout: data.layout ?? base.layout,
+        configured: true,
+        ...(data.prefillSource ? { prefillSource: data.prefillSource } : {}),
+        ...(typeof data.reminder === "boolean" ? { reminder: data.reminder } : {}),
+      };
+      const withOff = { ...d, declinedRooms: declinedFromSaved(d) };
+      lastSynced.current = JSON.stringify([withOff.survey, withOff.layout, withOff.contact.email, withOff.reminder]);
+      setDraft(withOff);
+      setStep(STEP.home);
+      track("quote_resume", { ok: true });
+    } catch {
+      setNotice("That link has run out, or the quote it was for is already saved: your quote email has its permanent link. Or start again here.");
+      track("quote_resume", { ok: false });
+    }
+    setReady(true);
+  }
+
   /** Save-early: the enquiry exists in the database from the email gate on. */
-  async function saveServerDraft(current: QuoteDraft): Promise<string | undefined> {
+  async function saveServerDraft(current: QuoteDraft, fresh = false): Promise<{ id?: string; resumeSent?: boolean }> {
     try {
       const res = await fetch("/api/quotes/draft", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email: current.contact.email, survey: current.survey, ...reminderFields(current) }),
+        body: JSON.stringify({
+          email: current.contact.email,
+          survey: current.survey,
+          ...funnelFields(current),
+          ...reminderFields(current),
+          ...(fresh ? { fresh: true } : {}),
+        }),
       });
-      if (!res.ok) return undefined;
-      const data = (await res.json()) as { demo: boolean; id?: string };
-      return data.id;
+      if (!res.ok) return {};
+      return (await res.json()) as { id?: string; resumeSent?: boolean };
     } catch {
-      return undefined;
+      return {};
     }
   }
 
@@ -182,7 +253,7 @@ export function QuoteWizard({
       headers: { "content-type": "application/json" },
       // Email travels too: a corrected address must reach the server draft,
       // or the follow-up email goes to the typo.
-      body: JSON.stringify({ survey: current.survey, email: current.contact.email || undefined, ...reminderFields(current) }),
+      body: JSON.stringify({ survey: current.survey, email: current.contact.email || undefined, ...funnelFields(current), ...reminderFields(current) }),
     }).catch(() => undefined);
   }
 
@@ -191,67 +262,45 @@ export function QuoteWizard({
     void showInstantPrice(draft);
   }
 
-  /** A basic changed on the guide-price card: re-lay the rooms and re-price, there and then. */
-  function adjustBasics(update: Partial<Survey["property"]>) {
-    setDraft((d) => configure({ ...d, survey: { ...d.survey, property: { ...d.survey.property, ...update } } }));
-    track("quote_adjust", { fields: Object.keys(update) });
-  }
-
   /** Price screen → the email gate. */
   function openGate() {
     track("quote_gate", {});
+    setResumeSent(false);
     setStep(STEP.gate);
   }
 
-  /** The email gate → the refine form. The server draft starts here. */
-  async function nextFromGate() {
-    // The reminder box sits under the email: leaving it is their answer (ticked unless they unticked it).
+  /** The email gate → "Your home". The server draft starts here (or they're sent the one they already have). */
+  async function nextFromGate(fresh = false) {
+    // The opt-out sits under the email: leaving it unticked is their answer.
     let current: QuoteDraft = { ...draft, reminder: draft.reminder !== false };
     setNotice(null);
     if (current.draftId) {
       syncServerDraft(current);
     } else {
       setBusy(true);
-      const id = await saveServerDraft(current);
+      const saved = await saveServerDraft(current, fresh);
       setBusy(false);
-      if (id) current = { ...current, draftId: id };
+      if (saved.resumeSent) {
+        setDraft(current);
+        setResumeSent(true);
+        track("quote_refine", { resumeSent: true });
+        return;
+      }
+      if (saved.id) current = { ...current, draftId: saved.id };
     }
+    lastSynced.current = JSON.stringify([current.survey, current.layout, current.contact.email, current.reminder]);
     setDraft(current);
+    setResumeSent(false);
     track("quote_refine", { draftSaved: Boolean(current.draftId) });
-    setStep(STEP.house);
+    setStep(STEP.home);
   }
 
-  function nextFromHouse() {
-    // (Re)generate the default rooms from the house answers, apply the
-    // auto-chosen outdoor position and install pattern, then show the price.
-    const updated = configure(draft);
-    setDraft(updated);
-    syncServerDraft(updated);
-    track("quote_step", { step: "house", to: "rooms" });
-    setStep(STEP.rooms);
-  }
-
-  function nextFromRooms() {
-    syncServerDraft(draft);
-    track("quote_step", { step: "rooms", to: "firm-up", rooms: draft.survey.rooms.length });
-    setStep(STEP.firmUp);
-  }
-
-  function nextFromFirmUp() {
-    syncServerDraft(draft);
-    const photos =
-      draft.survey.outdoor.photos.length +
-      draft.survey.electrics.photos.length +
-      draft.survey.rooms.reduce((n, r) => n + r.photos.length, 0);
-    track("quote_step", { step: "firm-up", to: "details", photos });
-    setStep(STEP.details);
-  }
-
+  /** "Next: confirm your price": save the quote and open its page, where the virtual survey is booked. */
   async function finish() {
-    if (!consent.operational) return;
+    if (syncTimer.current) clearTimeout(syncTimer.current);
     setBusy(true);
     setSaveError(null);
-    const result = await submitQuote(draft, { marketing: consent.marketing });
+    const result = await submitQuote(draft, { marketing: draft.reminder !== false });
     // How far they got, never what they typed or what it cost (the privacy notice's analytics list).
     track("quote_submit", { status: result.status, rooms: draft.survey.rooms.length });
     if (result.status === "saved") {
@@ -286,7 +335,6 @@ export function QuoteWizard({
     finished.current = false;
     clearDraft();
     setDraft(newDraft());
-    setConsent({ operational: false, marketing: false });
     setSaveError(null);
     setNotice(null);
     setDemo(false);
@@ -297,22 +345,20 @@ export function QuoteWizard({
     return <DemoResult draft={draft} settings={settings} onStartOver={startOver} />;
   }
 
-  const inRefineForm = step >= STEP.house;
+  const track1 = (what: string) => track("quote_adjust", { what });
   const common: StepProps = {
     draft,
     settings,
     setSurvey,
     setContact,
-    setLayout,
+    setLayout: (layout) => setDraft((d) => configure({ ...d, layout })),
     onPhotoUploaded,
     applyIntel,
     step,
-    ...(inRefineForm ? { totalSteps: REFINE_STEPS, progressStep: step - STEP.house } : {}),
     onNext: () => setStep(step + 1),
     onBack: step > STEP.address ? () => setStep(step - 1) : undefined,
     busy,
   };
-  const setReminder = (reminder: boolean) => setDraft((d) => ({ ...d, reminder }));
 
   const stepView = (() => {
     switch (step) {
@@ -325,7 +371,12 @@ export function QuoteWizard({
             settings={settings}
             step={step}
             pricing={pricing}
-            onAdjust={adjustBasics}
+            excluded={config.excluded}
+            onDecline={(id) => (setDraft((d) => declineRoom(d, id)), track1("decline"))}
+            onInclude={(id) => (setDraft((d) => includeRoom(d, id)), track1("include"))}
+            onAddBedroom={() => (setDraft((d) => addBedroom(d)), track1("bedroom"))}
+            onAddLivingRoom={() => (setDraft((d) => addLivingRoom(d)), track1("living-room"))}
+            onSize={(floorAreaM2) => (setDraft((d) => configure({ ...d, survey: { ...d.survey, property: { ...d.survey.property, floorAreaM2 } } })), track1("size"))}
             onRefine={openGate}
             onChangeAddress={() => {
               pricingRun.current++; // abandon a lookup still running
@@ -335,22 +386,38 @@ export function QuoteWizard({
           />
         );
       case STEP.gate:
-        return <RefineGateStep {...common} onNext={nextFromGate} onBack={() => setStep(STEP.price)} setReminder={setReminder} />;
-      case STEP.house:
-        return <HouseStep {...common} onNext={nextFromHouse} onBack={() => setStep(STEP.price)} />;
-      case STEP.rooms:
-        return <RoomsStep {...common} onNext={nextFromRooms} excluded={config.excluded} outdoorOptions={config.outdoorOptions} />;
-      case STEP.firmUp:
-        return <FirmUpStep {...common} onNext={nextFromFirmUp} />;
+        return (
+          <RefineGateStep
+            {...common}
+            onNext={() => void nextFromGate()}
+            onBack={() => {
+              setResumeSent(false);
+              setStep(STEP.price);
+            }}
+            setReminder={(reminder) => setDraft((d) => ({ ...d, reminder }))}
+            resumeSent={resumeSent}
+            onStartFresh={() => void nextFromGate(true)}
+          />
+        );
       default:
         return (
-          <DetailsStep
-            {...common}
-            onNext={finish}
-            onBack={() => setStep(STEP.firmUp)}
-            consent={consent}
-            setConsent={setConsent}
+          <HomeStep
+            draft={draft}
+            settings={settings}
+            step={step}
+            busy={busy}
             saveError={saveError}
+            excluded={config.excluded}
+            outdoorOptions={config.outdoorOptions}
+            setSurvey={setSurvey}
+            setContact={setContact}
+            onRooms={(rooms) => setSurvey({ rooms })}
+            onProperty={(update) => setDraft((d) => configure({ ...d, survey: { ...d.survey, property: { ...d.survey.property, ...update } } }))}
+            onLayout={(layout) => setDraft((d) => configure({ ...d, layout }))}
+            onToggleRoom={(id, on) => setDraft((d) => (on ? includeRoom(d, id) : declineRoom(d, id)))}
+            onAddRoom={(type: RoomType) => setDraft((d) => ({ ...d, survey: { ...d.survey, rooms: [...d.survey.rooms, newRoom(type, [...d.survey.rooms, ...(d.declinedRooms ?? [])])] } }))}
+            onNext={() => void finish()}
+            onBack={() => setStep(STEP.price)}
           />
         );
     }
@@ -471,39 +538,14 @@ async function prefill(d: QuoteDraft): Promise<QuoteDraft> {
   return guess?.type ? withNeighbours(base, guess) : base;
 }
 
-function configFor(d: QuoteDraft) {
-  const p = d.survey.property;
-  return buildDefaultConfig({
-    type: p.type,
-    era: p.era,
-    bedrooms: p.bedrooms,
-    bathrooms: p.bathrooms ?? 1,
-    layout: d.layout,
-    floorAreaM2: p.floorAreaM2,
-  });
-}
-
-/** Rooms, outdoor position and install pattern from the house answers; photos already taken for a room of the same name are kept. */
-function configure(d: QuoteDraft): QuoteDraft {
-  const config = configFor(d);
-  const previous = new Map(d.survey.rooms.map((r) => [r.name, r.photos]));
-  return {
-    ...d,
-    configured: true,
-    survey: {
-      ...d.survey,
-      archetypeId: config.archetypeId,
-      permutationId: config.permutationId,
-      rooms: config.rooms.map((r) => ({ ...r, photos: previous.get(r.name) ?? r.photos })),
-      outdoor: { ...d.survey.outdoor, location: config.outdoorDefault },
-    },
-  };
+/** The funnel state the server keeps with the draft, so a resume link restores it exactly. */
+function funnelFields(d: QuoteDraft): { layout: KitchenLivingLayout; prefillSource?: QuoteDraft["prefillSource"] } {
+  return { layout: d.layout, ...(d.prefillSource ? { prefillSource: d.prefillSource } : {}) };
 }
 
 /**
- * The reminder choice for a draft save, only once they've answered it at
- * the email gate (a draft from before the box existed has no answer, so
- * it's never reminded).
+ * The reminder answer for a draft save, once they've passed the email gate
+ * (undefined before: such a draft is never reminded).
  */
 function reminderFields(d: QuoteDraft): { reminder?: boolean; reminderNotice?: string } {
   return d.reminder === undefined ? {} : { reminder: d.reminder, reminderNotice: REMINDER_NOTICE_VERSION };

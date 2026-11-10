@@ -559,11 +559,14 @@ says what to do instead. Approvals that need a professional are in
     few hundred bytes (a beacon over 4 KB, or with more than 20 facts, is
     refused), so nobody can fill the database through it. Past that,
     page views for the rest of the day aren't counted.
-42. **An unfinished quote gets one reminder only if its owner agreed at the
-    time.** Under the email on the quote form's first step is **Email me one
-    reminder if I don't finish**, ticked unless they untick it. Only those
-    left ticked get the reminder (once, a day to 7 days later, at most 10 a
-    day); the email says why it came and how to have the quote deleted.
+42. **An unfinished quote gets one reminder unless its owner refused it.**
+    Under the email on the quote form is one line saying what we'll send and
+    one unticked box, **Don't send me the reminder or any news** (the soft
+    opt-in). Only those who left it unticked get the reminder (once, after 10
+    minutes untouched and within 7 days, at most 10 a day); the email says
+    why it came, links back to the saved answers and says how to have the
+    quote deleted. Drafts that saved under v1 (the old "Email me one
+    reminder" box, ticked) still count.
     Quotes started before this box existed are never reminded, by the daily
     job or from the **Unfinished** tab. Nothing checks that an address
     typed there is real, so a few reminders may bounce. *If someone asks

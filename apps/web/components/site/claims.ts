@@ -1,3 +1,4 @@
+import { QUOTE_EMAIL_NOTICE, QUOTE_EMAIL_OPT_OUT } from "@/lib/follow-up-notice";
 import {
   SLA_COMMITMENTS,
   TAX_CODES,
@@ -353,16 +354,23 @@ export function slaCommitments(ps: PublicSettings): { promise: string; remedy: s
 /* Consent wording (versioned: the stored record names the version)     */
 /* ------------------------------------------------------------------ */
 
-export const CONSENT_VERSION = "quote-consent-v1";
+export const CONSENT_VERSION = "quote-consent-v2";
 
+/**
+ * What the refine gate tells people about emails (lib/follow-up-notice.ts,
+ * the single source), as the consent record quotes it. v2: no tick for
+ * emails about their own quote, and the reminder and news on the soft
+ * opt-in, refused with one unticked box. v1 (two boxes) records stay as
+ * they were.
+ */
 export const OPERATIONAL_CONSENT = {
-  label: "Save my quote and keep me posted about it",
-  hint: "We'll email you about this quote and, if you go ahead, your survey and installation. Add your mobile and we'll text appointment reminders too. No sales calls and no marketing. Needed to save your quote.",
+  label: "Emails about this quote",
+  hint: QUOTE_EMAIL_NOTICE,
 } as const;
 
 export const MARKETING_CONSENT = {
-  label: "Send me occasional news and offers by email",
-  hint: "Seasonal tips, new areas and offers from us. Unsubscribe from any email, any time.",
+  label: "Occasional news and offers by email (soft opt-in)",
+  hint: `${QUOTE_EMAIL_NOTICE} Offered with one unticked box, "${QUOTE_EMAIL_OPT_OUT.label}", left unticked.`,
 } as const;
 
 export const AREA_LAUNCH_VERSION = "area-launch-v1";

@@ -192,7 +192,7 @@ export default async function OpsQuotesPage({
                       ) : reminderState(q.attribution) === "allowed" ? (
                         <a
                           className="font-semibold text-accent-700 hover:underline"
-                          href={followUpMailto(q.email, q.postcode, replyEmail)}
+                          href={followUpMailto(q.email, q.postcode, replyEmail, q.id)}
                         >
                           Email them →
                         </a>

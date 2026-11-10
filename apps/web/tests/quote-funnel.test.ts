@@ -33,6 +33,12 @@ test("quote email: honest promise, validity date, one next step, escaped name", 
   assert.doesNotMatch(html, /0800 000 0000/);
 });
 
+test("quote email: no name yet reads 'Hi,' not 'Hi ,'", () => {
+  const { html } = quoteEmail({ ...base, name: "" });
+  assert.match(html, />Hi,</);
+  assert.doesNotMatch(html, /Hi ,/);
+});
+
 test("quote email: phone only when real, VAT line only when settings give one", () => {
   const withPhone = quoteEmail({ ...base, supportPhone: "020 8123 4567", vatLine: null }).html;
   assert.match(withPhone, /call 020 8123 4567/);
@@ -129,4 +135,37 @@ test("a draft remembers where its prefill came from", () => {
   const d = normaliseDraft(JSON.parse(JSON.stringify(stored)))!;
   assert.equal(d.prefillSource, "neighbours");
   assert.equal(normaliseDraft(JSON.parse(JSON.stringify(newDraft())))!.prefillSource, undefined);
+});
+
+test("room plan: switch a room off and it stays off, in place, when the answers change", async () => {
+  const { addBedroom, addLivingRoom, allRooms, canAddLivingRoom, configure, declineRoom, declinedFromSaved, includeRoom, roomsPhrase } = await import("../lib/room-plan.ts");
+  const start = configure({ ...newDraft("SW16 2BE"), survey: { ...newDraft("SW16 2BE").survey, addressLine: "12 Example Road" } });
+  const names = (d: typeof start) => d.survey.rooms.map((r) => r.name);
+  assert.deepEqual(names(start), ["Living room", "Kitchen", "Main bedroom", "Bedroom 2", "Bedroom 3"]);
+  assert.equal(roomsPhrase(start.survey.rooms), "3 bedrooms, a kitchen and a living room");
+
+  const b3 = start.survey.rooms.find((r) => r.name === "Bedroom 3")!;
+  const off = declineRoom(start, b3.id);
+  assert.equal(roomsPhrase(off.survey.rooms), "2 bedrooms, a kitchen and a living room");
+  assert.deepEqual(allRooms(off).map((x) => [x.room.name, x.included]).at(-1), ["Bedroom 3", false], "still listed, in its place");
+  assert.ok(generateQuote(off.survey).totalGbp < generateQuote(start.survey).totalGbp, "the price follows");
+
+  // Changing the size re-lays the rooms; Bedroom 3 stays off.
+  const resized = configure({ ...off, survey: { ...off.survey, property: { ...off.survey.property, floorAreaM2: 130 } } });
+  assert.ok(!names(resized).includes("Bedroom 3"));
+  assert.equal(includeRoom(resized, resized.declinedRooms![0]!.id).survey.rooms.at(-1)!.name, "Bedroom 3", "back where it was");
+
+  // + Bedroom brings back the one switched off first, then adds another.
+  assert.ok(names(addBedroom(off)).includes("Bedroom 3"));
+  assert.ok(names(addBedroom(start)).includes("Bedroom 4"));
+  // + Living room makes it two living rooms, once.
+  const two = addLivingRoom(start);
+  assert.equal(two.layout, "two-receptions");
+  assert.equal(roomsPhrase(two.survey.rooms), "3 bedrooms, a kitchen and 2 living rooms");
+  assert.equal(canAddLivingRoom(two), false);
+  // Open plan reads as one space.
+  assert.equal(roomsPhrase(configure({ ...start, layout: "open-plan" }).survey.rooms), "3 bedrooms and an open-plan kitchen and living area");
+  // A resumed draft knows which generated rooms were switched off.
+  assert.deepEqual(declinedFromSaved({ ...off, declinedRooms: undefined }).map((r) => r.name), ["Bedroom 3"]);
+  assert.equal(roomsPhrase([]), "no rooms yet");
 });

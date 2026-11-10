@@ -39,6 +39,12 @@ export interface QuoteDraft {
   /** Set once the customer has generated a default configuration. */
   configured: boolean;
   /**
+   * Rooms they've said no to (switched off on the price card or the "Your
+   * home" page): out of the price, still on the list to switch back on, and
+   * kept off when the house answers change (lib/room-plan.ts).
+   */
+  declinedRooms?: SurveyRoom[];
+  /**
    * The funnel step they were on, so a refresh (or a tab the phone threw
    * away) puts them back where they were. Consent ticks are never stored:
    * they're given fresh each time.
@@ -94,9 +100,9 @@ export function newRoom(type: RoomType, existing: SurveyRoom[]): SurveyRoom {
   };
 }
 
-// v3: the price-first flow renumbered the steps, so a v2 draft's `step`
-// would open the wrong screen. Old drafts are simply not restored.
-const STORAGE_KEY = "aircon.quote-draft.v3";
+// v4: the refine form became one page, renumbering the steps, so an older
+// draft's `step` would open the wrong screen. Old drafts are not restored.
+const STORAGE_KEY = "aircon.quote-draft.v4";
 
 const uploaded = (p: SurveyPhoto | null | undefined): p is SurveyPhoto =>
   Boolean(p) && typeof p!.storagePath === "string" && p!.storagePath.length > 0;
@@ -147,10 +153,11 @@ export function normaliseDraft(raw: unknown): QuoteDraft | null {
     outdoor: { ...base.survey.outdoor, ...(s.outdoor ?? {}) },
     electrics: { ...base.survey.electrics, ...(s.electrics ?? {}) },
   });
-  const { step, reminder, ...rest } = stored;
+  const { step, reminder, declinedRooms, ...rest } = stored;
   return {
     ...base,
     ...rest,
+    ...(Array.isArray(declinedRooms) ? { declinedRooms: declinedRooms.filter((r) => r && typeof r.id === "string") } : {}),
     survey,
     contact: { ...base.contact, ...(stored.contact ?? {}) },
     configured: stored.configured === true,

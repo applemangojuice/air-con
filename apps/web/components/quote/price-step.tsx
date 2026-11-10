@@ -1,31 +1,34 @@
 "use client";
 
 import { useId, useMemo } from "react";
-import { generateQuote, type Survey } from "@aircon/domain";
+import { generateQuote, type ExcludedRoom } from "@aircon/domain";
 import { gbp } from "@/lib/format";
 import type { QuoteDraft } from "@/lib/quote-draft";
+import { allRooms, canAddLivingRoom, roomsPhrase } from "@/lib/room-plan";
 import { installDurationCopy, vatCopy, type PublicSettings } from "@/components/site/claims";
-import { TYPE_OPTIONS } from "./steps";
 import { StepShell } from "./ui";
-
-type Property = Survey["property"];
 
 /**
  * The guide price: the first thing after the address. The home was filled
- * in without a question, from public records for the address, from the
- * homes around it, or (failing both) a typical home, and the screen says
- * which. Under the price, one small card holds the four basics the guide
- * rests on (home type, bedrooms, bathrooms, size in 20 m² bands) as pills
- * they can tap, and the price follows. Era and layout are prefilled too but
- * live only on the full form. One button: Refine my quote, which asks for
- * an email and then opens that form with everything pre-populated.
+ * in without a question (public records for the address, the homes around
+ * it, or a typical home), so this screen is the price and the two things
+ * that drive it: which rooms, and how big the home is. "Priced for 3
+ * bedrooms, a kitchen and a living room", each room a chip with an ✕, a +
+ * for another bedroom or living room, and the size in 20 m² bands. One
+ * button: Refine my quote, which asks for an email and then opens the
+ * "Your home" page with everything pre-filled.
  */
 export function PriceStep({
   draft,
   settings,
   step,
   pricing,
-  onAdjust,
+  excluded,
+  onDecline,
+  onInclude,
+  onAddBedroom,
+  onAddLivingRoom,
+  onSize,
   onRefine,
   onChangeAddress,
 }: {
@@ -34,8 +37,13 @@ export function PriceStep({
   step: number;
   /** Still working out the prefill: show the shell, not a number. */
   pricing: boolean;
-  /** A basic changed on the card: re-lay the rooms and re-price. */
-  onAdjust: (update: Partial<Property>) => void;
+  /** Rooms the engine can't serve at a fixed price (no outside wall). */
+  excluded: ExcludedRoom[];
+  onDecline: (roomId: string) => void;
+  onInclude: (roomId: string) => void;
+  onAddBedroom: () => void;
+  onAddLivingRoom: () => void;
+  onSize: (floorAreaM2: number) => void;
   onRefine: () => void;
   onChangeAddress: () => void;
 }) {
@@ -44,13 +52,9 @@ export function PriceStep({
   const vat = vatCopy(settings);
   const quote = useMemo(() => (!pricing && rooms.length > 0 ? generateQuote(survey) : null), [survey, rooms.length, pricing]);
   const where = [survey.addressLine.trim(), survey.postcode].filter(Boolean).join(", ");
-
-  const basis =
-    draft.prefillSource === "records"
-      ? "We started from public records for this address."
-      : draft.prefillSource === "neighbours"
-        ? "We started from the homes around you: we hold no record for this address yet."
-        : "We started from a typical home: we hold no records at this postcode yet.";
+  const off = allRooms(draft).filter((x) => !x.included).map((x) => x.room);
+  const bedroomOff = off.some((r) => r.type === "bedroom");
+  const livingOff = off.some((r) => r.type === "living-room");
 
   return (
     <StepShell
@@ -69,15 +73,8 @@ export function PriceStep({
         </>
       }
       onNext={pricing ? undefined : onRefine}
+      nextDisabled={rooms.length === 0}
       nextLabel="Refine my quote"
-      footer={
-        pricing ? null : (
-          <p className="mt-4 text-xs leading-relaxed text-ink-500">
-            Refining takes about two minutes: your home room by room, with what we know already filled in. We ask
-            for your email first, so your quote is saved as you go.
-          </p>
-        )
-      }
     >
       {/* The guide price, or its shell while we look the home up */}
       <div className="ink-gradient rounded-3xl p-5 text-white shadow-lg" aria-busy={pricing || undefined}>
@@ -95,31 +92,88 @@ export function PriceStep({
         <p className="mt-1 text-xs text-white/75">
           {pricing
             ? "Looking your home up…"
-            : `${rooms.length} room${rooms.length === 1 ? "" : "s"} · heating and cooling · ${installDurationCopy(settings).toLowerCase()}${vat.short ? ` · ${vat.short}` : ""}`}
+            : `Heating and cooling · ${installDurationCopy(settings).toLowerCase()}${vat.short ? ` · ${vat.short}` : ""}`}
         </p>
         <p className="mt-1 text-xs text-white/75">Confirmed at your survey.</p>
       </div>
 
       {!pricing && (
-        <>
-          <BasicsCard property={survey.property} onAdjust={onAdjust} basis={basis} />
+        <section aria-labelledby="priced-for" data-testid="basics" className="rounded-2xl border border-line bg-white p-4">
+          <h2 id="priced-for" className="text-sm font-semibold text-ink-900">
+            Priced for {roomsPhrase(rooms)}
+          </h2>
 
-          {/* Discreet, and the honest version of "fixed": the survey refines it. */}
-          <p className="text-xs leading-relaxed text-ink-500">
-            A guide, not a final price. Our swift virtual survey, a video walk-round on your phone, lets us refine
-            this quote properly before you decide anything.
-          </p>
-        </>
+          <ul aria-label="Rooms in your price" className="mt-3 flex flex-wrap gap-1.5">
+            {rooms.map((room) => (
+              <li key={room.id}>
+                <span className="inline-flex items-center gap-1 rounded-full bg-accent-50 py-1 pl-3 pr-1 text-xs font-semibold text-accent-700">
+                  {room.name}
+                  <button
+                    type="button"
+                    onClick={() => onDecline(room.id)}
+                    aria-label={`Leave out ${room.name}`}
+                    className="flex h-6 w-6 items-center justify-center rounded-full text-accent-700 transition hover:bg-accent-100"
+                  >
+                    <span aria-hidden>✕</span>
+                  </button>
+                </span>
+              </li>
+            ))}
+            {off.map((room) => (
+              <li key={room.id}>
+                <button
+                  type="button"
+                  onClick={() => onInclude(room.id)}
+                  className="rounded-full border border-dashed border-line px-3 py-1 text-xs font-semibold text-ink-500 transition hover:border-accent-500 hover:text-accent-700"
+                >
+                  + {room.name}
+                </button>
+              </li>
+            ))}
+            {!bedroomOff && draft.survey.property.bedrooms < 6 && (
+              <li>
+                <button
+                  type="button"
+                  onClick={onAddBedroom}
+                  className="rounded-full border border-dashed border-line px-3 py-1 text-xs font-semibold text-ink-500 transition hover:border-accent-500 hover:text-accent-700"
+                >
+                  + Bedroom
+                </button>
+              </li>
+            )}
+            {!livingOff && canAddLivingRoom(draft) && (
+              <li>
+                <button
+                  type="button"
+                  onClick={onAddLivingRoom}
+                  className="rounded-full border border-dashed border-line px-3 py-1 text-xs font-semibold text-ink-500 transition hover:border-accent-500 hover:text-accent-700"
+                >
+                  + Living room
+                </button>
+              </li>
+            )}
+          </ul>
+
+          {excluded.length > 0 && (
+            <p className="mt-2 text-xs leading-relaxed text-ink-500">
+              {excluded.map((e) => e.name).join(", ")} can&apos;t be included: {excluded[0]!.reason.charAt(0).toLowerCase()}
+              {excluded[0]!.reason.slice(1)}
+            </p>
+          )}
+
+          <SizeRow value={survey.property.floorAreaM2} onChange={onSize} />
+        </section>
+      )}
+
+      {!pricing && (
+        <p className="text-xs leading-relaxed text-ink-500">
+          A guide, not a final price. Our swift virtual survey, a video walk-round on your phone, lets us refine
+          this quote properly before you decide anything.
+        </p>
       )}
     </StepShell>
   );
 }
-
-/* ------------------------------------------------------------------ */
-/* The basics card                                                     */
-/* ------------------------------------------------------------------ */
-
-const COUNTS = [1, 2, 3, 4] as const;
 
 /** Floor area in 20 m² bands; picking one sets the band's middle. */
 const SIZE_BANDS: { label: string; min: number; max: number; value: number }[] = [
@@ -138,86 +192,22 @@ export function sizeBandFor(areaM2: number | undefined): number | undefined {
   return i === -1 ? undefined : i;
 }
 
-/**
- * The four basics the guide price rests on, each a row of pills: tap one
- * and the price follows. Everything else about the home (era, layout, the
- * rooms themselves) waits for the full form after the email gate.
- */
-function BasicsCard({
-  property: p,
-  onAdjust,
-  basis,
-}: {
-  property: Property;
-  onAdjust: (update: Partial<Property>) => void;
-  basis: string;
-}) {
-  const beds = Math.min(4, Math.max(1, p.bedrooms));
-  const baths = Math.min(4, Math.max(1, p.bathrooms ?? 1));
-  const band = sizeBandFor(p.floorAreaM2);
-  return (
-    <section aria-labelledby="basics" data-testid="basics" className="rounded-2xl border border-line bg-white p-3">
-      <h2 id="basics" className="text-sm font-semibold text-ink-900">
-        Priced for
-      </h2>
-      <p className="mt-0.5 text-xs text-ink-500">Tap to adjust: the guide price updates.</p>
-      <div className="mt-2.5 space-y-2.5">
-        <PillRow
-          legend="Home"
-          options={TYPE_OPTIONS.map((o) => ({ value: o.value, label: o.label === "Semi-detached" ? "Semi" : o.label }))}
-          value={p.type}
-          onChange={(type) => onAdjust({ type })}
-        />
-        <PillRow
-          legend="Bedrooms"
-          options={COUNTS.map((n) => ({ value: n, label: n === 4 ? "4+" : String(n) }))}
-          value={beds}
-          // 4+ keeps a larger count we already hold (six bedrooms from the records stay six).
-          onChange={(n) => onAdjust({ bedrooms: n === 4 && p.bedrooms > 4 ? p.bedrooms : n })}
-        />
-        <PillRow
-          legend="Bathrooms"
-          options={COUNTS.map((n) => ({ value: n, label: n === 4 ? "4+" : String(n) }))}
-          value={baths}
-          onChange={(n) => onAdjust({ bathrooms: n === 4 && (p.bathrooms ?? 1) > 4 ? p.bathrooms : n })}
-        />
-        <PillRow
-          legend="Size, m²"
-          options={SIZE_BANDS.map((b, i) => ({ value: i, label: b.label }))}
-          value={band}
-          onChange={(i) => onAdjust({ floorAreaM2: SIZE_BANDS[i]!.value })}
-        />
-      </div>
-      <p className="mt-2.5 text-xs leading-relaxed text-ink-500">{basis}</p>
-    </section>
-  );
-}
-
-/** A row of pills as native radios: one tab stop, arrow keys, announced as "2 of 4". */
-function PillRow<T extends string | number>({
-  legend,
-  options,
-  value,
-  onChange,
-}: {
-  legend: string;
-  options: { value: T; label: string }[];
-  value: T | undefined;
-  onChange: (value: T) => void;
-}) {
+/** The home's size as a row of pills (native radios: one tab stop, arrow keys). */
+function SizeRow({ value, onChange }: { value: number | undefined; onChange: (m2: number) => void }) {
   const name = useId();
+  const band = sizeBandFor(value);
   return (
-    <fieldset className="flex min-w-0 items-start gap-2">
-      <legend className="sr-only">{legend}</legend>
-      <span aria-hidden className="w-[4.5rem] shrink-0 pt-1 text-xs text-ink-500">
-        {legend}
-      </span>
-      <div className="flex min-w-0 flex-wrap gap-1">
-        {options.map((o) => {
-          const selected = o.value === value;
+    <fieldset className="mt-4 min-w-0 border-t border-line pt-3">
+      <legend className="sr-only">Size of your home</legend>
+      <p aria-hidden className="text-xs font-semibold text-ink-700">
+        Size of your home, m²
+      </p>
+      <div className="mt-1.5 flex flex-wrap gap-1">
+        {SIZE_BANDS.map((b, i) => {
+          const selected = i === band;
           return (
             <label
-              key={String(o.value)}
+              key={b.label}
               className={`cursor-pointer rounded-full px-2.5 py-1 text-xs font-semibold transition has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent-500 has-[:focus-visible]:ring-offset-1 ${
                 selected ? "bg-accent-700 text-white" : "bg-surface text-ink-700 hover:bg-accent-50 hover:text-accent-700"
               }`}
@@ -226,11 +216,11 @@ function PillRow<T extends string | number>({
                 type="radio"
                 name={name}
                 checked={selected}
-                onChange={() => onChange(o.value)}
+                onChange={() => onChange(b.value)}
                 data-selected={selected || undefined}
                 className="sr-only"
               />
-              {o.label}
+              {b.label}
             </label>
           );
         })}
@@ -238,4 +228,3 @@ function PillRow<T extends string | number>({
     </fieldset>
   );
 }
-
