@@ -29,14 +29,12 @@
   .muted { color: var(--muted); }
 
   /* Header */
-  header { display: grid; grid-template-columns: 1fr 76mm; align-items: end; gap: 5mm;
+  header { display: grid; align-items: end; gap: 5mm;
            border-bottom: 1.4pt solid var(--ink); padding-bottom: 1.6mm; }
   .eyebrow { font-size: 5.8pt; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
   h1 { font-size: 14.5pt; line-height: 1.05; letter-spacing: -.01em; margin: .5mm 0 .9mm; }
   h1 span { color: var(--accent); }
   .thesis { font-size: 7.4pt; line-height: 1.28; }
-  .today { font-size: 6.1pt; border-left: 2pt solid var(--accent); padding-left: 2mm; }
-  .today .eyebrow { color: var(--accent); margin-bottom: .4mm; }
 
   /* KPI strip */
   .kpis { display: grid; grid-template-columns: repeat(6, 1fr); gap: 1.5mm; }
@@ -80,6 +78,12 @@
   .brands div { border: .8pt solid var(--accent); text-align: center; padding: .5mm .2mm; font-size: 5.2pt; line-height: 1.12; font-weight: 700; }
   .brands div span { display: block; font-weight: 400; color: var(--muted); font-size: 4.9pt; }
   .partners { border: .8pt dashed var(--muted); text-align: center; padding: .5mm; font-size: 5.9pt; }
+  .fulfil { display: flex; flex-direction: column; gap: .7mm; }
+  .own { background: var(--accent); color: #fff; padding: .8mm 1.2mm 1.1mm; }
+  .own .t { font-weight: 800; font-size: 6.7pt; margin-bottom: .6mm; }
+  .own .cells { display: grid; grid-template-columns: repeat(3, 1fr); gap: .7mm; }
+  .own .cells div { background: #fff; color: var(--ink); padding: .5mm .9mm; font-size: 5.9pt; line-height: 1.2; }
+  .own .cells b { display: block; color: var(--accent); font-size: 6.3pt; }
   .arrow { text-align: center; font-size: 5.4pt; color: var(--muted); line-height: 1; }
 
   .callout { background: var(--accent-soft); border-left: 2pt solid var(--accent); padding: .8mm 1.4mm; font-size: 6.4pt; line-height: 1.22; }
@@ -94,11 +98,7 @@
   <div>
     <div class="eyebrow">NewCo · Investor discussion · November 2026 · Confidential</div>
     <h1>The AI-native home heating group: <span>six local brands, one operating system</span></h1>
-    <p class="thesis">We own the customer, the price and the data; partner installers supply the labour. Central agents run marketing, sales, design, scheduling, procurement, grants and finance for every brand, so <b>launching a region is a configuration, not a company</b>, and SG&amp;A stays nearly flat as volume grows.</p>
-  </div>
-  <div class="today">
-    <div class="eyebrow">Already built: v1 OS, live pilots</div>
-    Address-to-price quote from EPC + planning data · ops board · field app with F-gas / Part P-locked steps · customer portal · 29 automated comms · P&amp;L planner. <b>4 London pilot homes</b> under Dang It's Hot.
+    <p class="thesis">We own the customer, the price and the data. Work is delivered by regional partner installers <b>and our own operating arm, Dang It's Hot</b>, which runs installation, sourcing and training so we know every part of the chain first-hand. Central agents run marketing, sales, design, scheduling, procurement, grants and finance for every brand, so <b>launching a region is a configuration, not a company</b>, and SG&amp;A stays nearly flat as volume grows.</p>
   </div>
 </header>
 
@@ -139,8 +139,8 @@
         <tr><td><b>Apex, Wrench</b> (US HVAC)</td><td>Local brands kept, one central back office</td><td>M&amp;A roll-up; we build</td></tr>
         <tr><td><b>Vet / dental groups</b></td><td>Local name, central SG&amp;A + procurement</td><td>Same logic, new category</td></tr>
         <tr><td><b>Neighborly</b></td><td>Multi-brand home services, shared infrastructure</td><td>Franchised, not owned</td></tr>
-        <tr><td><b>Octopus / Kraken</b></td><td>Operator proves the OS, then the OS becomes the asset</td><td>Energy retail, not installs</td></tr>
-        <tr><td><b>Checkatrade, Angi</b></td><td>Demand aggregation</td><td>No fulfilment control</td></tr>
+        <tr><td><b>Octopus</b></td><td>Own installers, training academy and heat pumps; OS spun out as Kraken</td><td>Energy-retail led, one brand</td></tr>
+        <tr><td><b>Amazon</b></td><td>Own logistics and 1P beside 3P partners: learns their costs, sets the bar</td><td>Same playbook, for installs</td></tr>
       </table>
       <div class="callout"><b>Subcontracting is common; our edge isn't.</b> It's agentic depth, installer productivity and near-zero marginal cost per new brand or territory.</div>
     </section>
@@ -156,29 +156,36 @@
           <div class="box acc"><div class="t">Agentic commercial engine</div><div class="d">Marketing, CRM, instant quotes, finance, grants, support</div></div>
           <div class="box acc"><div class="t">Agentic delivery engine</div><div class="d">Design, job packs, scheduling, procurement, QA, payouts</div></div>
         </div>
-        <div class="arrow">▼ one back end, six front ends ▼</div>
+        <div class="arrow">▼ one back end, six regional front ends ▼</div>
         <div class="brands">
-          <div>London<span>Dang It's Hot</span></div><div>South/SW<span>Bristol</span></div><div>Midlands<span>B'ham</span></div><div>N. West<span>M'chester</span></div><div>Yorks/NE<span>Leeds</span></div><div>Scotland<span>Glasgow</span></div>
+          <div>London<span>&amp; Home Cos.</span></div><div>South/SW<span>Bristol</span></div><div>Midlands<span>B'ham</span></div><div>N. West<span>M'chester</span></div><div>Yorks/NE<span>Leeds</span></div><div>Scotland<span>Glasgow</span></div>
         </div>
-        <div class="partners">Regional partner-installer networks: vetted · MCS route · rate-carded · scored</div>
+        <div class="arrow">▼ fulfilment: partner and owned, side by side ▼</div>
+        <div class="fulfil">
+          <div class="partners"><b>Regional partner-installer networks</b> · vetted · MCS route · rate-carded · scored</div>
+          <div class="own">
+            <div class="t">Dang It's Hot: our own operating arm</div>
+            <div class="cells"><div><b>Fulfilment</b>In-house install crews</div><div><b>Sourcing</b>Kit procurement &amp; supply</div><div><b>Training</b>Installer academy</div></div>
+          </div>
+        </div>
       </div>
+      <div class="callout"><b>Why we also operate:</b> to learn each trade from inside, speak our partners' language, benchmark their costs, and make in-sourcing a switch, not a rebuild, wherever owned wins.</div>
       <table>
         <tr><th>Layer</th><th>We own</th><th>Drives</th></tr>
         <tr><td><b>Demand</b></td><td>Brands, ads, SEO, lead scoring</td><td>CAC</td></tr>
-        <tr><td><b>Transaction</b></td><td>Design, quote, contract, finance, grant</td><td>Conversion, margin</td></tr>
-        <tr><td><b>Fulfilment</b></td><td>Matching, kit procurement, scheduling, QA</td><td>Cost, quality</td></tr>
-        <tr><td><b>Lifecycle</b></td><td>Warranty, service plans, referrals, upgrades</td><td>LTV, reputation</td></tr>
+        <tr><td><b>Transaction</b></td><td>Design, quote, contract, grant</td><td>Margin</td></tr>
+        <tr><td><b>Fulfilment</b></td><td>Matching, kit, scheduling, QA, own crews</td><td>Cost, quality</td></tr>
+        <tr><td><b>Lifecycle</b></td><td>Warranty, service plans, referrals</td><td>LTV</td></tr>
       </table>
     </section>
 
     <section>
       <h2><i>4</i> Why six regional brands</h2>
       <ul>
-        <li><b>Local trust converts.</b> Trades are bought on word of mouth: installs on your street, local reviews, a local installer.</li>
-        <li><b>Sharper targeting.</b> Each brand is positioned on its region's housing stock, demographics and competitors.</li>
-        <li><b>Six parallel experiments.</b> Test proposition, price and channel per region, then roll winners out group-wide.</li>
-        <li><b>Contained brand risk</b> behind one quality standard and one complaints process.</li>
-        <li><b>Near-zero launch cost.</b> Multi-tenant OS, with brand, territory and operating company as separate objects.</li>
+        <li><b>Local trust converts:</b> word of mouth, installs on your street, local reviews.</li>
+        <li><b>Sharper targeting</b> by regional housing stock, demographics and competitors.</li>
+        <li><b>Six parallel experiments;</b> winning propositions roll out group-wide.</li>
+        <li><b>Contained brand risk;</b> near-zero launch cost on one OS.</li>
       </ul>
       <table>
         <tr><th>Territory</th><th>Hub</th><th>Lead hypothesis</th></tr>
@@ -189,7 +196,7 @@
         <tr><td>Yorkshire &amp; North East</td><td>Leeds</td><td>Trusted local engineers</td></tr>
         <tr><td>Scotland*</td><td>Glasgow</td><td>Heating performance</td></tr>
       </table>
-      <div class="note">*BUS covers England &amp; Wales; Scotland uses the Home Energy Scotland grant and loan. Wales is served from the SW and Midlands hubs. Marketing runs as a national centre of excellence (data, paid, SEO, creative) plus regional growth pods; <b>each region is a P&amp;L on contribution</b>.</div>
+      <div class="note">*Home Energy Scotland grants (BUS is England &amp; Wales). National marketing centre of excellence + regional pods; <b>each region a P&amp;L</b>.</div>
     </section>
   </div>
 
@@ -207,11 +214,12 @@
         <tr><td><b>Aftercare</b></td><td>Comms, service reminders, reviews, referrals</td><td>Complaints</td></tr>
       </table>
       <div class="callout"><b>Target: &lt;15 central FTE running 6 brands at ~3,600 installs/yr.</b> Humans handle exceptions and regulated decisions; agents do the volume.</div>
-      <h3>Partner-installer programme</h3>
+      <h3>Fulfilment programme</h3>
       <ul>
         <li>Verified certs, insurance and coverage; a <b>fixed rate card</b> per package, with priced variations.</li>
         <li>A full job pack before acceptance: kit, photos, routes, electrics, fee. Kit arrives on time; <b>fast payment</b>.</li>
         <li>Quality scores, rework duty, retention holdback. Goal: <b>our job beats one they find themselves.</b></li>
+        <li><b>Partners and Dang It's Hot crews take jobs from the same platform</b>, so cost and quality are benchmarked like for like.</li>
       </ul>
     </section>
 
@@ -221,7 +229,7 @@
         <tr><th>Per air-to-air install, ex-VAT</th><th class="r">£</th><th class="r">%</th></tr>
         <tr><td>Net price (incl. £2.5k BUS grant; customer pays ~£2k)</td><td class="r">4,500</td><td class="r">100</td></tr>
         <tr><td>Equipment &amp; materials (group procurement)</td><td class="r">(1,400)</td><td class="r">31</td></tr>
-        <tr><td>Partner installer fee (rate card)</td><td class="r">(1,100)</td><td class="r">24</td></tr>
+        <tr><td>Installer fee (partner rate card or own crew)</td><td class="r">(1,100)</td><td class="r">24</td></tr>
         <tr><td>Customer acquisition cost</td><td class="r">(450)</td><td class="r">10</td></tr>
         <tr><td>Warranty / callback reserve</td><td class="r">(150)</td><td class="r">3</td></tr>
         <tr><td>Payments, finance, survey, other</td><td class="r">(150)</td><td class="r">3</td></tr>
@@ -260,14 +268,13 @@
     </section>
 
     <section>
-      <h2><i>8</i> Next 60 days: prove the machine</h2>
+      <h2><i>8</i> Next six months: prove the machine</h2>
       <table class="plan">
-        <tr><td><b>D1–14</b></td><td>Make the v1 OS multi-brand and multi-installer. Interview 10+ installers for real rate cards and capacity.</td></tr>
-        <tr><td><b>D15–30</b></td><td>Launch a 2nd brand next to Dang It's Hot. Quote funnel, grant pre-screen, paid tests in 1–2 territories.</td></tr>
-        <tr><td><b>D31–45</b></td><td>Job offers, POs, scheduling, evidence. First paid jobs via an MCS umbrella partner.</td></tr>
-        <tr><td><b>D46–60</b></td><td>Read CAC, conversion, margin and rework, then scale, re-price or refocus.</td></tr>
+        <tr><td><b>Build</b></td><td>Multi-brand, multi-installer OS. First partner installers signed; Dang It's Hot operating.</td></tr>
+        <tr><td><b>Launch</b></td><td>First regional brands live; demand, pricing and channel tests.</td></tr>
+        <tr><td><b>Prove</b></td><td>Partner vs owned economics; sourcing and training pilots; regional rollout decision.</td></tr>
       </table>
-      <div class="callout"><b>Gates to scale:</b> 5–10 partners · 100+ qualified leads · 5–10 installs · <b>≥20% contribution after CAC</b> · ≥95% with no major rework.</div>
+      <div class="callout"><b>What we'll prove:</b> CAC and conversion by region · <b>≥20% contribution after CAC</b> · partner vs owned cost per install · ≥95% with no major rework.</div>
       <h3>Risks → mitigants</h3>
       <table class="risk">
         <tr><td class="w"><b>Liability</b></td><td>As principal we carry Consumer Rights Act exposure for subcontracted work. Evidence capture, holdbacks, back-to-back warranties, insurance.</td></tr>
@@ -275,6 +282,7 @@
         <tr><td class="w"><b>CAC</b></td><td>Regional vs national A/B tests, EPC-targeted mail, referrals.</td></tr>
         <tr><td class="w"><b>Policy</b></td><td>Air-to-air also sells on comfort; BUS budget is set to 2029/30.</td></tr>
         <tr><td class="w"><b>Fragmentation</b></td><td>One OS, shared SEO infrastructure; a brand launches only once installer capacity exists.</td></tr>
+        <tr><td class="w"><b>Owned ops</b></td><td>Kept at learning scale; scaled only where they beat partners on cost and quality.</td></tr>
       </table>
     </section>
   </div>
