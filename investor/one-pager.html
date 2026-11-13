@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<title>NewCo Investor One-Pager</title>
+<style>
+  @page { size: A4 landscape; margin: 0; }
+  :root {
+    --ink: #14171c;
+    --muted: #5a6270;
+    --rule: #d5d9e0;
+    --soft: #f2f4f7;
+    --accent: #0b5d4b;
+    --accent-soft: #e3f1ec;
+    --warn: #8a3b12;
+    --warn-soft: #fbeee6;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: #fff; }
+  body {
+    width: 297mm; height: 210mm; overflow: hidden;
+    padding: 5.5mm 6.5mm 4mm;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-size: 6.75pt; line-height: 1.25; color: var(--ink);
+    display: flex; flex-direction: column; gap: 2mm;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+  b { font-weight: 700; }
+  .muted { color: var(--muted); }
+
+  /* Header */
+  header { display: grid; grid-template-columns: 1fr 76mm; align-items: end; gap: 5mm;
+           border-bottom: 1.4pt solid var(--ink); padding-bottom: 1.6mm; }
+  .eyebrow { font-size: 5.8pt; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+  h1 { font-size: 14.5pt; line-height: 1.05; letter-spacing: -.01em; margin: .5mm 0 .9mm; }
+  h1 span { color: var(--accent); }
+  .thesis { font-size: 7.4pt; line-height: 1.28; }
+  .today { font-size: 6.1pt; border-left: 2pt solid var(--accent); padding-left: 2mm; }
+  .today .eyebrow { color: var(--accent); margin-bottom: .4mm; }
+
+  /* KPI strip */
+  .kpis { display: grid; grid-template-columns: repeat(6, 1fr); gap: 1.5mm; }
+  .kpi { background: var(--soft); padding: 1.2mm 1.8mm 1.1mm; border-top: 1.4pt solid var(--accent); }
+  .kpi .n { font-size: 11pt; font-weight: 800; letter-spacing: -.01em; line-height: 1.05; }
+  .kpi .l { font-size: 5.9pt; line-height: 1.2; margin-top: .3mm; }
+  .kpi .s { font-size: 5pt; color: var(--muted); margin-top: .2mm; }
+
+  /* Four flowing columns */
+  .grid { flex: 1; display: grid; grid-template-columns: 1fr 1.04fr 1fr 1fr; gap: 3mm; min-height: 0; }
+  .col { display: flex; flex-direction: column; gap: 2.2mm; min-width: 0; }
+  section { display: flex; flex-direction: column; gap: .9mm; }
+  h2 { font-size: 7.5pt; text-transform: uppercase; letter-spacing: .06em; padding-bottom: .5mm;
+       border-bottom: .8pt solid var(--ink); display: flex; gap: 1.4mm; align-items: baseline; }
+  h2 i { font-style: normal; color: #fff; background: var(--accent); font-size: 6pt; padding: 0 1.1mm; border-radius: .6mm; }
+  h3 { font-size: 6.3pt; text-transform: uppercase; letter-spacing: .05em; color: var(--accent); margin-top: .3mm; }
+  ul { list-style: none; display: flex; flex-direction: column; gap: .45mm; }
+  li { padding-left: 2.2mm; position: relative; }
+  li::before { content: ""; position: absolute; left: 0; top: 1mm; width: 1mm; height: 1mm; background: var(--accent); }
+  li.x::before { background: var(--warn); }
+  .note { font-size: 5.8pt; color: var(--muted); line-height: 1.22; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 6.25pt; line-height: 1.2; }
+  th { text-align: left; font-size: 5.5pt; text-transform: uppercase; letter-spacing: .04em; color: var(--muted);
+       border-bottom: .6pt solid var(--ink); padding: .2mm .7mm .2mm 0; font-weight: 700; }
+  td { border-bottom: .4pt solid var(--rule); padding: .35mm .7mm .35mm 0; vertical-align: top; }
+  td.r, th.r { text-align: right; padding-right: 0; padding-left: 1.4mm; white-space: nowrap; }
+  table.plan td:first-child, table.risk td:first-child { white-space: nowrap; }
+  tr.tot td { border-top: .8pt solid var(--ink); border-bottom: none; font-weight: 800; background: var(--accent-soft); padding-top: .5mm; padding-bottom: .5mm; }
+  td.w { color: var(--warn); }
+
+  /* Structure diagram */
+  .stack { display: flex; flex-direction: column; gap: .7mm; }
+  .box { border: .8pt solid var(--ink); padding: .8mm 1.4mm; }
+  .box.dark { background: var(--ink); color: #fff; }
+  .box.acc { background: var(--accent-soft); border-color: var(--accent); }
+  .box .t { font-weight: 800; font-size: 6.7pt; }
+  .box .d { font-size: 5.9pt; line-height: 1.2; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: .7mm; }
+  .brands { display: grid; grid-template-columns: repeat(6, 1fr); gap: .6mm; }
+  .brands div { border: .8pt solid var(--accent); text-align: center; padding: .5mm .2mm; font-size: 5.2pt; line-height: 1.12; font-weight: 700; }
+  .brands div span { display: block; font-weight: 400; color: var(--muted); font-size: 4.9pt; }
+  .partners { border: .8pt dashed var(--muted); text-align: center; padding: .5mm; font-size: 5.9pt; }
+  .arrow { text-align: center; font-size: 5.4pt; color: var(--muted); line-height: 1; }
+
+  .callout { background: var(--accent-soft); border-left: 2pt solid var(--accent); padding: .8mm 1.4mm; font-size: 6.4pt; line-height: 1.22; }
+  .callout.warn { background: var(--warn-soft); border-left-color: var(--warn); }
+
+  footer { display: flex; justify-content: space-between; gap: 4mm; font-size: 4.9pt; color: var(--muted); border-top: .6pt solid var(--rule); padding-top: .8mm; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="eyebrow">NewCo · Investor discussion · November 2026 · Confidential</div>
+    <h1>The AI-native home heating group: <span>six local brands, one operating system</span></h1>
+    <p class="thesis">We own the customer, the price and the data; partner installers supply the labour. Central agents run marketing, sales, design, scheduling, procurement, grants and finance for every brand, so <b>launching a region is a configuration, not a company</b>, and SG&amp;A stays nearly flat as volume grows.</p>
+  </div>
+  <div class="today">
+    <div class="eyebrow">Already built: v1 OS, live pilots</div>
+    Address-to-price quote from EPC + planning data · ops board · field app with F-gas / Part P-locked steps · customer portal · 29 automated comms · P&amp;L planner. <b>4 London pilot homes</b> under Dang It's Hot.
+  </div>
+</header>
+
+<div class="kpis">
+  <div class="kpi"><div class="n">125k</div><div class="l">UK heat pumps sold 2025, <b>+27% YoY</b> (record)</div><div class="s">Heat Pump Association</div></div>
+  <div class="kpi"><div class="n">450k/yr</div><div class="l">Govt 2030 install goal: needs <b>~33% CAGR</b></div><div class="s">Warm Homes Plan; HPA</div></div>
+  <div class="kpi"><div class="n">£2.7bn</div><div class="l">BUS grants to 2029/30: <b>£295m → £709m p.a.</b></div><div class="s">DESNZ BUS business case</div></div>
+  <div class="kpi"><div class="n">£2,500</div><div class="l"><b>Air-to-air</b> (heat + cool) grant-eligible from 28 Apr 2026</div><div class="s">GOV.UK BUS notice</div></div>
+  <div class="kpi"><div class="n">£7.5–9k</div><div class="l">Air-to-water grant; <b>£9k</b> off-gas-grid to Mar 2027</div><div class="s">GOV.UK BUS notice</div></div>
+  <div class="kpi"><div class="n">60k+</div><div class="l">MCS-certified installs 2025 from a <b>fragmented SME base</b></div><div class="s">MCS</div></div>
+</div>
+
+<div class="grid">
+
+  <!-- Column 1 -->
+  <div class="col">
+    <section>
+      <h2><i>1</i> Why now</h2>
+      <ul>
+        <li><b>Demand is grant-funded and compounding.</b> BUS budget rises 2.4× to 2030, and air-to-air opened up in Apr 2026. No brand owns that category yet.</li>
+        <li><b>Supply is fragmented.</b> Installers are good engineers but weak marketers, and they lose capacity to surveys, admin and grant paperwork.</li>
+        <li><b>The buying journey leaks.</b> Slow surveys, opaque quotes, grant forms, no-shows.</li>
+        <li><b>Incumbent SG&amp;A scales linearly</b> with surveyors, sales, schedulers and back office.</li>
+        <li class="x"><b>National reach alone doesn't win.</b> British Gas (7,000+ engineers) rides its energy customer base. Safestyle's national branches failed in 2023 under fixed cost and CAC.</li>
+        <li><b>Wedge: air-to-air heating + cooling.</b> It's simpler and more standardisable than air-to-water, so it's the right product to prove the machine on.</li>
+      </ul>
+      <div class="note"><b>Positioning:</b> consumers buy heat pumps and home heating, with cooling as the upsell. The corporate ambition is home electrification: solar, batteries and EV charging on the same OS later.</div>
+    </section>
+
+    <section>
+      <h2><i>2</i> Analogues: each piece exists</h2>
+      <table>
+        <tr><th>Company</th><th>Proves</th><th>Gap we fill</th></tr>
+        <tr><td><b>BOXT</b></td><td>Online quote-to-install; 100k+ homes; Brookfield £20m (2022)</td><td>One national brand; boilers</td></tr>
+        <tr><td><b>Heatable</b></td><td>Central selling, distributed delivery</td><td>No local trust</td></tr>
+        <tr><td><b>Heat Geek</b></td><td>Installer network to one technical standard</td><td>Doesn't own demand</td></tr>
+        <tr><td><b>HomeServe</b></td><td>Recurring plans + engineers; £4.1bn to Brookfield</td><td>Not install-native</td></tr>
+        <tr><td><b>Apex, Wrench</b> (US HVAC)</td><td>Local brands kept, one central back office</td><td>M&amp;A roll-up; we build</td></tr>
+        <tr><td><b>Vet / dental groups</b></td><td>Local name, central SG&amp;A + procurement</td><td>Same logic, new category</td></tr>
+        <tr><td><b>Neighborly</b></td><td>Multi-brand home services, shared infrastructure</td><td>Franchised, not owned</td></tr>
+        <tr><td><b>Octopus / Kraken</b></td><td>Operator proves the OS, then the OS becomes the asset</td><td>Energy retail, not installs</td></tr>
+        <tr><td><b>Checkatrade, Angi</b></td><td>Demand aggregation</td><td>No fulfilment control</td></tr>
+      </table>
+      <div class="callout"><b>Subcontracting is common; our edge isn't.</b> It's agentic depth, installer productivity and near-zero marginal cost per new brand or territory.</div>
+    </section>
+  </div>
+
+  <!-- Column 2 -->
+  <div class="col">
+    <section>
+      <h2><i>3</i> The model</h2>
+      <div class="stack">
+        <div class="box dark"><div class="t">NewCo: one legal operating company</div><div class="d">Capital · risk · insurance · supplier contracts · finance · MCS / BUS compliance</div></div>
+        <div class="row2">
+          <div class="box acc"><div class="t">Agentic commercial engine</div><div class="d">Marketing, CRM, instant quotes, finance, grants, support</div></div>
+          <div class="box acc"><div class="t">Agentic delivery engine</div><div class="d">Design, job packs, scheduling, procurement, QA, payouts</div></div>
+        </div>
+        <div class="arrow">▼ one back end, six front ends ▼</div>
+        <div class="brands">
+          <div>London<span>Dang It's Hot</span></div><div>South/SW<span>Bristol</span></div><div>Midlands<span>B'ham</span></div><div>N. West<span>M'chester</span></div><div>Yorks/NE<span>Leeds</span></div><div>Scotland<span>Glasgow</span></div>
+        </div>
+        <div class="partners">Regional partner-installer networks: vetted · MCS route · rate-carded · scored</div>
+      </div>
+      <table>
+        <tr><th>Layer</th><th>We own</th><th>Drives</th></tr>
+        <tr><td><b>Demand</b></td><td>Brands, ads, SEO, lead scoring</td><td>CAC</td></tr>
+        <tr><td><b>Transaction</b></td><td>Design, quote, contract, finance, grant</td><td>Conversion, margin</td></tr>
+        <tr><td><b>Fulfilment</b></td><td>Matching, kit procurement, scheduling, QA</td><td>Cost, quality</td></tr>
+        <tr><td><b>Lifecycle</b></td><td>Warranty, service plans, referrals, upgrades</td><td>LTV, reputation</td></tr>
+      </table>
+    </section>
+
+    <section>
+      <h2><i>4</i> Why six regional brands</h2>
+      <ul>
+        <li><b>Local trust converts.</b> Trades are bought on word of mouth: installs on your street, local reviews, a local installer.</li>
+        <li><b>Sharper targeting.</b> Each brand is positioned on its region's housing stock, demographics and competitors.</li>
+        <li><b>Six parallel experiments.</b> Test proposition, price and channel per region, then roll winners out group-wide.</li>
+        <li><b>Contained brand risk</b> behind one quality standard and one complaints process.</li>
+        <li><b>Near-zero launch cost.</b> Multi-tenant OS, with brand, territory and operating company as separate objects.</li>
+      </ul>
+      <table>
+        <tr><th>Territory</th><th>Hub</th><th>Lead hypothesis</th></tr>
+        <tr><td>London &amp; Home Counties</td><td>London</td><td>Premium heat + cool</td></tr>
+        <tr><td>South &amp; South West</td><td>Bristol</td><td>Efficiency, sustainability</td></tr>
+        <tr><td>Midlands</td><td>B'ham</td><td>Affordable upgrade</td></tr>
+        <tr><td>North West</td><td>M'chester</td><td>Value, reliability</td></tr>
+        <tr><td>Yorkshire &amp; North East</td><td>Leeds</td><td>Trusted local engineers</td></tr>
+        <tr><td>Scotland*</td><td>Glasgow</td><td>Heating performance</td></tr>
+      </table>
+      <div class="note">*BUS covers England &amp; Wales; Scotland uses the Home Energy Scotland grant and loan. Wales is served from the SW and Midlands hubs. Marketing runs as a national centre of excellence (data, paid, SEO, creative) plus regional growth pods; <b>each region is a P&amp;L on contribution</b>.</div>
+    </section>
+  </div>
+
+  <!-- Column 3 -->
+  <div class="col">
+    <section>
+      <h2><i>5</i> Agentic org: SG&amp;A as software</h2>
+      <table>
+        <tr><th>Function</th><th>Agents run</th><th>Humans own</th></tr>
+        <tr><td><b>Growth</b></td><td>Paid, SEO and local pages per brand; creative variants; CRO tests</td><td>Budget, brand, guardrails</td></tr>
+        <tr><td><b>Sales</b></td><td>Address-to-price quote, qualification, grant pre-screen, follow-up</td><td>Complex homes</td></tr>
+        <tr><td><b>Design</b></td><td>Self-survey, heat-loss pre-calc, sizing, job pack</td><td>MCS-competent sign-off</td></tr>
+        <tr><td><b>Fulfilment</b></td><td>Installer matching, job offers, POs, delivery, evidence capture</td><td>Partners, QA audit</td></tr>
+        <tr><td><b>Finance</b></td><td>Invoicing, payouts, BUS claims, reconciliation</td><td>Controls, audit</td></tr>
+        <tr><td><b>Aftercare</b></td><td>Comms, service reminders, reviews, referrals</td><td>Complaints</td></tr>
+      </table>
+      <div class="callout"><b>Target: &lt;15 central FTE running 6 brands at ~3,600 installs/yr.</b> Humans handle exceptions and regulated decisions; agents do the volume.</div>
+      <h3>Partner-installer programme</h3>
+      <ul>
+        <li>Verified certs, insurance and coverage; a <b>fixed rate card</b> per package, with priced variations.</li>
+        <li>A full job pack before acceptance: kit, photos, routes, electrics, fee. Kit arrives on time; <b>fast payment</b>.</li>
+        <li>Quality scores, rework duty, retention holdback. Goal: <b>our job beats one they find themselves.</b></li>
+      </ul>
+    </section>
+
+    <section>
+      <h2><i>6</i> Unit economics (illustrative)</h2>
+      <table>
+        <tr><th>Per air-to-air install, ex-VAT</th><th class="r">£</th><th class="r">%</th></tr>
+        <tr><td>Net price (incl. £2.5k BUS grant; customer pays ~£2k)</td><td class="r">4,500</td><td class="r">100</td></tr>
+        <tr><td>Equipment &amp; materials (group procurement)</td><td class="r">(1,400)</td><td class="r">31</td></tr>
+        <tr><td>Partner installer fee (rate card)</td><td class="r">(1,100)</td><td class="r">24</td></tr>
+        <tr><td>Customer acquisition cost</td><td class="r">(450)</td><td class="r">10</td></tr>
+        <tr><td>Warranty / callback reserve</td><td class="r">(150)</td><td class="r">3</td></tr>
+        <tr><td>Payments, finance, survey, other</td><td class="r">(150)</td><td class="r">3</td></tr>
+        <tr class="tot"><td>Contribution per install</td><td class="r">1,250</td><td class="r">28</td></tr>
+      </table>
+      <ul>
+        <li><b>Recurring layer:</b> service plan (£12/mo target, 35% attach), referrals, later upgrades.</li>
+        <li><b>Levers:</b> CAC via local proof; kit via group buying; installer cost via productivity, not squeezed rates.</li>
+      </ul>
+      <div class="callout warn"><b>Key risk:</b> site complexity pushes cost above quote. Mitigated by remote survey, fixed package scope and priced variations.</div>
+    </section>
+  </div>
+
+  <!-- Column 4 -->
+  <div class="col">
+    <section>
+      <h2><i>7</i> Scale path &amp; value</h2>
+      <table>
+        <tr><th>Steady state (illustrative)</th><th class="r">1 region</th><th class="r">6 regions</th></tr>
+        <tr><td>Installs / yr (50 / mo / region)</td><td class="r">600</td><td class="r">3,600</td></tr>
+        <tr><td>Revenue</td><td class="r">£2.7m</td><td class="r">£16.2m</td></tr>
+        <tr><td>Contribution (28%)</td><td class="r">£0.75m</td><td class="r">£4.5m</td></tr>
+        <tr><td>Central SG&amp;A (agentic, mostly fixed)</td><td class="r">(£0.9m)</td><td class="r">(£1.5m)</td></tr>
+        <tr class="tot"><td>EBITDA</td><td class="r">(£0.15m)</td><td class="r">£3.0m · 19%</td></tr>
+      </table>
+      <table>
+        <tr><th>EBITDA</th><th class="r">6× EV</th><th class="r">10× EV</th></tr>
+        <tr><td>£3m (6 regions, air-to-air)</td><td class="r">£18m</td><td class="r">£30m</td></tr>
+        <tr><td>£5m</td><td class="r">£30m</td><td class="r">£50m</td></tr>
+        <tr><td>£10m (+ air-to-water, adjacencies)</td><td class="r">£60m</td><td class="r">£100m</td></tr>
+      </table>
+      <ul>
+        <li><b>Two businesses in one.</b> Our own brands prove the OS, which can later be licensed to third-party installers. Precedent: Octopus spun out <b>Kraken at $8.65bn</b> (Dec 2025).</li>
+        <li><b>Natural acquirers:</b> HomeServe / BOXT (Brookfield), Centrica / British Gas, Octopus, E.ON, EDF, OVO, PE home-services platforms. They'd be buying a <b>lower-SG&amp;A acquisition and fulfilment engine</b>, not just EBITDA.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2><i>8</i> Next 60 days: prove the machine</h2>
+      <table class="plan">
+        <tr><td><b>D1–14</b></td><td>Make the v1 OS multi-brand and multi-installer. Interview 10+ installers for real rate cards and capacity.</td></tr>
+        <tr><td><b>D15–30</b></td><td>Launch a 2nd brand next to Dang It's Hot. Quote funnel, grant pre-screen, paid tests in 1–2 territories.</td></tr>
+        <tr><td><b>D31–45</b></td><td>Job offers, POs, scheduling, evidence. First paid jobs via an MCS umbrella partner.</td></tr>
+        <tr><td><b>D46–60</b></td><td>Read CAC, conversion, margin and rework, then scale, re-price or refocus.</td></tr>
+      </table>
+      <div class="callout"><b>Gates to scale:</b> 5–10 partners · 100+ qualified leads · 5–10 installs · <b>≥20% contribution after CAC</b> · ≥95% with no major rework.</div>
+      <h3>Risks → mitigants</h3>
+      <table class="risk">
+        <tr><td class="w"><b>Liability</b></td><td>As principal we carry Consumer Rights Act exposure for subcontracted work. Evidence capture, holdbacks, back-to-back warranties, insurance.</td></tr>
+        <tr><td class="w"><b>MCS / BUS</b></td><td>Start via an MCS umbrella scheme; own certification later.</td></tr>
+        <tr><td class="w"><b>CAC</b></td><td>Regional vs national A/B tests, EPC-targeted mail, referrals.</td></tr>
+        <tr><td class="w"><b>Policy</b></td><td>Air-to-air also sells on comfort; BUS budget is set to 2029/30.</td></tr>
+        <tr><td class="w"><b>Fragmentation</b></td><td>One OS, shared SEO infrastructure; a brand launches only once installer capacity exists.</td></tr>
+      </table>
+    </section>
+  </div>
+
+</div>
+
+<footer>
+  <span>Sources: Heat Pump Association (2025 sales); MCS (2025 installs); GOV.UK BUS grant notices (Apr / Jul 2026); DESNZ BUS summary business case; Warm Homes Plan technical annex; Centrica ARA 2025; press (Kraken Dec 2025; HomeServe / Brookfield; BOXT 2022; Safestyle 2023).</span>
+  <span>Unit economics, scale and valuation figures are illustrative planning assumptions, not forecasts.</span>
+</footer>
+
+</body>
+</html>
